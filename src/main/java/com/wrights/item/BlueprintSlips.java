@@ -96,13 +96,18 @@ public final class BlueprintSlips {
     }
 
     public static void load(ServerPlayer player, int slot, int mode, String requestedName) {
-        SchematicLibrary library = SchematicLibrary.get(player.getServer());
         Schematic stored = read(player.getInventory().getItem(slot), player);
         if (stored == null) {
             Messages.actionBar(player, "message.wrights.slip_empty");
             sendList(player);
             return;
         }
+        accept(player, stored, mode, requestedName);
+        sendList(player);
+    }
+
+    public static void accept(ServerPlayer player, Schematic stored, int mode, String requestedName) {
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
         List<String> taken = BlueprintActions.takenBlueprintNames(library);
         Schematic match = named(library, stored.name());
         boolean exact = match != null && match.sameBlocks(stored);
@@ -111,16 +116,13 @@ public final class BlueprintSlips {
                 mode = LOAD;
             } else if (exact) {
                 Messages.actionBar(player, "message.wrights.slip_same", match.name());
-                sendList(player);
                 return;
             } else if (library.isInUse(match.id())) {
                 Messages.actionBar(player, "message.wrights.slip_in_use");
-                sendList(player);
                 return;
             } else {
                 library.putSchematic(match.withContents(stored));
                 Messages.actionBar(player, "message.wrights.slip_replaced", match.name());
-                sendList(player);
                 return;
             }
         }
@@ -130,26 +132,33 @@ public final class BlueprintSlips {
         } else if (mode == NAMED) {
             if (requestedName == null || requestedName.isBlank()) {
                 Messages.actionBar(player, "message.wrights.name_taken");
-                sendList(player);
                 return;
             }
             String clean = BlueprintActions.cleanName(requestedName);
             if (!BlueprintActions.uniqueName(clean, taken).equals(clean)) {
                 Messages.actionBar(player, "message.wrights.name_taken");
-                sendList(player);
                 return;
             }
             name = clean;
         } else if (match != null) {
             Messages.actionBar(player, "message.wrights.name_taken");
-            sendList(player);
             return;
         } else {
             name = BlueprintActions.cleanName(stored.name());
         }
         library.putSchematic(stored.duplicate(UUID.randomUUID(), name));
         Messages.actionBar(player, "message.wrights.slip_loaded", name);
-        sendList(player);
+    }
+
+    public static Preview preview(ServerPlayer player, Schematic stored) {
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        Schematic match = named(library, stored.name());
+        int kind = match == null ? NEW : match.sameBlocks(stored) ? EXACT : DIFFERENT;
+        String next = BlueprintActions.uniqueName(stored.name(), BlueprintActions.takenBlueprintNames(library));
+        return new Preview(stored.name(), stored.sizeX(), stored.sizeY(), stored.sizeZ(), stored.blockCount(), kind, next, match == null ? -1 : match.blockCount());
+    }
+
+    public record Preview(String name, int sizeX, int sizeY, int sizeZ, int blocks, int kind, String nextName, int libraryBlocks) {
     }
 
     private static Schematic read(ItemStack stack, ServerPlayer player) {

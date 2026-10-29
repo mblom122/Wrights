@@ -63,6 +63,9 @@ public final class BlueprintNetwork {
         registrar.playToServer(BlueprintPayloads.RequestFolderItems.TYPE, BlueprintPayloads.RequestFolderItems.STREAM_CODEC, BlueprintNetwork::requestFolderItems);
         registrar.playToServer(BlueprintPayloads.WriteFolderItem.TYPE, BlueprintPayloads.WriteFolderItem.STREAM_CODEC, BlueprintNetwork::writeFolderItem);
         registrar.playToServer(BlueprintPayloads.LoadFolderItem.TYPE, BlueprintPayloads.LoadFolderItem.STREAM_CODEC, BlueprintNetwork::loadFolderItem);
+        registrar.playToServer(BlueprintPayloads.CopyClipboard.TYPE, BlueprintPayloads.CopyClipboard.STREAM_CODEC, BlueprintNetwork::copyClipboard);
+        registrar.playToServer(BlueprintPayloads.ClipboardPreview.TYPE, BlueprintPayloads.ClipboardPreview.STREAM_CODEC, BlueprintNetwork::previewClipboard);
+        registrar.playToServer(BlueprintPayloads.ClipboardImport.TYPE, BlueprintPayloads.ClipboardImport.STREAM_CODEC, BlueprintNetwork::importClipboard);
 
         registrar.playToClient(BlueprintPayloads.LibrarySync.TYPE, BlueprintPayloads.LibrarySync.STREAM_CODEC, BlueprintNetwork::clientLibrary);
         registrar.playToClient(BlueprintPayloads.CaptureSync.TYPE, BlueprintPayloads.CaptureSync.STREAM_CODEC, BlueprintNetwork::clientCapture);
@@ -76,6 +79,8 @@ public final class BlueprintNetwork {
         registrar.playToClient(BlueprintPayloads.JobDone.TYPE, BlueprintPayloads.JobDone.STREAM_CODEC, BlueprintNetwork::clientJobDone);
         registrar.playToClient(BlueprintPayloads.BlueprintItemList.TYPE, BlueprintPayloads.BlueprintItemList.STREAM_CODEC, BlueprintNetwork::clientBlueprintItems);
         registrar.playToClient(BlueprintPayloads.FolderItemList.TYPE, BlueprintPayloads.FolderItemList.STREAM_CODEC, BlueprintNetwork::clientFolderItems);
+        registrar.playToClient(BlueprintPayloads.ClipboardOffer.TYPE, BlueprintPayloads.ClipboardOffer.STREAM_CODEC, BlueprintNetwork::clientClipboardOffer);
+        registrar.playToClient(BlueprintPayloads.ClipboardView.TYPE, BlueprintPayloads.ClipboardView.STREAM_CODEC, BlueprintNetwork::clientClipboardView);
     }
 
     public static void syncLibrary(ServerPlayer player) {
@@ -402,6 +407,49 @@ public final class BlueprintNetwork {
 
     private static void loadBlueprintItem(BlueprintPayloads.LoadBlueprintItem payload, IPayloadContext context) {
         context.enqueueWork(() -> com.wrights.item.BlueprintSlips.load((ServerPlayer) context.player(), payload.slot(), payload.mode(), payload.name()));
+    }
+
+    public static void sendClipboard(ServerPlayer player, byte[] data, BlueprintPayloads.ClipboardStatus status) {
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.ClipboardOffer(data, status));
+    }
+
+    public static void sendClipboardStatus(ServerPlayer player, BlueprintPayloads.ClipboardStatus status) {
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.ClipboardView(status));
+    }
+
+    private static void copyClipboard(BlueprintPayloads.CopyClipboard payload, IPayloadContext context) {
+        context.enqueueWork(() -> com.wrights.item.ClipboardExchange.copy((ServerPlayer) context.player(), payload.id(), payload.folder()));
+    }
+
+    private static void previewClipboard(BlueprintPayloads.ClipboardPreview payload, IPayloadContext context) {
+        context.enqueueWork(() -> com.wrights.item.ClipboardExchange.preview((ServerPlayer) context.player(), payload.data()));
+    }
+
+    private static void importClipboard(BlueprintPayloads.ClipboardImport payload, IPayloadContext context) {
+        context.enqueueWork(() -> com.wrights.item.ClipboardExchange.importClip((ServerPlayer) context.player(), payload.data(), payload.mode(), payload.name()));
+    }
+
+    private static void clientClipboardOffer(BlueprintPayloads.ClipboardOffer payload, IPayloadContext context) {
+        if (FMLEnvironment.dist != Dist.CLIENT) {
+            return;
+        }
+        context.enqueueWork(() -> {
+            com.wrights.client.BlueprintClipboard.store(payload.data());
+            if (net.minecraft.client.Minecraft.getInstance().screen instanceof com.wrights.client.ImportExportScreen screen) {
+                screen.apply(payload.status());
+            }
+        });
+    }
+
+    private static void clientClipboardView(BlueprintPayloads.ClipboardView payload, IPayloadContext context) {
+        if (FMLEnvironment.dist != Dist.CLIENT) {
+            return;
+        }
+        context.enqueueWork(() -> {
+            if (net.minecraft.client.Minecraft.getInstance().screen instanceof com.wrights.client.ImportExportScreen screen) {
+                screen.apply(payload.status());
+            }
+        });
     }
 
     public static void sendFolderItems(ServerPlayer player, java.util.List<BlueprintPayloads.FolderItemLine> lines) {

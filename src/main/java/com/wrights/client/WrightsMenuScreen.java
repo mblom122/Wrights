@@ -68,6 +68,7 @@ public class WrightsMenuScreen extends Screen {
     private WrightsButton editButton;
     private WrightsButton deleteButton;
     private WrightsButton duplicateButton;
+    private WrightsButton importButton;
     private WrightsButton buildButton;
     private WrightsButton renameButton;
     private WrightsButton discardButton;
@@ -75,8 +76,6 @@ public class WrightsMenuScreen extends Screen {
     private WrightsButton previewButton;
     private WrightsButton stopButton;
     private WrightsButton materialsButton;
-    private WrightsButton toItemButton;
-    private WrightsButton fromItemsButton;
     private int detailSplit;
     private UUID modelAsked;
     private UUID spinId;
@@ -251,22 +250,20 @@ public class WrightsMenuScreen extends Screen {
         int x = listX;
         folderButton = add(new WrightsButton(x, y, folderW, 18, Component.translatable("menu.wrights.new_folder"), button -> newFolder()));
         x += folderW + gap;
-        newButton = add(new WrightsButton(x, y, otherW, 18, Component.translatable("menu.wrights.new"), button -> newBlueprint()));
+        duplicateButton = add(new WrightsButton(x, y, otherW, 18, Component.translatable("menu.wrights.duplicate"), button -> duplicate()));
         x += otherW + gap;
         editButton = add(new WrightsButton(x, y, otherW, 18, Component.translatable("menu.wrights.edit"), button -> edit()));
         x += otherW + gap;
         deleteButton = add(new WrightsButton(x, y, otherW + Math.max(0, slack), 18, Component.translatable("menu.wrights.delete"), button -> delete(), true));
         int bottom = panelY + panelH - 26;
-        duplicateButton = add(new WrightsButton(listX, bottom, listW, 18, Component.translatable("menu.wrights.duplicate"), button -> duplicate()));
+        int importW = Math.max(40, listW - gap - otherW);
+        importButton = add(new WrightsButton(listX, bottom, importW, 18, Component.translatable("menu.wrights.transfer"), button -> openImport()));
+        newButton = add(new WrightsButton(listX + importW + gap, bottom, otherW, 18, Component.translatable("menu.wrights.new"), button -> newBlueprint()));
         int detailButtonW = 58;
         buildButton = add(new WrightsButton(detailX + detailW - 120, bottom, detailButtonW, 18, Component.translatable("menu.wrights.build"), button -> build()));
         addRenderableWidget(new WrightsButton(detailX + detailW - detailButtonW, bottom, detailButtonW, 18, Component.translatable("menu.wrights.close"), button -> onClose()));
         renameButton = add(new WrightsButton(detailX + Math.max(48, detailW - 78), detailSplit + 52, 74, 14, Component.translatable("menu.wrights.rename"), button -> rename()));
         materialsButton = add(new WrightsButton(detailX + 4, detailSplit + 72, Math.max(40, detailW - 8), 16, Component.translatable("menu.wrights.materials"), button -> openMaterials()));
-        int slipY = panelY + panelH - 48;
-        int half = Math.max(36, (detailW - 8) / 2);
-        toItemButton = add(new WrightsButton(detailX + 4, slipY, half, 16, Component.translatable("menu.wrights.to_item"), button -> saveToItem()));
-        fromItemsButton = add(new WrightsButton(detailX + 8 + half, slipY, Math.max(36, detailW - half - 12), 16, Component.translatable("menu.wrights.from_items"), button -> openBlueprintItems()));
         stopButton = add(new WrightsButton(detailX + 4, detailSplit + 92, Math.max(40, detailW - 8), 16, Component.translatable("menu.wrights.stop"), button -> PacketDistributor.sendToServer(new BlueprintPayloads.StopJob())));
         discardButton = add(new WrightsButton(panelX + 14, panelY + panelH - 48, 92, 16, Component.translatable("menu.wrights.discard"), button -> discard()));
         resumeButton = add(new WrightsButton(panelX + 14, panelY + panelH - 68, 92, 16, Component.translatable("menu.wrights.resume"), button -> closeKeepingMode()));
@@ -408,12 +405,7 @@ public class WrightsMenuScreen extends Screen {
         }
         editButton.visible = building;
         deleteButton.visible = building;
-        if (duplicateButton != null) {
-            duplicateButton.visible = building;
-            duplicateButton.active = any;
-            duplicateButton.setX(listX);
-            duplicateButton.setWidth(listW);
-        }
+        placeShelfButtons(building, any);
         buildButton.visible = building;
         renameButton.visible = building;
         discardButton.visible = building && (capture || WrightsClientState.mode == WrightsClientState.Mode.SAVING);
@@ -434,22 +426,6 @@ public class WrightsMenuScreen extends Screen {
             materialsButton.setX(detailX + 4);
             materialsButton.setY(detailSplit + 72);
             materialsButton.setWidth(Math.max(40, detailW - 8));
-        }
-        if (toItemButton != null && fromItemsButton != null) {
-            int slipY = panelY + panelH - 48;
-            int half = Math.max(36, (detailW - 8) / 2);
-            boolean folderRow = row != null && row.folder();
-            toItemButton.visible = building;
-            toItemButton.active = blueprint || folderRow;
-            toItemButton.setMessage(Component.translatable(folderRow ? "menu.wrights.to_folder" : "menu.wrights.to_item"));
-            toItemButton.setX(detailX + 4);
-            toItemButton.setY(slipY);
-            toItemButton.setWidth(half);
-            fromItemsButton.visible = building;
-            fromItemsButton.setMessage(Component.translatable(folderRow ? "menu.wrights.from_folders" : "menu.wrights.from_items"));
-            fromItemsButton.setX(detailX + 8 + half);
-            fromItemsButton.setY(slipY);
-            fromItemsButton.setWidth(Math.max(36, detailW - half - 12));
         }
         if (rename != null) {
             rename.setX(detailX + 4);
@@ -1690,27 +1666,61 @@ public class WrightsMenuScreen extends Screen {
         this.minecraft.setScreen(null);
     }
 
-    private void saveToItem() {
-        BlueprintList.Row row = selectedRow();
-        if (row == null) {
-            return;
+    private void placeShelfButtons(boolean building, boolean any) {
+        int gap = 4;
+        int y = panelY + panelH - 48;
+        int folderW = this.font.width(Component.translatable("menu.wrights.new_folder").getString()) + 12;
+        int room = listW - gap * 3;
+        int minOther = 30;
+        if (folderW > room - minOther * 3) {
+            folderW = Math.max(minOther, room - minOther * 3);
         }
-        if (row.folder()) {
-            PacketDistributor.sendToServer(new BlueprintPayloads.WriteFolderItem(-1, row.id()));
-            return;
+        int otherW = Math.max(minOther, (room - folderW) / 3);
+        int slack = listW - (folderW + otherW * 3 + gap * 3);
+        int x = listX;
+        if (folderButton != null) {
+            folderButton.setX(x);
+            folderButton.setY(y);
+            folderButton.setWidth(folderW);
         }
-        PacketDistributor.sendToServer(new BlueprintPayloads.WriteBlueprintItem(-1, row.id()));
+        x += folderW + gap;
+        if (duplicateButton != null) {
+            duplicateButton.visible = building;
+            duplicateButton.active = any;
+            duplicateButton.setX(x);
+            duplicateButton.setY(y);
+            duplicateButton.setWidth(otherW);
+        }
+        x += otherW + gap;
+        if (editButton != null) {
+            editButton.setX(x);
+            editButton.setY(y);
+            editButton.setWidth(otherW);
+        }
+        x += otherW + gap;
+        if (deleteButton != null) {
+            deleteButton.setX(x);
+            deleteButton.setY(y);
+            deleteButton.setWidth(otherW + Math.max(0, slack));
+        }
+        int bottom = panelY + panelH - 26;
+        int importW = Math.max(40, listW - gap - otherW);
+        if (importButton != null) {
+            importButton.visible = building;
+            importButton.setX(listX);
+            importButton.setY(bottom);
+            importButton.setWidth(importW);
+        }
+        if (newButton != null) {
+            newButton.setX(listX + importW + gap);
+            newButton.setY(bottom);
+            newButton.setWidth(otherW);
+        }
     }
 
-    private void openBlueprintItems() {
+    private void openImport() {
         BlueprintList.Row row = selectedRow();
-        if (row != null && row.folder()) {
-            this.minecraft.setScreen(new FolderLoadScreen(this));
-            PacketDistributor.sendToServer(new BlueprintPayloads.RequestFolderItems());
-            return;
-        }
-        this.minecraft.setScreen(new BlueprintLoadScreen(this));
-        PacketDistributor.sendToServer(new BlueprintPayloads.RequestBlueprintItems());
+        this.minecraft.setScreen(new ImportExportScreen(this, row == null ? null : row.id(), row != null && row.folder()));
     }
 
     private void newBlueprint() {

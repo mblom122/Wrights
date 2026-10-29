@@ -1126,6 +1126,100 @@ public final class BlueprintPayloads {
         }
     }
 
+    public record ClipboardStatus(boolean folder, String name, int a, int b, int c, int count, int kind, String nextName, int libraryStat) {
+        public static final ClipboardStatus EMPTY = new ClipboardStatus(false, "", 0, 0, 0, 0, -1, "", -1);
+
+        public boolean present() {
+            return kind >= 0 && name != null && !name.isEmpty();
+        }
+
+        public void write(RegistryFriendlyByteBuf buf) {
+            buf.writeBoolean(folder);
+            buf.writeUtf(name == null ? "" : name, 48);
+            buf.writeVarInt(a);
+            buf.writeVarInt(b);
+            buf.writeVarInt(c);
+            buf.writeVarInt(count);
+            buf.writeByte(kind);
+            buf.writeUtf(nextName == null ? "" : nextName, 48);
+            buf.writeVarInt(libraryStat + 1);
+        }
+
+        public static ClipboardStatus read(RegistryFriendlyByteBuf buf) {
+            return new ClipboardStatus(buf.readBoolean(), buf.readUtf(48), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readByte(), buf.readUtf(48), buf.readVarInt() - 1);
+        }
+    }
+
+    public record CopyClipboard(UUID id, boolean folder) implements CustomPacketPayload {
+        public static final Type<CopyClipboard> TYPE = payloadType("copy_clipboard");
+        public static final StreamCodec<RegistryFriendlyByteBuf, CopyClipboard> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeUUID(value.id);
+                    buf.writeBoolean(value.folder);
+                },
+                buf -> new CopyClipboard(buf.readUUID(), buf.readBoolean()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record ClipboardOffer(byte[] data, ClipboardStatus status) implements CustomPacketPayload {
+        public static final Type<ClipboardOffer> TYPE = payloadType("clipboard_offer");
+        public static final StreamCodec<RegistryFriendlyByteBuf, ClipboardOffer> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    writeBlob(buf, value.data);
+                    value.status.write(buf);
+                },
+                buf -> new ClipboardOffer(readBlob(buf), ClipboardStatus.read(buf)));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record ClipboardPreview(byte[] data) implements CustomPacketPayload {
+        public static final Type<ClipboardPreview> TYPE = payloadType("clipboard_preview");
+        public static final StreamCodec<RegistryFriendlyByteBuf, ClipboardPreview> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> writeBlob(buf, value.data),
+                buf -> new ClipboardPreview(readBlob(buf)));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record ClipboardView(ClipboardStatus status) implements CustomPacketPayload {
+        public static final Type<ClipboardView> TYPE = payloadType("clipboard_view");
+        public static final StreamCodec<RegistryFriendlyByteBuf, ClipboardView> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> value.status.write(buf),
+                buf -> new ClipboardView(ClipboardStatus.read(buf)));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record ClipboardImport(int mode, String name, byte[] data) implements CustomPacketPayload {
+        public static final Type<ClipboardImport> TYPE = payloadType("clipboard_import");
+        public static final StreamCodec<RegistryFriendlyByteBuf, ClipboardImport> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeByte(value.mode);
+                    buf.writeUtf(value.name == null ? "" : value.name, 48);
+                    writeBlob(buf, value.data);
+                },
+                buf -> new ClipboardImport(buf.readByte(), buf.readUtf(48), readBlob(buf)));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public record SaveSession() implements CustomPacketPayload {
         public static final Type<SaveSession> TYPE = payloadType("save_session");
         public static final StreamCodec<RegistryFriendlyByteBuf, SaveSession> STREAM_CODEC = empty(new SaveSession());
@@ -1134,6 +1228,22 @@ public final class BlueprintPayloads {
         public Type<? extends CustomPacketPayload> type() {
             return TYPE;
         }
+    }
+
+    private static void writeBlob(RegistryFriendlyByteBuf buf, byte[] data) {
+        byte[] bytes = data == null ? new byte[0] : data;
+        buf.writeVarInt(bytes.length);
+        buf.writeBytes(bytes);
+    }
+
+    private static byte[] readBlob(RegistryFriendlyByteBuf buf) {
+        int length = buf.readVarInt();
+        if (length < 0 || length > 512_000) {
+            throw new IllegalArgumentException("clipboard");
+        }
+        byte[] data = new byte[length];
+        buf.readBytes(data);
+        return data;
     }
 
     private static <T extends CustomPacketPayload> Type<T> payloadType(String path) {

@@ -91,25 +91,65 @@ public final class BlueprintFolders {
         Messages.actionBar(player, "message.wrights.slip_folder_saved", folder.name());
     }
 
-    public static void load(ServerPlayer player, int slot, int mode, String requestedName) {
+    private static boolean itemReply = true;
+
+    public static CompoundTag exportTag(SchematicLibrary library, UUID folderId) {
+        if (library.shelf().folder(folderId) == null) {
+            return null;
+        }
+        return save(fromLibrary(library, folderId));
+    }
+
+    public static Preview preview(ServerPlayer player, CompoundTag tag) {
+        Node stored = readTag(tag, player);
+        if (stored == null) {
+            return null;
+        }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        Match match = match(library, stored);
+        String next = BlueprintActions.uniqueName(stored.name, folderNames(library));
+        return new Preview(stored.name, countFolders(stored), countBlueprints(stored), match.kind, next, match.libraryBlueprints);
+    }
+
+    public static boolean importTag(ServerPlayer player, CompoundTag tag, int mode, String name) {
+        Node stored = readTag(tag, player);
+        if (stored == null) {
+            return false;
+        }
+        boolean previous = itemReply;
+        itemReply = false;
+        try {
+            apply(player, stored, mode, name);
+            return true;
+        } finally {
+            itemReply = previous;
+        }
+    }
+
+    public static void load(ServerPlayer player, int slot, int mode, String requestedName) {
         Node stored = read(player.getInventory().getItem(slot), player);
         if (stored == null) {
             Messages.actionBar(player, "message.wrights.slip_folder_empty");
             sendList(player);
             return;
         }
+        itemReply = true;
+        apply(player, stored, mode, requestedName);
+    }
+
+    private static void apply(ServerPlayer player, Node stored, int mode, String requestedName) {
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
         Match match = match(library, stored);
         if (mode == BlueprintSlips.REPLACE) {
             if (match.replaceId == null) {
                 mode = BlueprintSlips.LOAD;
             } else if (inUse(library, match.replaceId)) {
                 Messages.actionBar(player, "message.wrights.slip_folder_in_use");
-                sendList(player);
+                reply(player);
                 return;
             } else if (!clearChildren(library, match.replaceId)) {
                 Messages.actionBar(player, "message.wrights.slip_folder_in_use");
-                sendList(player);
+                reply(player);
                 return;
             } else {
                 int renamed = importChildren(library, stored, match.replaceId, takenNames(library));
@@ -125,19 +165,19 @@ public final class BlueprintFolders {
         } else if (mode == BlueprintSlips.NAMED) {
             if (requestedName == null || requestedName.isBlank()) {
                 Messages.actionBar(player, "message.wrights.name_taken");
-                sendList(player);
+                reply(player);
                 return;
             }
             name = BlueprintActions.cleanName(requestedName);
         } else if (mode != BlueprintSlips.LOAD) {
-            sendList(player);
+            reply(player);
             return;
         }
         Map<UUID, String> names = names(library);
         UUID root = UUID.randomUUID();
         if (!library.shelf().createFolder(root, null, name, names)) {
             Messages.actionBar(player, "message.wrights.slip_folder_missing");
-            sendList(player);
+            reply(player);
             return;
         }
         int renamed = importChildren(library, stored, root, takenNames(library));
@@ -153,7 +193,24 @@ public final class BlueprintFolders {
         } else {
             Messages.actionBar(player, key, name);
         }
-        sendList(player);
+        reply(player);
+    }
+
+    private static void reply(ServerPlayer player) {
+        if (itemReply) {
+            sendList(player);
+        } else {
+            BlueprintNetwork.syncLibrary(player);
+        }
+    }
+
+    private static Node readTag(CompoundTag tag, ServerPlayer player) {
+        ItemStack stack = new ItemStack(ModItems.BLUEPRINT_FOLDER.get());
+        stack.set(ModDataComponents.FOLDER.get(), tag);
+        return read(stack, player);
+    }
+
+    public record Preview(String name, int folders, int blueprints, int kind, String nextName, int libraryBlueprints) {
     }
 
     private static int importChildren(SchematicLibrary library, Node node, UUID parent, List<String> taken) {
