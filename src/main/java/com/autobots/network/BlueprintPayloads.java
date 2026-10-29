@@ -510,7 +510,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record JobLine(UUID id, String name, int done, int total, int skipped, boolean paused, boolean saving, boolean finished, boolean canUndo, boolean undoing, boolean stopped, boolean undone, String dimension, BlockPos anchor, BlockPos origin, int sizeX, int sizeY, int sizeZ) {
+    public record JobLine(UUID id, String name, int done, int total, int skipped, boolean paused, boolean saving, boolean finished, boolean canUndo, boolean undoing, boolean stopped, boolean undone, String dimension, BlockPos anchor, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones) {
         public void write(RegistryFriendlyByteBuf buf) {
             buf.writeUUID(id);
             buf.writeUtf(name, 48);
@@ -530,6 +530,7 @@ public final class BlueprintPayloads {
             buf.writeVarInt(sizeX);
             buf.writeVarInt(sizeY);
             buf.writeVarInt(sizeZ);
+            buf.writeVarInt(drones);
         }
 
         public static JobLine read(RegistryFriendlyByteBuf buf) {
@@ -549,6 +550,7 @@ public final class BlueprintPayloads {
                     buf.readUtf(64),
                     buf.readBlockPos(),
                     buf.readBlockPos(),
+                    buf.readVarInt(),
                     buf.readVarInt(),
                     buf.readVarInt(),
                     buf.readVarInt());
@@ -613,6 +615,21 @@ public final class BlueprintPayloads {
         public static final StreamCodec<RegistryFriendlyByteBuf, SetPace> STREAM_CODEC = StreamCodec.of(
                 (buf, value) -> buf.writeBoolean(value.instant),
                 buf -> new SetPace(buf.readBoolean()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record SetJobDrones(UUID id, int count) implements CustomPacketPayload {
+        public static final Type<SetJobDrones> TYPE = payloadType("set_job_drones");
+        public static final StreamCodec<RegistryFriendlyByteBuf, SetJobDrones> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeUUID(value.id);
+                    buf.writeVarInt(value.count);
+                },
+                buf -> new SetJobDrones(buf.readUUID(), buf.readVarInt()));
 
         @Override
         public Type<? extends CustomPacketPayload> type() {

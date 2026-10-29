@@ -63,6 +63,15 @@ public record Swarm(List<Unit> units, int assign) {
         return Mth.clamp(assign, 1, units.size());
     }
 
+    public List<Integer> speeds(int count) {
+        int n = Math.min(Math.max(0, count), units.size());
+        List<Integer> speeds = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) {
+            speeds.add(Mth.clamp(units.get(i).speed(), 1, MAX_SPEED));
+        }
+        return speeds;
+    }
+
     public List<Integer> assignedSpeeds() {
         int count = assignCount();
         List<Integer> speeds = new ArrayList<>(count);

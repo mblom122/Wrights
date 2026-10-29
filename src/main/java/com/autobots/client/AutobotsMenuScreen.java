@@ -14,6 +14,7 @@ import net.minecraft.util.Mth;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.autobots.AutobotsClientConfig;
+import com.autobots.drone.Cradles;
 import com.autobots.network.BlueprintPayloads;
 
 public class AutobotsMenuScreen extends Screen {
@@ -893,7 +894,7 @@ public class AutobotsMenuScreen extends Screen {
                 }
             }
         }
-        int top = panelY + 22;
+        int top = panelY + 36;
         int bottom = panelY + panelH - 12;
         int gap = 8;
         int header = 18;
@@ -940,6 +941,9 @@ public class AutobotsMenuScreen extends Screen {
         prepareJobs();
         int x = listX;
         int width = panelX + panelW - 24 - x;
+        int[] pool = dronePool();
+        String drones = this.font.plainSubstrByWidth(Component.translatable("menu.autobots.drones_pool", pool[0], pool[1]).getString(), Math.max(40, width));
+        graphics.drawString(this.font, drones, x, panelY + 22, AutobotsUi.TEXT, false);
         drawJobSection(graphics, x, workHeaderY, width, "menu.autobots.jobs_working", workingJobs.isEmpty() ? "menu.autobots.jobs_working_empty" : null, workingJobs.isEmpty() ? 0 : workPauseWidth + workRemoveWidth + 12);
         if (!workingJobs.isEmpty()) {
             drawJobButton(graphics, workRemoveRight, workHeaderY, "menu.autobots.remove_all", mouseX, mouseY, workRemoveWidth);
@@ -975,6 +979,9 @@ public class AutobotsMenuScreen extends Screen {
         BlockPos anchor = job.anchor();
         graphics.drawString(this.font, Component.translatable("menu.autobots.job_anchor", anchor.getX(), anchor.getY(), anchor.getZ()), x + 6, y + 15, AutobotsUi.MUTED, false);
         drawProgress(graphics, x + 6, y + 26, Math.max(40, width - 12), job);
+        if (!job.finished() && !job.saving()) {
+            drawDroneControls(graphics, mouseX, mouseY, x, y + 36, job);
+        }
         int right = x + width - 4;
         right = drawJobButton(graphics, right, y + 36, "menu.autobots.remove", mouseX, mouseY, 52);
         if (creativeVisit()) {
@@ -1115,6 +1122,9 @@ public class AutobotsMenuScreen extends Screen {
         if (mouseY < y + 36 || mouseY >= y + 52) {
             return false;
         }
+        if (!job.finished() && !job.saving() && clickDroneControls(mouseX, mouseY, listX, y + 36, job)) {
+            return true;
+        }
         int right = listX + (panelX + panelW - 24 - listX) - 4;
         if (hitJobButton(mouseX, right, y + 36)) {
             PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.REMOVE));
@@ -1152,6 +1162,52 @@ public class AutobotsMenuScreen extends Screen {
         right -= 56;
         if (hitJobButton(mouseX, right, y + 36)) {
             PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), job.paused() ? BlueprintPayloads.JobControl.RESUME : BlueprintPayloads.JobControl.PAUSE));
+            return true;
+        }
+        return false;
+    }
+
+    private int[] dronePool() {
+        int total = this.minecraft.player == null ? 0 : Cradles.swarm(this.minecraft.player).units().size();
+        int used = 0;
+        for (BlueprintPayloads.JobLine job : AutobotsClientState.jobs) {
+            if (!job.finished() && !job.saving()) {
+                used += job.drones();
+            }
+        }
+        return new int[] {Math.max(0, total - used), total};
+    }
+
+    private int droneMinusX(int x) {
+        return x + 6 + this.font.width(Component.translatable("menu.autobots.job_drones")) + 4;
+    }
+
+    private void drawDroneControls(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, BlueprintPayloads.JobLine job) {
+        graphics.drawString(this.font, Component.translatable("menu.autobots.job_drones"), x + 6, y + 4, AutobotsUi.MUTED, false);
+        int minus = droneMinusX(x);
+        int plus = minus + 30;
+        drawStep(graphics, mouseX, mouseY, minus, y, "-", job.drones() > 0);
+        String count = Integer.toString(job.drones());
+        graphics.drawString(this.font, count, minus + 14 + (16 - this.font.width(count)) / 2, y + 4, AutobotsUi.TEXT, false);
+        drawStep(graphics, mouseX, mouseY, plus, y, "+", dronePool()[0] > 0);
+    }
+
+    private void drawStep(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, String label, boolean enabled) {
+        boolean hover = enabled && mouseX >= x && mouseX < x + 14 && mouseY >= y && mouseY < y + 16;
+        graphics.fill(x, y, x + 14, y + 16, hover ? 0xFF3A5164 : (enabled ? 0xFF24384A : 0xFF1A242E));
+        int color = enabled ? AutobotsUi.TEXT : 0xFF5C6A74;
+        graphics.drawString(this.font, label, x + (14 - this.font.width(label)) / 2, y + 4, color, false);
+    }
+
+    private boolean clickDroneControls(double mouseX, double mouseY, int x, int y, BlueprintPayloads.JobLine job) {
+        int minus = droneMinusX(x);
+        int plus = minus + 30;
+        if (job.drones() > 0 && mouseX >= minus && mouseX < minus + 14 && mouseY >= y && mouseY < y + 16) {
+            PacketDistributor.sendToServer(new BlueprintPayloads.SetJobDrones(job.id(), job.drones() - 1));
+            return true;
+        }
+        if (dronePool()[0] > 0 && mouseX >= plus && mouseX < plus + 14 && mouseY >= y && mouseY < y + 16) {
+            PacketDistributor.sendToServer(new BlueprintPayloads.SetJobDrones(job.id(), job.drones() + 1));
             return true;
         }
         return false;

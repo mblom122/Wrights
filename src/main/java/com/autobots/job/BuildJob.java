@@ -200,6 +200,7 @@ public final class BuildJob {
 
     public void setCrew(List<Integer> speeds, int sizeX, int sizeY, int sizeZ) {
         hands.clear();
+        awaitDrones = false;
         spanX = Math.max(1, sizeX);
         spanY = Math.max(1, sizeY);
         spanZ = Math.max(1, sizeZ);
@@ -213,11 +214,53 @@ public final class BuildJob {
         }
     }
 
+    public boolean awaitingDrones() {
+        return awaitDrones;
+    }
+
+    public void clearAssigned() {
+        hands.clear();
+        awaitDrones = true;
+    }
+
+    public List<UUID> resizeCrew(List<Integer> speeds, int sizeX, int sizeY, int sizeZ, boolean rescan) {
+        if (hands.isEmpty()) {
+            spanX = Math.max(1, sizeX);
+            spanY = Math.max(1, sizeY);
+            spanZ = Math.max(1, sizeZ);
+        }
+        int lanes = speeds.size();
+        boolean scan = hands.size() != lanes || (hands.isEmpty() && rescan);
+        List<UUID> dropped = new ArrayList<>();
+        List<Hand> next = new ArrayList<>();
+        for (int i = 0; i < lanes; i++) {
+            Hand hand = i < hands.size() ? hands.get(i) : new Hand();
+            hand.lane = i;
+            hand.lanes = lanes;
+            hand.speed = Math.max(1, Math.min(4, speeds.get(i)));
+            if (scan) {
+                hand.cursor = 0;
+                hand.rescan = true;
+            }
+            next.add(hand);
+        }
+        for (int i = lanes; i < hands.size(); i++) {
+            if (hands.get(i).entityId != null) {
+                dropped.add(hands.get(i).entityId);
+            }
+        }
+        hands.clear();
+        hands.addAll(next);
+        awaitDrones = false;
+        return dropped;
+    }
+
     public void resetCrew() {
         for (Hand hand : hands) {
             hand.cursor = 0;
             hand.entityId = null;
             hand.lastPos = null;
+            hand.rescan = false;
         }
     }
 
@@ -316,6 +359,7 @@ public final class BuildJob {
     }
 
     private boolean paused;
+    private boolean awaitDrones;
     private boolean finished;
     private boolean stopped;
     private boolean undone;
@@ -457,6 +501,7 @@ public final class BuildJob {
         undone = false;
         undoing = false;
         paused = false;
+        awaitDrones = false;
         cursor = 0;
         placed = 0;
         skipped = 0;
@@ -525,6 +570,7 @@ public final class BuildJob {
                 handTag.putInt("lanes", hand.lanes);
                 handTag.putInt("speed", hand.speed);
                 handTag.putInt("cursor", hand.cursor);
+                handTag.putBoolean("rescan", hand.rescan);
                 if (hand.entityId != null) {
                     handTag.putUUID("entity", hand.entityId);
                 }
@@ -551,6 +597,7 @@ public final class BuildJob {
             tag.put("anchor", NbtUtils.writeBlockPos(anchor));
         }
         tag.putBoolean("paused", paused);
+        tag.putBoolean("awaitDrones", awaitDrones);
         tag.putBoolean("finished", finished);
         tag.putBoolean("stopped", stopped);
         tag.putBoolean("undone", undone);
@@ -617,6 +664,7 @@ public final class BuildJob {
                 hand.lanes = handTag.getInt("lanes");
                 hand.speed = handTag.getInt("speed");
                 hand.cursor = handTag.getInt("cursor");
+                hand.rescan = handTag.getBoolean("rescan");
                 if (handTag.hasUUID("entity")) {
                     hand.entityId = handTag.getUUID("entity");
                 }
@@ -644,6 +692,7 @@ public final class BuildJob {
             job.clipZ = tag.getInt("clipZ");
         }
         job.paused = tag.getBoolean("paused");
+        job.awaitDrones = tag.getBoolean("awaitDrones");
         job.finished = tag.getBoolean("finished");
         job.stopped = tag.getBoolean("stopped");
         job.undone = tag.getBoolean("undone");
@@ -667,6 +716,7 @@ public final class BuildJob {
         public int lanes;
         public int speed = 1;
         public int cursor;
+        public boolean rescan;
         public UUID entityId;
         public BlockPos lastPos;
     }

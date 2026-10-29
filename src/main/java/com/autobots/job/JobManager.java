@@ -159,8 +159,12 @@ public final class JobManager {
             job.setPaused(true);
             library.setDirty();
         } else if (action == com.autobots.network.BlueprintPayloads.JobControl.RESUME && !job.finished()) {
-            job.setPaused(false);
-            library.setDirty();
+            if (missingDrones(player, job)) {
+                Messages.actionBar(player, "message.autobots.paused_no_drones");
+            } else {
+                job.setPaused(false);
+                library.setDirty();
+            }
         } else if (action == com.autobots.network.BlueprintPayloads.JobControl.REDO) {
             redo(player, library, job);
             return;
@@ -295,8 +299,13 @@ public final class JobManager {
 
     private static void setPausedAll(ServerPlayer player, SchematicLibrary library, boolean paused) {
         boolean changed = false;
+        int blocked = 0;
         for (BuildJob job : library.jobsFor(player.getUUID())) {
             if (!job.finished() && job.paused() != paused) {
+                if (!paused && missingDrones(player, job)) {
+                    blocked++;
+                    continue;
+                }
                 job.setPaused(paused);
                 changed = true;
             }
@@ -304,6 +313,8 @@ public final class JobManager {
         if (changed) {
             library.setDirty();
             Messages.actionBar(player, paused ? "message.autobots.paused_all" : "message.autobots.resumed_all");
+        } else if (blocked > 0) {
+            Messages.actionBar(player, "message.autobots.paused_no_drones");
         }
         BlueprintNetwork.syncJobs(player);
     }
@@ -784,6 +795,9 @@ public final class JobManager {
             placeAll(level, player, library, job, schematic);
             return;
         }
+        if (holdWithoutDrones(player, library, job)) {
+            return;
+        }
         if (job.hasCrew()) {
             if (!player.level().dimension().equals(job.dimension())) {
                 if (job.tickMessage()) {
@@ -886,6 +900,9 @@ public final class JobManager {
         }
         if (instant(player)) {
             undoAll(level, server, library, player, job);
+            return;
+        }
+        if (holdWithoutDrones(player, library, job)) {
             return;
         }
         if (job.hasCrew()) {
@@ -1054,6 +1071,95 @@ public final class JobManager {
         } else {
             Messages.actionBar(player, "message.autobots.launched");
         }
+    }
+
+    public static int droneSlots(ServerPlayer player, BuildJob job) {
+        if (job.kind() != BuildJob.Kind.PASTE || job.finished() || job.awaitingDrones()) {
+            return 0;
+        }
+        if (job.hasCrew()) {
+            return job.hands().size();
+        }
+        return instant(player) ? 0 : 1;
+    }
+
+    public static void setJobDrones(ServerPlayer player, UUID id, int count) {
+        if (!com.autobots.item.ControllerItem.isHeld(player)) {
+            return;
+        }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        BuildJob job = library.job(id).orElse(null);
+        if (job == null || !job.owner().equals(player.getUUID()) || job.finished() || job.kind() != BuildJob.Kind.PASTE) {
+            BlueprintNetwork.syncJobs(player);
+            return;
+        }
+        int total = Cradles.swarm(player).units().size();
+        int others = 0;
+        for (BuildJob other : library.jobsFor(player.getUUID())) {
+            if (other.id().equals(job.id()) || other.finished() || other.kind() != BuildJob.Kind.PASTE) {
+                continue;
+            }
+            others += droneSlots(player, other);
+        }
+        int next = Math.max(0, Math.min(count, Math.max(0, total - others)));
+        if (next == droneSlots(player, job)) {
+            BlueprintNetwork.syncJobs(player);
+            return;
+        }
+        if (next == 0) {
+            discardDrone(player.getServer(), job);
+            job.clearAssigned();
+            job.setPaused(true);
+        } else {
+            if (!job.hasCrew() && job.droneId() != null) {
+                discardId(player.getServer().getLevel(job.dimension()), job.droneId());
+                job.setDroneId(null);
+            }
+            int sizeX = Math.max(1, job.spanX());
+            int sizeY = Math.max(1, job.spanY());
+            int sizeZ = Math.max(1, job.spanZ());
+            if (!job.hasCrew() && job.schematicId() != null) {
+                Schematic schematic = library.schematic(job.schematicId()).orElse(null);
+                if (schematic != null) {
+                    sizeX = schematic.sizeX();
+                    sizeY = schematic.sizeY();
+                    sizeZ = schematic.sizeZ();
+                    if (job.clipX() != Integer.MAX_VALUE) {
+                        sizeX = Math.min(sizeX, job.clipX());
+                        sizeY = Math.min(sizeY, job.clipY());
+                        sizeZ = Math.min(sizeZ, job.clipZ());
+                    }
+                }
+            }
+            boolean rescan = job.hasCrew() || job.cursor() > 0;
+            List<UUID> dropped = job.resizeCrew(Cradles.swarm(player).speeds(next), sizeX, sizeY, sizeZ, rescan);
+            ServerLevel level = player.getServer().getLevel(job.dimension());
+            for (UUID droppedId : dropped) {
+                discardId(level, droppedId);
+            }
+        }
+        library.setDirty();
+        BlueprintNetwork.syncJobs(player);
+    }
+
+    private static boolean missingDrones(ServerPlayer player, BuildJob job) {
+        if (instant(player) || job.kind() != BuildJob.Kind.PASTE) {
+            return false;
+        }
+        return Cradles.worn(player).isEmpty() || Cradles.swarm(player).units().isEmpty() || job.awaitingDrones();
+    }
+
+    private static boolean holdWithoutDrones(ServerPlayer player, SchematicLibrary library, BuildJob job) {
+        if (!missingDrones(player, job)) {
+            return false;
+        }
+        if (!job.paused()) {
+            job.setPaused(true);
+            library.setDirty();
+            Messages.actionBar(player, "message.autobots.paused_no_drones");
+            BlueprintNetwork.syncJobs(player);
+        }
+        return true;
     }
 
     private static boolean crewReady(ServerPlayer player) {
@@ -1245,6 +1351,7 @@ public final class JobManager {
         while (budget[0] > 0) {
             int index = nextInLane(schematic, job, hand);
             if (index < 0) {
+                hand.rescan = false;
                 return -1;
             }
             if (!satisfied(level, job, schematic.entry(index))) {
@@ -1252,7 +1359,9 @@ public final class JobManager {
             }
             budget[0]--;
             hand.cursor = index + 1;
-            job.advance();
+            if (!hand.rescan) {
+                job.advance();
+            }
         }
         return nextInLane(schematic, job, hand) < 0 ? -1 : -2;
     }
