@@ -14,7 +14,7 @@ import net.minecraft.util.Mth;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.WrightsClientConfig;
-import com.wrights.drone.Cradles;
+import com.wrights.drone.Wrightports;
 import com.wrights.network.BlueprintPayloads;
 
 public class WrightsMenuScreen extends Screen {
@@ -1273,7 +1273,7 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private int[] dronePool() {
-        int total = this.minecraft.player == null ? 0 : Cradles.swarm(this.minecraft.player).units().size();
+        int total = this.minecraft.player == null ? 0 : Wrightports.swarm(this.minecraft.player).units().size();
         int working = 0;
         for (BlueprintPayloads.JobLine job : WrightsClientState.jobs) {
             if (!job.finished() && !job.saving()) {

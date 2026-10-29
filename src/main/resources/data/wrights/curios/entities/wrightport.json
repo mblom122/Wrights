@@ -1,5 +1,5 @@
 {
   "entities": ["minecraft:player"],
-  "slots": ["drone_cradle"],
+  "slots": ["wrightport"],
   "operation": "ADD"
 }

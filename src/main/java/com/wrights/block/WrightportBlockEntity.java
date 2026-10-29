@@ -33,7 +33,7 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
     public void setSwarm(Swarm swarm) {
         ItemStack stack = items.getItem(0);
         if (stack.isEmpty()) {
-            stack = new ItemStack(ModItems.CRADLE.get());
+            stack = new ItemStack(ModItems.PERSONAL_WRIGHTPORT.get());
             items.setItem(0, stack);
         }
         Swarm.write(stack, swarm);

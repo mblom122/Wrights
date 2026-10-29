@@ -3,5 +3,5 @@
   "order": 80,
   "icon": "curios:slot/empty_curio_slot",
   "add_cosmetic": false,
-  "validators": ["wrights:drone_cradle"]
+  "validators": ["wrights:wrightport"]
 }

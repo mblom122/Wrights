@@ -17,7 +17,7 @@ import net.minecraft.world.item.ItemStack;
 import com.wrights.item.ModDataComponents;
 
 /**
- * The drones stored in one cradle. {@code power} is reserved for a later upgrade
+ * The drones stored in one wrightport. {@code power} is reserved for a later upgrade
  * and is not spent yet.
  */
 public record Swarm(List<Unit> units, int assign) {

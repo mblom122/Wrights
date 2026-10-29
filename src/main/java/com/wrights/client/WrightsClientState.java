@@ -639,12 +639,12 @@ public final class WrightsClientState {
         if (minecraft.player == null) {
             return;
         }
-        com.wrights.drone.Swarm swarm = com.wrights.drone.Cradles.swarm(minecraft.player);
+        com.wrights.drone.Swarm swarm = com.wrights.drone.Wrightports.swarm(minecraft.player);
         int next = WrightsClientConfig.deployTarget(swarm.units().size(), placeableBlocks());
         if (next <= 0 || next == swarm.assignCount()) {
             return;
         }
-        com.wrights.drone.Cradles.replaceWorn(minecraft.player, swarm.withAssign(next));
+        com.wrights.drone.Wrightports.replaceWorn(minecraft.player, swarm.withAssign(next));
         PacketDistributor.sendToServer(new BlueprintPayloads.SetAssign(next));
     }
 

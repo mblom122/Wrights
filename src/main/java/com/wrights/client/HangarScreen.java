@@ -70,8 +70,8 @@ public class HangarScreen extends AbstractContainerScreen<com.wrights.menu.Hanga
     @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
         graphics.drawString(this.font, this.title, this.titleLabelX, this.titleLabelY, WrightsUi.COPPER, false);
-        graphics.drawString(this.font, Component.translatable("screen.wrights.cradle_dock"), 8, 18, WrightsUi.MUTED, false);
-        graphics.drawString(this.font, Component.translatable("screen.wrights.cradle_worn"), 46, 18, WrightsUi.MUTED, false);
+        graphics.drawString(this.font, Component.translatable("screen.wrights.wrightport_dock"), 8, 18, WrightsUi.MUTED, false);
+        graphics.drawString(this.font, Component.translatable("screen.wrights.wrightport_worn"), 46, 18, WrightsUi.MUTED, false);
     }
 
     @Override

@@ -14,7 +14,7 @@ public final class ModItems {
             .rarity(Rarity.UNCOMMON)
             .component(ModDataComponents.CONTROLLER.get(), ControllerData.EMPTY)));
 
-    public static final DeferredItem<CradleItem> CRADLE = ITEMS.register("drone_cradle", () -> new CradleItem(new net.minecraft.world.item.Item.Properties()
+    public static final DeferredItem<PersonalWrightportItem> PERSONAL_WRIGHTPORT = ITEMS.register("personal_wrightport", () -> new PersonalWrightportItem(new net.minecraft.world.item.Item.Properties()
             .stacksTo(1)
             .rarity(Rarity.UNCOMMON)
             .component(ModDataComponents.SWARM.get(), com.wrights.drone.Swarm.EMPTY)));

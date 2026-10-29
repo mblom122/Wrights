@@ -267,8 +267,8 @@ public final class BlueprintNetwork {
     private static void assign(BlueprintPayloads.SetAssign payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
         context.enqueueWork(() -> {
-            com.wrights.drone.Swarm swarm = com.wrights.drone.Cradles.swarm(player);
-            com.wrights.drone.Cradles.replaceWorn(player, swarm.withAssign(payload.count()));
+            com.wrights.drone.Swarm swarm = com.wrights.drone.Wrightports.swarm(player);
+            com.wrights.drone.Wrightports.replaceWorn(player, swarm.withAssign(payload.count()));
         });
     }
 

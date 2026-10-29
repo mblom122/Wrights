@@ -41,12 +41,13 @@ public class HangarBlockEntity extends BlockEntity implements MenuProvider {
     @Override
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
-        tag.put("Cradle", items.createTag(registries));
+        tag.put("Wrightport", items.createTag(registries));
     }
 
     @Override
     protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
-        items.fromTag(tag.getList("Cradle", Tag.TAG_COMPOUND), registries);
+        String key = tag.contains("Wrightport") ? "Wrightport" : "Cradle";
+        items.fromTag(tag.getList(key, Tag.TAG_COMPOUND), registries);
     }
 }

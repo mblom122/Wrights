@@ -45,7 +45,7 @@ public class WrightsMod {
 
     private static void commonSetup(FMLCommonSetupEvent event) {
         event.enqueueWork(() -> CuriosApi.registerCurioPredicate(
-                ResourceLocation.fromNamespaceAndPath(MOD_ID, "drone_cradle"),
-                result -> result.stack().is(ModItems.CRADLE.get())));
+                ResourceLocation.fromNamespaceAndPath(MOD_ID, "wrightport"),
+                result -> result.stack().is(ModItems.PERSONAL_WRIGHTPORT.get())));
     }
 }

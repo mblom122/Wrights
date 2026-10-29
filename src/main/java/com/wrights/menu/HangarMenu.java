@@ -13,8 +13,8 @@ import net.minecraft.world.SimpleContainer;
 
 import com.wrights.block.HangarBlockEntity;
 import com.wrights.block.ModBlocks;
-import com.wrights.drone.Cradles;
-import com.wrights.item.CradleItem;
+import com.wrights.drone.Wrightports;
+import com.wrights.item.PersonalWrightportItem;
 
 import top.theillusivec4.curios.api.CuriosApi;
 import top.theillusivec4.curios.api.type.capability.ICuriosItemHandler;
@@ -40,7 +40,7 @@ public class HangarMenu extends AbstractContainerMenu {
         addSlot(new Slot(container, 0, 8, 28) {
             @Override
             public boolean mayPlace(ItemStack stack) {
-                return stack.getItem() instanceof CradleItem;
+                return stack.getItem() instanceof PersonalWrightportItem;
             }
 
             @Override
@@ -62,9 +62,9 @@ public class HangarMenu extends AbstractContainerMenu {
     private void addWornSlot(Inventory inventory) {
         Player player = inventory.player;
         ICuriosItemHandler curios = CuriosApi.getCuriosInventory(player).orElse(null);
-        ICurioStacksHandler stacks = curios == null ? null : curios.getStacksHandler(Cradles.SLOT).orElse(null);
+        ICurioStacksHandler stacks = curios == null ? null : curios.getStacksHandler(Wrightports.SLOT).orElse(null);
         if (stacks != null) {
-            addSlot(new CurioSlot(player, stacks.getStacks(), 0, Cradles.SLOT, 46, 28, stacks.getRenders(), false));
+            addSlot(new CurioSlot(player, stacks.getStacks(), 0, Wrightports.SLOT, 46, 28, stacks.getRenders(), false));
             return;
         }
         addSlot(new Slot(new SimpleContainer(1), 0, 46, 28) {

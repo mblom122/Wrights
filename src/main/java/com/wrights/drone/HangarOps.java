@@ -36,17 +36,17 @@ public final class HangarOps {
         if (!(player.containerMenu instanceof HangarMenu open) || !open.pos().equals(menu.pos())) {
             return;
         }
-        ItemStack cradle = hangar.items().getItem(0);
-        if (cradle.isEmpty()) {
-            Messages.actionBar(player, "message.wrights.dock_cradle");
+        ItemStack worn = hangar.items().getItem(0);
+        if (worn.isEmpty()) {
+            Messages.actionBar(player, "message.wrights.dock_wrightport");
             return;
         }
-        Swarm swarm = Swarm.from(cradle);
+        Swarm swarm = Swarm.from(worn);
         Swarm next = edit(player, swarm, action, index);
         if (next == swarm) {
             return;
         }
-        Swarm.write(cradle, next);
+        Swarm.write(worn, next);
         hangar.setChanged();
         open.broadcastChanges();
     }

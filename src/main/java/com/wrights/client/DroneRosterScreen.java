@@ -10,7 +10,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-import com.wrights.drone.Cradles;
+import com.wrights.drone.Wrightports;
 import com.wrights.drone.Swarm;
 import com.wrights.network.BlueprintPayloads;
 
@@ -217,7 +217,7 @@ public class DroneRosterScreen extends Screen {
     }
 
     private Swarm swarm() {
-        return this.minecraft == null || this.minecraft.player == null ? Swarm.EMPTY : Cradles.swarm(this.minecraft.player);
+        return this.minecraft == null || this.minecraft.player == null ? Swarm.EMPTY : Wrightports.swarm(this.minecraft.player);
     }
 
     private static String stat(Swarm.Unit unit) {

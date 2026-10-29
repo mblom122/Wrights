@@ -19,7 +19,7 @@ public final class ModCreativeTabs {
             .icon(() -> ModItems.CONTROLLER.get().getDefaultInstance())
             .displayItems((parameters, output) -> {
                 output.accept(ModItems.CONTROLLER.get());
-                output.accept(ModItems.CRADLE.get());
+                output.accept(ModItems.PERSONAL_WRIGHTPORT.get());
                 output.accept(ModBlocks.WRIGHTPORT_ITEM.get());
                 output.accept(ModBlocks.HANGAR_ITEM.get());
             })

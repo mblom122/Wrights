@@ -257,10 +257,10 @@ public class PlacementScreen extends Screen {
         if (paceInstant) {
             graphics.drawString(this.font, Component.translatable("screen.wrights.drones_instant"), controlsX + 12, panelY + 122, WrightsUi.MUTED, false);
         } else if (this.minecraft.player != null) {
-            com.wrights.drone.Swarm swarm = com.wrights.drone.Cradles.swarm(this.minecraft.player);
+            com.wrights.drone.Swarm swarm = com.wrights.drone.Wrightports.swarm(this.minecraft.player);
             int cap = Math.min(swarm.units().size(), Math.max(0, WrightsClientState.placeableBlocks()));
             Component line = swarm.units().isEmpty()
-                    ? Component.translatable(com.wrights.drone.Cradles.worn(this.minecraft.player).isEmpty() ? "screen.wrights.need_cradle" : "screen.wrights.need_drone")
+                    ? Component.translatable(com.wrights.drone.Wrightports.worn(this.minecraft.player).isEmpty() ? "screen.wrights.need_wrightport" : "screen.wrights.need_drone")
                     : Component.translatable("screen.wrights.drones_send", Math.min(swarm.assignCount(), Math.max(1, cap)), Math.max(1, cap));
             int color = swarm.units().isEmpty() ? 0xFFE07A7A : WrightsUi.BLUE;
             graphics.drawString(this.font, this.font.plainSubstrByWidth(line.getString(), 168), controlsX + 32, panelY + 122, color, false);
@@ -668,7 +668,7 @@ public class PlacementScreen extends Screen {
         if (this.minecraft.player == null) {
             return;
         }
-        com.wrights.drone.Swarm swarm = com.wrights.drone.Cradles.swarm(this.minecraft.player);
+        com.wrights.drone.Swarm swarm = com.wrights.drone.Wrightports.swarm(this.minecraft.player);
         if (swarm.units().isEmpty()) {
             return;
         }
@@ -681,7 +681,7 @@ public class PlacementScreen extends Screen {
             return;
         }
         WrightsClientState.deployChosen = true;
-        com.wrights.drone.Cradles.replaceWorn(this.minecraft.player, swarm.withAssign(next));
+        com.wrights.drone.Wrightports.replaceWorn(this.minecraft.player, swarm.withAssign(next));
         PacketDistributor.sendToServer(new BlueprintPayloads.SetAssign(next));
     }
 
@@ -689,12 +689,12 @@ public class PlacementScreen extends Screen {
         if (this.minecraft.player == null) {
             return;
         }
-        com.wrights.drone.Swarm swarm = com.wrights.drone.Cradles.swarm(this.minecraft.player);
+        com.wrights.drone.Swarm swarm = com.wrights.drone.Wrightports.swarm(this.minecraft.player);
         int cap = Math.min(swarm.units().size(), WrightsClientState.placeableBlocks());
         if (cap <= 0 || swarm.assignCount() <= cap) {
             return;
         }
-        com.wrights.drone.Cradles.replaceWorn(this.minecraft.player, swarm.withAssign(cap));
+        com.wrights.drone.Wrightports.replaceWorn(this.minecraft.player, swarm.withAssign(cap));
         PacketDistributor.sendToServer(new BlueprintPayloads.SetAssign(cap));
     }
 
