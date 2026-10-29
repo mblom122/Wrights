@@ -127,6 +127,8 @@ public final class AutobotsHud {
         int width = 188;
         width = Math.max(width, minecraft.font.width(title) + 28);
         width = Math.max(width, minecraft.font.width(how) + 28);
+        width = Math.max(width, minecraft.font.width(build) + minecraft.font.width(selected) + 36);
+        width = Math.max(width, minecraft.font.width(bind) + minecraft.font.width(selected) + 36);
         int row = 18;
         int height = 28 + row * 2 + 18;
         int x = (graphics.guiWidth() - width) / 2;
