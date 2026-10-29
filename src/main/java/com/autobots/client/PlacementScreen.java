@@ -58,12 +58,13 @@ public class PlacementScreen extends Screen {
     protected void init() {
         boolean map = !AutobotsClientState.concealed && StructureGrid.oversized(AutobotsClientState.fullX, AutobotsClientState.fullZ);
         panelW = 214;
-        panelH = 296;
-        int extra = map ? 292 : 274;
-        modelSize = Math.min(120, Math.max(64, this.height - extra - 12));
+        panelH = 318;
+        int extra = map ? 314 : 296;
+        int openW = this.font.width(Component.translatable("screen.autobots.open_map")) + 12;
+        modelSize = Math.min(120, Math.max(map ? openW : 64, this.height - extra - 12));
         int gap = 12;
         if (modelSize + gap + panelW > this.width - 16) {
-            modelSize = Math.max(88, this.width - 16 - gap - panelW);
+            modelSize = Math.max(map ? openW : 88, this.width - 16 - gap - panelW);
         }
         int columnH = extra + modelSize;
         int blockH = Math.max(panelH, columnH);
@@ -112,9 +113,14 @@ public class PlacementScreen extends Screen {
         chestButton = new AutobotsButton(panelX + 16 + aimW, panelY + 188, aimW, 16, Component.translatable("screen.autobots.supply_chest"), button -> bindChest());
         addRenderableWidget(inventoryButton);
         addRenderableWidget(chestButton);
-        addRenderableWidget(new AutobotsButton(panelX + 12, panelY + 230, 118, 18, Component.translatable("menu.autobots.build"), button -> send()));
-        addRenderableWidget(new AutobotsButton(panelX + 134, panelY + 230, 68, 18, Component.translatable("screen.autobots.back"), button -> onClose()));
-        addRenderableWidget(new AutobotsButton(panelX + 12, panelY + 252, panelW - 24, 18, Component.translatable("screen.autobots.save_blueprint"), button -> saveBlueprint()));
+        boolean creative = this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild;
+        if (!creative) {
+            step(panelX + 12, panelY + 230, "-", () -> changeAssign(-1));
+            step(panelX + 186, panelY + 230, "+", () -> changeAssign(1));
+        }
+        addRenderableWidget(new AutobotsButton(panelX + 12, panelY + 252, 118, 18, Component.translatable("menu.autobots.build"), button -> send()));
+        addRenderableWidget(new AutobotsButton(panelX + 134, panelY + 252, 68, 18, Component.translatable("screen.autobots.back"), button -> onClose()));
+        addRenderableWidget(new AutobotsButton(panelX + 12, panelY + 274, panelW - 24, 18, Component.translatable("screen.autobots.save_blueprint"), button -> saveBlueprint()));
         addRenderableWidget(new AutobotsButton(modelX, layerY, 22, 16, Component.literal("-"), button -> changeLayer(-1)));
         addRenderableWidget(new AutobotsButton(modelX + modelSize - 22, layerY, 22, 16, Component.literal("+"), button -> changeLayer(1)));
         if (map) {
@@ -194,6 +200,17 @@ public class PlacementScreen extends Screen {
         axis(graphics, panelY + 140, "Y");
         axis(graphics, panelY + 158, "Z");
         graphics.drawString(this.font, Component.translatable("screen.autobots.items_from"), panelX + 12, panelY + 176, AutobotsUi.BLUE, false);
+        boolean creative = this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild;
+        if (creative) {
+            graphics.drawString(this.font, Component.translatable("screen.autobots.drones_instant"), panelX + 12, panelY + 234, AutobotsUi.MUTED, false);
+        } else if (this.minecraft.player != null) {
+            com.autobots.drone.Swarm swarm = com.autobots.drone.Cradles.swarm(this.minecraft.player);
+            Component line = swarm.units().isEmpty()
+                    ? Component.translatable(com.autobots.drone.Cradles.worn(this.minecraft.player).isEmpty() ? "screen.autobots.need_cradle" : "screen.autobots.need_drone")
+                    : Component.translatable("screen.autobots.drones_send", swarm.assignCount(), swarm.units().size());
+            int color = swarm.units().isEmpty() ? 0xFFE07A7A : AutobotsUi.BLUE;
+            graphics.drawString(this.font, this.font.plainSubstrByWidth(line.getString(), 150), panelX + 32, panelY + 234, color, false);
+        }
         syncSelection();
         if (AutobotsClientState.concealed) {
             graphics.drawCenteredString(this.font, Component.translatable("screen.autobots.preview_hidden"), modelX + modelSize / 2, gridY + modelSize / 2, AutobotsUi.MUTED);
@@ -400,9 +417,10 @@ public class PlacementScreen extends Screen {
     }
 
     private void layoutGrid() {
-        int focusX = selY == layer && selX >= 0 ? selX : AutobotsClientState.pivotX;
-        int focusZ = selY == layer && selZ >= 0 ? selZ : AutobotsClientState.pivotZ;
-        grid.layout(modelX + 12, gridY + 14, Math.max(32, modelSize - 28), AutobotsClientState.fullX, AutobotsClientState.fullZ, focusX, focusZ, StructureGrid.INLINE);
+        grid.layout(modelX + 12, gridY + 14, Math.max(32, modelSize - 28), AutobotsClientState.fullX, AutobotsClientState.fullZ, AutobotsClientState.pivotX, AutobotsClientState.pivotZ, StructureGrid.INLINE);
+        if (selY == layer && selX >= 0 && selZ >= 0) {
+            grid.ensureVisible(selX, selZ, AutobotsClientState.fullX, AutobotsClientState.fullZ);
+        }
     }
 
     private void saveBlueprint() {
@@ -517,6 +535,19 @@ public class PlacementScreen extends Screen {
 
     private void step(int x, int y, String label, Runnable action) {
         addRenderableWidget(new AutobotsButton(x, y, 16, 14, Component.literal(label), button -> action.run()));
+    }
+
+    private void changeAssign(int delta) {
+        if (this.minecraft.player == null || this.minecraft.player.getAbilities().instabuild) {
+            return;
+        }
+        com.autobots.drone.Swarm swarm = com.autobots.drone.Cradles.swarm(this.minecraft.player);
+        if (swarm.units().isEmpty()) {
+            return;
+        }
+        int next = net.minecraft.util.Mth.clamp(swarm.assignCount() + delta, 1, swarm.units().size());
+        com.autobots.drone.Cradles.replaceWorn(this.minecraft.player, swarm.withAssign(next));
+        PacketDistributor.sendToServer(new BlueprintPayloads.SetAssign(next));
     }
 
     private void axis(GuiGraphics graphics, int y, String label) {

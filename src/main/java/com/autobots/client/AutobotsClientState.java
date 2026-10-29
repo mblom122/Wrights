@@ -1,6 +1,7 @@
 package com.autobots.client;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -117,6 +118,8 @@ public final class AutobotsClientState {
 
     public static final Map<UUID, ActiveBuild> activeBuilds = new LinkedHashMap<>();
     public static final Set<Long> activeCells = new HashSet<>();
+    public static final Set<UUID> markedJobs = new HashSet<>();
+    private static final Map<UUID, Pace> paces = new HashMap<>();
 
     public static void applyJobHologram(BlueprintPayloads.JobHologram payload) {
         if (payload.clear()) {
@@ -150,12 +153,71 @@ public final class AutobotsClientState {
     public static void applyJobs(BlueprintPayloads.JobSync payload) {
         jobs = List.copyOf(payload.jobs());
         busy = false;
+        long now = System.currentTimeMillis();
+        Set<UUID> seen = new HashSet<>();
         for (BlueprintPayloads.JobLine job : jobs) {
+            seen.add(job.id());
             if (!job.finished()) {
                 busy = true;
-                break;
             }
+            notePace(job, now);
         }
+        paces.keySet().retainAll(seen);
+        markedJobs.retainAll(seen);
+    }
+
+    public static void toggleMark(UUID id) {
+        if (!markedJobs.add(id)) {
+            markedJobs.remove(id);
+        }
+    }
+
+    public static int percent(BlueprintPayloads.JobLine job) {
+        int total = Math.max(1, job.total());
+        return Mth.clamp(job.done() * 100 / total, 0, 100);
+    }
+
+    public static String timeLeft(BlueprintPayloads.JobLine job) {
+        if (job.finished() || job.paused() || job.undoing()) {
+            return "";
+        }
+        Pace pace = paces.get(job.id());
+        if (pace == null || pace.perSecond < 0.05D) {
+            return "";
+        }
+        int left = Math.max(0, job.total() - job.done());
+        long seconds = (long) Math.ceil(left / pace.perSecond);
+        if (seconds < 1) {
+            return "1s";
+        }
+        if (seconds < 60) {
+            return seconds + "s";
+        }
+        long minutes = seconds / 60;
+        long rest = seconds % 60;
+        if (minutes < 60) {
+            return minutes + "m " + rest + "s";
+        }
+        return (minutes / 60) + "h " + (minutes % 60) + "m";
+    }
+
+    private static void notePace(BlueprintPayloads.JobLine job, long now) {
+        Pace pace = paces.computeIfAbsent(job.id(), id -> new Pace());
+        if (pace.at > 0 && now > pace.at && job.done() > pace.done) {
+            double rate = (job.done() - pace.done) * 1000.0D / (now - pace.at);
+            pace.perSecond = pace.perSecond <= 0 ? rate : pace.perSecond * 0.6D + rate * 0.4D;
+        }
+        if (job.finished() || job.done() < pace.done) {
+            pace.perSecond = 0;
+        }
+        pace.done = job.done();
+        pace.at = now;
+    }
+
+    private static final class Pace {
+        private int done;
+        private long at;
+        private double perSecond;
     }
 
     public static void updateFlags() {

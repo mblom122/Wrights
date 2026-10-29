@@ -15,6 +15,11 @@ public final class ModDataComponents {
                     .persistent(ControllerData.CODEC)
                     .networkSynchronized(ControllerData.STREAM_CODEC));
 
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<com.autobots.drone.Swarm>> SWARM =
+            DATA_COMPONENTS.registerComponentType("swarm", builder -> builder
+                    .persistent(com.autobots.drone.Swarm.CODEC)
+                    .networkSynchronized(com.autobots.drone.Swarm.STREAM_CODEC));
+
     private ModDataComponents() {
     }
 }

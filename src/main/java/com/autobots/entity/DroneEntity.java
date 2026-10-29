@@ -75,7 +75,7 @@ public class DroneEntity extends Entity {
         Optional<UUID> id = jobId();
         SchematicLibrary library = SchematicLibrary.get(serverLevel.getServer());
         BuildJob job = id.flatMap(library::job).orElse(null);
-        if (job == null || job.droneId() == null || !job.droneId().equals(this.getUUID())) {
+        if (job == null || !job.ownsDrone(this.getUUID())) {
             this.discard();
         }
     }

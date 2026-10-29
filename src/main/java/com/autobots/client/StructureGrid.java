@@ -18,18 +18,45 @@ public final class StructureGrid {
     private int fromZ;
     private int spanX = 1;
     private int spanZ = 1;
+    private int sizedX = -1;
+    private int sizedZ = -1;
 
     public void layout(int x, int y, int pixelSize, int sizeX, int sizeZ, int focusX, int focusZ, int window) {
         spanX = Math.max(1, Math.min(Math.max(1, window), Math.max(1, sizeX)));
         spanZ = Math.max(1, Math.min(Math.max(1, window), Math.max(1, sizeZ)));
-        fromX = origin(focusX, sizeX, spanX);
-        fromZ = origin(focusZ, sizeZ, spanZ);
+        if (sizedX != sizeX || sizedZ != sizeZ) {
+            fromX = origin(focusX, sizeX, spanX);
+            fromZ = origin(focusZ, sizeZ, spanZ);
+            sizedX = sizeX;
+            sizedZ = sizeZ;
+        } else {
+            fromX = Math.max(0, Math.min(Math.max(0, sizeX - spanX), fromX));
+            fromZ = Math.max(0, Math.min(Math.max(0, sizeZ - spanZ), fromZ));
+        }
         int span = Math.max(spanX, spanZ);
         cell = Math.max(1, Math.min(16, Math.max(1, pixelSize) / span));
         int gridW = spanX * cell;
         int gridH = spanZ * cell;
         originX = x + Math.max(0, (pixelSize - gridW) / 2);
         originY = y + Math.max(0, (pixelSize - gridH) / 2);
+    }
+
+    public void ensureVisible(int x, int z, int sizeX, int sizeZ) {
+        if (x < 0 || z < 0) {
+            return;
+        }
+        if (x < fromX) {
+            fromX = x;
+        } else if (x >= fromX + spanX) {
+            fromX = x - spanX + 1;
+        }
+        if (z < fromZ) {
+            fromZ = z;
+        } else if (z >= fromZ + spanZ) {
+            fromZ = z - spanZ + 1;
+        }
+        fromX = Math.max(0, Math.min(Math.max(0, sizeX - spanX), fromX));
+        fromZ = Math.max(0, Math.min(Math.max(0, sizeZ - spanZ), fromZ));
     }
 
     public void pan(int x, int z, int sizeX, int sizeZ) {
@@ -87,7 +114,7 @@ public final class StructureGrid {
                     var pose = graphics.pose();
                     pose.pushPose();
                     pose.translate(cellX, cellY, 50);
-                    float scale = Math.max(0.25F, (cell - 1) / 16.0F);
+                    float scale = blockSize() / 16.0F;
                     pose.scale(scale, scale, 1.0F);
                     graphics.renderItem(stack, 0, 0);
                     pose.popPose();
@@ -102,8 +129,13 @@ public final class StructureGrid {
         } else if (same && inside(anchorX, anchorZ, sizeX, sizeZ)) {
             int cellX = originX + (anchorX - fromX) * cell;
             int cellY = originY + (anchorZ - fromZ) * cell;
-            int inset = Math.max(1, cell / 4);
-            AutobotsUi.border(graphics, cellX + inset, cellY + inset, Math.max(2, cell - inset * 2), Math.max(2, cell - inset * 2), 0xFFF2D48A);
+            int inset = cell <= 6 ? 1 : Math.max(1, blockSize() / 5);
+            int inner = Math.max(1, blockSize() - inset * 2);
+            if (cell <= 6) {
+                markCorners(graphics, cellX + inset, cellY + inset, inner, 0xFFF2D48A);
+            } else {
+                AutobotsUi.border(graphics, cellX + inset, cellY + inset, inner, inner, 0xFFF2D48A);
+            }
         }
         var font = Minecraft.getInstance().font;
         int north = originX + width / 2;
@@ -126,11 +158,30 @@ public final class StructureGrid {
         int localZ = z - fromZ;
         int cellX = originX + localX * cell;
         int cellY = originY + localZ * cell;
-        AutobotsUi.border(graphics, cellX - 1, cellY - 1, cell + 1, cell + 1, border);
+        int block = blockSize();
+        if (cell <= 6) {
+            markCorners(graphics, cellX, cellY, block, border);
+        } else {
+            AutobotsUi.border(graphics, cellX, cellY, block, block, border);
+        }
         int index = localX + localZ * spanX;
         if (index >= 0 && index < filled.length && !filled[index]) {
-            graphics.fill(cellX, cellY, cellX + Math.max(1, cell - 1), cellY + Math.max(1, cell - 1), empty);
+            graphics.fill(cellX, cellY, cellX + block, cellY + block, empty);
         }
+    }
+
+    private int blockSize() {
+        return cell <= 6 ? Math.max(1, cell - 1) : cell;
+    }
+
+    private void markCorners(GuiGraphics graphics, int x, int y, int size, int color) {
+        int arm = 1;
+        int end = x + size;
+        int bottom = y + size;
+        graphics.fill(x, y, x + arm, y + arm, color);
+        graphics.fill(end - arm, y, end, y + arm, color);
+        graphics.fill(x, bottom - arm, x + arm, bottom, color);
+        graphics.fill(end - arm, bottom - arm, end, bottom, color);
     }
 
     public int[] hit(double mouseX, double mouseY, int sizeX, int sizeZ, int layer) {

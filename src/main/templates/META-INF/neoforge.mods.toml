@@ -88,6 +88,13 @@ First tested in an otherwise empty NeoForge 1.21.1 instance.
     ordering="NONE"
     side="BOTH"
 
+[[dependencies.${mod_id}]]
+    modId="curios"
+    type="required"
+    versionRange="[9.2,)"
+    ordering="AFTER"
+    side="BOTH"
+
 # JEI is optional. The dev client has it; a normal instance does not need it.
 [[dependencies.${mod_id}]]
     modId="jei"

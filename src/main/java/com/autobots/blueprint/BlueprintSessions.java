@@ -69,6 +69,7 @@ public final class BlueprintSessions {
         private UUID buildId;
         private Schematic draft;
         private boolean draftDirty;
+        private boolean instantJobs;
         private int generation;
         private int seq;
 
@@ -142,6 +143,14 @@ public final class BlueprintSessions {
 
         public void setDraftDirty(boolean draftDirty) {
             this.draftDirty = draftDirty;
+        }
+
+        public boolean instantJobs() {
+            return instantJobs;
+        }
+
+        public void setInstantJobs(boolean instantJobs) {
+            this.instantJobs = instantJobs;
         }
 
         public int generation() {

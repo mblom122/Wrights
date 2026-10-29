@@ -42,6 +42,9 @@ public final class BlueprintNetwork {
         registrar.playToServer(BlueprintPayloads.StopJob.TYPE, BlueprintPayloads.StopJob.STREAM_CODEC, BlueprintNetwork::stop);
         registrar.playToServer(BlueprintPayloads.SaveSession.TYPE, BlueprintPayloads.SaveSession.STREAM_CODEC, BlueprintNetwork::saveSession);
         registrar.playToServer(BlueprintPayloads.JobControl.TYPE, BlueprintPayloads.JobControl.STREAM_CODEC, BlueprintNetwork::control);
+        registrar.playToServer(BlueprintPayloads.SetPace.TYPE, BlueprintPayloads.SetPace.STREAM_CODEC, BlueprintNetwork::pace);
+        registrar.playToServer(BlueprintPayloads.SetAssign.TYPE, BlueprintPayloads.SetAssign.STREAM_CODEC, BlueprintNetwork::assign);
+        registrar.playToServer(BlueprintPayloads.HangarEdit.TYPE, BlueprintPayloads.HangarEdit.STREAM_CODEC, BlueprintNetwork::hangar);
         registrar.playToServer(BlueprintPayloads.BindSupply.TYPE, BlueprintPayloads.BindSupply.STREAM_CODEC, BlueprintNetwork::bindSupply);
         registrar.playToServer(BlueprintPayloads.SetAnchor.TYPE, BlueprintPayloads.SetAnchor.STREAM_CODEC, BlueprintNetwork::anchor);
         registrar.playToServer(BlueprintPayloads.EditCell.TYPE, BlueprintPayloads.EditCell.STREAM_CODEC, BlueprintNetwork::editCell);
@@ -231,6 +234,28 @@ public final class BlueprintNetwork {
         context.enqueueWork(() -> JobManager.control(player, payload.id(), payload.action()));
     }
 
+    private static void pace(BlueprintPayloads.SetPace payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> BlueprintSessions.get(player).setInstantJobs(payload.instant()));
+    }
+
+    private static void assign(BlueprintPayloads.SetAssign payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> {
+            com.autobots.drone.Swarm swarm = com.autobots.drone.Cradles.swarm(player);
+            com.autobots.drone.Cradles.replaceWorn(player, swarm.withAssign(payload.count()));
+        });
+    }
+
+    private static void hangar(BlueprintPayloads.HangarEdit payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> {
+            if (player.containerMenu instanceof com.autobots.menu.HangarMenu menu && menu.pos().equals(payload.pos())) {
+                com.autobots.drone.HangarOps.apply(player, menu, payload.action(), payload.index());
+            }
+        });
+    }
+
     private static void bindSupply(BlueprintPayloads.BindSupply payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
         context.enqueueWork(() -> JobManager.bindSupply(player, payload.pos(), payload.clear()));
@@ -317,7 +342,25 @@ public final class BlueprintNetwork {
             }
             int done = job.undoing() ? job.undoTotal() - job.refundCount() : job.finished() ? job.placed() : job.cursor();
             int total = job.undoing() ? Math.max(1, job.undoTotal()) : job.total();
-            lines.add(new BlueprintPayloads.JobLine(job.id(), name, done, total, job.skipped(), job.paused(), job.kind() == BuildJob.Kind.COPY, job.finished(), job.canUndo(), job.undoing()));
+            lines.add(new BlueprintPayloads.JobLine(
+                    job.id(),
+                    name,
+                    done,
+                    total,
+                    job.skipped(),
+                    job.paused(),
+                    job.kind() == BuildJob.Kind.COPY,
+                    job.finished(),
+                    job.canUndo(),
+                    job.undoing(),
+                    job.stopped(),
+                    job.undone(),
+                    job.dimension().location().toString(),
+                    job.anchor(),
+                    job.min(),
+                    job.boxSizeX(),
+                    job.boxSizeY(),
+                    job.boxSizeZ()));
         }
         PacketDistributor.sendToPlayer(player, new BlueprintPayloads.JobSync(lines));
     }

@@ -36,6 +36,9 @@ public final class AutobotsClientConfig {
     public static final ModConfigSpec.BooleanValue CORNER_MARKERS = BUILDER
             .comment("Draw the small blocks on the eight corners of a selection.")
             .define("cornerMarkers", true);
+    public static final ModConfigSpec.BooleanValue INSTANT_JOBS = BUILDER
+            .comment("When true, building and undoing finish in one step. When false, the drone places and removes a few blocks at a time.")
+            .define("instantJobs", false);
     public static final ModConfigSpec.IntValue PLACE_X = BUILDER
             .comment("Blocks to your right when a paste is not aimed at a block.")
             .defineInRange("placeX", 0, -32, 32);
@@ -114,6 +117,11 @@ public final class AutobotsClientConfig {
 
     public static void setCornerMarkers(boolean enabled) {
         CORNER_MARKERS.set(enabled);
+        save();
+    }
+
+    public static void setInstantJobs(boolean enabled) {
+        INSTANT_JOBS.set(enabled);
         save();
     }
 

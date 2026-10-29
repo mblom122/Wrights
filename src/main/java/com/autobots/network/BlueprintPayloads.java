@@ -498,7 +498,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record JobLine(UUID id, String name, int done, int total, int skipped, boolean paused, boolean saving, boolean finished, boolean canUndo, boolean undoing) {
+    public record JobLine(UUID id, String name, int done, int total, int skipped, boolean paused, boolean saving, boolean finished, boolean canUndo, boolean undoing, boolean stopped, boolean undone, String dimension, BlockPos anchor, BlockPos origin, int sizeX, int sizeY, int sizeZ) {
         public void write(RegistryFriendlyByteBuf buf) {
             buf.writeUUID(id);
             buf.writeUtf(name, 48);
@@ -510,6 +510,14 @@ public final class BlueprintPayloads {
             buf.writeBoolean(finished);
             buf.writeBoolean(canUndo);
             buf.writeBoolean(undoing);
+            buf.writeBoolean(stopped);
+            buf.writeBoolean(undone);
+            buf.writeUtf(dimension, 64);
+            buf.writeBlockPos(anchor);
+            buf.writeBlockPos(origin);
+            buf.writeVarInt(sizeX);
+            buf.writeVarInt(sizeY);
+            buf.writeVarInt(sizeZ);
         }
 
         public static JobLine read(RegistryFriendlyByteBuf buf) {
@@ -523,7 +531,15 @@ public final class BlueprintPayloads {
                     buf.readBoolean(),
                     buf.readBoolean(),
                     buf.readBoolean(),
-                    buf.readBoolean());
+                    buf.readBoolean(),
+                    buf.readBoolean(),
+                    buf.readBoolean(),
+                    buf.readUtf(64),
+                    buf.readBlockPos(),
+                    buf.readBlockPos(),
+                    buf.readVarInt(),
+                    buf.readVarInt(),
+                    buf.readVarInt());
         }
     }
 
@@ -560,6 +576,8 @@ public final class BlueprintPayloads {
         public static final int REDO = 3;
         public static final int UNDO = 4;
         public static final int UNDO_FORCE = 5;
+        public static final int REMOVE = 6;
+        public static final int VISIT = 7;
         public static final Type<JobControl> TYPE = payloadType("job_control");
         public static final StreamCodec<RegistryFriendlyByteBuf, JobControl> STREAM_CODEC = StreamCodec.of(
                 (buf, value) -> {
@@ -567,6 +585,46 @@ public final class BlueprintPayloads {
                     buf.writeByte(value.action);
                 },
                 buf -> new JobControl(buf.readUUID(), buf.readByte()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record SetPace(boolean instant) implements CustomPacketPayload {
+        public static final Type<SetPace> TYPE = payloadType("set_pace");
+        public static final StreamCodec<RegistryFriendlyByteBuf, SetPace> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> buf.writeBoolean(value.instant),
+                buf -> new SetPace(buf.readBoolean()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record SetAssign(int count) implements CustomPacketPayload {
+        public static final Type<SetAssign> TYPE = payloadType("set_assign");
+        public static final StreamCodec<RegistryFriendlyByteBuf, SetAssign> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> buf.writeVarInt(value.count),
+                buf -> new SetAssign(buf.readVarInt()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record HangarEdit(BlockPos pos, int action, int index) implements CustomPacketPayload {
+        public static final Type<HangarEdit> TYPE = payloadType("hangar_edit");
+        public static final StreamCodec<RegistryFriendlyByteBuf, HangarEdit> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeBlockPos(value.pos);
+                    buf.writeByte(value.action);
+                    buf.writeVarInt(value.index);
+                },
+                buf -> new HangarEdit(buf.readBlockPos(), buf.readByte(), buf.readVarInt()));
 
         @Override
         public Type<? extends CustomPacketPayload> type() {

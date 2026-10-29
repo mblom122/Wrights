@@ -1,6 +1,7 @@
 package com.autobots.item;
 
 import com.autobots.AutobotsMod;
+import com.autobots.block.ModBlocks;
 
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
@@ -16,7 +17,11 @@ public final class ModCreativeTabs {
             .title(Component.translatable("itemGroup.autobots"))
             .withTabsBefore(CreativeModeTabs.SPAWN_EGGS)
             .icon(() -> ModItems.CONTROLLER.get().getDefaultInstance())
-            .displayItems((parameters, output) -> output.accept(ModItems.CONTROLLER.get()))
+            .displayItems((parameters, output) -> {
+                output.accept(ModItems.CONTROLLER.get());
+                output.accept(ModItems.CRADLE.get());
+                output.accept(ModBlocks.HANGAR_ITEM.get());
+            })
             .build());
 
     private ModCreativeTabs() {

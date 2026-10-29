@@ -6,6 +6,7 @@ import java.util.Locale;
 import java.util.UUID;
 
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.core.BlockPos;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -71,6 +72,9 @@ public class AutobotsMenuScreen extends Screen {
     private int markerX;
     private int markerY;
     private int markerW;
+    private int instantX;
+    private int instantY;
+    private int instantW;
     private EditBox wallPercent;
     private EditBox edgePercent;
     private EditBox placeX;
@@ -324,6 +328,19 @@ public class AutobotsMenuScreen extends Screen {
         AutobotsUi.border(graphics, markerX, markerY, markerW, 16, marks ? AutobotsUi.COPPER : 0xFF3D4E5E);
         graphics.drawCenteredString(this.font, state, markerX + markerW / 2, markerY + 4, AutobotsUi.TEXT);
         y += 22;
+        boolean creative = this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild;
+        graphics.drawString(this.font, Component.translatable("menu.autobots.build_speed"), x, y, AutobotsUi.MUTED, false);
+        boolean instant = creative || AutobotsClientConfig.INSTANT_JOBS.get();
+        Component pace = Component.translatable(instant ? "menu.autobots.instant" : "menu.autobots.drone_pace");
+        instantW = Math.max(52, this.font.width(pace) + 16);
+        instantX = x + 108;
+        instantY = y - 3;
+        graphics.fill(instantX, instantY, instantX + instantW, instantY + 16, instant ? 0xFF24384A : 0xFF18222C);
+        AutobotsUi.border(graphics, instantX, instantY, instantW, 16, instant ? AutobotsUi.COPPER : 0xFF3D4E5E);
+        graphics.drawCenteredString(this.font, pace, instantX + instantW / 2, instantY + 4, AutobotsUi.TEXT);
+        y += 14;
+        graphics.drawString(this.font, Component.translatable(creative ? "menu.autobots.build_speed_creative" : "menu.autobots.build_speed_hint"), x, y, AutobotsUi.MUTED, false);
+        y += 18;
         graphics.drawString(this.font, Component.translatable("menu.autobots.place_offset"), x, y, AutobotsUi.TEXT, false);
         y += 12;
         graphics.drawString(this.font, Component.translatable("menu.autobots.place_hint"), x, y, AutobotsUi.MUTED, false);
@@ -499,6 +516,15 @@ public class AutobotsMenuScreen extends Screen {
             }
             if (mouseX >= markerX && mouseX < markerX + markerW && mouseY >= markerY && mouseY < markerY + 16) {
                 AutobotsClientConfig.setCornerMarkers(!AutobotsClientConfig.CORNER_MARKERS.get());
+                return true;
+            }
+            if (mouseX >= instantX && mouseX < instantX + instantW && mouseY >= instantY && mouseY < instantY + 16) {
+                if (this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild) {
+                    return true;
+                }
+                boolean next = !AutobotsClientConfig.INSTANT_JOBS.get();
+                AutobotsClientConfig.setInstantJobs(next);
+                PacketDistributor.sendToServer(new BlueprintPayloads.SetPace(next));
                 return true;
             }
             if (hitSlider(mouseX, mouseY, wallSliderX, wallSliderY, wallSliderW)) {
@@ -682,8 +708,10 @@ public class AutobotsMenuScreen extends Screen {
         return count;
     }
 
+    private static final int JOB_ROW = 58;
+
     private int jobRows() {
-        return Math.max(1, (panelH - 110) / 44);
+        return Math.max(1, (panelH - 110) / JOB_ROW);
     }
 
     private void renderJobs(GuiGraphics graphics, int mouseX, int mouseY) {
@@ -695,82 +723,162 @@ public class AutobotsMenuScreen extends Screen {
             graphics.drawString(this.font, Component.translatable("menu.autobots.jobs_empty"), x, panelY + 52, AutobotsUi.MUTED, false);
             return;
         }
+        boolean creative = creativeVisit();
         jobScroll = Mth.clamp(jobScroll, 0, Math.max(0, jobs.size() - jobRows()));
         for (int row = 0; row < jobRows() && jobScroll + row < jobs.size(); row++) {
             BlueprintPayloads.JobLine job = jobs.get(jobScroll + row);
-            int y = panelY + 44 + row * 44;
-            boolean hover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 40;
-            graphics.fill(x, y, x + width, y + 40, hover ? 0xFF24303C : 0xFF18222C);
-            graphics.drawString(this.font, Component.literal(job.name()), x + 6, y + 5, AutobotsUi.TEXT, false);
-            String status = job.undoing() ? "menu.autobots.undoing" : job.finished() ? "menu.autobots.done" : job.saving() ? "menu.autobots.saving" : job.paused() ? "menu.autobots.paused" : "menu.autobots.running";
+            int y = panelY + 44 + row * JOB_ROW;
+            boolean hover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 54;
+            graphics.fill(x, y, x + width, y + 54, hover ? 0xFF24303C : 0xFF18222C);
+            String name = this.font.plainSubstrByWidth(job.name(), width / 2);
+            graphics.drawString(this.font, name, x + 6, y + 4, AutobotsUi.TEXT, false);
+            String status = jobStatus(job);
             Component statusText = Component.translatable(status);
-            int statusColor = job.finished() ? AutobotsUi.MUTED : job.paused() ? 0xFFE0B060 : AutobotsUi.COPPER;
-            graphics.drawString(this.font, statusText, x + width - 130 - this.font.width(statusText), y + 5, statusColor, false);
-            int total = Math.max(1, job.total());
-            graphics.drawString(this.font, Component.translatable("menu.autobots.job_progress", job.done(), job.total(), job.skipped()), x + 6, y + 17, AutobotsUi.MUTED, false);
-            int barW = Math.max(20, width - 148);
-            graphics.fill(x + 6, y + 30, x + 6 + barW, y + 34, 0xFF0C141C);
-            int filled = Mth.clamp(job.done() * barW / total, 0, barW);
-            graphics.fill(x + 6, y + 30, x + 6 + filled, y + 34, job.finished() ? 0xFF6E8494 : AutobotsUi.COPPER);
+            graphics.drawString(this.font, statusText, x + width - 8 - this.font.width(statusText), y + 4, jobColor(job), false);
+            BlockPos anchor = job.anchor();
+            graphics.drawString(this.font, Component.translatable("menu.autobots.job_anchor", anchor.getX(), anchor.getY(), anchor.getZ()), x + 6, y + 15, AutobotsUi.MUTED, false);
+            graphics.drawString(this.font, progressLine(job), x + 6, y + 26, AutobotsUi.TEXT, false);
+            int right = x + width - 4;
+            right = drawJobButton(graphics, right, y + 36, "menu.autobots.remove", mouseX, mouseY);
+            if (creative) {
+                right = drawJobButton(graphics, right, y + 36, "menu.autobots.visit", mouseX, mouseY);
+            }
+            right = drawJobButton(graphics, right, y + 36, AutobotsClientState.markedJobs.contains(job.id()) ? "menu.autobots.mark_on" : "menu.autobots.mark", mouseX, mouseY);
             if (job.finished()) {
+                right = drawJobButton(graphics, right, y + 36, "menu.autobots.redo", mouseX, mouseY);
                 if (job.canUndo()) {
-                    drawJobButton(graphics, x + width - 124, y + 12, "menu.autobots.undo", mouseX, mouseY);
+                    drawJobButton(graphics, right, y + 36, "menu.autobots.undo", mouseX, mouseY);
                 }
-                drawJobButton(graphics, x + width - 60, y + 12, "menu.autobots.redo", mouseX, mouseY);
             } else {
-                drawJobButton(graphics, x + width - 124, y + 12, job.paused() ? "menu.autobots.resume" : "menu.autobots.pause", mouseX, mouseY);
-                drawJobButton(graphics, x + width - 60, y + 12, "menu.autobots.stop", mouseX, mouseY);
+                right = drawJobButton(graphics, right, y + 36, "menu.autobots.stop", mouseX, mouseY);
+                drawJobButton(graphics, right, y + 36, job.paused() ? "menu.autobots.resume" : "menu.autobots.pause", mouseX, mouseY);
             }
         }
         if (activeJobs() > 1) {
-            drawJobButton(graphics, x, panelY + panelH - 58, "menu.autobots.stop_all", mouseX, mouseY);
+            drawJobButton(graphics, x + 64, panelY + panelH - 58, "menu.autobots.stop_all", mouseX, mouseY);
         }
     }
 
-    private void drawJobButton(GuiGraphics graphics, int x, int y, String key, int mouseX, int mouseY) {
-        boolean hover = mouseX >= x && mouseX < x + 56 && mouseY >= y && mouseY < y + 16;
-        graphics.fill(x, y, x + 56, y + 16, hover ? 0xFF3A5164 : 0xFF24384A);
+    private String jobStatus(BlueprintPayloads.JobLine job) {
+        if (job.undoing()) {
+            return "menu.autobots.undoing";
+        }
+        if (job.finished()) {
+            if (job.stopped()) {
+                return "menu.autobots.stopped";
+            }
+            if (job.undone()) {
+                return "menu.autobots.undone";
+            }
+            return "menu.autobots.completed";
+        }
+        if (job.saving()) {
+            return "menu.autobots.saving";
+        }
+        if (job.paused()) {
+            return "menu.autobots.paused";
+        }
+        return "menu.autobots.running";
+    }
+
+    private int jobColor(BlueprintPayloads.JobLine job) {
+        if (job.finished() && job.stopped()) {
+            return 0xFFE07A7A;
+        }
+        if (job.finished() && !job.undone() && !job.undoing()) {
+            return 0xFF6FCF97;
+        }
+        if (job.paused()) {
+            return 0xFFE0B060;
+        }
+        return job.finished() ? AutobotsUi.MUTED : AutobotsUi.COPPER;
+    }
+
+    private Component progressLine(BlueprintPayloads.JobLine job) {
+        int percent = AutobotsClientState.percent(job);
+        String left = AutobotsClientState.timeLeft(job);
+        if (job.finished() || left.isEmpty()) {
+            return Component.translatable("menu.autobots.job_percent", percent, job.done(), job.total());
+        }
+        return Component.translatable("menu.autobots.job_eta", percent, job.done(), job.total(), left);
+    }
+
+    private boolean creativeVisit() {
+        return this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild && !this.minecraft.player.isSpectator();
+    }
+
+    private int drawJobButton(GuiGraphics graphics, int right, int y, String key, int mouseX, int mouseY) {
+        int width = Math.max(52, key.equals("menu.autobots.stop_all") ? 64 : 52);
+        int left = right - width;
+        boolean hover = mouseX >= left && mouseX < right && mouseY >= y && mouseY < y + 16;
+        graphics.fill(left, y, right, y + 16, hover ? 0xFF3A5164 : 0xFF24384A);
         Component label = Component.translatable(key);
-        graphics.drawString(this.font, label, x + (56 - this.font.width(label)) / 2, y + 4, AutobotsUi.TEXT, false);
+        String text = this.font.plainSubstrByWidth(label.getString(), width - 4);
+        graphics.drawString(this.font, text, left + (width - this.font.width(text)) / 2, y + 4, AutobotsUi.TEXT, false);
+        return left - 4;
     }
 
     private boolean clickJob(double mouseX, double mouseY) {
         List<BlueprintPayloads.JobLine> jobs = AutobotsClientState.jobs;
         int x = listX;
         int width = panelX + panelW - 24 - x;
-        if (activeJobs() > 1 && mouseX >= x && mouseX < x + 56 && mouseY >= panelY + panelH - 58 && mouseY < panelY + panelH - 42) {
+        if (activeJobs() > 1 && mouseX >= x && mouseX < x + 64 && mouseY >= panelY + panelH - 58 && mouseY < panelY + panelH - 42) {
             PacketDistributor.sendToServer(new BlueprintPayloads.StopJob());
             return true;
         }
-        int row = (int) ((mouseY - (panelY + 44)) / 44.0D);
+        int row = (int) ((mouseY - (panelY + 44)) / JOB_ROW);
         if (row < 0 || row >= jobRows() || jobScroll + row >= jobs.size()) {
             return false;
         }
-        int y = panelY + 44 + row * 44;
-        if (mouseY < y || mouseY >= y + 40) {
+        int y = panelY + 44 + row * JOB_ROW;
+        if (mouseY < y + 36 || mouseY >= y + 52) {
             return false;
         }
         BlueprintPayloads.JobLine job = jobs.get(jobScroll + row);
-        if (job.finished()) {
-            if (job.canUndo() && mouseX >= x + width - 124 && mouseX < x + width - 68 && mouseY >= y + 12 && mouseY < y + 28) {
-                PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.UNDO));
+        int right = x + width - 4;
+        if (hitJobButton(mouseX, right, y + 36)) {
+            PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.REMOVE));
+            return true;
+        }
+        right -= 56;
+        if (creativeVisit()) {
+            if (hitJobButton(mouseX, right, y + 36)) {
+                PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.VISIT));
                 return true;
             }
-            if (mouseX >= x + width - 60 && mouseX < x + width - 4 && mouseY >= y + 12 && mouseY < y + 28) {
+            right -= 56;
+        }
+        if (hitJobButton(mouseX, right, y + 36)) {
+            AutobotsClientState.toggleMark(job.id());
+            return true;
+        }
+        right -= 56;
+        if (job.finished()) {
+            if (hitJobButton(mouseX, right, y + 36)) {
                 PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.REDO));
+                return true;
+            }
+            right -= 56;
+            if (job.canUndo() && hitJobButton(mouseX, right, y + 36)) {
+                PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.UNDO));
                 return true;
             }
             return false;
         }
-        if (mouseX >= x + width - 124 && mouseX < x + width - 68 && mouseY >= y + 12 && mouseY < y + 28) {
-            PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), job.paused() ? BlueprintPayloads.JobControl.RESUME : BlueprintPayloads.JobControl.PAUSE));
-            return true;
-        }
-        if (mouseX >= x + width - 60 && mouseX < x + width - 4 && mouseY >= y + 12 && mouseY < y + 28) {
+        if (hitJobButton(mouseX, right, y + 36)) {
             PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.STOP));
             return true;
         }
+        right -= 56;
+        if (hitJobButton(mouseX, right, y + 36)) {
+            PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), job.paused() ? BlueprintPayloads.JobControl.RESUME : BlueprintPayloads.JobControl.PAUSE));
+            return true;
+        }
         return false;
+    }
+
+    private boolean hitJobButton(double mouseX, int right, int y) {
+        return mouseX >= right - 52 && mouseX < right;
     }
 
     @Override

@@ -1,0 +1,7 @@
+{
+  "size": 1,
+  "order": 80,
+  "icon": "curios:slot/empty_curio_slot",
+  "add_cosmetic": false,
+  "validators": ["autobots:drone_cradle"]
+}

@@ -2,6 +2,7 @@ package com.autobots.client;
 
 import com.autobots.AutobotsMod;
 import com.autobots.item.ControllerItem;
+import com.autobots.network.BlueprintPayloads;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -27,6 +28,12 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
 @EventBusSubscriber(modid = AutobotsMod.MOD_ID, value = Dist.CLIENT)
 public final class SelectionRenderer {
+    private static final int PREVIEW_BUDGET = 4096;
+    private static final int ACTIVE_BUDGET = 480;
+    private static final double RANGE_SQR = 48.0D * 48.0D;
+    private static int[] order = new int[0];
+    private static double[] distanceSq = new double[0];
+
     private SelectionRenderer() {
     }
 
@@ -43,20 +50,43 @@ public final class SelectionRenderer {
         PoseStack pose = event.getPoseStack();
         Vec3 camera = event.getCamera().getPosition();
         MultiBufferSource.BufferSource buffers = minecraft.renderBuffers().bufferSource();
-        pose.pushPose();
-        pose.translate(-camera.x, -camera.y, -camera.z);
         boolean placing = minecraft.screen instanceof PlacementScreen;
         boolean gui = minecraft.screen != null;
         if (!gui && (AutobotsClientState.mode == AutobotsClientState.Mode.CAPTURE || AutobotsClientState.mode == AutobotsClientState.Mode.SAVING)) {
-            drawCapture(pose, buffers);
+            drawCapture(pose, buffers, camera);
         } else if ((!gui || placing) && AutobotsClientState.mode == AutobotsClientState.Mode.BUILD) {
             drawPreview(pose, buffers, camera);
         }
         drawActiveBuilds(pose, buffers, camera, minecraft, !gui);
-        pose.popPose();
+        drawMarkedJobs(pose, buffers, camera, minecraft);
     }
 
-    private static void drawCapture(PoseStack pose, MultiBufferSource.BufferSource buffers) {
+    private static void drawMarkedJobs(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
+        if (AutobotsClientState.markedJobs.isEmpty() || minecraft.level == null) {
+            return;
+        }
+        String here = minecraft.level.dimension().location().toString();
+        float pulse = 0.65F + 0.35F * (float) Math.sin(System.currentTimeMillis() / 180.0D);
+        VertexConsumer lines = buffers.getBuffer(RenderType.lines());
+        boolean any = false;
+        for (BlueprintPayloads.JobLine job : AutobotsClientState.jobs) {
+            if (!AutobotsClientState.markedJobs.contains(job.id()) || !here.equals(job.dimension())) {
+                continue;
+            }
+            BlockPos origin = job.origin();
+            AABB box = new AABB(origin.getX(), origin.getY(), origin.getZ(), origin.getX() + job.sizeX(), origin.getY() + job.sizeY(), origin.getZ() + job.sizeZ());
+            drawBox(pose, lines, box, camera, 0.95F, 0.78F, 0.25F, pulse);
+            BlockPos anchor = job.anchor();
+            AABB marker = new AABB(anchor.getX(), anchor.getY(), anchor.getZ(), anchor.getX() + 1.0D, anchor.getY() + 1.0D, anchor.getZ() + 1.0D);
+            drawBox(pose, lines, marker, camera, 0.35F, 0.75F, 1.0F, 1.0F);
+            any = true;
+        }
+        if (any) {
+            buffers.endBatch(RenderType.lines());
+        }
+    }
+
+    private static void drawCapture(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera) {
         BlockPos first = AutobotsClientState.cornerA;
         BlockPos second = AutobotsClientState.cornerB;
         if (first == null && second == null) {
@@ -69,7 +99,7 @@ public final class SelectionRenderer {
             float alpha = com.autobots.AutobotsClientConfig.wallAlpha();
             if (alpha > 0.01F) {
                 int rgb = com.autobots.AutobotsClientConfig.wallRgb();
-                AABB wall = box.inflate(0.02D);
+                AABB wall = box.inflate(0.02D).move(-camera.x, -camera.y, -camera.z);
                 LevelRenderer.addChainedFilledBoxVertices(
                         pose, fill, wall.minX, wall.minY, wall.minZ, wall.maxX, wall.maxY, wall.maxZ,
                         com.autobots.AutobotsClientConfig.channel(rgb, 16),
@@ -78,11 +108,11 @@ public final class SelectionRenderer {
                         alpha);
             }
             if (com.autobots.AutobotsClientConfig.CORNER_MARKERS.get()) {
-                drawCorners(pose, fill, box, 1.0F, 0.72F, 0.25F);
+                drawCorners(pose, fill, box, camera, 1.0F, 0.72F, 0.25F);
             }
             buffers.endBatch(RenderType.debugFilledBox());
             int edge = com.autobots.AutobotsClientConfig.edgeRgb();
-            drawBox(pose, buffers.getBuffer(RenderType.lines()), box,
+            drawBox(pose, buffers.getBuffer(RenderType.lines()), box, camera,
                     com.autobots.AutobotsClientConfig.channel(edge, 16),
                     com.autobots.AutobotsClientConfig.channel(edge, 8),
                     com.autobots.AutobotsClientConfig.channel(edge, 0),
@@ -90,9 +120,9 @@ public final class SelectionRenderer {
         } else {
             BlockPos only = first != null ? first : second;
             AABB box = new AABB(only.getX(), only.getY(), only.getZ(), only.getX() + 1.0D, only.getY() + 1.0D, only.getZ() + 1.0D);
-            drawCorners(pose, fill, box, 1.0F, 0.72F, 0.25F);
+            drawCorners(pose, fill, box, camera, 1.0F, 0.72F, 0.25F);
             buffers.endBatch(RenderType.debugFilledBox());
-            drawBox(pose, buffers.getBuffer(RenderType.lines()), box, 1.0F, 0.78F, 0.2F, pulse);
+            drawBox(pose, buffers.getBuffer(RenderType.lines()), box, camera, 1.0F, 0.78F, 0.2F, pulse);
         }
         buffers.endBatch(RenderType.lines());
     }
@@ -102,45 +132,51 @@ public final class SelectionRenderer {
         if (anchor == null) {
             return;
         }
-        int inRange = 0;
-        for (AutobotsClientState.Ghost ghost : AutobotsClientState.ghosts) {
+        var ghosts = AutobotsClientState.ghosts;
+        prepare(ghosts.size());
+        int count = 0;
+        for (int i = 0; i < ghosts.size(); i++) {
+            AutobotsClientState.Ghost ghost = ghosts.get(i);
             if (outsideView(ghost)) {
                 continue;
             }
-            if (nearCamera(camera, anchor, ghost)) {
-                inRange++;
-            }
-        }
-        int step = Math.max(1, (inRange + 479) / 480);
-        int seen = 0;
-        BlockRenderDispatcher renderer = Minecraft.getInstance().getBlockRenderer();
-        for (AutobotsClientState.Ghost ghost : AutobotsClientState.ghosts) {
-            if (outsideView(ghost) || !nearCamera(camera, anchor, ghost)) {
+            double x = anchor.getX() - AutobotsClientState.pivotX + ghost.x();
+            double y = anchor.getY() - AutobotsClientState.pivotY + ghost.y();
+            double z = anchor.getZ() - AutobotsClientState.pivotZ + ghost.z();
+            double dx = x + 0.5D - camera.x;
+            double dy = y + 0.5D - camera.y;
+            double dz = z + 0.5D - camera.z;
+            double distance = dx * dx + dy * dy + dz * dz;
+            if (distance > RANGE_SQR) {
                 continue;
             }
-            boolean pivot = ghost.x() == AutobotsClientState.pivotX && ghost.y() == AutobotsClientState.pivotY && ghost.z() == AutobotsClientState.pivotZ;
-            if (!pivot && seen++ % step != 0) {
+            BlockPos world = BlockPos.containing(x, y, z);
+            if (AutobotsClientState.activeCells.contains(world.asLong()) || alreadyBuilt(world, ghost.stateId())) {
                 continue;
             }
             BlockState state = Block.stateById(ghost.stateId());
             if (state.isAir() || state.getRenderShape() == RenderShape.INVISIBLE) {
                 continue;
             }
+            order[count] = i;
+            distanceSq[count] = distance;
+            count++;
+        }
+        int keep = Math.min(count, PREVIEW_BUDGET);
+        nearest(count, keep);
+        BlockRenderDispatcher renderer = Minecraft.getInstance().getBlockRenderer();
+        boolean any = false;
+        for (int n = 0; n < keep; n++) {
+            AutobotsClientState.Ghost ghost = ghosts.get(order[n]);
             double x = anchor.getX() - AutobotsClientState.pivotX + ghost.x();
             double y = anchor.getY() - AutobotsClientState.pivotY + ghost.y();
             double z = anchor.getZ() - AutobotsClientState.pivotZ + ghost.z();
-            BlockPos world = BlockPos.containing(x, y, z);
-            if (AutobotsClientState.activeCells.contains(world.asLong()) || alreadyBuilt(world, ghost.stateId())) {
-                continue;
-            }
-            pose.pushPose();
-            pose.translate(x + 0.5D, y + 0.5D, z + 0.5D);
-            pose.scale(0.92F, 0.92F, 0.92F);
-            pose.translate(-0.5D, -0.5D, -0.5D);
-            renderer.renderSingleBlock(state, pose, buffers, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
-            pose.popPose();
+            any = true;
+            drawGhost(pose, buffers, renderer, camera, x, y, z, Block.stateById(ghost.stateId()));
         }
-        buffers.endBatch();
+        if (any) {
+            buffers.endBatch();
+        }
         float pulse = 0.65F + 0.35F * (float) Math.sin(System.currentTimeMillis() / 260.0D);
         VertexConsumer lines = buffers.getBuffer(RenderType.lines());
         AABB box = new AABB(
@@ -150,9 +186,9 @@ public final class SelectionRenderer {
                 anchor.getX() - AutobotsClientState.pivotX + AutobotsClientState.viewX,
                 anchor.getY() - AutobotsClientState.pivotY + AutobotsClientState.viewY,
                 anchor.getZ() - AutobotsClientState.pivotZ + AutobotsClientState.viewZ);
-        drawBox(pose, lines, box, 0.45F, 0.78F, 1.0F, pulse);
+        drawBox(pose, lines, box, camera, 0.45F, 0.78F, 1.0F, pulse);
         AABB marker = new AABB(anchor.getX(), anchor.getY(), anchor.getZ(), anchor.getX() + 1.0D, anchor.getY() + 1.0D, anchor.getZ() + 1.0D);
-        drawBox(pose, lines, marker, 0.49F, 0.71F, 1.0F, 1.0F);
+        drawBox(pose, lines, marker, camera, 0.49F, 0.71F, 1.0F, 1.0F);
         buffers.endBatch(RenderType.lines());
     }
 
@@ -162,49 +198,49 @@ public final class SelectionRenderer {
         }
         BlockRenderDispatcher renderer = minecraft.getBlockRenderer();
         boolean any = false;
-        int budget = 480;
         if (models) {
-        for (AutobotsClientState.ActiveBuild build : AutobotsClientState.activeBuilds.values()) {
-            if (budget <= 0) {
-                break;
+            int budget = ACTIVE_BUDGET;
+            for (AutobotsClientState.ActiveBuild build : AutobotsClientState.activeBuilds.values()) {
+                if (budget <= 0) {
+                    break;
+                }
+                var ghosts = build.ghosts();
+                prepare(ghosts.size());
+                int count = 0;
+                for (int i = 0; i < ghosts.size(); i++) {
+                    AutobotsClientState.Ghost ghost = ghosts.get(i);
+                    if (ghost.x() >= build.clipX() || ghost.y() >= build.clipY() || ghost.z() >= build.clipZ()) {
+                        continue;
+                    }
+                    BlockPos world = build.origin().offset(ghost.x(), ghost.y(), ghost.z());
+                    if (alreadyBuilt(world, ghost.stateId())) {
+                        continue;
+                    }
+                    double x = world.getX() + 0.5D - camera.x;
+                    double y = world.getY() + 0.5D - camera.y;
+                    double z = world.getZ() + 0.5D - camera.z;
+                    double distance = x * x + y * y + z * z;
+                    if (distance > RANGE_SQR) {
+                        continue;
+                    }
+                    order[count] = i;
+                    distanceSq[count] = distance;
+                    count++;
+                }
+                int keep = Math.min(count, budget);
+                nearest(count, keep);
+                for (int n = 0; n < keep; n++) {
+                    AutobotsClientState.Ghost ghost = ghosts.get(order[n]);
+                    BlockState state = Block.stateById(ghost.stateId());
+                    if (state.isAir() || state.getRenderShape() == RenderShape.INVISIBLE) {
+                        continue;
+                    }
+                    BlockPos world = build.origin().offset(ghost.x(), ghost.y(), ghost.z());
+                    any = true;
+                    budget--;
+                    drawGhost(pose, buffers, renderer, camera, world.getX(), world.getY(), world.getZ(), state);
+                }
             }
-            int nearby = 0;
-            for (AutobotsClientState.Ghost ghost : build.ghosts()) {
-                if (ghost.x() >= build.clipX() || ghost.y() >= build.clipY() || ghost.z() >= build.clipZ()) {
-                    continue;
-                }
-                BlockPos world = build.origin().offset(ghost.x(), ghost.y(), ghost.z());
-                if (nearBlock(camera, world) && !alreadyBuilt(world, ghost.stateId())) {
-                    nearby++;
-                }
-            }
-            int step = Math.max(1, (nearby + budget - 1) / budget);
-            int seen = 0;
-            for (AutobotsClientState.Ghost ghost : build.ghosts()) {
-                if (ghost.x() >= build.clipX() || ghost.y() >= build.clipY() || ghost.z() >= build.clipZ()) {
-                    continue;
-                }
-                BlockPos world = build.origin().offset(ghost.x(), ghost.y(), ghost.z());
-                if (!nearBlock(camera, world) || alreadyBuilt(world, ghost.stateId())) {
-                    continue;
-                }
-                if (seen++ % step != 0) {
-                    continue;
-                }
-                BlockState state = Block.stateById(ghost.stateId());
-                if (state.isAir() || state.getRenderShape() == RenderShape.INVISIBLE) {
-                    continue;
-                }
-                any = true;
-                budget--;
-                pose.pushPose();
-                pose.translate(world.getX() + 0.5D, world.getY() + 0.5D, world.getZ() + 0.5D);
-                pose.scale(0.92F, 0.92F, 0.92F);
-                pose.translate(-0.5D, -0.5D, -0.5D);
-                renderer.renderSingleBlock(state, pose, buffers, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
-                pose.popPose();
-            }
-        }
         }
         if (any) {
             buffers.endBatch();
@@ -214,7 +250,7 @@ public final class SelectionRenderer {
         for (AutobotsClientState.ActiveBuild build : AutobotsClientState.activeBuilds.values()) {
             BlockPos origin = build.origin();
             AABB box = new AABB(origin.getX(), origin.getY(), origin.getZ(), origin.getX() + build.clipX(), origin.getY() + build.clipY(), origin.getZ() + build.clipZ());
-            drawBox(pose, lines, box, 0.45F, 0.78F, 1.0F, 0.45F);
+            drawBox(pose, lines, box, camera, 0.45F, 0.78F, 1.0F, 0.45F);
             boxed = true;
         }
         if (boxed) {
@@ -230,28 +266,15 @@ public final class SelectionRenderer {
         return minecraft.level.getBlockState(pos).getBlock() == Block.stateById(stateId).getBlock();
     }
 
-    private static boolean nearBlock(Vec3 camera, BlockPos pos) {
-        double x = pos.getX() + 0.5D - camera.x;
-        double y = pos.getY() + 0.5D - camera.y;
-        double z = pos.getZ() + 0.5D - camera.z;
-        return x * x + y * y + z * z <= 48.0D * 48.0D;
-    }
-
     private static boolean outsideView(AutobotsClientState.Ghost ghost) {
         return ghost.x() >= AutobotsClientState.viewX || ghost.y() >= AutobotsClientState.viewY || ghost.z() >= AutobotsClientState.viewZ;
     }
 
-    private static boolean nearCamera(Vec3 camera, BlockPos anchor, AutobotsClientState.Ghost ghost) {
-        double x = anchor.getX() - AutobotsClientState.pivotX + ghost.x() + 0.5D - camera.x;
-        double y = anchor.getY() - AutobotsClientState.pivotY + ghost.y() + 0.5D - camera.y;
-        double z = anchor.getZ() - AutobotsClientState.pivotZ + ghost.z() + 0.5D - camera.z;
-        return x * x + y * y + z * z <= 48.0D * 48.0D;
-    }
-
-    private static void drawCorners(PoseStack pose, VertexConsumer fill, AABB box, float red, float green, float blue) {
-        double[] xs = {box.minX, box.maxX - 0.18D};
-        double[] ys = {box.minY, box.maxY - 0.18D};
-        double[] zs = {box.minZ, box.maxZ - 0.18D};
+    private static void drawCorners(PoseStack pose, VertexConsumer fill, AABB box, Vec3 camera, float red, float green, float blue) {
+        AABB local = box.move(-camera.x, -camera.y, -camera.z);
+        double[] xs = {local.minX, local.maxX - 0.18D};
+        double[] ys = {local.minY, local.maxY - 0.18D};
+        double[] zs = {local.minZ, local.maxZ - 0.18D};
         for (double x : xs) {
             for (double y : ys) {
                 for (double z : zs) {
@@ -271,7 +294,68 @@ public final class SelectionRenderer {
                 Math.max(first.getZ(), second.getZ()) + 1.0D);
     }
 
-    private static void drawBox(PoseStack pose, VertexConsumer lines, AABB box, float red, float green, float blue, float alpha) {
-        LevelRenderer.renderLineBox(pose, lines, box, red, green, blue, alpha);
+    private static void drawBox(PoseStack pose, VertexConsumer lines, AABB box, Vec3 camera, float red, float green, float blue, float alpha) {
+        LevelRenderer.renderLineBox(pose, lines, box.move(-camera.x, -camera.y, -camera.z), red, green, blue, alpha);
+    }
+
+    private static void drawGhost(PoseStack pose, MultiBufferSource buffers, BlockRenderDispatcher renderer, Vec3 camera, double x, double y, double z, BlockState state) {
+        pose.pushPose();
+        pose.translate(x - camera.x, y - camera.y, z - camera.z);
+        renderer.renderSingleBlock(state, pose, buffers, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
+        pose.popPose();
+    }
+
+    private static void prepare(int needed) {
+        if (order.length >= needed) {
+            return;
+        }
+        int size = Math.max(needed, 256);
+        order = new int[size];
+        distanceSq = new double[size];
+    }
+
+    private static void nearest(int count, int keep) {
+        if (keep <= 0 || keep >= count) {
+            return;
+        }
+        selectNearest(0, count - 1, keep);
+    }
+
+    private static void selectNearest(int left, int right, int keep) {
+        while (left < right) {
+            int mid = partition(left, right);
+            if (mid == keep) {
+                return;
+            }
+            if (mid > keep) {
+                right = mid - 1;
+            } else {
+                left = mid + 1;
+            }
+        }
+    }
+
+    private static int partition(int left, int right) {
+        int pivot = left + ((right - left) >>> 1);
+        swap(pivot, right);
+        double value = distanceSq[right];
+        int store = left;
+        for (int index = left; index < right; index++) {
+            if (distanceSq[index] < value) {
+                swap(store, index);
+                store++;
+            }
+        }
+        swap(store, right);
+        return store;
+    }
+
+    private static void swap(int first, int second) {
+        int index = order[first];
+        order[first] = order[second];
+        order[second] = index;
+        double distance = distanceSq[first];
+        distanceSq[first] = distanceSq[second];
+        distanceSq[second] = distance;
     }
 }

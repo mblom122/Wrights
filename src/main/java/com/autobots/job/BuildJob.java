@@ -48,6 +48,10 @@ public final class BuildJob {
     private int skipped;
     private int skippedSpecial;
     private UUID droneId;
+    private final List<Hand> hands = new ArrayList<>();
+    private int spanX = 1;
+    private int spanY = 1;
+    private int spanZ = 1;
     private BlockPos lastDronePos;
     private Phase phase = Phase.RUNNING;
     private int messageDelay;
@@ -56,6 +60,7 @@ public final class BuildJob {
     private int clipX = Integer.MAX_VALUE;
     private int clipY = Integer.MAX_VALUE;
     private int clipZ = Integer.MAX_VALUE;
+    private BlockPos anchor;
 
     private BuildJob(UUID id, UUID owner, UUID controllerId, Kind kind, ResourceKey<Level> dimension, BlockPos min, BlockPos max, int total) {
         this.id = id;
@@ -173,6 +178,64 @@ public final class BuildJob {
         this.droneId = droneId;
     }
 
+    public boolean hasCrew() {
+        return !hands.isEmpty();
+    }
+
+    public List<Hand> hands() {
+        return hands;
+    }
+
+    public int spanX() {
+        return spanX;
+    }
+
+    public int spanY() {
+        return spanY;
+    }
+
+    public int spanZ() {
+        return spanZ;
+    }
+
+    public void setCrew(List<Integer> speeds, int sizeX, int sizeY, int sizeZ) {
+        hands.clear();
+        spanX = Math.max(1, sizeX);
+        spanY = Math.max(1, sizeY);
+        spanZ = Math.max(1, sizeZ);
+        int lanes = speeds.size();
+        for (int i = 0; i < lanes; i++) {
+            Hand hand = new Hand();
+            hand.lane = i;
+            hand.lanes = lanes;
+            hand.speed = Math.max(1, Math.min(4, speeds.get(i)));
+            hands.add(hand);
+        }
+    }
+
+    public void resetCrew() {
+        for (Hand hand : hands) {
+            hand.cursor = 0;
+            hand.entityId = null;
+            hand.lastPos = null;
+        }
+    }
+
+    public boolean ownsDrone(UUID id) {
+        if (id == null) {
+            return false;
+        }
+        if (id.equals(droneId)) {
+            return true;
+        }
+        for (Hand hand : hands) {
+            if (id.equals(hand.entityId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public BlockPos lastDronePos() {
         return lastDronePos;
     }
@@ -223,8 +286,39 @@ public final class BuildJob {
         return entry.x() >= clipX || entry.y() >= clipY || entry.z() >= clipZ;
     }
 
+    public void setAnchor(BlockPos anchor) {
+        this.anchor = anchor == null ? null : anchor.immutable();
+    }
+
+    public BlockPos anchor() {
+        return anchor != null ? anchor : min;
+    }
+
+    public int boxSizeX() {
+        if (kind == Kind.COPY) {
+            return Math.max(1, max.getX() - min.getX() + 1);
+        }
+        return clipX == Integer.MAX_VALUE ? 1 : clipX;
+    }
+
+    public int boxSizeY() {
+        if (kind == Kind.COPY) {
+            return Math.max(1, max.getY() - min.getY() + 1);
+        }
+        return clipY == Integer.MAX_VALUE ? 1 : clipY;
+    }
+
+    public int boxSizeZ() {
+        if (kind == Kind.COPY) {
+            return Math.max(1, max.getZ() - min.getZ() + 1);
+        }
+        return clipZ == Integer.MAX_VALUE ? 1 : clipZ;
+    }
+
     private boolean paused;
     private boolean finished;
+    private boolean stopped;
+    private boolean undone;
     private boolean undoing;
     private int historyOrder;
     private int undoTotal;
@@ -240,6 +334,14 @@ public final class BuildJob {
 
     public boolean finished() {
         return finished;
+    }
+
+    public boolean stopped() {
+        return stopped;
+    }
+
+    public boolean undone() {
+        return undone;
     }
 
     public boolean undoing() {
@@ -291,8 +393,16 @@ public final class BuildJob {
         return refunds.remove(refunds.size() - 1);
     }
 
+    public Refund takeRefund(int index) {
+        return refunds.remove(index);
+    }
+
     public void restoreRefund(Refund refund) {
         refunds.add(refund);
+    }
+
+    public void restoreRefund(int index, Refund refund) {
+        refunds.add(Math.min(Math.max(0, index), refunds.size()), refund);
     }
 
     public boolean hasRefunds() {
@@ -314,6 +424,8 @@ public final class BuildJob {
         }
         undoing = true;
         finished = false;
+        stopped = false;
+        undone = false;
         paused = false;
         undoTotal = refunds.size();
         returned = 0;
@@ -322,16 +434,27 @@ public final class BuildJob {
         return true;
     }
 
-    public void markFinished(int order) {
+    public void markFinished(int order, boolean stopped) {
         finished = true;
+        this.stopped = stopped;
+        if (stopped) {
+            undone = false;
+        }
         undoing = false;
         historyOrder = order;
         paused = false;
         droneId = null;
     }
 
+    public void markUndone() {
+        undone = true;
+        stopped = false;
+    }
+
     public void restart() {
         finished = false;
+        stopped = false;
+        undone = false;
         undoing = false;
         paused = false;
         cursor = 0;
@@ -340,6 +463,7 @@ public final class BuildJob {
         skippedSpecial = 0;
         droneId = null;
         lastDronePos = null;
+        resetCrew();
     }
 
     public boolean tickMessage() {
@@ -393,6 +517,27 @@ public final class BuildJob {
         if (lastDronePos != null) {
             tag.put("dronePos", NbtUtils.writeBlockPos(lastDronePos));
         }
+        if (!hands.isEmpty()) {
+            ListTag crew = new ListTag();
+            for (Hand hand : hands) {
+                CompoundTag handTag = new CompoundTag();
+                handTag.putInt("lane", hand.lane);
+                handTag.putInt("lanes", hand.lanes);
+                handTag.putInt("speed", hand.speed);
+                handTag.putInt("cursor", hand.cursor);
+                if (hand.entityId != null) {
+                    handTag.putUUID("entity", hand.entityId);
+                }
+                if (hand.lastPos != null) {
+                    handTag.put("pos", NbtUtils.writeBlockPos(hand.lastPos));
+                }
+                crew.add(handTag);
+            }
+            tag.put("hands", crew);
+            tag.putInt("spanX", spanX);
+            tag.putInt("spanY", spanY);
+            tag.putInt("spanZ", spanZ);
+        }
         if (blueprintName != null) {
             tag.putString("blueprintName", blueprintName);
         }
@@ -402,8 +547,13 @@ public final class BuildJob {
         if (supplyPos != null) {
             tag.put("supply", NbtUtils.writeBlockPos(supplyPos));
         }
+        if (anchor != null) {
+            tag.put("anchor", NbtUtils.writeBlockPos(anchor));
+        }
         tag.putBoolean("paused", paused);
         tag.putBoolean("finished", finished);
+        tag.putBoolean("stopped", stopped);
+        tag.putBoolean("undone", undone);
         tag.putBoolean("undoing", undoing);
         tag.putInt("historyOrder", historyOrder);
         tag.putInt("undoTotal", undoTotal);
@@ -455,6 +605,27 @@ public final class BuildJob {
         if (tag.contains("dronePos")) {
             job.lastDronePos = NbtUtils.readBlockPos(tag, "dronePos").orElse(null);
         }
+        if (tag.contains("hands")) {
+            job.spanX = Math.max(1, tag.getInt("spanX"));
+            job.spanY = Math.max(1, tag.getInt("spanY"));
+            job.spanZ = Math.max(1, tag.getInt("spanZ"));
+            ListTag crew = tag.getList("hands", Tag.TAG_COMPOUND);
+            for (int i = 0; i < crew.size(); i++) {
+                CompoundTag handTag = crew.getCompound(i);
+                Hand hand = new Hand();
+                hand.lane = handTag.getInt("lane");
+                hand.lanes = handTag.getInt("lanes");
+                hand.speed = handTag.getInt("speed");
+                hand.cursor = handTag.getInt("cursor");
+                if (handTag.hasUUID("entity")) {
+                    hand.entityId = handTag.getUUID("entity");
+                }
+                if (handTag.contains("pos")) {
+                    hand.lastPos = NbtUtils.readBlockPos(handTag, "pos").orElse(null);
+                }
+                job.hands.add(hand);
+            }
+        }
         if (tag.contains("blueprintName")) {
             job.blueprintName = tag.getString("blueprintName");
         }
@@ -464,6 +635,9 @@ public final class BuildJob {
         if (tag.contains("supply")) {
             job.supplyPos = NbtUtils.readBlockPos(tag, "supply").orElse(null);
         }
+        if (tag.contains("anchor")) {
+            job.anchor = NbtUtils.readBlockPos(tag, "anchor").orElse(null);
+        }
         if (tag.contains("clipX")) {
             job.clipX = tag.getInt("clipX");
             job.clipY = tag.getInt("clipY");
@@ -471,6 +645,8 @@ public final class BuildJob {
         }
         job.paused = tag.getBoolean("paused");
         job.finished = tag.getBoolean("finished");
+        job.stopped = tag.getBoolean("stopped");
+        job.undone = tag.getBoolean("undone");
         job.undoing = tag.getBoolean("undoing");
         job.historyOrder = tag.getInt("historyOrder");
         job.undoTotal = tag.getInt("undoTotal");
@@ -484,6 +660,15 @@ public final class BuildJob {
             job.partial.add(Schematic.Entry.load(list.getCompound(i), blocks));
         }
         return job;
+    }
+
+    public static final class Hand {
+        public int lane;
+        public int lanes;
+        public int speed = 1;
+        public int cursor;
+        public UUID entityId;
+        public BlockPos lastPos;
     }
 
     public record Refund(short x, short y, short z, BlockState state, boolean paid) {

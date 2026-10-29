@@ -29,6 +29,7 @@ public final class AutobotsInput {
     private static boolean windowRaised;
     private static boolean wasHeld;
     private static int resumeDelay;
+    private static boolean paceSent;
 
     private AutobotsInput() {
     }
@@ -57,6 +58,7 @@ public final class AutobotsInput {
         AutobotsClientState.prepareJoin();
         resumeDelay = 20;
         wasHeld = false;
+        paceSent = false;
     }
 
     @SubscribeEvent
@@ -66,6 +68,10 @@ public final class AutobotsInput {
         if (minecraft.player == null) {
             wasHeld = false;
             return;
+        }
+        if (!paceSent && minecraft.getConnection() != null) {
+            net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.autobots.network.BlueprintPayloads.SetPace(com.autobots.AutobotsClientConfig.INSTANT_JOBS.get()));
+            paceSent = true;
         }
         boolean held = com.autobots.item.ControllerItem.isHeld(minecraft.player);
         if (held) {
