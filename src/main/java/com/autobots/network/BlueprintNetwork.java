@@ -387,6 +387,9 @@ public final class BlueprintNetwork {
     }
 
     public static void showJobHologram(ServerPlayer player, BuildJob job, Schematic schematic) {
+        if (job.finished() || schematic == null) {
+            return;
+        }
         java.util.List<BlueprintPayloads.Bit> bits = new java.util.ArrayList<>();
         if (schematic != null && schematic.blockCount() <= com.autobots.AutobotsConfig.MAX_PREVIEW_BLOCKS) {
             for (Schematic.Entry entry : schematic.entries()) {
@@ -410,7 +413,7 @@ public final class BlueprintNetwork {
         PacketDistributor.sendToPlayer(player, BlueprintPayloads.JobHologram.clearAll());
         com.autobots.schematic.SchematicLibrary library = com.autobots.schematic.SchematicLibrary.get(player.getServer());
         for (com.autobots.job.BuildJob job : library.jobsFor(player.getUUID())) {
-            if (job.kind() != com.autobots.job.BuildJob.Kind.PASTE || job.schematicId() == null) {
+            if (job.finished() || job.kind() != com.autobots.job.BuildJob.Kind.PASTE || job.schematicId() == null) {
                 continue;
             }
             library.schematic(job.schematicId()).ifPresent(schematic -> showJobHologram(player, job, schematic));

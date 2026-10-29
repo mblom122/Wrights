@@ -107,6 +107,13 @@ public final class SelectionRenderer {
             drawBox(pose, lines, supplyBox(level, bound), camera, 0.35F, 0.62F, 1.0F, 1.0F);
             any = true;
         }
+        if (AutobotsClientState.supplyHighlighting() && bound != null) {
+            float pulse = 0.4F + 0.6F * (float) Math.sin(System.currentTimeMillis() / 90.0D);
+            AABB glow = supplyBox(level, bound).inflate(0.14D);
+            drawBox(pose, lines, glow, camera, 1.0F, 0.86F, 0.2F, pulse);
+            drawBox(pose, lines, glow.inflate(0.08D), camera, 1.0F, 0.96F, 0.55F, pulse * 0.7F);
+            any = true;
+        }
         if (aim != null) {
             drawBox(pose, lines, supplyBox(level, aim), camera, 0.95F, 0.78F, 0.22F, 1.0F);
             any = true;
@@ -146,7 +153,7 @@ public final class SelectionRenderer {
         VertexConsumer lines = buffers.getBuffer(RenderType.lines());
         boolean any = false;
         for (BlueprintPayloads.JobLine job : AutobotsClientState.jobs) {
-            if (!AutobotsClientState.markedJobs.contains(job.id()) || !here.equals(job.dimension())) {
+            if (job.finished() || !AutobotsClientState.markedJobs.contains(job.id()) || !here.equals(job.dimension())) {
                 continue;
             }
             BlockPos origin = job.origin();

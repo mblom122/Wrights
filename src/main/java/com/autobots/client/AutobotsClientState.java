@@ -128,6 +128,8 @@ public final class AutobotsClientState {
             } else {
                 activeBuilds.remove(payload.jobId());
             }
+        } else if (finishedJob(payload.jobId())) {
+            activeBuilds.remove(payload.jobId());
         } else {
             List<Ghost> ghosts = new ArrayList<>();
             for (BlueprintPayloads.Bit bit : payload.bits()) {
@@ -139,15 +141,7 @@ public final class AutobotsClientState {
             }
             activeBuilds.put(payload.jobId(), new ActiveBuild(payload.origin(), payload.clipX(), payload.clipY(), payload.clipZ(), ghosts));
         }
-        activeCells.clear();
-        for (ActiveBuild build : activeBuilds.values()) {
-            for (Ghost ghost : build.ghosts()) {
-                if (ghost.x() >= build.clipX() || ghost.y() >= build.clipY() || ghost.z() >= build.clipZ()) {
-                    continue;
-                }
-                activeCells.add(BlockPos.asLong(build.origin().getX() + ghost.x(), build.origin().getY() + ghost.y(), build.origin().getZ() + ghost.z()));
-            }
-        }
+        rebuildActiveCells();
     }
 
     public static void applyJobs(BlueprintPayloads.JobSync payload) {
@@ -164,6 +158,30 @@ public final class AutobotsClientState {
         }
         paces.keySet().retainAll(seen);
         markedJobs.retainAll(seen);
+        if (activeBuilds.keySet().removeIf(AutobotsClientState::finishedJob)) {
+            rebuildActiveCells();
+        }
+    }
+
+    private static boolean finishedJob(UUID id) {
+        for (BlueprintPayloads.JobLine job : jobs) {
+            if (job.id().equals(id)) {
+                return job.finished();
+            }
+        }
+        return false;
+    }
+
+    private static void rebuildActiveCells() {
+        activeCells.clear();
+        for (ActiveBuild build : activeBuilds.values()) {
+            for (Ghost ghost : build.ghosts()) {
+                if (ghost.x() >= build.clipX() || ghost.y() >= build.clipY() || ghost.z() >= build.clipZ()) {
+                    continue;
+                }
+                activeCells.add(BlockPos.asLong(build.origin().getX() + ghost.x(), build.origin().getY() + ghost.y(), build.origin().getZ() + ghost.z()));
+            }
+        }
     }
 
     public static void toggleMark(UUID id) {
