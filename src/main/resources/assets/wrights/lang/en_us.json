@@ -426,7 +426,6 @@
   "curios.identifier.wrightport": "Wrightport",
   "item.wrights.personal_wrightport": "Personal Wrightport",
   "item.wrights.personal_wrightport.drones": "Wrights %s/%s",
-  "item.wrights.personal_wrightport.assign": "Sends %s on a job",
   "item.wrights.personal_wrightport.hint": "Wear this. Wrights kept here go with you. Dock it in a Wright Manager to add them.",
   "item.wrights.blueprint": "Blueprint",
   "item.wrights.blueprint.filled": "Blueprint: %s",
