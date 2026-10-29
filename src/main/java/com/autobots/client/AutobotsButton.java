@@ -13,6 +13,11 @@ public class AutobotsButton extends Button {
         this.picked = picked;
     }
 
+    public void setShown(boolean shown) {
+        this.visible = shown;
+        this.active = shown;
+    }
+
     public AutobotsButton(int x, int y, int width, int height, Component message, OnPress onPress) {
         this(x, y, width, height, message, onPress, false);
     }
