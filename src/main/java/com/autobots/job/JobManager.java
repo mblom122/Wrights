@@ -1252,6 +1252,22 @@ public final class JobManager {
         }
     }
 
+    private static int placeableBlocks(Schematic schematic, BuildJob job) {
+        if (schematic == null) {
+            return Integer.MAX_VALUE;
+        }
+        if (job.clipX() == Integer.MAX_VALUE) {
+            return Math.max(0, schematic.blockCount());
+        }
+        int count = 0;
+        for (Schematic.Entry entry : schematic.entries()) {
+            if (!job.outsideClip(entry)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     private static boolean usesDrones(BuildJob job) {
         return job.kind() == BuildJob.Kind.PASTE && !job.finished();
     }
@@ -1296,13 +1312,21 @@ public final class JobManager {
                 }
             }
         }
+        Schematic schematic = job.schematicId() == null ? null : library.schematic(job.schematicId()).orElse(null);
+        int room = placeableBlocks(schematic, job);
+        if (kept.size() > room) {
+            Messages.actionBar(player, "message.autobots.drone_block_cap", Math.max(0, room));
+            while (kept.size() > room) {
+                kept.remove(kept.size() - 1);
+                speeds.remove(speeds.size() - 1);
+            }
+        }
         if (kept.isEmpty()) {
             discardDrone(player.getServer(), job);
             job.clearAssigned();
             job.setPaused(true);
             return;
         }
-        Schematic schematic = job.schematicId() == null ? null : library.schematic(job.schematicId()).orElse(null);
         if (!job.hasCrew() && job.droneId() != null) {
             discardId(player.getServer().getLevel(job.dimension()), job.droneId());
             job.setDroneId(null);
@@ -1414,7 +1438,13 @@ public final class JobManager {
         }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         bindCrewIds(player, library);
-        List<Swarm.Unit> units = freeUnits(player, library, job.id(), Swarm.from(Cradles.worn(player)).assignCount());
+        int blocks = placeableBlocks(schematic, job);
+        if (blocks <= 0) {
+            Messages.actionBar(player, "message.autobots.drone_block_cap", 0);
+            return false;
+        }
+        int wanted = Math.min(Swarm.from(Cradles.worn(player)).assignCount(), blocks);
+        List<Swarm.Unit> units = freeUnits(player, library, job.id(), wanted);
         if (units.isEmpty()) {
             Messages.actionBar(player, "message.autobots.drones_busy");
             return false;

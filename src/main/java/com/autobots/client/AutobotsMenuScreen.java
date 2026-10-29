@@ -122,6 +122,12 @@ public class AutobotsMenuScreen extends Screen {
     private int optionPreviewX;
     private int optionPreviewY;
     private int optionHintY;
+    private int droneY;
+    private int droneX;
+    private int droneW;
+    private int droneMinusX;
+    private int dronePlusX;
+    private int droneHintY;
     private int optionPlaceY;
     private int optionPlaceHintY;
     private int optionOffsetY;
@@ -441,7 +447,17 @@ public class AutobotsMenuScreen extends Screen {
         instantY = optionY(local - 3);
         local += 14;
         optionHintY = optionY(local);
-        local += 18;
+        local += 20;
+        boolean droneMax = AutobotsClientConfig.DRONE_MAX.get();
+        Component droneMode = Component.translatable(droneMax ? "menu.autobots.drone_max" : "menu.autobots.drone_fixed");
+        droneW = Math.max(52, this.font.width(droneMode) + 16);
+        droneX = x + 108;
+        droneY = optionY(local - 3);
+        droneMinusX = droneX + droneW + 8;
+        dronePlusX = droneMinusX + 36;
+        local += 16;
+        droneHintY = optionY(local);
+        local += 16;
         optionPlaceY = optionY(local);
         local += 12;
         optionPlaceHintY = optionY(local);
@@ -516,6 +532,24 @@ public class AutobotsMenuScreen extends Screen {
         graphics.drawCenteredString(this.font, pace, instantX + instantW / 2, instantY + 4, text);
         Component hint = Component.translatable(paceChoice ? "menu.autobots.build_speed_hint" : "menu.autobots.build_speed_locked");
         graphics.drawString(this.font, this.font.plainSubstrByWidth(hint.getString(), optionViewW - 28), x, optionHintY, 0xFF667480, false);
+        boolean droneMax = AutobotsClientConfig.DRONE_MAX.get();
+        graphics.drawString(this.font, Component.translatable("menu.autobots.drone_deploy"), x, droneY + 3, AutobotsUi.MUTED, false);
+        Component droneMode = Component.translatable(droneMax ? "menu.autobots.drone_max" : "menu.autobots.drone_fixed");
+        graphics.fill(droneX, droneY, droneX + droneW, droneY + 16, droneMax ? 0xFF24384A : 0xFF18222C);
+        AutobotsUi.border(graphics, droneX, droneY, droneW, 16, droneMax ? AutobotsUi.COPPER : 0xFF3D4E5E);
+        graphics.drawCenteredString(this.font, droneMode, droneX + droneW / 2, droneY + 4, AutobotsUi.TEXT);
+        if (!droneMax) {
+            graphics.fill(droneMinusX, droneY, droneMinusX + 16, droneY + 16, 0xFF18222C);
+            AutobotsUi.border(graphics, droneMinusX, droneY, 16, 16, 0xFF3D4E5E);
+            graphics.drawCenteredString(this.font, "-", droneMinusX + 8, droneY + 4, AutobotsUi.TEXT);
+            String count = Integer.toString(AutobotsClientConfig.DRONE_COUNT.get());
+            graphics.drawCenteredString(this.font, count, droneMinusX + 26, droneY + 4, AutobotsUi.TEXT);
+            graphics.fill(dronePlusX, droneY, dronePlusX + 16, droneY + 16, 0xFF18222C);
+            AutobotsUi.border(graphics, dronePlusX, droneY, 16, 16, 0xFF3D4E5E);
+            graphics.drawCenteredString(this.font, "+", dronePlusX + 8, droneY + 4, AutobotsUi.TEXT);
+        }
+        Component droneHint = Component.translatable(droneMax ? "menu.autobots.drone_max_hint" : "menu.autobots.drone_fixed_hint");
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(droneHint.getString(), optionViewW - 28), x, droneHintY, 0xFF667480, false);
         graphics.drawString(this.font, Component.translatable("menu.autobots.place_offset"), x, optionPlaceY, AutobotsUi.TEXT, false);
         int hintW = Math.max(40, optionViewW - 16);
         graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("menu.autobots.place_hint").getString(), hintW), x, optionPlaceHintY, AutobotsUi.MUTED, false);
@@ -708,6 +742,26 @@ public class AutobotsMenuScreen extends Screen {
                         PacketDistributor.sendToServer(new BlueprintPayloads.SetPace(next));
                     }
                     return true;
+                }
+                if (mouseX >= droneX && mouseX < droneX + droneW && mouseY >= droneY && mouseY < droneY + 16) {
+                    AutobotsClientState.deployChosen = false;
+                    AutobotsClientConfig.setDroneMax(!AutobotsClientConfig.DRONE_MAX.get());
+                    AutobotsClientState.applyDeploy();
+                    return true;
+                }
+                if (!AutobotsClientConfig.DRONE_MAX.get() && mouseY >= droneY && mouseY < droneY + 16) {
+                    int step = 0;
+                    if (mouseX >= droneMinusX && mouseX < droneMinusX + 16) {
+                        step = -1;
+                    } else if (mouseX >= dronePlusX && mouseX < dronePlusX + 16) {
+                        step = 1;
+                    }
+                    if (step != 0) {
+                        AutobotsClientState.deployChosen = false;
+                        AutobotsClientConfig.setDroneCount(AutobotsClientConfig.DRONE_COUNT.get() + step);
+                        AutobotsClientState.applyDeploy();
+                        return true;
+                    }
                 }
                 if (hitSlider(mouseX, mouseY, wallSliderX, wallSliderY, wallSliderW)) {
                     drag = 1;

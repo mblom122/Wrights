@@ -122,6 +122,11 @@
   "menu.autobots.undone": "Undone",
   "menu.autobots.build_speed": "Build speed",
   "menu.autobots.build_speed_hint": "Creative only. Drone follows the cradle. Instant finishes the job in one step.",
+  "menu.autobots.drone_deploy": "Drones on a job",
+  "menu.autobots.drone_max": "Max",
+  "menu.autobots.drone_fixed": "Fixed",
+  "menu.autobots.drone_max_hint": "Uses every free drone, but never more than the job has blocks.",
+  "menu.autobots.drone_fixed_hint": "Uses this many drones, but never more than the job has blocks.",
   "menu.autobots.build_speed_locked": "Survival always uses drones.",
   "menu.autobots.instant": "Instant",
   "menu.autobots.drone_pace": "Drone",
@@ -343,5 +348,6 @@
   "message.autobots.speed_max": "That drone is already at full speed",
   "message.autobots.speed_parts": "That tune needs %s gold and %s redstone",
   "message.autobots.speed_up": "Drone speed is now %s",
-  "message.autobots.launched_crew": "Sent %s drones"
+  "message.autobots.launched_crew": "Sent %s drones",
+  "message.autobots.drone_block_cap": "This job has %s blocks, so it can't use more drones than that."
 }

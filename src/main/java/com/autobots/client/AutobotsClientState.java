@@ -61,6 +61,7 @@ public final class AutobotsClientState {
     public static int viewY = 1;
     public static int viewZ = 1;
     public static int blockCount;
+    public static boolean deployChosen;
     public static boolean sampled;
     public static boolean concealed;
     public static boolean follow;
@@ -607,6 +608,37 @@ public final class AutobotsClientState {
         }
     }
 
+    public static int placeableBlocks() {
+        if (blockCount <= 0) {
+            return 0;
+        }
+        boolean smaller = viewX < fullX || viewY < fullY || viewZ < fullZ;
+        if (!smaller || sampled || ghosts.isEmpty()) {
+            return blockCount;
+        }
+        int inside = 0;
+        for (Ghost ghost : ghosts) {
+            if (ghost.x() < viewX && ghost.y() < viewY && ghost.z() < viewZ) {
+                inside++;
+            }
+        }
+        return inside > 0 ? inside : blockCount;
+    }
+
+    public static void applyDeploy() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null) {
+            return;
+        }
+        com.autobots.drone.Swarm swarm = com.autobots.drone.Cradles.swarm(minecraft.player);
+        int next = AutobotsClientConfig.deployTarget(swarm.units().size(), placeableBlocks());
+        if (next <= 0 || next == swarm.assignCount()) {
+            return;
+        }
+        com.autobots.drone.Cradles.replaceWorn(minecraft.player, swarm.withAssign(next));
+        PacketDistributor.sendToServer(new BlueprintPayloads.SetAssign(next));
+    }
+
     public static boolean tryBuild() {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player == null || !ControllerItem.isHeld(minecraft.player)) {
@@ -614,6 +646,9 @@ public final class AutobotsClientState {
         }
         if (mode != Mode.BUILD || buildId == null || anchor == null || buildCooldown > 0) {
             return false;
+        }
+        if (!(minecraft.screen instanceof PlacementScreen) && !deployChosen) {
+            applyDeploy();
         }
         buildCooldown = 2;
         follow = true;

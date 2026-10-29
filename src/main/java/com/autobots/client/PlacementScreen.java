@@ -45,6 +45,7 @@ public class PlacementScreen extends Screen {
     private AutobotsButton promptCancel;
     private boolean promptOpen;
     private boolean movePrompt;
+    private boolean deployApplied;
     private boolean awaitTaller;
     private EditBox xBox;
     private EditBox yBox;
@@ -135,6 +136,10 @@ public class PlacementScreen extends Screen {
         addRenderableWidget(clearSupplyButton);
         boolean paceInstant = this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild && !this.minecraft.player.isSpectator() && AutobotsClientConfig.INSTANT_JOBS.get();
         if (!paceInstant) {
+            if (!deployApplied && !AutobotsClientState.deployChosen) {
+                AutobotsClientState.applyDeploy();
+            }
+            deployApplied = true;
             step(controlsX + 12, panelY + 118, "-", () -> changeAssign(-1));
             step(controlsX + controlsW - 28, panelY + 118, "+", () -> changeAssign(1));
         }
@@ -253,9 +258,10 @@ public class PlacementScreen extends Screen {
             graphics.drawString(this.font, Component.translatable("screen.autobots.drones_instant"), controlsX + 12, panelY + 122, AutobotsUi.MUTED, false);
         } else if (this.minecraft.player != null) {
             com.autobots.drone.Swarm swarm = com.autobots.drone.Cradles.swarm(this.minecraft.player);
+            int cap = Math.min(swarm.units().size(), Math.max(0, AutobotsClientState.placeableBlocks()));
             Component line = swarm.units().isEmpty()
                     ? Component.translatable(com.autobots.drone.Cradles.worn(this.minecraft.player).isEmpty() ? "screen.autobots.need_cradle" : "screen.autobots.need_drone")
-                    : Component.translatable("screen.autobots.drones_send", swarm.assignCount(), swarm.units().size());
+                    : Component.translatable("screen.autobots.drones_send", Math.min(swarm.assignCount(), Math.max(1, cap)), Math.max(1, cap));
             int color = swarm.units().isEmpty() ? 0xFFE07A7A : AutobotsUi.BLUE;
             graphics.drawString(this.font, this.font.plainSubstrByWidth(line.getString(), 168), controlsX + 32, panelY + 122, color, false);
         }
@@ -401,6 +407,7 @@ public class PlacementScreen extends Screen {
         AutobotsClientState.viewX = clamp(sx);
         AutobotsClientState.viewY = clamp(sy);
         AutobotsClientState.viewZ = clamp(sz);
+        clampDeploy();
     }
 
     private void setAnchor(BlockPos anchor) {
@@ -416,6 +423,7 @@ public class PlacementScreen extends Screen {
         AutobotsClientState.viewX = clamp(x);
         AutobotsClientState.viewY = clamp(y);
         AutobotsClientState.viewZ = clamp(z);
+        clampDeploy();
         refresh();
     }
 
@@ -664,9 +672,30 @@ public class PlacementScreen extends Screen {
         if (swarm.units().isEmpty()) {
             return;
         }
-        int next = net.minecraft.util.Mth.clamp(swarm.assignCount() + delta, 1, swarm.units().size());
+        int cap = Math.min(swarm.units().size(), AutobotsClientState.placeableBlocks());
+        if (cap <= 0) {
+            return;
+        }
+        int next = Mth.clamp(swarm.assignCount() + delta, 1, cap);
+        if (next == swarm.assignCount()) {
+            return;
+        }
+        AutobotsClientState.deployChosen = true;
         com.autobots.drone.Cradles.replaceWorn(this.minecraft.player, swarm.withAssign(next));
         PacketDistributor.sendToServer(new BlueprintPayloads.SetAssign(next));
+    }
+
+    private void clampDeploy() {
+        if (this.minecraft.player == null) {
+            return;
+        }
+        com.autobots.drone.Swarm swarm = com.autobots.drone.Cradles.swarm(this.minecraft.player);
+        int cap = Math.min(swarm.units().size(), AutobotsClientState.placeableBlocks());
+        if (cap <= 0 || swarm.assignCount() <= cap) {
+            return;
+        }
+        com.autobots.drone.Cradles.replaceWorn(this.minecraft.player, swarm.withAssign(cap));
+        PacketDistributor.sendToServer(new BlueprintPayloads.SetAssign(cap));
     }
 
     private void axis(GuiGraphics graphics, int x, int y, String label) {
