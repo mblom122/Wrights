@@ -1,0 +1,14 @@
+---
+description: Commit and push after every user prompt that changes the project
+alwaysApply: true
+---
+
+# Commit and push after each prompt
+
+After each chat prompt from the user, if that prompt changed project files, commit those changes and push them to the tracked remote branch before the turn ends.
+
+- Include every file the prompt changed. Leave out secrets (`.env`, credentials, tokens).
+- Use a short commit message in the repo's existing style, focused on why the change exists.
+- Push the current branch. Do not force-push.
+- If the prompt changed nothing, do not create an empty commit.
+- If the user explicitly says not to commit or not to push for that prompt, skip it.
