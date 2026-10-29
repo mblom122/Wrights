@@ -33,4 +33,10 @@ public final class AutobotsUi {
         graphics.fill(x, y, x + width, y + height, INSET);
         border(graphics, x, y, width, height, 0xFF243140);
     }
+
+    public static void slot(GuiGraphics graphics, int x, int y, int edge) {
+        graphics.fill(x, y, x + 18, y + 18, 0xFF050A10);
+        border(graphics, x, y, 18, 18, edge);
+        graphics.fill(x + 1, y + 1, x + 17, y + 2, 0xFF1A2836);
+    }
 }

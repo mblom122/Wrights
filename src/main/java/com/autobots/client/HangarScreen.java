@@ -13,7 +13,7 @@ import com.autobots.network.BlueprintPayloads;
 
 public class HangarScreen extends AbstractContainerScreen<com.autobots.menu.HangarMenu> {
     private static final int ROW = 12;
-    private static final int LIST_X = 30;
+    private static final int LIST_X = 80;
     private static final int LIST_Y = 18;
     private int selected;
 
@@ -70,11 +70,17 @@ public class HangarScreen extends AbstractContainerScreen<com.autobots.menu.Hang
     @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
         graphics.drawString(this.font, this.title, this.titleLabelX, this.titleLabelY, AutobotsUi.COPPER, false);
+        graphics.drawString(this.font, Component.translatable("screen.autobots.cradle_dock"), 8, 18, AutobotsUi.MUTED, false);
+        graphics.drawString(this.font, Component.translatable("screen.autobots.cradle_worn"), 46, 18, AutobotsUi.MUTED, false);
     }
 
     @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
         AutobotsUi.panel(graphics, leftPos, topPos, imageWidth, imageHeight);
+        for (net.minecraft.world.inventory.Slot slot : this.menu.slots) {
+            int edge = slot.index <= 1 ? AutobotsUi.COPPER : 0xFFC5D2DE;
+            AutobotsUi.slot(graphics, leftPos + slot.x - 1, topPos + slot.y - 1, edge);
+        }
     }
 
     @Override
@@ -95,7 +101,7 @@ public class HangarScreen extends AbstractContainerScreen<com.autobots.menu.Hang
                     ? Component.translatable("screen.autobots.hangar_duty").getString()
                     : Component.translatable("screen.autobots.hangar_standby").getString();
             String line = (i + 1) + "  " + Component.translatable("drone.autobots.speed." + speed).getString() + "  " + duty;
-            graphics.drawString(this.font, this.font.plainSubstrByWidth(line, 136), leftPos + LIST_X, y + 1, i < swarm.assignCount() ? AutobotsUi.COPPER : AutobotsUi.MUTED, false);
+            graphics.drawString(this.font, this.font.plainSubstrByWidth(line, 84), leftPos + LIST_X, y + 1, i < swarm.assignCount() ? AutobotsUi.COPPER : AutobotsUi.MUTED, false);
         }
         if (swarm.units().isEmpty()) {
             graphics.drawString(this.font, Component.translatable("screen.autobots.hangar_empty"), leftPos + LIST_X, topPos + LIST_Y + 2, AutobotsUi.MUTED, false);
