@@ -14,13 +14,19 @@ import com.wrights.drone.WrightTier;
 import com.wrights.item.WrightItem;
 
 /**
- * The wright list opened from the Wright Manager. Adding and taking use the click modifiers:
+ * The wright list opened from the Wright Manager. Adding uses the click modifiers:
  * plain is one, shift is 16, alt is a stack of 64, and alt with shift is everything that fits.
  */
 final class WrightManagePanel {
     private static final int PANEL_W = 248;
     private static final int ROW = 14;
     private static final int EXPAND = 46;
+    private static final int UPGRADE_X = 18;
+    private static final int UPGRADE_W = 108;
+    private static final int DOWNGRADE_X = 132;
+    private static final int DOWNGRADE_W = 100;
+
+    private WrightsButton removeButton;
 
     private boolean open;
     private int scroll;
@@ -53,8 +59,10 @@ final class WrightManagePanel {
         int y = panelY + panelH - 34;
         screen.addButton(new WrightsButton(panelX + 12, y, 70, 16, Component.translatable("screen.wrights.manage_add"),
                 button -> screen.edit(HangarOps.INSERT, mode())));
-        screen.addButton(new WrightsButton(panelX + 88, y, 70, 16, Component.translatable("screen.wrights.manage_take"),
-                button -> screen.edit(HangarOps.EXTRACT, mode())));
+        removeButton = new WrightsButton(panelX + 88, y, 70, 16, Component.translatable("screen.wrights.manage_remove"),
+                button -> removeSelected(screen));
+        removeButton.active = false;
+        screen.addButton(removeButton);
         screen.addButton(new WrightsButton(panelX + 164, y, 72, 16, Component.translatable("screen.wrights.back"),
                 button -> close(screen)));
     }
@@ -67,6 +75,9 @@ final class WrightManagePanel {
         Swarm swarm = swarm(screen);
         if (expanded >= swarm.units().size()) {
             expanded = -1;
+        }
+        if (removeButton != null) {
+            removeButton.active = expanded >= 0;
         }
         graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_count", swarm.units().size(), Swarm.MAX, held(screen)),
                 panelX + 12, panelY + 22, WrightsUi.MUTED, false);
@@ -97,16 +108,17 @@ final class WrightManagePanel {
             if (i == expanded) {
                 if (y + EXPAND > listTop && y < listBottom) {
                     graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_pace"), panelX + 18, y + 2, WrightsUi.TEXT, false);
+                    boolean canDowngrade = tier > WrightTier.COPPER;
                     if (tier < WrightTier.NETHERITE) {
                         Component next = Component.translatable(WrightTier.nameKey(tier + 1));
                         graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_next", next), panelX + 18, y + 14, WrightsUi.MUTED, false);
                         boolean have = screen.getMinecraft().player != null && (screen.getMinecraft().player.getAbilities().instabuild
                                 || count(screen, WrightTier.upgradeItem(tier + 1)) > 0);
-                        drawMini(graphics, screen, panelX + 18, y + 28, 108, Component.translatable("screen.wrights.manage_upgrade", next), have, mouseX, mouseY);
-                        drawMini(graphics, screen, panelX + 132, y + 28, 72, Component.translatable("screen.wrights.manage_take_one"), true, mouseX, mouseY);
+                        drawMini(graphics, screen, panelX + UPGRADE_X, y + 28, UPGRADE_W, Component.translatable("screen.wrights.manage_upgrade", next), have, mouseX, mouseY);
+                        drawMini(graphics, screen, panelX + DOWNGRADE_X, y + 28, DOWNGRADE_W, Component.translatable("screen.wrights.manage_remove_upgrade"), canDowngrade, mouseX, mouseY);
                     } else {
                         graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_best"), panelX + 18, y + 14, WrightsUi.MUTED, false);
-                        drawMini(graphics, screen, panelX + 18, y + 28, 72, Component.translatable("screen.wrights.manage_take_one"), true, mouseX, mouseY);
+                        drawMini(graphics, screen, panelX + UPGRADE_X, y + 28, UPGRADE_W, Component.translatable("screen.wrights.manage_remove_upgrade"), canDowngrade, mouseX, mouseY);
                     }
                 }
                 y += EXPAND;
@@ -135,25 +147,30 @@ final class WrightManagePanel {
             y += ROW;
             if (expanded == i) {
                 int tier = WrightTier.clamp(swarm.units().get(i).speed());
-                if (tier < WrightTier.NETHERITE && local >= y + 28 && local < y + 42) {
-                    if (mouseX >= panelX + 18 && mouseX < panelX + 126) {
+                if (local >= y + 28 && local < y + 42) {
+                    if (tier < WrightTier.NETHERITE && mouseX >= panelX + UPGRADE_X && mouseX < panelX + UPGRADE_X + UPGRADE_W) {
                         screen.edit(HangarOps.UPGRADE, i);
                         return true;
                     }
-                    if (mouseX >= panelX + 132 && mouseX < panelX + 204) {
-                        screen.edit(HangarOps.TAKE, i);
-                        expanded = -1;
+                    int downX = tier < WrightTier.NETHERITE ? panelX + DOWNGRADE_X : panelX + UPGRADE_X;
+                    int downW = tier < WrightTier.NETHERITE ? DOWNGRADE_W : UPGRADE_W;
+                    if (tier > WrightTier.COPPER && mouseX >= downX && mouseX < downX + downW) {
+                        screen.edit(HangarOps.DOWNGRADE, i);
                         return true;
                     }
-                } else if (tier >= WrightTier.NETHERITE && local >= y + 28 && local < y + 42 && mouseX >= panelX + 18 && mouseX < panelX + 90) {
-                    screen.edit(HangarOps.TAKE, i);
-                    expanded = -1;
-                    return true;
                 }
                 y += EXPAND;
             }
         }
         return true;
+    }
+
+    private void removeSelected(HangarScreen screen) {
+        if (expanded < 0) {
+            return;
+        }
+        screen.edit(HangarOps.TAKE, expanded);
+        expanded = -1;
     }
 
     boolean mouseScrolled(HangarScreen screen, double mouseX, double mouseY, double delta) {

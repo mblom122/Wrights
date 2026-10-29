@@ -28,6 +28,7 @@ public final class HangarOps {
     public static final int EXTRACT = 7;
     public static final int UPGRADE = 8;
     public static final int TAKE = 9;
+    public static final int DOWNGRADE = 10;
 
     public static final int ONE = 0;
     public static final int SIXTEEN = 1;
@@ -78,6 +79,7 @@ public final class HangarOps {
             case EXTRACT -> extract(player, swarm, index);
             case UPGRADE -> upgrade(player, swarm, index);
             case TAKE -> take(player, swarm, index);
+            case DOWNGRADE -> downgrade(player, swarm, index);
             default -> swarm;
         };
     }
@@ -168,6 +170,30 @@ public final class HangarOps {
             Messages.actionBar(player, "message.wrights.wrights_removed", taken);
         }
         return next;
+    }
+
+    private static Swarm downgrade(ServerPlayer player, Swarm swarm, int index) {
+        if (index < 0 || index >= swarm.units().size()) {
+            return swarm;
+        }
+        int tier = WrightTier.clamp(swarm.units().get(index).speed());
+        if (tier <= WrightTier.COPPER) {
+            Messages.actionBar(player, "message.wrights.downgrade_none");
+            return swarm;
+        }
+        Item upgrade = WrightTier.upgradeItem(tier);
+        if (upgrade != null) {
+            giveStack(player, new ItemStack(upgrade));
+        }
+        Messages.actionBar(player, "message.wrights.downgrade_done", Component.translatable(WrightTier.nameKey(tier)));
+        return swarm.withSpeed(index, tier - 1);
+    }
+
+    private static void giveStack(ServerPlayer player, ItemStack stack) {
+        player.getInventory().add(stack);
+        if (!stack.isEmpty()) {
+            player.drop(stack, false);
+        }
     }
 
     private static Swarm upgrade(ServerPlayer player, Swarm swarm, int index) {
