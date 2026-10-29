@@ -159,9 +159,10 @@ public final class JobManager {
             job.setPaused(true);
             library.setDirty();
         } else if (action == com.wrights.network.BlueprintPayloads.JobControl.RESUME && !job.finished()) {
-            if (missingDrones(player, job)) {
+            bindCrewIds(player, library);
+            if (job.paused() && !restorePausedCrew(player, library, job)) {
                 Messages.actionBar(player, "message.wrights.paused_no_drones");
-            } else {
+            } else if (job.paused()) {
                 job.setPaused(false);
                 library.setDirty();
             }
@@ -300,9 +301,12 @@ public final class JobManager {
     private static void setPausedAll(ServerPlayer player, SchematicLibrary library, boolean paused) {
         boolean changed = false;
         int blocked = 0;
+        if (!paused) {
+            bindCrewIds(player, library);
+        }
         for (BuildJob job : library.jobsFor(player.getUUID())) {
             if (!job.finished() && job.paused() != paused) {
-                if (!paused && missingDrones(player, job)) {
+                if (!paused && !restorePausedCrew(player, library, job)) {
                     blocked++;
                     continue;
                 }
@@ -1097,6 +1101,7 @@ public final class JobManager {
     }
 
     public static void bindCrewIds(ServerPlayer player, SchematicLibrary library) {
+        boolean worn = !Wrightports.worn(player).isEmpty();
         Swarm swarm = Wrightports.swarm(player);
         Set<UUID> known = new HashSet<>();
         for (Swarm.Unit unit : swarm.units()) {
@@ -1112,13 +1117,21 @@ public final class JobManager {
                 }
                 continue;
             }
+            if (!worn) {
+                dirty |= job.rememberCrewQuota(assignedCount(job));
+                continue;
+            }
             List<UUID> current = new ArrayList<>();
             for (UUID unit : job.crewUnits()) {
                 if (known.contains(unit) && taken.add(unit)) {
                     current.add(unit);
                 }
             }
-            if (current.isEmpty() && job.crewUnits().isEmpty()) {
+            int had = assignedCount(job);
+            if (current.size() < had) {
+                dirty |= job.rememberCrewQuota(had);
+            }
+            if (current.isEmpty() && job.crewUnits().isEmpty() && !(job.paused() && job.crewQuota() > 0)) {
                 int need = job.hasCrew() ? job.hands().size() : (instant(player) ? 0 : 1);
                 for (Swarm.Unit unit : swarm.units()) {
                     if (current.size() >= need) {
@@ -1129,25 +1142,58 @@ public final class JobManager {
                     }
                 }
             }
+            if (current.isEmpty() && had > 0) {
+                dirty |= detachCrew(player, job);
+                continue;
+            }
+            if (job.crewQuota() == 0 && !current.isEmpty()) {
+                job.setCrewQuota(current.size());
+                dirty = true;
+            }
             if (!current.equals(job.crewUnits())) {
                 job.setCrewUnits(current);
                 dirty = true;
             }
             taken.addAll(current);
             if (job.hasCrew() && current.size() != job.hands().size()) {
-                if (current.isEmpty()) {
-                    discardDrone(player.getServer(), job);
-                    job.clearAssigned();
-                    job.setPaused(true);
-                } else {
-                    fitCrew(player, library, job, current);
-                }
+                fitCrew(player, library, job, current);
                 dirty = true;
             }
         }
         if (dirty) {
             library.setDirty();
         }
+    }
+
+    private static int assignedCount(BuildJob job) {
+        return Math.max(job.crewUnits().size(), job.hasCrew() ? job.hands().size() : 0);
+    }
+
+    /** Drops wright ids that left the port, but keeps the job's work split for a later resume. */
+    private static boolean detachCrew(ServerPlayer player, BuildJob job) {
+        boolean changed = false;
+        boolean flying = job.droneId() != null;
+        if (!flying) {
+            for (BuildJob.Hand hand : job.hands()) {
+                if (hand.entityId != null) {
+                    flying = true;
+                    break;
+                }
+            }
+        }
+        if (flying) {
+            discardDrone(player.getServer(), job);
+            changed = true;
+        }
+        if (!job.crewUnits().isEmpty()) {
+            job.setCrewUnits(List.of());
+            changed = true;
+        }
+        if (!job.paused()) {
+            job.setPaused(true);
+            changed = true;
+        }
+        return changed;
     }
 
     public static void setJobDrones(ServerPlayer player, UUID id, UUID unitId, boolean add) {
@@ -1255,10 +1301,12 @@ public final class JobManager {
     private static void placeCrew(ServerPlayer player, SchematicLibrary library, BuildJob job, List<UUID> ids) {
         if (ids.isEmpty()) {
             discardDrone(player.getServer(), job);
+            job.setCrewQuota(0);
             job.clearAssigned();
             job.setPaused(true);
         } else {
             fitCrew(player, library, job, ids);
+            job.setCrewQuota(assignedCount(job));
         }
     }
 
@@ -1409,15 +1457,83 @@ public final class JobManager {
         return Wrightports.worn(player).isEmpty() || Wrightports.swarm(player).units().isEmpty() || job.awaitingDrones();
     }
 
+    /**
+     * Puts the crew back to the size it had when the personal wrightport was taken off.
+     * Uses wrights that are still in the port, then fills the rest from whatever is free.
+     */
+    private static boolean restorePausedCrew(ServerPlayer player, SchematicLibrary library, BuildJob job) {
+        if (instant(player) || job.kind() != BuildJob.Kind.PASTE || job.finished()) {
+            return true;
+        }
+        if (Wrightports.worn(player).isEmpty() || Wrightports.swarm(player).units().isEmpty()) {
+            return false;
+        }
+        int quota = job.crewQuota();
+        if (quota <= 0) {
+            return !job.awaitingDrones() && (job.hasCrew() || !job.crewUnits().isEmpty());
+        }
+        Schematic schematic = job.schematicId() == null ? null : library.schematic(job.schematicId()).orElse(null);
+        int room = placeableBlocks(schematic, job);
+        if (room <= 0) {
+            return false;
+        }
+        int wanted = Math.min(quota, room);
+        Swarm swarm = Wrightports.swarm(player);
+        Set<UUID> have = new HashSet<>();
+        for (Swarm.Unit unit : swarm.units()) {
+            have.add(unit.id());
+        }
+        List<UUID> ids = new ArrayList<>();
+        for (UUID unit : job.crewUnits()) {
+            if (ids.size() >= wanted) {
+                break;
+            }
+            if (have.contains(unit)) {
+                ids.add(unit);
+            }
+        }
+        for (Swarm.Unit unit : swarm.units()) {
+            if (ids.size() >= wanted) {
+                break;
+            }
+            if (ids.contains(unit.id()) || claimedByOther(library, player.getUUID(), job.id(), unit.id())) {
+                continue;
+            }
+            ids.add(unit.id());
+        }
+        if (ids.isEmpty()) {
+            return false;
+        }
+        if (!job.awaitingDrones() && job.hasCrew() && ids.size() == job.hands().size() && ids.size() == job.crewUnits().size() && ids.containsAll(job.crewUnits())) {
+            return true;
+        }
+        boolean fresh = !job.hasCrew();
+        fitCrew(player, library, job, ids);
+        if (fresh && job.hasCrew()) {
+            for (BuildJob.Hand hand : job.hands()) {
+                hand.cursor = 0;
+                hand.rescan = true;
+                for (BuildJob.Slice slice : hand.slices) {
+                    slice.cursor = 0;
+                }
+            }
+        }
+        return job.hasCrew() && !job.awaitingDrones();
+    }
+
     private static boolean holdWithoutDrones(ServerPlayer player, SchematicLibrary library, BuildJob job) {
         if (!missingDrones(player, job)) {
             return false;
         }
+        boolean dirty = job.rememberCrewQuota(assignedCount(job));
         if (!job.paused()) {
             job.setPaused(true);
-            library.setDirty();
+            dirty = true;
             Messages.actionBar(player, "message.wrights.paused_no_drones");
             BlueprintNetwork.syncJobs(player);
+        }
+        if (dirty) {
+            library.setDirty();
         }
         return true;
     }
@@ -1467,6 +1583,7 @@ public final class JobManager {
         }
         job.setCrew(speeds, sizeX, sizeY, sizeZ);
         job.setCrewUnits(ids);
+        job.setCrewQuota(ids.size());
         evenOut(job, schematic);
         return job.hasCrew();
     }

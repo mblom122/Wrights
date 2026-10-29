@@ -233,6 +233,23 @@ public final class BuildJob {
         return awaitDrones;
     }
 
+    public int crewQuota() {
+        return crewQuota;
+    }
+
+    public void setCrewQuota(int crewQuota) {
+        this.crewQuota = Math.max(0, crewQuota);
+    }
+
+    /** Keeps the largest crew this job was given, so a later resume can refill it. */
+    public boolean rememberCrewQuota(int count) {
+        if (count > crewQuota) {
+            crewQuota = count;
+            return true;
+        }
+        return false;
+    }
+
     public void clearAssigned() {
         hands.clear();
         crewUnits.clear();
@@ -380,6 +397,7 @@ public final class BuildJob {
 
     private boolean paused;
     private boolean awaitDrones;
+    private int crewQuota;
     private boolean finished;
     private boolean stopped;
     private boolean undone;
@@ -655,6 +673,7 @@ public final class BuildJob {
         tag.putInt("workedTicks", workedTicks);
         tag.putBoolean("paused", paused);
         tag.putBoolean("awaitDrones", awaitDrones);
+        tag.putInt("crewQuota", crewQuota);
         tag.putBoolean("finished", finished);
         tag.putBoolean("stopped", stopped);
         tag.putBoolean("undone", undone);
@@ -774,6 +793,7 @@ public final class BuildJob {
         job.workedTicks = tag.getInt("workedTicks");
         job.paused = tag.getBoolean("paused");
         job.awaitDrones = tag.getBoolean("awaitDrones");
+        job.crewQuota = Math.max(0, tag.getInt("crewQuota"));
         job.finished = tag.getBoolean("finished");
         job.stopped = tag.getBoolean("stopped");
         job.undone = tag.getBoolean("undone");
