@@ -1,11 +1,18 @@
 package com.wrights.client;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.joml.Matrix4f;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.ByteBufferBuilder;
+import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexBuffer;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 
@@ -14,6 +21,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -28,7 +36,8 @@ import net.minecraft.world.level.material.FluidState;
 import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
 
 public final class BlueprintModelView {
-    private static final int DRAW_LIMIT = 1200;
+    private static List<WrightsClientState.Ghost> bakedFor;
+    private static ModelMesh baked = ModelMesh.EMPTY;
 
     private BlueprintModelView() {
     }
@@ -49,37 +58,26 @@ public final class BlueprintModelView {
         pose.mulPose(Axis.YP.rotationDegrees(yaw));
         pose.translate(-sizeX / 2.0D, -sizeY / 2.0D, -sizeZ / 2.0D);
 
-        Minecraft minecraft = Minecraft.getInstance();
-        BlockRenderDispatcher renderer = minecraft.getBlockRenderer();
-        MultiBufferSource.BufferSource buffer = minecraft.renderBuffers().bufferSource();
-        int step = Math.max(1, (ghosts.size() + DRAW_LIMIT - 1) / DRAW_LIMIT);
+        ModelMesh mesh = meshFor(ghosts);
+        Matrix4f modelView = new Matrix4f(RenderSystem.getModelViewMatrix()).mul(pose.last().pose());
+        Matrix4f projection = new Matrix4f(RenderSystem.getProjectionMatrix());
         RenderSystem.enableDepthTest();
-        for (int pass = 0; pass < 2; pass++) {
-            boolean fluids = pass == 1;
-            for (int i = 0; i < ghosts.size(); i += step) {
-                WrightsClientState.Ghost ghost = ghosts.get(i);
-                BlockState state = Block.stateById(ghost.stateId());
-                boolean liquid = state.getBlock() instanceof LiquidBlock;
-                if (liquid != fluids || state.isAir()) {
-                    continue;
-                }
-                if (!liquid && state.getRenderShape() == RenderShape.INVISIBLE) {
-                    continue;
-                }
-                pose.pushPose();
-                pose.translate(ghost.x(), ghost.y(), ghost.z());
-                if (liquid) {
-                    renderFluid(pose, buffer, state);
-                } else {
-                    renderer.renderSingleBlock(state, pose, buffer, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
-                }
-                pose.popPose();
-            }
-            buffer.endBatch();
-        }
+        mesh.draw(modelView, projection);
         RenderSystem.disableDepthTest();
         pose.popPose();
         graphics.disableScissor();
+    }
+
+    /** Every block stays on its real coordinate. The mesh is built once so turning it stays cheap. */
+    private static ModelMesh meshFor(List<WrightsClientState.Ghost> ghosts) {
+        if (ghosts == bakedFor) {
+            return baked;
+        }
+        ModelMesh next = ModelMesh.build(ghosts);
+        baked.close();
+        bakedFor = ghosts;
+        baked = next;
+        return baked;
     }
 
     /** Water and lava have no block model, so the preview draws the fluid texture as a cube. */
@@ -128,5 +126,113 @@ public final class BlueprintModelView {
                 .setOverlay(OverlayTexture.NO_OVERLAY)
                 .setLight(LightTexture.FULL_BRIGHT)
                 .setNormal(nx, ny, nz);
+    }
+
+    private static final class ModelMesh {
+        private static final ModelMesh EMPTY = new ModelMesh(List.of());
+
+        private final List<Layer> layers;
+
+        private ModelMesh(List<Layer> layers) {
+            this.layers = layers;
+        }
+
+        private static ModelMesh build(List<WrightsClientState.Ghost> ghosts) {
+            Capture capture = new Capture();
+            PoseStack pose = new PoseStack();
+            BlockRenderDispatcher renderer = Minecraft.getInstance().getBlockRenderer();
+            for (WrightsClientState.Ghost ghost : ghosts) {
+                BlockState state = Block.stateById(ghost.stateId());
+                if (state.isAir()) {
+                    continue;
+                }
+                pose.pushPose();
+                pose.translate(ghost.x(), ghost.y(), ghost.z());
+                if (state.getBlock() instanceof LiquidBlock) {
+                    renderFluid(pose, capture, state);
+                } else if (state.getRenderShape() != RenderShape.INVISIBLE) {
+                    renderer.renderSingleBlock(state, pose, capture, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
+                }
+                pose.popPose();
+            }
+            List<Layer> opaque = new ArrayList<>();
+            List<Layer> clear = new ArrayList<>();
+            try {
+                for (Map.Entry<RenderType, BufferBuilder> entry : capture.builders.entrySet()) {
+                    MeshData mesh = entry.getValue().build();
+                    if (mesh == null) {
+                        continue;
+                    }
+                    VertexBuffer buffer = new VertexBuffer(VertexBuffer.Usage.STATIC);
+                    buffer.upload(mesh);
+                    Layer layer = new Layer(entry.getKey(), buffer);
+                    if (entry.getKey().sortOnUpload()) {
+                        clear.add(layer);
+                    } else {
+                        opaque.add(layer);
+                    }
+                }
+            } catch (RuntimeException ex) {
+                for (Layer layer : opaque) {
+                    layer.buffer.close();
+                }
+                for (Layer layer : clear) {
+                    layer.buffer.close();
+                }
+                throw ex;
+            } finally {
+                for (ByteBufferBuilder bytes : capture.memory.values()) {
+                    bytes.close();
+                }
+            }
+            opaque.addAll(clear);
+            return new ModelMesh(opaque);
+        }
+
+        private void draw(Matrix4f modelView, Matrix4f projection) {
+            for (Layer layer : layers) {
+                layer.type.setupRenderState();
+                ShaderInstance shader = RenderSystem.getShader();
+                if (shader != null) {
+                    layer.buffer.bind();
+                    layer.buffer.drawWithShader(modelView, projection, shader);
+                    VertexBuffer.unbind();
+                }
+                layer.type.clearRenderState();
+            }
+        }
+
+        private void close() {
+            for (Layer layer : layers) {
+                layer.buffer.close();
+            }
+        }
+    }
+
+    private static final class Layer {
+        private final RenderType type;
+        private final VertexBuffer buffer;
+
+        private Layer(RenderType type, VertexBuffer buffer) {
+            this.type = type;
+            this.buffer = buffer;
+        }
+    }
+
+    private static final class Capture implements MultiBufferSource {
+        private final Map<RenderType, ByteBufferBuilder> memory = new LinkedHashMap<>();
+        private final Map<RenderType, BufferBuilder> builders = new LinkedHashMap<>();
+
+        @Override
+        public VertexConsumer getBuffer(RenderType type) {
+            BufferBuilder builder = builders.get(type);
+            if (builder == null) {
+                ByteBufferBuilder bytes = new ByteBufferBuilder(Math.max(256, type.bufferSize()));
+                memory.put(type, bytes);
+                builder = new BufferBuilder(bytes, type.mode(), type.format());
+                builders.put(type, builder);
+            }
+            return builder;
+        }
     }
 }
