@@ -1,5 +1,9 @@
 package com.wrights;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 public final class WrightsClientConfig {
@@ -75,6 +79,12 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.ConfigValue<String> RECENT_BLOCKS = BUILDER
             .comment("Blocks recently picked while editing a blueprint.")
             .define("recentBlocks", "");
+    public static final ModConfigSpec.ConfigValue<String> LIST_SORT = BUILDER
+            .comment("Sort for each blueprint tab: key and direction. Keys are manual, name, size, blocks, used, last used.")
+            .define("listSort", "0:1,5:0,4:0,1:1");
+    public static final ModConfigSpec.ConfigValue<String> LIST_MANUAL = BUILDER
+            .comment("Last hand-ordered blueprint list for each tab, kept when another sort is chosen.")
+            .define("listManual", "");
 
     static final ModConfigSpec SPEC = BUILDER.build();
 
@@ -178,6 +188,114 @@ public final class WrightsClientConfig {
 
     public static void save() {
         SPEC.save();
+    }
+
+    public static int sortKey(int tab) {
+        return sortPair(tab)[0];
+    }
+
+    public static boolean sortAscending(int tab) {
+        return sortPair(tab)[1] == 1;
+    }
+
+    public static void setListSort(int tab, int key, boolean ascending) {
+        int[][] pairs = new int[4][];
+        for (int i = 0; i < pairs.length; i++) {
+            pairs[i] = sortPair(i);
+        }
+        int index = clamp(tab, 0, pairs.length - 1);
+        pairs[index][0] = clamp(key, 0, 5);
+        pairs[index][1] = ascending ? 1 : 0;
+        StringBuilder joined = new StringBuilder();
+        for (int i = 0; i < pairs.length; i++) {
+            if (i > 0) {
+                joined.append(',');
+            }
+            joined.append(pairs[i][0]).append(':').append(pairs[i][1]);
+        }
+        LIST_SORT.set(joined.toString());
+        save();
+    }
+
+    public static List<UUID> manualOrder(int tab) {
+        String raw = LIST_MANUAL.get();
+        if (raw == null || raw.isEmpty()) {
+            return List.of();
+        }
+        String prefix = clamp(tab, 0, 3) + ":";
+        for (String part : raw.split("\\|")) {
+            if (!part.startsWith(prefix)) {
+                continue;
+            }
+            String body = part.substring(prefix.length());
+            if (body.isEmpty()) {
+                return List.of();
+            }
+            List<UUID> ids = new ArrayList<>();
+            for (String token : body.split(",")) {
+                try {
+                    ids.add(UUID.fromString(token));
+                } catch (IllegalArgumentException ignored) {
+                    // A damaged entry is skipped so the rest of the order still loads.
+                }
+            }
+            return ids;
+        }
+        return List.of();
+    }
+
+    public static void setManualOrder(int tab, List<UUID> ids) {
+        String[] parts = new String[] {"0:", "1:", "2:", "3:"};
+        String raw = LIST_MANUAL.get();
+        if (raw != null && !raw.isEmpty()) {
+            for (String part : raw.split("\\|")) {
+                int colon = part.indexOf(':');
+                if (colon != 1) {
+                    continue;
+                }
+                int which = part.charAt(0) - '0';
+                if (which >= 0 && which < parts.length) {
+                    parts[which] = part;
+                }
+            }
+        }
+        int index = clamp(tab, 0, parts.length - 1);
+        StringBuilder body = new StringBuilder();
+        body.append(index).append(':');
+        for (int i = 0; i < ids.size(); i++) {
+            if (i > 0) {
+                body.append(',');
+            }
+            body.append(ids.get(i));
+        }
+        parts[index] = body.toString();
+        LIST_MANUAL.set(String.join("|", parts));
+        save();
+    }
+
+    private static int[] sortPair(int tab) {
+        int[][] defaults = {{0, 1}, {5, 0}, {4, 0}, {1, 1}};
+        int index = clamp(tab, 0, defaults.length - 1);
+        int[] pair = defaults[index].clone();
+        String raw = LIST_SORT.get();
+        if (raw == null || raw.isEmpty()) {
+            return pair;
+        }
+        String[] parts = raw.split(",");
+        if (index >= parts.length) {
+            return pair;
+        }
+        String[] bits = parts[index].split(":");
+        if (bits.length < 2) {
+            return pair;
+        }
+        try {
+            pair[0] = clamp(Integer.parseInt(bits[0].trim()), 0, 5);
+            pair[1] = "1".equals(bits[1].trim()) ? 1 : 0;
+        } catch (NumberFormatException ignored) {
+            return defaults[index].clone();
+        }
+        return pair;
     }
 
     public static void setRecentBlocks(String ids) {

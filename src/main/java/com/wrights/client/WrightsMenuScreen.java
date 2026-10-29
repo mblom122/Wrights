@@ -51,6 +51,20 @@ public class WrightsMenuScreen extends Screen {
     private EditBox rename;
     private WrightsButton newButton;
     private WrightsButton folderButton;
+    private WrightsButton sortButton;
+    private boolean sortOpen;
+    private int sortMenuX;
+    private int sortMenuY;
+    private int sortMenuW;
+    private int sortMenuH;
+    private static final String[] SORT_LABELS = {
+            "menu.wrights.sort_manual",
+            "menu.wrights.sort_name",
+            "menu.wrights.sort_size",
+            "menu.wrights.sort_blocks",
+            "menu.wrights.sort_used",
+            "menu.wrights.sort_last"
+    };
     private WrightsButton editButton;
     private WrightsButton deleteButton;
     private WrightsButton buildButton;
@@ -215,12 +229,30 @@ public class WrightsMenuScreen extends Screen {
 
         int y = panelY + panelH - 26;
         int gap = 4;
-        int buttonW = Math.max(36, (listW - gap * 3) / 4);
+        int sortW = Math.max(40, this.font.width(Component.translatable("menu.wrights.sort").getString()) + 12);
+        sortButton = add(new WrightsButton(listX + listW - sortW, searchY, sortW, 16, Component.translatable("menu.wrights.sort"), button -> {
+            sortOpen = !sortOpen;
+            if (sortButton != null) {
+                sortButton.setPicked(sortOpen);
+            }
+        }));
+        int folderW = this.font.width(Component.translatable("menu.wrights.new_folder").getString()) + 12;
+        int room = listW - gap * 3;
+        int minOther = 30;
+        if (folderW > room - minOther * 3) {
+            folderW = Math.max(minOther, room - minOther * 3);
+        }
+        int otherW = Math.max(minOther, (room - folderW) / 3);
+        int slack = listW - (folderW + otherW * 3 + gap * 3);
+        int x = listX;
+        folderButton = add(new WrightsButton(x, y, folderW, 18, Component.translatable("menu.wrights.new_folder"), button -> newFolder()));
+        x += folderW + gap;
+        newButton = add(new WrightsButton(x, y, otherW, 18, Component.translatable("menu.wrights.new"), button -> newBlueprint()));
+        x += otherW + gap;
+        editButton = add(new WrightsButton(x, y, otherW, 18, Component.translatable("menu.wrights.edit"), button -> edit()));
+        x += otherW + gap;
+        deleteButton = add(new WrightsButton(x, y, otherW + Math.max(0, slack), 18, Component.translatable("menu.wrights.delete"), button -> delete(), true));
         int detailButtonW = 58;
-        newButton = add(new WrightsButton(listX, y, buttonW, 18, Component.translatable("menu.wrights.new"), button -> newBlueprint()));
-        folderButton = add(new WrightsButton(listX + buttonW + gap, y, buttonW, 18, Component.translatable("menu.wrights.folder"), button -> newFolder()));
-        editButton = add(new WrightsButton(listX + (buttonW + gap) * 2, y, buttonW, 18, Component.translatable("menu.wrights.edit"), button -> edit()));
-        deleteButton = add(new WrightsButton(listX + (buttonW + gap) * 3, y, buttonW, 18, Component.translatable("menu.wrights.delete"), button -> delete(), true));
         buildButton = add(new WrightsButton(detailX + detailW - 120, y, detailButtonW, 18, Component.translatable("menu.wrights.build"), button -> build()));
         addRenderableWidget(new WrightsButton(detailX + detailW - detailButtonW, y, detailButtonW, 18, Component.translatable("menu.wrights.close"), button -> onClose()));
         renameButton = add(new WrightsButton(detailX + Math.max(48, detailW - 78), detailSplit + 52, 74, 14, Component.translatable("menu.wrights.rename"), button -> rename()));
@@ -324,8 +356,18 @@ public class WrightsMenuScreen extends Screen {
         boolean building = !options && !jobsPage;
         search.setX(listX);
         search.setY(searchY);
-        search.setWidth(listW);
+        int sortW = sortButton == null ? 0 : sortButton.getWidth();
+        search.setWidth(Math.max(40, listW - sortW - 4));
         search.visible = building;
+        if (sortButton != null) {
+            sortButton.setX(listX + listW - sortW);
+            sortButton.setY(searchY);
+            sortButton.visible = building;
+            sortButton.setPicked(sortOpen && building);
+        }
+        if (!building) {
+            sortOpen = false;
+        }
         rename.visible = building;
         newButton.visible = building;
         if (folderButton != null) {
@@ -428,6 +470,9 @@ public class WrightsMenuScreen extends Screen {
         }
         renderList(graphics, mouseX, mouseY);
         renderDetail(graphics);
+        if (sortOpen) {
+            renderSortMenu(graphics, mouseX, mouseY);
+        }
     }
 
     private void drawTask(GuiGraphics graphics, Component label, boolean active, boolean soon, int y) {
@@ -663,7 +708,7 @@ public class WrightsMenuScreen extends Screen {
             int tabW = i == keys.length - 1 ? listX + listW - x : width;
             boolean on = savedTab == i;
             boolean hover = mouseX >= x && mouseX < x + tabW && mouseY >= headingY && mouseY < headingY + 14;
-            graphics.fill(x, headingY, x + tabW - 1, headingY + 13, on ? 0xFF24384A : (hover ? 0xFF1E2C38 : 0xFF141C24));
+            graphics.fill(x, headingY, x + tabW - 1, headingY + 13, on ? 0xFF24384A : (hover ? 0xFF223445 : 0xFF1C2A37));
             if (on) {
                 graphics.fill(x, headingY, x + tabW - 1, headingY + 2, WrightsUi.COPPER);
             }
@@ -952,7 +997,17 @@ public class WrightsMenuScreen extends Screen {
             }
             return super.mouseClicked(mouseX, mouseY, button);
         }
+        if (button == 0 && !options && !jobsPage && sortOpen && pickSort(mouseX, mouseY)) {
+            return true;
+        }
         if (button == 0 && !options && !jobsPage && clickTab(mouseX, mouseY)) {
+            return true;
+        }
+        if (button == 0 && !options && !jobsPage && sortOpen && (sortButton == null || !sortButton.isMouseOver(mouseX, mouseY))) {
+            sortOpen = false;
+            if (sortButton != null) {
+                sortButton.setPicked(false);
+            }
             return true;
         }
         if (button == 0 && !options && !jobsPage && insideModel(mouseX, mouseY)) {
@@ -1027,7 +1082,11 @@ public class WrightsMenuScreen extends Screen {
             dropHighlight = null;
             dropLineY = -1;
             if (dragging && index >= 0) {
-                PacketDistributor.sendToServer(new BlueprintPayloads.ShelfEdit(BlueprintPayloads.ShelfEdit.MOVE, pressed, folder, parent, index, ""));
+                if (savedTab == BlueprintList.Tab.ALL.ordinal()) {
+                    PacketDistributor.sendToServer(new BlueprintPayloads.ShelfEdit(BlueprintPayloads.ShelfEdit.MOVE, pressed, folder, parent, index, ""));
+                } else {
+                    rememberManual(pressed, index);
+                }
             } else if (!dragging) {
                 activateRow(pressed);
             }
@@ -1044,6 +1103,18 @@ public class WrightsMenuScreen extends Screen {
             return true;
         }
         return super.mouseReleased(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (sortOpen && keyCode == 256) {
+            sortOpen = false;
+            if (sortButton != null) {
+                sortButton.setPicked(false);
+            }
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     private boolean insideModel(double mouseX, double mouseY) {
@@ -1684,8 +1755,144 @@ public class WrightsMenuScreen extends Screen {
         return true;
     }
 
+    private void placeSortMenu() {
+        int widest = 128;
+        for (String key : SORT_LABELS) {
+            widest = Math.max(widest, this.font.width(Component.translatable(key).getString()) + 72);
+        }
+        sortMenuW = widest;
+        sortMenuH = 8 + SORT_LABELS.length * 16;
+        sortMenuX = sortButton.getX() + sortButton.getWidth() - sortMenuW;
+        sortMenuY = sortButton.getY() + sortButton.getHeight() + 2;
+        if (sortMenuX < panelX + 8) {
+            sortMenuX = panelX + 8;
+        }
+        if (sortMenuY + sortMenuH > panelY + panelH - 8) {
+            sortMenuY = sortButton.getY() - sortMenuH - 2;
+        }
+    }
+
+    private void renderSortMenu(GuiGraphics graphics, int mouseX, int mouseY) {
+        if (sortButton == null) {
+            return;
+        }
+        placeSortMenu();
+        WrightsUi.panel(graphics, sortMenuX, sortMenuY, sortMenuW, sortMenuH);
+        int selected = WrightsClientConfig.sortKey(savedTab);
+        boolean ascending = WrightsClientConfig.sortAscending(savedTab);
+        for (int i = 0; i < SORT_LABELS.length; i++) {
+            int y = sortMenuY + 4 + i * 16;
+            boolean on = selected == i;
+            boolean hover = mouseX >= sortMenuX && mouseX < sortMenuX + sortMenuW && mouseY >= y && mouseY < y + 16;
+            if (on || hover) {
+                graphics.fill(sortMenuX + 3, y, sortMenuX + sortMenuW - 2, y + 15, on ? 0xFF24384A : 0xFF1C2A37);
+            }
+            String label = Component.translatable(SORT_LABELS[i]).getString();
+            graphics.drawString(this.font, label, sortMenuX + 8, y + 4, on ? WrightsUi.TEXT : WrightsUi.MUTED, false);
+            if (on && i != BlueprintList.SortKey.MANUAL.ordinal()) {
+                String direction = sortDirection(i, ascending);
+                graphics.drawString(this.font, direction, sortMenuX + sortMenuW - 8 - this.font.width(direction), y + 4, WrightsUi.COPPER, false);
+            }
+        }
+    }
+
+    private String sortDirection(int key, boolean ascending) {
+        String id = switch (key) {
+            case 1 -> ascending ? "menu.wrights.sort_az" : "menu.wrights.sort_za";
+            case 2 -> ascending ? "menu.wrights.sort_small" : "menu.wrights.sort_large";
+            case 3 -> ascending ? "menu.wrights.sort_few" : "menu.wrights.sort_many";
+            case 4 -> ascending ? "menu.wrights.sort_least" : "menu.wrights.sort_most";
+            case 5 -> ascending ? "menu.wrights.sort_oldest" : "menu.wrights.sort_newest";
+            default -> "";
+        };
+        return id.isEmpty() ? "" : Component.translatable(id).getString();
+    }
+
+    private boolean pickSort(double mouseX, double mouseY) {
+        if (sortButton == null) {
+            return false;
+        }
+        placeSortMenu();
+        if (mouseX < sortMenuX || mouseX >= sortMenuX + sortMenuW || mouseY < sortMenuY || mouseY >= sortMenuY + sortMenuH) {
+            return false;
+        }
+        int row = (int) ((mouseY - sortMenuY - 4) / 16);
+        if (row >= 0 && row < SORT_LABELS.length) {
+            chooseSort(row);
+        }
+        return true;
+    }
+
+    private void chooseSort(int key) {
+        int current = WrightsClientConfig.sortKey(savedTab);
+        boolean ascending = WrightsClientConfig.sortAscending(savedTab);
+        if (key == BlueprintList.SortKey.MANUAL.ordinal()) {
+            if (current == key) {
+                return;
+            }
+            if (savedTab != BlueprintList.Tab.ALL.ordinal() && WrightsClientConfig.manualOrder(savedTab).isEmpty()) {
+                List<UUID> ids = new ArrayList<>();
+                for (BlueprintList.Row row : BlueprintList.rows(BlueprintList.Tab.values()[savedTab], "")) {
+                    ids.add(row.id());
+                }
+                WrightsClientConfig.setManualOrder(savedTab, ids);
+            }
+            WrightsClientConfig.setListSort(savedTab, key, true);
+        } else {
+            boolean next = key == current ? !ascending : key == BlueprintList.SortKey.NAME.ordinal();
+            WrightsClientConfig.setListSort(savedTab, key, next);
+        }
+        scroll = 0;
+        refresh();
+    }
+
+    private void rememberManual(UUID id, int toIndex) {
+        List<UUID> visible = new ArrayList<>();
+        for (BlueprintList.Row row : rows) {
+            visible.add(row.id());
+        }
+        int from = visible.indexOf(id);
+        if (from < 0) {
+            return;
+        }
+        visible.remove(from);
+        visible.add(Mth.clamp(toIndex, 0, visible.size()), id);
+        List<UUID> merged = new ArrayList<>();
+        int cursor = 0;
+        for (UUID old : WrightsClientConfig.manualOrder(savedTab)) {
+            if (visible.contains(old)) {
+                if (cursor < visible.size()) {
+                    UUID next = visible.get(cursor++);
+                    if (!merged.contains(next)) {
+                        merged.add(next);
+                    }
+                }
+            } else if (inLibrary(old) && !merged.contains(old)) {
+                merged.add(old);
+            }
+        }
+        while (cursor < visible.size()) {
+            UUID next = visible.get(cursor++);
+            if (!merged.contains(next)) {
+                merged.add(next);
+            }
+        }
+        WrightsClientConfig.setManualOrder(savedTab, merged);
+        refresh();
+    }
+
+    private static boolean inLibrary(UUID id) {
+        for (BlueprintPayloads.Summary summary : WrightsClientState.library) {
+            if (summary.id().equals(id)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean canArrange() {
-        return savedTab == BlueprintList.Tab.ALL.ordinal() && (search == null || search.getValue().trim().isEmpty());
+        return WrightsClientConfig.sortKey(savedTab) == BlueprintList.SortKey.MANUAL.ordinal()
+                && (search == null || search.getValue().trim().isEmpty());
     }
 
     private void newFolder() {
@@ -1704,7 +1911,7 @@ public class WrightsMenuScreen extends Screen {
                 true,
                 parent,
                 0,
-                Component.translatable("menu.wrights.folder").getString()));
+                Component.translatable("menu.wrights.new_folder").getString()));
         refresh();
     }
 
