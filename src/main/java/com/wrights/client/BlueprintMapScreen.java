@@ -1,20 +1,24 @@
 package com.wrights.client;
 
 import java.util.List;
+import java.util.UUID;
+import java.util.function.Supplier;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.block.state.BlockState;
 
-public class BlueprintMapScreen extends Screen {
+public class BlueprintMapScreen extends Screen implements JeiPreview {
     public interface Pick {
         void selectCell(int x, int y, int z);
     }
 
     private final Screen parent;
     private final Pick pick;
-    private final List<WrightsClientState.Ghost> ghosts;
+    private final Supplier<List<WrightsClientState.Ghost>> ghosts;
+    private final UUID id;
     private final StructureGrid grid = new StructureGrid();
     private final int sizeX;
     private final int sizeY;
@@ -33,11 +37,12 @@ public class BlueprintMapScreen extends Screen {
     private boolean chosen;
     private WrightsButton okButton;
 
-    public BlueprintMapScreen(Screen parent, Pick pick, List<WrightsClientState.Ghost> ghosts, int sizeX, int sizeY, int sizeZ, int layer, int anchorX, int anchorY, int anchorZ, int selectedX, int selectedY, int selectedZ) {
+    public BlueprintMapScreen(Screen parent, Pick pick, Supplier<List<WrightsClientState.Ghost>> ghosts, UUID id, int sizeX, int sizeY, int sizeZ, int layer, int anchorX, int anchorY, int anchorZ, int selectedX, int selectedY, int selectedZ) {
         super(Component.translatable("screen.wrights.map"));
         this.parent = parent;
         this.pick = pick;
-        this.ghosts = ghosts == null ? List.of() : ghosts;
+        this.ghosts = ghosts == null ? List::of : ghosts;
+        this.id = id;
         this.sizeX = Math.max(1, sizeX);
         this.sizeY = Math.max(1, sizeY);
         this.sizeZ = Math.max(1, sizeZ);
@@ -59,11 +64,17 @@ public class BlueprintMapScreen extends Screen {
 
     @Override
     protected void init() {
-        int margin = 28;
+        int margin = 16;
         int chrome = 78;
-        pixel = Math.max(48, Math.min(this.width - margin * 2, this.height - chrome));
+        int room = this.width - margin * 2 - JeiPreview.JEI_LANE;
+        if (room >= 48) {
+            pixel = Math.max(48, Math.min(room, this.height - chrome));
+            gridX = Math.max(margin, (this.width - pixel - JeiPreview.JEI_LANE) / 2);
+        } else {
+            pixel = Math.max(48, Math.min(this.width - margin * 2, this.height - chrome));
+            gridX = Math.max(margin, (this.width - pixel) / 2);
+        }
         window = Math.max(1, pixel / 8);
-        gridX = (this.width - pixel) / 2;
         gridY = 28;
         int focusX = chosen ? pendingX : anchorX;
         int focusZ = chosen ? pendingZ : anchorZ;
@@ -93,7 +104,8 @@ public class BlueprintMapScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, this.title, gridX, 10, WrightsUi.COPPER, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.layer", layer + 1, sizeY), gridX + pixel - 80, 10, WrightsUi.MUTED, false);
-        grid.render(graphics, ghosts, sizeX, sizeZ, layer, anchorX, anchorY, anchorZ, pendingX, pendingY, pendingZ);
+        List<WrightsClientState.Ghost> shown = ghosts.get();
+        grid.render(graphics, shown == null ? List.of() : shown, sizeX, sizeZ, layer, anchorX, anchorY, anchorZ, pendingX, pendingY, pendingZ);
     }
 
     @Override
@@ -126,6 +138,58 @@ public class BlueprintMapScreen extends Screen {
     @Override
     public boolean isPauseScreen() {
         return false;
+    }
+
+    @Override
+    public int jeiLeft() {
+        return gridX;
+    }
+
+    @Override
+    public int jeiTop() {
+        return gridY;
+    }
+
+    @Override
+    public int jeiWidth() {
+        return pixel;
+    }
+
+    @Override
+    public int jeiHeight() {
+        return pixel;
+    }
+
+    @Override
+    public int jeiScreenWidth() {
+        return this.width;
+    }
+
+    @Override
+    public int jeiScreenHeight() {
+        return this.height;
+    }
+
+    @Override
+    public List<StructureGrid.Spot> dropSpots() {
+        return grid.spots(sizeX, sizeZ, layer);
+    }
+
+    @Override
+    public UUID blueprintId() {
+        return id;
+    }
+
+    @Override
+    public void acceptDrop(int x, int y, int z, BlockState state) {
+        pendingX = x;
+        pendingY = y;
+        pendingZ = z;
+        chosen = true;
+        if (okButton != null) {
+            okButton.active = true;
+        }
+        CellEdits.apply(id, x, y, z, state);
     }
 
     private void confirm() {

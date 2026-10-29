@@ -315,7 +315,8 @@ public final class LayerColumn {
         screen.getMinecraft().setScreen(new BlueprintMapScreen(
                 screen,
                 this::selectCell,
-                view.ghosts(),
+                view::ghosts,
+                view.id(),
                 view.sizeX(),
                 view.sizeY(),
                 view.sizeZ(),
@@ -326,6 +327,14 @@ public final class LayerColumn {
                 selX,
                 selY,
                 selZ));
+    }
+
+    public List<StructureGrid.Spot> dropSpots() {
+        if (view.concealed() || view.id() == null) {
+            return List.of();
+        }
+        layoutGrid();
+        return grid.spots(view.sizeX(), view.sizeZ(), layer);
     }
 
     private void layoutGrid() {

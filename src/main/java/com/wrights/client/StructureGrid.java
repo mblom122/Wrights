@@ -1,5 +1,6 @@
 package com.wrights.client;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import net.minecraft.client.Minecraft;
@@ -7,6 +8,8 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+
+import com.wrights.util.BlockFilters;
 
 public final class StructureGrid {
     public static final int INLINE = 10;
@@ -114,15 +117,24 @@ public final class StructureGrid {
                 int cellX = originX + localX * cell;
                 int cellY = originY + localZ * cell;
                 BlockState state = Block.stateById(ghost.stateId());
-                ItemStack stack = com.wrights.util.BlockFilters.icon(state);
-                if (!stack.isEmpty()) {
+                int drawn = blockSize();
+                if (BlockFilters.isFluid(state)) {
                     var pose = graphics.pose();
                     pose.pushPose();
-                    pose.translate(cellX, cellY, 50);
-                    float scale = blockSize() / 16.0F;
-                    pose.scale(scale, scale, 1.0F);
-                    graphics.renderItem(stack, 0, 0);
+                    pose.translate(0.0F, 0.0F, 50.0F);
+                    FluidIcons.draw(graphics, state, cellX, cellY, drawn);
                     pose.popPose();
+                } else {
+                    ItemStack stack = BlockFilters.icon(state);
+                    if (!stack.isEmpty()) {
+                        var pose = graphics.pose();
+                        pose.pushPose();
+                        pose.translate(cellX, cellY, 50);
+                        float scale = drawn / 16.0F;
+                        pose.scale(scale, scale, 1.0F);
+                        graphics.renderItem(stack, 0, 0);
+                        pose.popPose();
+                    }
                 }
             }
         }
@@ -187,6 +199,26 @@ public final class StructureGrid {
         graphics.fill(end - arm, y, end, y + arm, color);
         graphics.fill(x, bottom - arm, x + arm, bottom, color);
         graphics.fill(end - arm, bottom - arm, end, bottom, color);
+    }
+
+    public record Spot(int x, int y, int z, int pixelX, int pixelY, int size) {
+    }
+
+    /** Every visible cell, including empty ones, so a drop can place or replace. */
+    public List<Spot> spots(int sizeX, int sizeZ, int layer) {
+        List<Spot> spots = new ArrayList<>();
+        int drawn = blockSize();
+        for (int z = 0; z < spanZ; z++) {
+            for (int x = 0; x < spanX; x++) {
+                int worldX = fromX + x;
+                int worldZ = fromZ + z;
+                if (!inside(worldX, worldZ, sizeX, sizeZ)) {
+                    continue;
+                }
+                spots.add(new Spot(worldX, layer, worldZ, originX + x * cell, originY + z * cell, drawn));
+            }
+        }
+        return spots;
     }
 
     public int[] hit(double mouseX, double mouseY, int sizeX, int sizeZ, int layer) {

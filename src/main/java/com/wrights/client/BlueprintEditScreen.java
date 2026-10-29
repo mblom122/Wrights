@@ -1,15 +1,19 @@
 package com.wrights.client;
 
+import java.util.List;
+import java.util.UUID;
+
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.blueprint.BlueprintTransforms;
 import com.wrights.blueprint.BoxEdits;
 import com.wrights.network.BlueprintPayloads;
 
-public class BlueprintEditScreen extends Screen {
+public class BlueprintEditScreen extends Screen implements JeiPreview {
     private final LayerColumn column = new LayerColumn(LayerColumn.EDIT);
     private int panelX;
     private int panelY;
@@ -39,7 +43,7 @@ public class BlueprintEditScreen extends Screen {
         }
         panelW = pad + modelSize + gap + controlsW + pad;
         panelH = 420;
-        panelX = Math.max(4, (this.width - panelW) / 2);
+        panelX = JeiPreview.left(this.width, panelW);
         panelY = Math.max(4, (this.height - panelH) / 2);
         int modelX = panelX + pad;
         int modelY = panelY + 28;
@@ -136,6 +140,52 @@ public class BlueprintEditScreen extends Screen {
 
     public void selectCell(int x, int y, int z) {
         column.selectCell(x, y, z);
+    }
+
+    @Override
+    public int jeiLeft() {
+        return panelX;
+    }
+
+    @Override
+    public int jeiTop() {
+        return panelY;
+    }
+
+    @Override
+    public int jeiWidth() {
+        return panelW;
+    }
+
+    @Override
+    public int jeiHeight() {
+        return panelH;
+    }
+
+    @Override
+    public int jeiScreenWidth() {
+        return this.width;
+    }
+
+    @Override
+    public int jeiScreenHeight() {
+        return this.height;
+    }
+
+    @Override
+    public List<StructureGrid.Spot> dropSpots() {
+        return column.dropSpots();
+    }
+
+    @Override
+    public UUID blueprintId() {
+        return WrightsClientState.editId;
+    }
+
+    @Override
+    public void acceptDrop(int x, int y, int z, BlockState state) {
+        column.selectCell(x, y, z);
+        CellEdits.apply(WrightsClientState.editId, x, y, z, state);
     }
 
     private void transform(BlueprintTransforms.Op operation) {

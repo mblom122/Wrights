@@ -1,10 +1,14 @@
 package com.wrights.client;
 
+import java.util.List;
+import java.util.UUID;
+
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.WrightsClientConfig;
@@ -13,7 +17,7 @@ import com.wrights.blueprint.BlueprintTransforms;
 import com.wrights.blueprint.BoxEdits;
 import com.wrights.network.BlueprintPayloads;
 
-public class PlacementScreen extends Screen {
+public class PlacementScreen extends Screen implements JeiPreview {
     private final LayerColumn column = new LayerColumn(LayerColumn.BUILD);
     private int panelX;
     private int panelY;
@@ -55,7 +59,7 @@ public class PlacementScreen extends Screen {
         }
         panelW = pad + modelSize + gap + controlsW + pad;
         panelH = 420;
-        panelX = Math.max(4, (this.width - panelW) / 2);
+        panelX = JeiPreview.left(this.width, panelW);
         panelY = Math.max(4, (this.height - panelH) / 2);
         int modelX = panelX + pad;
         int modelY = panelY + 28;
@@ -433,5 +437,51 @@ public class PlacementScreen extends Screen {
 
     private void axis(GuiGraphics graphics, int x, int y, String label) {
         graphics.drawString(this.font, label, x, y + 3, WrightsUi.MUTED, false);
+    }
+
+    @Override
+    public int jeiLeft() {
+        return panelX;
+    }
+
+    @Override
+    public int jeiTop() {
+        return panelY;
+    }
+
+    @Override
+    public int jeiWidth() {
+        return panelW;
+    }
+
+    @Override
+    public int jeiHeight() {
+        return panelH;
+    }
+
+    @Override
+    public int jeiScreenWidth() {
+        return this.width;
+    }
+
+    @Override
+    public int jeiScreenHeight() {
+        return this.height;
+    }
+
+    @Override
+    public List<StructureGrid.Spot> dropSpots() {
+        return column.dropSpots();
+    }
+
+    @Override
+    public UUID blueprintId() {
+        return WrightsClientState.buildId;
+    }
+
+    @Override
+    public void acceptDrop(int x, int y, int z, BlockState state) {
+        column.selectCell(x, y, z);
+        CellEdits.apply(WrightsClientState.buildId, x, y, z, state);
     }
 }

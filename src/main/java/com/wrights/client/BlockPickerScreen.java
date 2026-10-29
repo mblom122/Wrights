@@ -23,7 +23,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import com.wrights.network.BlueprintPayloads;
 import com.wrights.util.BlockFilters;
 
-public class BlockPickerScreen extends Screen {
+public class BlockPickerScreen extends Screen implements JeiPreview {
     private enum Tab {
         RECENT,
         INVENTORY,
@@ -77,7 +77,7 @@ public class BlockPickerScreen extends Screen {
     protected void init() {
         panelW = Math.min(220, this.width - 16);
         panelH = Math.min(248, this.height - 16);
-        panelX = (this.width - panelW) / 2;
+        panelX = JeiPreview.left(this.width, panelW);
         panelY = (this.height - panelH) / 2;
         search = new EditBox(this.font, panelX + 12, panelY + 28, panelW - 24, 16, Component.translatable("menu.wrights.search"));
         search.setHint(Component.translatable("menu.wrights.search"));
@@ -119,24 +119,30 @@ public class BlockPickerScreen extends Screen {
             return;
         }
         int start = scroll * COLS;
-        ItemStack hovered = ItemStack.EMPTY;
+        Choice hovered = null;
         for (int i = 0; i < rows * COLS && start + i < shown.size(); i++) {
             int column = i % COLS;
             int row = i / COLS;
             int x = listX + column * CELL;
             int y = listY + row * CELL;
-            ItemStack stack = shown.get(start + i).icon();
+            Choice choice = shown.get(start + i);
             boolean over = mouseX >= x && mouseX < x + CELL && mouseY >= y && mouseY < y + CELL;
             if (over) {
                 graphics.fill(x, y, x + CELL, y + CELL, 0x66F2D48A);
-                hovered = stack;
+                hovered = choice;
             }
-            if (!stack.isEmpty()) {
-                graphics.renderItem(stack, x + 1, y + 1);
+            if (choice.fluid() != null) {
+                FluidIcons.draw(graphics, choice.fluid(), x + 1, y + 1, 16);
+            } else if (!choice.icon().isEmpty()) {
+                graphics.renderItem(choice.icon(), x + 1, y + 1);
             }
         }
-        if (!hovered.isEmpty()) {
-            graphics.renderTooltip(this.font, hovered, (int) mouseX, (int) mouseY);
+        if (hovered != null) {
+            if (hovered.fluid() != null) {
+                graphics.renderTooltip(this.font, hovered.name(), (int) mouseX, (int) mouseY);
+            } else if (!hovered.icon().isEmpty()) {
+                graphics.renderTooltip(this.font, hovered.icon(), (int) mouseX, (int) mouseY);
+            }
         }
     }
 
@@ -199,7 +205,7 @@ public class BlockPickerScreen extends Screen {
         }
         shown.clear();
         for (Choice choice : source()) {
-            if (!query.isEmpty() && !choice.icon().getHoverName().getString().toLowerCase(Locale.ROOT).contains(query)) {
+            if (!query.isEmpty() && !choice.name().getString().toLowerCase(Locale.ROOT).contains(query)) {
                 continue;
             }
             shown.add(choice);
@@ -250,9 +256,8 @@ public class BlockPickerScreen extends Screen {
 
     private static void addFluid(List<Choice> choices, Block block) {
         BlockState state = block.defaultBlockState();
-        ItemStack icon = BlockFilters.icon(state);
-        if (!icon.isEmpty() && BlockFilters.isSourceFluid(state)) {
-            choices.add(new Choice(icon, Block.getId(state)));
+        if (BlockFilters.isSourceFluid(state)) {
+            choices.add(Choice.ofFluid(state));
         }
     }
 
@@ -302,9 +307,47 @@ public class BlockPickerScreen extends Screen {
         this.minecraft.setScreen(parent);
     }
 
-    private record Choice(ItemStack icon, int stateId) {
+    @Override
+    public int jeiLeft() {
+        return panelX;
+    }
+
+    @Override
+    public int jeiTop() {
+        return panelY;
+    }
+
+    @Override
+    public int jeiWidth() {
+        return panelW;
+    }
+
+    @Override
+    public int jeiHeight() {
+        return panelH;
+    }
+
+    @Override
+    public int jeiScreenWidth() {
+        return this.width;
+    }
+
+    @Override
+    public int jeiScreenHeight() {
+        return this.height;
+    }
+
+    private record Choice(ItemStack icon, BlockState fluid, int stateId) {
         private static Choice ofBlock(BlockItem item) {
-            return new Choice(item.getDefaultInstance(), Block.getId(item.getBlock().defaultBlockState()));
+            return new Choice(item.getDefaultInstance(), null, Block.getId(item.getBlock().defaultBlockState()));
+        }
+
+        private static Choice ofFluid(BlockState state) {
+            return new Choice(ItemStack.EMPTY, state, Block.getId(state));
+        }
+
+        private Component name() {
+            return fluid != null ? fluid.getBlock().getName() : icon.getHoverName();
         }
     }
 }
