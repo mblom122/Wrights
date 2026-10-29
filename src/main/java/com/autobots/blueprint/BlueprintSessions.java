@@ -69,6 +69,9 @@ public final class BlueprintSessions {
         private UUID buildId;
         private Schematic draft;
         private boolean draftDirty;
+        private Schematic editBaseline;
+        private boolean editWasDraft;
+        private boolean editBaselineDirty;
         private boolean instantJobs;
         private int generation;
         private int seq;
@@ -145,6 +148,30 @@ public final class BlueprintSessions {
             this.draftDirty = draftDirty;
         }
 
+        public Schematic editBaseline() {
+            return editBaseline;
+        }
+
+        public boolean editWasDraft() {
+            return editWasDraft;
+        }
+
+        public boolean editBaselineDirty() {
+            return editBaselineDirty;
+        }
+
+        public void armEdit(Schematic baseline, boolean wasDraft, boolean baselineDirty) {
+            this.editBaseline = baseline;
+            this.editWasDraft = wasDraft;
+            this.editBaselineDirty = baselineDirty;
+        }
+
+        public void clearEdit() {
+            editBaseline = null;
+            editWasDraft = false;
+            editBaselineDirty = false;
+        }
+
         public boolean instantJobs() {
             return instantJobs;
         }
@@ -178,6 +205,7 @@ public final class BlueprintSessions {
             buildId = null;
             draft = null;
             draftDirty = false;
+            clearEdit();
             name = "Blueprint";
             this.dimension = dimension;
             bump();
@@ -201,6 +229,7 @@ public final class BlueprintSessions {
             buildId = null;
             draft = null;
             draftDirty = false;
+            clearEdit();
             bump();
         }
     }

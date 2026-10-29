@@ -283,6 +283,18 @@ public final class BlueprintPayloads {
         }
     }
 
+    public record FinishEdit(boolean keep) implements CustomPacketPayload {
+        public static final Type<FinishEdit> TYPE = payloadType("finish_edit");
+        public static final StreamCodec<RegistryFriendlyByteBuf, FinishEdit> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> buf.writeBoolean(value.keep),
+                buf -> new FinishEdit(buf.readBoolean()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public record BeginEdit(UUID id) implements CustomPacketPayload {
         public static final Type<BeginEdit> TYPE = payloadType("begin_edit");
         public static final StreamCodec<RegistryFriendlyByteBuf, BeginEdit> STREAM_CODEC = StreamCodec.of(

@@ -36,6 +36,7 @@ public class BlueprintEditScreen extends Screen {
     private AutobotsButton changeButton;
     private EditBox layerTo;
     private boolean frameSelection;
+    private boolean leaving;
 
     public BlueprintEditScreen() {
         super(Component.translatable("screen.autobots.adjust_edit"));
@@ -57,7 +58,7 @@ public class BlueprintEditScreen extends Screen {
         int sideNeed = Math.max(fromW, sideLabel * 2 + 4);
         sideW = Math.max(sideNeed, 188);
         int gap = 14;
-        int extra = (map ? 192 : 172) + 12;
+        int extra = (map ? 192 : 172) + 32;
         modelSize = Math.min(140, Math.max(72, this.height - extra - 24));
         int columnW = Math.max(modelSize, pair * 2 + 4);
         if (columnW + gap + sideW > this.width - 16) {
@@ -108,9 +109,26 @@ public class BlueprintEditScreen extends Screen {
         addRenderableWidget(new AutobotsButton(sideX, panelY + 164, row, 16, Component.translatable("screen.autobots.move_layer"), button -> editLayer(BlueprintPayloads.EditLayer.MOVE, targetLayer())));
         addRenderableWidget(new AutobotsButton(sideX + row + 4, panelY + 164, row, 16, Component.translatable("screen.autobots.copy_layer"), button -> editLayer(BlueprintPayloads.EditLayer.COPY, targetLayer())));
         int footY = panelY + panelH - 34;
-        addRenderableWidget(new AutobotsButton(sideX, footY, row, 16, Component.translatable("menu.autobots.materials"), button -> MaterialsScreen.request(AutobotsClientState.editId, 0, 0, 0, this)));
-        addRenderableWidget(new AutobotsButton(sideX + row + 4, footY, row, 16, Component.translatable("menu.autobots.close"), button -> onClose()));
+        addRenderableWidget(new AutobotsButton(sideX, footY - 20, sideW, 16, Component.translatable("menu.autobots.materials"), button -> MaterialsScreen.request(AutobotsClientState.editId, 0, 0, 0, this)));
+        addRenderableWidget(new AutobotsButton(sideX, footY, row, 16, Component.translatable("screen.autobots.cancel"), button -> onClose()));
+        addRenderableWidget(new AutobotsButton(sideX + row + 4, footY, row, 16, Component.translatable("screen.autobots.save"), button -> finish(true)));
         syncSelection();
+    }
+
+    @Override
+    public void onClose() {
+        finish(false);
+    }
+
+    private void finish(boolean keep) {
+        if (leaving || this.minecraft == null) {
+            return;
+        }
+        leaving = true;
+        if (AutobotsClientState.editId != null) {
+            PacketDistributor.sendToServer(new BlueprintPayloads.FinishEdit(keep));
+        }
+        this.minecraft.setScreen(new AutobotsMenuScreen());
     }
 
     public void refresh() {

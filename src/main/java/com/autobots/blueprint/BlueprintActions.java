@@ -328,7 +328,56 @@ public final class BlueprintActions {
         if (schematic == null) {
             return;
         }
-        BlueprintNetwork.preview(player, schematic, building(player, id), true);
+        BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
+        boolean drafting = building(player, id);
+        session.armEdit(schematic, drafting, drafting && session.draftDirty());
+        BlueprintNetwork.preview(player, schematic, drafting, true);
+    }
+
+    public static void finishEdit(ServerPlayer player, boolean keep) {
+        if (!held(player)) {
+            return;
+        }
+        BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
+        Schematic baseline = session.editBaseline();
+        boolean wasDraft = session.editWasDraft();
+        boolean baselineDirty = session.editBaselineDirty();
+        session.clearEdit();
+        if (baseline == null) {
+            return;
+        }
+        if (wasDraft && session.mode() == BlueprintSessions.Mode.BUILD && baseline.id().equals(session.buildId())) {
+            if (!keep) {
+                session.setDraft(baseline);
+                session.setDraftDirty(baselineDirty);
+                BlueprintNetwork.preview(player, baseline, false, false);
+                Messages.actionBar(player, "message.autobots.edit_discarded");
+                return;
+            }
+            Schematic draft = session.draft();
+            if (draft != null && draft != baseline) {
+                Messages.actionBar(player, "message.autobots.session_saved", draft.name());
+            } else {
+                Messages.actionBar(player, "message.autobots.session_clean");
+            }
+            return;
+        }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        Schematic current = library.schematic(baseline.id()).orElse(null);
+        if (keep) {
+            if (current != null && current != baseline) {
+                Messages.actionBar(player, "message.autobots.session_saved", current.name());
+            } else {
+                Messages.actionBar(player, "message.autobots.session_clean");
+            }
+            return;
+        }
+        if (current != baseline) {
+            library.putSchematic(baseline);
+            BlueprintNetwork.syncLibrary(player);
+            BlueprintNetwork.preview(player, baseline, false, false);
+            Messages.actionBar(player, "message.autobots.edit_discarded");
+        }
     }
 
     public static void recapture(ServerPlayer player, java.util.UUID id) {

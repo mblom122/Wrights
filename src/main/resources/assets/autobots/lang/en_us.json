@@ -242,6 +242,7 @@
   "message.autobots.blueprint_saved": "Saved %s (box %s, blocks %s)",
   "message.autobots.session_saved": "Saved %s",
   "message.autobots.session_clean": "No changes to save",
+  "message.autobots.edit_discarded": "Changes discarded",
   "message.autobots.blueprint_deleted": "Deleted %s",
   "message.autobots.blueprint_renamed": "Renamed to %s",
   "message.autobots.blueprint_in_use": "The drone is using that blueprint",

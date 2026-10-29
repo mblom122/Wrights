@@ -37,6 +37,7 @@ public final class BlueprintNetwork {
         registrar.playToServer(BlueprintPayloads.PreviewBlueprint.TYPE, BlueprintPayloads.PreviewBlueprint.STREAM_CODEC, BlueprintNetwork::previewBlueprint);
         registrar.playToServer(BlueprintPayloads.MaterialsRequest.TYPE, BlueprintPayloads.MaterialsRequest.STREAM_CODEC, BlueprintNetwork::materialsRequest);
         registrar.playToServer(BlueprintPayloads.BeginEdit.TYPE, BlueprintPayloads.BeginEdit.STREAM_CODEC, BlueprintNetwork::edit);
+        registrar.playToServer(BlueprintPayloads.FinishEdit.TYPE, BlueprintPayloads.FinishEdit.STREAM_CODEC, BlueprintNetwork::finishEdit);
         registrar.playToServer(BlueprintPayloads.BeginBuild.TYPE, BlueprintPayloads.BeginBuild.STREAM_CODEC, BlueprintNetwork::build);
         registrar.playToServer(BlueprintPayloads.LaunchBuild.TYPE, BlueprintPayloads.LaunchBuild.STREAM_CODEC, BlueprintNetwork::launch);
         registrar.playToServer(BlueprintPayloads.StopJob.TYPE, BlueprintPayloads.StopJob.STREAM_CODEC, BlueprintNetwork::stop);
@@ -170,6 +171,11 @@ public final class BlueprintNetwork {
     private static void edit(BlueprintPayloads.BeginEdit payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
         context.enqueueWork(() -> BlueprintActions.beginEdit(player, payload.id()));
+    }
+
+    private static void finishEdit(BlueprintPayloads.FinishEdit payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> BlueprintActions.finishEdit(player, payload.keep()));
     }
 
     private static void build(BlueprintPayloads.BeginBuild payload, IPayloadContext context) {
