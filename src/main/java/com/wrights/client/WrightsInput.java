@@ -209,7 +209,12 @@ public final class WrightsInput {
         }
         if (WrightsClientState.mode == WrightsClientState.Mode.JOBS && Minecraft.getInstance().screen == null) {
             event.setCanceled(true);
-            openAimedJob();
+            if (WrightsClientState.jobAimed() != null) {
+                openAimedJob();
+            } else {
+                Minecraft.getInstance().setScreen(new WrightsMenuScreen());
+                net.neoforged.neoforge.network.PacketDistributor.sendToServer(new BlueprintPayloads.LibraryRequest());
+            }
         }
     }
 

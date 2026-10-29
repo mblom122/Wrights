@@ -251,7 +251,7 @@
   "hud.wrights.task_build": "Building",
   "hud.wrights.task_build_tool": "Build · %s",
   "hud.wrights.task_jobs": "Jobs",
-  "hud.wrights.jobs_explain": "Right-click a blueprint to control it.",
+  "hud.wrights.jobs_explain": "Right-click air to open jobs. Right-click a blueprint to control it.",
   "hud.wrights.job_time": "Took %s",
   "hud.wrights.job_time_under": "Took under a second",
   "hud.wrights.job_building": "Building %s",
