@@ -18,6 +18,14 @@ import com.autobots.network.BlueprintPayloads;
 
 public class AutobotsMenuScreen extends Screen {
     private static final int ROW = 18;
+    private static final int PAGE_BUILDING = 0;
+    private static final int PAGE_JOBS = 1;
+    private static final int PAGE_OPTIONS = 2;
+    private static int savedPage = PAGE_BUILDING;
+    private static int savedScroll;
+    private static int savedJobScroll;
+    private static int savedOptionScroll;
+    private static String savedSearch = "";
 
     private int panelX;
     private int panelY;
@@ -98,9 +106,17 @@ public class AutobotsMenuScreen extends Screen {
     private EditBox placeY;
     private EditBox placeZ;
     private boolean suppressOptions;
+    private String searchText = "";
+    private boolean applyingSearch;
 
     public AutobotsMenuScreen() {
         super(Component.translatable("menu.autobots.title"));
+        jobsPage = savedPage == PAGE_JOBS;
+        options = savedPage == PAGE_OPTIONS;
+        scroll = savedScroll;
+        jobScroll = savedJobScroll;
+        optionScroll = savedOptionScroll;
+        searchText = savedSearch;
     }
 
     @Override
@@ -110,9 +126,16 @@ public class AutobotsMenuScreen extends Screen {
         search.setHint(Component.translatable("menu.autobots.search"));
         search.setMaxLength(48);
         search.setResponder(value -> {
+            searchText = value;
+            if (applyingSearch) {
+                return;
+            }
             scroll = 0;
             refresh();
         });
+        applyingSearch = true;
+        search.setValue(searchText);
+        applyingSearch = false;
         addRenderableWidget(search);
 
         rename = new EditBox(this.font, detailX + 4, detailSplit + 52, Math.max(40, detailW - 86), 14, Component.translatable("screen.autobots.name"));
@@ -138,6 +161,16 @@ public class AutobotsMenuScreen extends Screen {
         placeY = offsetBox(1);
         placeZ = offsetBox(2);
         refresh();
+    }
+
+    @Override
+    public void removed() {
+        savedPage = jobsPage ? PAGE_JOBS : options ? PAGE_OPTIONS : PAGE_BUILDING;
+        savedScroll = scroll;
+        savedJobScroll = jobScroll;
+        savedOptionScroll = optionScroll;
+        savedSearch = searchText == null ? "" : searchText;
+        super.removed();
     }
 
     private <T extends AutobotsButton> T add(T button) {
@@ -583,7 +616,6 @@ public class AutobotsMenuScreen extends Screen {
         if (button == 0 && hitTask(mouseX, mouseY, panelY + 150)) {
             options = true;
             jobsPage = false;
-            optionScroll = 0;
             setFocused(null);
             refresh();
             return true;
