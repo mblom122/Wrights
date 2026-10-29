@@ -277,6 +277,8 @@ public final class BlueprintNetwork {
         context.enqueueWork(() -> {
             if (player.containerMenu instanceof com.autobots.menu.HangarMenu menu && menu.pos().equals(payload.pos())) {
                 com.autobots.drone.HangarOps.apply(player, menu, payload.action(), payload.index());
+            } else if (player.containerMenu instanceof com.autobots.menu.WrightportMenu menu && menu.pos().equals(payload.pos())) {
+                com.autobots.drone.WrightportOps.apply(player, menu, payload.action(), payload.index());
             }
         });
     }

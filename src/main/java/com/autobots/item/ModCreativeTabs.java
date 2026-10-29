@@ -20,6 +20,7 @@ public final class ModCreativeTabs {
             .displayItems((parameters, output) -> {
                 output.accept(ModItems.CONTROLLER.get());
                 output.accept(ModItems.CRADLE.get());
+                output.accept(ModBlocks.WRIGHTPORT_ITEM.get());
                 output.accept(ModBlocks.HANGAR_ITEM.get());
             })
             .build());

@@ -14,6 +14,9 @@ public final class ModMenus {
     public static final DeferredHolder<MenuType<?>, MenuType<HangarMenu>> HANGAR = MENUS.register("hangar",
             () -> IMenuTypeExtension.create(HangarMenu::new));
 
+    public static final DeferredHolder<MenuType<?>, MenuType<WrightportMenu>> WRIGHTPORT = MENUS.register("wrightport",
+            () -> IMenuTypeExtension.create(WrightportMenu::new));
+
     private ModMenus() {
     }
 }

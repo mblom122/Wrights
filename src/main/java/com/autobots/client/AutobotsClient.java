@@ -39,5 +39,6 @@ public class AutobotsClient {
     @SubscribeEvent
     public static void registerScreens(RegisterMenuScreensEvent event) {
         event.register(ModMenus.HANGAR.get(), HangarScreen::new);
+        event.register(ModMenus.WRIGHTPORT.get(), WrightportScreen::new);
     }
 }

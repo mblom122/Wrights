@@ -13,6 +13,9 @@ public final class ModBlockEntities {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<HangarBlockEntity>> HANGAR = TYPES.register("hangar",
             () -> BlockEntityType.Builder.of(HangarBlockEntity::new, ModBlocks.HANGAR.get()).build(null));
 
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<WrightportBlockEntity>> WRIGHTPORT = TYPES.register("wrightport",
+            () -> BlockEntityType.Builder.of(WrightportBlockEntity::new, ModBlocks.WRIGHTPORT.get()).build(null));
+
     private ModBlockEntities() {
     }
 }

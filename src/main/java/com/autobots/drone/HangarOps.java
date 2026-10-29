@@ -42,7 +42,17 @@ public final class HangarOps {
             return;
         }
         Swarm swarm = Swarm.from(cradle);
-        Swarm next = switch (action) {
+        Swarm next = edit(player, swarm, action, index);
+        if (next == swarm) {
+            return;
+        }
+        Swarm.write(cradle, next);
+        hangar.setChanged();
+        open.broadcastChanges();
+    }
+
+    public static Swarm edit(ServerPlayer player, Swarm swarm, int action, int index) {
+        return switch (action) {
             case BUILD -> build(player, swarm);
             case REMOVE -> swarm.removeUnit(index);
             case SPEED -> speed(player, swarm, index);
@@ -51,12 +61,6 @@ public final class HangarOps {
             case DOWN -> swarm.move(index, 1);
             default -> swarm;
         };
-        if (next == swarm) {
-            return;
-        }
-        Swarm.write(cradle, next);
-        hangar.setChanged();
-        open.broadcastChanges();
     }
 
     private static Swarm build(ServerPlayer player, Swarm swarm) {
