@@ -62,6 +62,7 @@ public final class BuildJob {
     private int clipY = Integer.MAX_VALUE;
     private int clipZ = Integer.MAX_VALUE;
     private BlockPos anchor;
+    private int workedTicks;
 
     private BuildJob(UUID id, UUID owner, UUID controllerId, Kind kind, ResourceKey<Level> dimension, BlockPos min, BlockPos max, int total) {
         this.id = id;
@@ -394,6 +395,16 @@ public final class BuildJob {
         this.paused = paused;
     }
 
+    public void workedTick() {
+        if (workedTicks < Integer.MAX_VALUE) {
+            workedTicks++;
+        }
+    }
+
+    public int elapsedSeconds() {
+        return workedTicks / 20;
+    }
+
     public boolean finished() {
         return finished;
     }
@@ -526,6 +537,7 @@ public final class BuildJob {
         skippedSpecial = 0;
         droneId = null;
         lastDronePos = null;
+        workedTicks = 0;
         resetCrew();
     }
 
@@ -639,6 +651,7 @@ public final class BuildJob {
         if (anchor != null) {
             tag.put("anchor", NbtUtils.writeBlockPos(anchor));
         }
+        tag.putInt("workedTicks", workedTicks);
         tag.putBoolean("paused", paused);
         tag.putBoolean("awaitDrones", awaitDrones);
         tag.putBoolean("finished", finished);
@@ -757,6 +770,7 @@ public final class BuildJob {
             job.clipY = tag.getInt("clipY");
             job.clipZ = tag.getInt("clipZ");
         }
+        job.workedTicks = tag.getInt("workedTicks");
         job.paused = tag.getBoolean("paused");
         job.awaitDrones = tag.getBoolean("awaitDrones");
         job.finished = tag.getBoolean("finished");

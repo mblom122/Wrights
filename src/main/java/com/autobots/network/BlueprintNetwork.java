@@ -64,6 +64,7 @@ public final class BlueprintNetwork {
         registrar.playToClient(BlueprintPayloads.JobSync.TYPE, BlueprintPayloads.JobSync.STREAM_CODEC, BlueprintNetwork::clientJobs);
         registrar.playToClient(BlueprintPayloads.SupplySync.TYPE, BlueprintPayloads.SupplySync.STREAM_CODEC, BlueprintNetwork::clientSupply);
         registrar.playToClient(BlueprintPayloads.UndoPrompt.TYPE, BlueprintPayloads.UndoPrompt.STREAM_CODEC, BlueprintNetwork::clientUndoPrompt);
+        registrar.playToClient(BlueprintPayloads.JobDone.TYPE, BlueprintPayloads.JobDone.STREAM_CODEC, BlueprintNetwork::clientJobDone);
     }
 
     public static void syncLibrary(ServerPlayer player) {
@@ -341,6 +342,13 @@ public final class BlueprintNetwork {
         context.enqueueWork(() -> com.autobots.client.AutobotsClientState.applySupply(payload));
     }
 
+    private static void clientJobDone(BlueprintPayloads.JobDone payload, IPayloadContext context) {
+        if (FMLEnvironment.dist != Dist.CLIENT) {
+            return;
+        }
+        context.enqueueWork(() -> com.autobots.client.AutobotsClientState.showJobDone(payload.name(), payload.seconds()));
+    }
+
     private static void clientUndoPrompt(BlueprintPayloads.UndoPrompt payload, IPayloadContext context) {
         if (FMLEnvironment.dist != Dist.CLIENT) {
             return;
@@ -395,6 +403,14 @@ public final class BlueprintNetwork {
     public static void syncSupply(ServerPlayer player) {
         BlockPos pos = BlueprintSessions.get(player).supplyPos();
         PacketDistributor.sendToPlayer(player, new BlueprintPayloads.SupplySync(pos != null, pos == null ? BlockPos.ZERO : pos));
+    }
+
+    public static void jobDone(ServerPlayer player, String name, int seconds) {
+        String title = name == null || name.isBlank() ? "Build" : name;
+        if (title.length() > 48) {
+            title = title.substring(0, 48);
+        }
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.JobDone(title, Math.max(0, seconds)));
     }
 
     public static void undoPrompt(ServerPlayer player, java.util.UUID id, int extra, int drop) {

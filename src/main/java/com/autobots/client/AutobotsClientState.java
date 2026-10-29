@@ -62,6 +62,7 @@ public final class AutobotsClientState {
     public static int viewZ = 1;
     public static int blockCount;
     public static boolean deployChosen;
+    public static final List<JobNotice> jobNotices = new ArrayList<>();
     public static boolean sampled;
     public static boolean concealed;
     public static boolean follow;
@@ -625,6 +626,14 @@ public final class AutobotsClientState {
         return inside > 0 ? inside : blockCount;
     }
 
+    public static void showJobDone(String name, int seconds) {
+        String title = name == null || name.isBlank() ? "Build" : name;
+        jobNotices.add(new JobNotice(title, Math.max(0, seconds)));
+        while (jobNotices.size() > 3) {
+            jobNotices.remove(0);
+        }
+    }
+
     public static void applyDeploy() {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player == null) {
@@ -686,6 +695,9 @@ public final class AutobotsClientState {
     }
 
     public static void tickCapture() {
+        if (!jobNotices.isEmpty()) {
+            jobNotices.removeIf(notice -> --notice.ticks <= 0);
+        }
         if (pickCooldown > 0) {
             pickCooldown--;
         }
@@ -1048,5 +1060,16 @@ public final class AutobotsClientState {
 
     private static float channel(int rgb, int shift) {
         return Math.min(1.0F, ((rgb >> shift) & 255) / 255.0F * 1.25F + 0.08F);
+    }
+
+    public static final class JobNotice {
+        public final String name;
+        public final int seconds;
+        public int ticks = 100;
+
+        public JobNotice(String name, int seconds) {
+            this.name = name;
+            this.seconds = seconds;
+        }
     }
 }

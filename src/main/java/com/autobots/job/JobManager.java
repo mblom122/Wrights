@@ -784,6 +784,9 @@ public final class JobManager {
         if (player == null) {
             return;
         }
+        if (!job.paused()) {
+            job.workedTick();
+        }
         if (job.cursor() >= job.total()) {
             finishPaste(server, library, player, job);
             return;
@@ -1007,12 +1010,24 @@ public final class JobManager {
         }
     }
 
+    private static String finishedName(SchematicLibrary library, BuildJob job) {
+        String name = job.blueprintName();
+        if (name == null || name.isBlank()) {
+            name = "Build";
+            if (job.schematicId() != null) {
+                name = library.schematic(job.schematicId()).map(Schematic::name).orElse(name);
+            }
+        }
+        return name;
+    }
+
     private static void finishPaste(MinecraftServer server, SchematicLibrary library, ServerPlayer player, BuildJob job) {
         discardDrone(server, job);
         int placed = job.placed();
         int skipped = job.skipped();
         archive(library, job, false);
         com.autobots.network.BlueprintNetwork.clearJobHologram(player, job.id());
+        com.autobots.network.BlueprintNetwork.jobDone(player, finishedName(library, job), job.elapsedSeconds());
         com.autobots.network.BlueprintNetwork.syncJobs(player);
         if (placed == 0 && skipped > 0) {
             Messages.actionBar(player, "message.autobots.all_skipped");

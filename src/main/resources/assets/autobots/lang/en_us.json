@@ -252,6 +252,8 @@
   "hud.autobots.task_build_tool": "Build · %s",
   "hud.autobots.task_jobs": "Jobs",
   "hud.autobots.jobs_explain": "Right-click a blueprint to control it.",
+  "hud.autobots.job_time": "Took %s",
+  "hud.autobots.job_time_under": "Took under a second",
   "hud.autobots.job_building": "Building %s",
   "hud.autobots.job_paused": "Paused · %s",
   "hud.autobots.job_undoing": "Undoing %s",

@@ -24,8 +24,11 @@ public final class AutobotsHud {
     @SubscribeEvent
     public static void onHud(RenderGuiEvent.Post event) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.player == null || minecraft.screen != null || minecraft.options.hideGui
-                || !com.autobots.item.ControllerItem.isHeld(minecraft.player)) {
+        if (minecraft.player == null || minecraft.options.hideGui) {
+            return;
+        }
+        drawJobNotices(event.getGuiGraphics(), minecraft);
+        if (minecraft.screen != null || !com.autobots.item.ControllerItem.isHeld(minecraft.player)) {
             return;
         }
         Component line = null;
@@ -288,5 +291,41 @@ public final class AutobotsHud {
             return "hud.autobots.mode_move";
         }
         return "hud.autobots.mode_corners";
+    }
+
+    private static void drawJobNotices(GuiGraphics graphics, Minecraft minecraft) {
+        if (AutobotsClientState.jobNotices.isEmpty()) {
+            return;
+        }
+        int y = 6;
+        for (AutobotsClientState.JobNotice notice : AutobotsClientState.jobNotices) {
+            Component title = Component.literal(notice.name);
+            Component time = notice.seconds < 1
+                    ? Component.translatable("hud.autobots.job_time_under")
+                    : Component.translatable("hud.autobots.job_time", duration(notice.seconds));
+            int width = Math.min(220, Math.max(minecraft.font.width(title), minecraft.font.width(time)) + 18);
+            int x = graphics.guiWidth() - 6 - width;
+            int alpha = notice.ticks > 20 ? 0xC0 : Math.max(0, 0xC0 * notice.ticks / 20);
+            int panel = (alpha << 24) | 0x101822;
+            int bar = (alpha << 24) | (AutobotsUi.COPPER & 0xFFFFFF);
+            graphics.fill(x, y, x + width, y + 32, panel);
+            graphics.fill(x + width - 2, y, x + width, y + 32, bar);
+            graphics.drawString(minecraft.font, minecraft.font.plainSubstrByWidth(title.getString(), width - 16), x + 8, y + 5, AutobotsUi.TEXT, false);
+            graphics.drawString(minecraft.font, minecraft.font.plainSubstrByWidth(time.getString(), width - 16), x + 8, y + 17, AutobotsUi.MUTED, false);
+            y += 36;
+        }
+    }
+
+    private static String duration(int seconds) {
+        int hours = seconds / 3600;
+        int minutes = (seconds % 3600) / 60;
+        int rest = seconds % 60;
+        if (hours > 0) {
+            return hours + "h " + minutes + "m";
+        }
+        if (minutes > 0) {
+            return minutes + "m " + rest + "s";
+        }
+        return rest + "s";
     }
 }

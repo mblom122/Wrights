@@ -667,6 +667,21 @@ public final class BlueprintPayloads {
         }
     }
 
+    public record JobDone(String name, int seconds) implements CustomPacketPayload {
+        public static final Type<JobDone> TYPE = payloadType("job_done");
+        public static final StreamCodec<RegistryFriendlyByteBuf, JobDone> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeUtf(value.name, 48);
+                    buf.writeVarInt(value.seconds);
+                },
+                buf -> new JobDone(buf.readUtf(48), buf.readVarInt()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public record SetAssign(int count) implements CustomPacketPayload {
         public static final Type<SetAssign> TYPE = payloadType("set_assign");
         public static final StreamCodec<RegistryFriendlyByteBuf, SetAssign> STREAM_CODEC = StreamCodec.of(
