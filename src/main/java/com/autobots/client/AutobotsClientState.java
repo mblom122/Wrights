@@ -36,7 +36,8 @@ public final class AutobotsClientState {
         NONE,
         CAPTURE,
         SAVING,
-        BUILD
+        BUILD,
+        JOBS
     }
 
     public static Mode mode = Mode.NONE;
@@ -96,6 +97,7 @@ public final class AutobotsClientState {
     public static boolean moveGrabbed;
     public static int styleHudTicks;
     public static boolean styleAnnounce;
+    public static boolean mainPicker;
     private static int pickCooldown;
     private static int boxSlot = -1;
     private static int moveSlot = -1;
@@ -251,7 +253,7 @@ public final class AutobotsClientState {
     private static String rememberedBuild = "";
 
     private static void rememberMode() {
-        int modeId = mode == Mode.CAPTURE ? 1 : mode == Mode.BUILD ? 2 : 0;
+        int modeId = mode == Mode.CAPTURE ? 1 : mode == Mode.BUILD ? 2 : mode == Mode.JOBS ? 3 : 0;
         if (modeId == 0) {
             return;
         }
@@ -309,6 +311,11 @@ public final class AutobotsClientState {
             return;
         }
         int last = com.autobots.AutobotsClientConfig.LAST_MODE.get();
+        if (last == 3) {
+            resumeSent = true;
+            enterJobs();
+            return;
+        }
         if (last != 1 && last != 2) {
             return;
         }
@@ -337,6 +344,79 @@ public final class AutobotsClientState {
         moveGrabbed = false;
         styleHudTicks = 70;
         updateFlags();
+    }
+
+    public static void enterJobs() {
+        leaveCapture();
+        mode = Mode.JOBS;
+        bindSupply = false;
+        updateFlags();
+    }
+
+    public static void enterBuildMode() {
+        leaveCapture();
+        mode = Mode.BUILD;
+        updateFlags();
+    }
+
+    public static void cycleMainMode(int delta) {
+        int index = mode == Mode.JOBS ? 1 : mode == Mode.BUILD ? 0 : delta > 0 ? -1 : 2;
+        int next = Math.floorMod(index + delta, 2);
+        if (next == 1) {
+            enterJobs();
+        } else {
+            enterBuildMode();
+        }
+        mainPicker = true;
+        styleHudTicks = 70;
+        styleAnnounce = true;
+    }
+
+    public static BlueprintPayloads.JobLine jobAimed() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || minecraft.level == null) {
+            return null;
+        }
+        String here = minecraft.level.dimension().location().toString();
+        Vec3 eye = minecraft.player.getEyePosition();
+        Vec3 end = eye.add(minecraft.player.getViewVector(1.0F).scale(AutobotsConfig.MAX_RANGE.getAsInt()));
+        BlueprintPayloads.JobLine best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (BlueprintPayloads.JobLine job : jobs) {
+            if (job.finished() || job.saving() || !here.equals(job.dimension())) {
+                continue;
+            }
+            BlockPos origin = job.origin();
+            AABB box = new AABB(
+                    origin.getX(),
+                    origin.getY(),
+                    origin.getZ(),
+                    origin.getX() + Math.max(1, job.sizeX()),
+                    origin.getY() + Math.max(1, job.sizeY()),
+                    origin.getZ() + Math.max(1, job.sizeZ()));
+            var hit = box.clip(eye, end);
+            if (hit.isEmpty()) {
+                continue;
+            }
+            double distance = hit.get().distanceToSqr(eye);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                best = job;
+            }
+        }
+        return best;
+    }
+
+    private static void leaveCapture() {
+        if (mode != Mode.CAPTURE && mode != Mode.SAVING) {
+            return;
+        }
+        PacketDistributor.sendToServer(new BlueprintPayloads.CaptureCancel());
+        cornerA = null;
+        cornerB = null;
+        editingId = null;
+        boxDragging = false;
+        moveGrabbed = false;
     }
 
     public static void markSaving() {
@@ -595,6 +675,7 @@ public final class AutobotsClientState {
     }
 
     public static void cycleStyle(int direction) {
+        mainPicker = false;
         CaptureStyle[] values = CaptureStyle.values();
         int next = captureStyle.ordinal();
         for (int step = 0; step < values.length; step++) {
@@ -620,6 +701,7 @@ public final class AutobotsClientState {
     }
 
     public static void cycleBuildTool() {
+        mainPicker = false;
         bindSupply = !bindSupply;
         styleHudTicks = 70;
         styleAnnounce = true;

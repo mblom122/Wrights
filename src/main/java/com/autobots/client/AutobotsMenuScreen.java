@@ -128,8 +128,18 @@ public class AutobotsMenuScreen extends Screen {
 
     public AutobotsMenuScreen() {
         super(Component.translatable("menu.autobots.title"));
-        jobsPage = savedPage == PAGE_JOBS;
-        options = savedPage == PAGE_OPTIONS;
+        if (AutobotsClientState.mode == AutobotsClientState.Mode.JOBS) {
+            jobsPage = true;
+            options = false;
+        } else if (AutobotsClientState.mode == AutobotsClientState.Mode.BUILD
+                || AutobotsClientState.mode == AutobotsClientState.Mode.CAPTURE
+                || AutobotsClientState.mode == AutobotsClientState.Mode.SAVING) {
+            jobsPage = false;
+            options = false;
+        } else {
+            jobsPage = savedPage == PAGE_JOBS;
+            options = savedPage == PAGE_OPTIONS;
+        }
         scroll = savedScroll;
         jobScroll = savedJobScroll;
         historyScroll = savedHistoryScroll;
@@ -171,7 +181,7 @@ public class AutobotsMenuScreen extends Screen {
         materialsButton = add(new AutobotsButton(detailX + 4, detailSplit + 72, Math.max(40, detailW - 8), 16, Component.translatable("menu.autobots.materials"), button -> openMaterials()));
         stopButton = add(new AutobotsButton(detailX + 4, detailSplit + 92, Math.max(40, detailW - 8), 16, Component.translatable("menu.autobots.stop"), button -> PacketDistributor.sendToServer(new BlueprintPayloads.StopJob())));
         discardButton = add(new AutobotsButton(panelX + 14, panelY + panelH - 48, 92, 16, Component.translatable("menu.autobots.discard"), button -> discard()));
-        resumeButton = add(new AutobotsButton(panelX + 14, panelY + panelH - 68, 92, 16, Component.translatable("menu.autobots.resume"), button -> minecraft.setScreen(null)));
+        resumeButton = add(new AutobotsButton(panelX + 14, panelY + panelH - 68, 92, 16, Component.translatable("menu.autobots.resume"), button -> closeKeepingMode()));
         previewButton = add(new AutobotsButton(panelX + 14, panelY + panelH - 48, 92, 16, Component.translatable("menu.autobots.cancel_preview"), button -> cancelPreview()));
         wallPercent = percentBox(value -> AutobotsClientConfig.setWallTransparency(value));
         edgePercent = percentBox(value -> AutobotsClientConfig.setEdgeOpacity(value));
@@ -181,6 +191,8 @@ public class AutobotsMenuScreen extends Screen {
         refresh();
     }
 
+    private boolean preserveMode;
+
     @Override
     public void removed() {
         savedPage = jobsPage ? PAGE_JOBS : options ? PAGE_OPTIONS : PAGE_BUILDING;
@@ -189,6 +201,13 @@ public class AutobotsMenuScreen extends Screen {
         savedHistoryScroll = historyScroll;
         savedOptionScroll = optionScroll;
         savedSearch = searchText == null ? "" : searchText;
+        if (!preserveMode) {
+            if (jobsPage) {
+                AutobotsClientState.enterJobs();
+            } else if (!options) {
+                AutobotsClientState.enterBuildMode();
+            }
+        }
         super.removed();
     }
 
@@ -1175,7 +1194,13 @@ public class AutobotsMenuScreen extends Screen {
         return false;
     }
 
+    private void closeKeepingMode() {
+        preserveMode = true;
+        this.minecraft.setScreen(null);
+    }
+
     private void newBlueprint() {
+        preserveMode = true;
         AutobotsClientState.beginCaptureLocal();
         PacketDistributor.sendToServer(new BlueprintPayloads.StartCapture());
         this.minecraft.setScreen(null);
@@ -1196,6 +1221,7 @@ public class AutobotsMenuScreen extends Screen {
         }
         AutobotsClientState.armBuild(summary);
         PacketDistributor.sendToServer(new BlueprintPayloads.BeginBuild(summary.id()));
+        preserveMode = true;
         this.minecraft.setScreen(null);
     }
 

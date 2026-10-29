@@ -3,6 +3,7 @@ package com.autobots.client;
 import org.lwjgl.glfw.GLFW;
 
 import com.autobots.AutobotsMod;
+import com.autobots.network.BlueprintPayloads;
 
 import com.mojang.blaze3d.platform.InputConstants;
 
@@ -96,7 +97,8 @@ public final class AutobotsInput {
                     || minecraft.screen instanceof BlueprintAdjustScreen
                     || minecraft.screen instanceof PlacementScreen
                     || minecraft.screen instanceof BlueprintEditScreen
-                    || minecraft.screen instanceof BlockPickerScreen) {
+                    || minecraft.screen instanceof BlockPickerScreen
+                    || minecraft.screen instanceof JobActionScreen) {
                 minecraft.setScreen(null);
             }
             while (MENU.consumeClick()) {
@@ -115,7 +117,8 @@ public final class AutobotsInput {
                     || minecraft.screen instanceof BlueprintAdjustScreen
                     || minecraft.screen instanceof PlacementScreen
                     || minecraft.screen instanceof BlueprintEditScreen
-                    || minecraft.screen instanceof BlockPickerScreen) {
+                    || minecraft.screen instanceof BlockPickerScreen
+                    || minecraft.screen instanceof JobActionScreen) {
                 minecraft.setScreen(null);
             }
         }
@@ -161,6 +164,13 @@ public final class AutobotsInput {
             } else {
                 AutobotsClientState.tryBuild();
             }
+            return;
+        }
+        if (AutobotsClientState.mode == AutobotsClientState.Mode.JOBS && Minecraft.getInstance().screen == null) {
+            event.setCanceled(true);
+            event.setUseBlock(TriState.FALSE);
+            event.setUseItem(TriState.FALSE);
+            openAimedJob();
         }
     }
 
@@ -195,6 +205,18 @@ public final class AutobotsInput {
             } else {
                 AutobotsClientState.tryBuild();
             }
+            return;
+        }
+        if (AutobotsClientState.mode == AutobotsClientState.Mode.JOBS && Minecraft.getInstance().screen == null) {
+            event.setCanceled(true);
+            openAimedJob();
+        }
+    }
+
+    private static void openAimedJob() {
+        BlueprintPayloads.JobLine job = AutobotsClientState.jobAimed();
+        if (job != null) {
+            Minecraft.getInstance().setScreen(new JobActionScreen(job.id()));
         }
     }
 
@@ -207,7 +229,18 @@ public final class AutobotsInput {
         if (!com.autobots.item.ControllerItem.isHeld(minecraft.player)) {
             return;
         }
-        if (!minecraft.player.isShiftKeyDown() || event.getScrollDeltaY() == 0.0D) {
+        if (event.getScrollDeltaY() == 0.0D) {
+            return;
+        }
+        boolean shift = minecraft.player.isShiftKeyDown();
+        boolean control = InputConstants.isKeyDown(minecraft.getWindow().getWindow(), GLFW.GLFW_KEY_LEFT_CONTROL)
+                || InputConstants.isKeyDown(minecraft.getWindow().getWindow(), GLFW.GLFW_KEY_RIGHT_CONTROL);
+        if (shift && control) {
+            AutobotsClientState.cycleMainMode(event.getScrollDeltaY() > 0.0D ? -1 : 1);
+            event.setCanceled(true);
+            return;
+        }
+        if (!shift) {
             return;
         }
         if (AutobotsClientState.mode == AutobotsClientState.Mode.CAPTURE) {

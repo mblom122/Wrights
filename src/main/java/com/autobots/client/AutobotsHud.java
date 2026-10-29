@@ -4,6 +4,10 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+
+import org.lwjgl.glfw.GLFW;
+
+import com.mojang.blaze3d.platform.InputConstants;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -62,6 +66,8 @@ public final class AutobotsHud {
                 line = Component.translatable("hud.autobots.build", AutobotsClientState.buildName);
                 sub = Component.translatable(AutobotsClientState.supplyBound ? "hud.autobots.build_chest" : "hud.autobots.build_inventory");
             }
+        } else if (AutobotsClientState.mode == AutobotsClientState.Mode.JOBS) {
+            line = Component.translatable("hud.autobots.jobs_explain");
         } else if (AutobotsClientState.mode == AutobotsClientState.Mode.NONE) {
             line = Component.translatable("hud.autobots.task_ready_sub");
         }
@@ -89,7 +95,9 @@ public final class AutobotsHud {
                 graphics.drawString(minecraft.font, sub, x, top + 16, AutobotsUi.MUTED, false);
             }
         }
-        if (showModes(minecraft)) {
+        if (showMainModes(minecraft)) {
+            drawMainModes(graphics, minecraft);
+        } else if (showModes(minecraft)) {
             if (AutobotsClientState.mode == AutobotsClientState.Mode.BUILD) {
                 drawBuildModes(graphics, minecraft);
             } else {
@@ -105,10 +113,53 @@ public final class AutobotsHud {
         if (AutobotsClientState.mode == AutobotsClientState.Mode.BUILD) {
             return Component.translatable("hud.autobots.task_build_tool", Component.translatable(AutobotsClientState.bindSupply ? "hud.autobots.tool_bind" : "hud.autobots.tool_build"));
         }
+        if (AutobotsClientState.mode == AutobotsClientState.Mode.JOBS) {
+            return Component.translatable("hud.autobots.task_jobs");
+        }
         if (AutobotsClientState.mode == AutobotsClientState.Mode.SAVING) {
             return Component.translatable("hud.autobots.task_saving");
         }
         return Component.translatable("hud.autobots.task_ready");
+    }
+
+    private static boolean showMainModes(Minecraft minecraft) {
+        boolean control = InputConstants.isKeyDown(minecraft.getWindow().getWindow(), GLFW.GLFW_KEY_LEFT_CONTROL)
+                || InputConstants.isKeyDown(minecraft.getWindow().getWindow(), GLFW.GLFW_KEY_RIGHT_CONTROL);
+        return minecraft.player.isShiftKeyDown() && control
+                || AutobotsClientState.mainPicker && AutobotsClientState.styleHudTicks > 0;
+    }
+
+    private static void drawMainModes(GuiGraphics graphics, Minecraft minecraft) {
+        Component title = Component.translatable("hud.autobots.main_modes");
+        Component how = Component.translatable("hud.autobots.main_how");
+        Component build = Component.translatable("hud.autobots.main_build");
+        Component jobs = Component.translatable("hud.autobots.main_jobs");
+        Component selected = Component.translatable("hud.autobots.mode_selected");
+        int width = 188;
+        width = Math.max(width, minecraft.font.width(title) + 28);
+        width = Math.max(width, minecraft.font.width(how) + 28);
+        width = Math.max(width, minecraft.font.width(build) + minecraft.font.width(selected) + 36);
+        width = Math.max(width, minecraft.font.width(jobs) + minecraft.font.width(selected) + 36);
+        int row = 18;
+        int height = 28 + row * 2 + 18;
+        int x = (graphics.guiWidth() - width) / 2;
+        int y = graphics.guiHeight() / 2 + 8;
+        AutobotsUi.panel(graphics, x, y, width, height);
+        graphics.drawString(minecraft.font, title, x + 12, y + 8, AutobotsUi.TEXT, false);
+        drawMainRow(graphics, minecraft, x, y + 24, width, AutobotsClientState.mode == AutobotsClientState.Mode.BUILD, build, selected);
+        drawMainRow(graphics, minecraft, x, y + 24 + row, width, AutobotsClientState.mode == AutobotsClientState.Mode.JOBS, jobs, selected);
+        graphics.drawString(minecraft.font, how, x + 12, y + height - 14, AutobotsUi.MUTED, false);
+    }
+
+    private static void drawMainRow(GuiGraphics graphics, Minecraft minecraft, int x, int y, int width, boolean on, Component label, Component selected) {
+        if (on) {
+            graphics.fill(x + 8, y - 3, x + width - 8, y + 11, 0xA0C47A3A);
+        }
+        graphics.drawString(minecraft.font, label, x + 14, y, on ? 0xFFFFFFFF : AutobotsUi.MUTED, false);
+        if (on) {
+            int markWidth = minecraft.font.width(selected);
+            graphics.drawString(minecraft.font, selected, x + width - markWidth - 14, y, 0xFFFFFFFF, false);
+        }
     }
 
     private static boolean showModes(Minecraft minecraft) {
