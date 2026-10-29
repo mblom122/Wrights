@@ -156,7 +156,7 @@ public final class SelectionRenderer {
         VertexConsumer lines = buffers.getBuffer(RenderType.lines());
         boolean any = false;
         for (BlueprintPayloads.JobLine job : WrightsClientState.jobs) {
-            if (job.finished() || !WrightsClientState.markedJobs.contains(job.id()) || !here.equals(job.dimension())) {
+            if (!WrightsClientState.markedJobs.contains(job.id()) || !here.equals(job.dimension())) {
                 continue;
             }
             BlockPos origin = job.origin();

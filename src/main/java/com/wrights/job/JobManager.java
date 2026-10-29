@@ -422,15 +422,26 @@ public final class JobManager {
                 new BlockPos(x, y + 2, z)
         };
         for (BlockPos candidate : tries) {
-            if (insideBox(candidate, min, maxX, maxY, maxZ)) {
-                continue;
+            BlockPos open = standAbove(level, candidate, min, maxX, maxY, maxZ);
+            if (open != null) {
+                return open;
             }
-            if (!level.isLoaded(candidate)) {
-                level.getChunkAt(candidate);
+        }
+        return null;
+    }
+
+    private static BlockPos standAbove(ServerLevel level, BlockPos feet, BlockPos min, int maxX, int maxY, int maxZ) {
+        BlockPos candidate = feet;
+        for (int step = 0; step < 16; step++) {
+            if (!insideBox(candidate, min, maxX, maxY, maxZ)) {
+                if (!level.isLoaded(candidate)) {
+                    level.getChunkAt(candidate);
+                }
+                if (openStand(level, candidate)) {
+                    return candidate;
+                }
             }
-            if (openStand(level, candidate)) {
-                return candidate;
-            }
+            candidate = candidate.above();
         }
         return null;
     }
@@ -799,7 +810,7 @@ public final class JobManager {
         if (player == null) {
             return;
         }
-        if (job.cursor() >= job.total()) {
+        if (!job.hasCrew() && job.cursor() >= job.total()) {
             finishPaste(server, library, player, job);
             return;
         }
@@ -1834,6 +1845,7 @@ public final class JobManager {
     }
 
     private static int nextWork(ServerLevel level, Schematic schematic, BuildJob job, BuildJob.Hand hand, int[] budget) {
+        int seen = -1;
         while (budget[0] > 0) {
             int index = nextInLane(level, schematic, job, hand);
             if (index == SUPPORT_WAIT) {
@@ -1843,6 +1855,10 @@ public final class JobManager {
                 hand.rescan = false;
                 return -1;
             }
+            if (index == seen) {
+                return -2;
+            }
+            seen = index;
             Schematic.Entry entry = schematic.entry(index);
             if (!satisfied(level, job, entry)) {
                 Falling hold = falling(level, schematic, job, entry);
@@ -1852,6 +1868,7 @@ public final class JobManager {
                     if (!hand.rescan) {
                         job.advance();
                     }
+                    budget[0]--;
                     continue;
                 }
                 if (hold == Falling.WAIT) {
@@ -1912,7 +1929,8 @@ public final class JobManager {
         int start = Math.max(slice.cursor, slice.probe);
         java.util.function.Predicate<Schematic.Entry> include = entry -> slice.contains(entry.x(), entry.y(), entry.z());
         int found = scan(level, schematic, job, slice.cursor, start, include);
-        if (found < 0 && start > slice.cursor) {
+        // Waiting on a floor is not an empty scan. Rewinding here finds the same block again and never returns.
+        if (found == -1 && start > slice.cursor) {
             slice.probe = slice.cursor;
             found = scan(level, schematic, job, slice.cursor, slice.cursor, include);
         }
@@ -1972,12 +1990,50 @@ public final class JobManager {
         int support = schematic.indexAt(entry.x(), entry.y() - 1, entry.z());
         BlockState under = level.getBlockState(below);
         if (support >= 0 && !under.equals(schematic.entry(support).state())) {
-            return floorComing(level, schematic, job, support, seen) ? Falling.WAIT : Falling.SKIP;
+            if (floorComing(level, schematic, job, support, seen)) {
+                return Falling.WAIT;
+            }
+            if (under.isAir() || under.canBeReplaced()) {
+                Schematic.Entry floor = schematic.entry(support);
+                if (reopen(job, support, floor.x(), floor.y(), floor.z())) {
+                    return Falling.WAIT;
+                }
+            }
+            return Falling.SKIP;
         }
         if (FallingBlock.isFree(under)) {
             return Falling.SKIP;
         }
         return Falling.READY;
+    }
+
+    /** Pulls an unplaced support block back into a wright's queue after the crew was split. */
+    private static boolean reopen(BuildJob job, int index, int x, int y, int z) {
+        boolean opened = false;
+        for (BuildJob.Hand hand : job.hands()) {
+            boolean owned = false;
+            for (BuildJob.Slice slice : hand.slices) {
+                if (!slice.contains(x, y, z)) {
+                    continue;
+                }
+                owned = true;
+                if (slice.cursor > index) {
+                    slice.cursor = index;
+                    slice.probe = index;
+                    hand.idle = false;
+                    opened = true;
+                }
+            }
+            if (!owned && hand.slices.isEmpty()
+                    && CrewSplit.lane(x, y, z, hand.lanes, job.spanX(), job.spanY(), job.spanZ()) == hand.lane
+                    && hand.cursor > index) {
+                hand.cursor = index;
+                hand.probe = index;
+                hand.idle = false;
+                opened = true;
+            }
+        }
+        return opened;
     }
 
     private static boolean floorComing(ServerLevel level, Schematic schematic, BuildJob job, int support, Set<Long> seen) {
@@ -2014,7 +2070,7 @@ public final class JobManager {
     private static int nextSolo(ServerLevel level, Schematic schematic, BuildJob job) {
         int start = Math.max(job.cursor(), job.pasteProbe());
         int found = scan(level, schematic, job, job.cursor(), start, entry -> true);
-        if (found < 0 && start > job.cursor()) {
+        if (found == -1 && start > job.cursor()) {
             job.setPasteProbe(job.cursor());
             found = scan(level, schematic, job, job.cursor(), job.cursor(), entry -> true);
         }
@@ -2565,7 +2621,11 @@ public final class JobManager {
             return PlaceResult.DONE;
         }
         if (entry.secondary()) {
-            if (level.getBlockState(pos.below()).getBlock() != state.getBlock()) {
+            BlockState below = level.getBlockState(pos.below());
+            if (below.getBlock() != state.getBlock()) {
+                if (below.isAir() || below.canBeReplaced()) {
+                    return PlaceResult.WAIT;
+                }
                 job.skippedOne();
                 return PlaceResult.DONE;
             }

@@ -1513,7 +1513,7 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private int progressPercent(BlueprintPayloads.JobLine job) {
-        if (job.finished() && !job.stopped() && !job.undone() && !job.undoing()) {
+        if (job.finished() && job.skipped() <= 0 && !job.stopped() && !job.undone() && !job.undoing()) {
             return 100;
         }
         return WrightsClientState.percent(job);
