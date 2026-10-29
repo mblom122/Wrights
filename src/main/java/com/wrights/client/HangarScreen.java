@@ -60,6 +60,18 @@ public class HangarScreen extends AbstractContainerScreen<com.wrights.menu.Hanga
         PacketDistributor.sendToServer(new BlueprintPayloads.HangarEdit(menu.pos(), action, index));
     }
 
+    void batch(int action, int value, int[] units) {
+        PacketDistributor.sendToServer(new BlueprintPayloads.HangarBatch(menu.pos(), action, value, units));
+    }
+
+    void addField(net.minecraft.client.gui.components.EditBox box) {
+        addRenderableWidget(box);
+    }
+
+    void focus(net.minecraft.client.gui.components.events.GuiEventListener listener) {
+        setFocused(listener);
+    }
+
     net.minecraft.client.gui.Font font() {
         return this.font;
     }
@@ -149,6 +161,7 @@ public class HangarScreen extends AbstractContainerScreen<com.wrights.menu.Hanga
             }
             for (GuiEventListener child : this.children()) {
                 if (child.mouseClicked(mouseX, mouseY, button)) {
+                    setFocused(child);
                     return true;
                 }
             }
@@ -189,6 +202,9 @@ public class HangarScreen extends AbstractContainerScreen<com.wrights.menu.Hanga
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (manage.isOpen() && keyCode == 256) {
+            if (manage.closeTop()) {
+                return true;
+            }
             manage.close(this);
             return true;
         }

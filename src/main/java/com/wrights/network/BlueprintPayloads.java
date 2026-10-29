@@ -797,6 +797,40 @@ public final class BlueprintPayloads {
         }
     }
 
+    public record HangarBatch(BlockPos pos, int action, int value, int[] units) implements CustomPacketPayload {
+        public static final Type<HangarBatch> TYPE = payloadType("hangar_batch");
+        public static final StreamCodec<RegistryFriendlyByteBuf, HangarBatch> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeBlockPos(value.pos);
+                    buf.writeByte(value.action);
+                    buf.writeVarInt(value.value);
+                    int[] units = value.units == null ? new int[0] : value.units;
+                    buf.writeVarInt(units.length);
+                    for (int unit : units) {
+                        buf.writeVarInt(unit);
+                    }
+                },
+                buf -> {
+                    BlockPos pos = buf.readBlockPos();
+                    int action = buf.readByte();
+                    int value = buf.readVarInt();
+                    int count = buf.readVarInt();
+                    if (count < 0 || count > 1024) {
+                        throw new IllegalArgumentException("hangar");
+                    }
+                    int[] units = new int[count];
+                    for (int i = 0; i < count; i++) {
+                        units[i] = buf.readVarInt();
+                    }
+                    return new HangarBatch(pos, action, value, units);
+                });
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public record HangarEdit(BlockPos pos, int action, int index) implements CustomPacketPayload {
         public static final Type<HangarEdit> TYPE = payloadType("hangar_edit");
         public static final StreamCodec<RegistryFriendlyByteBuf, HangarEdit> STREAM_CODEC = StreamCodec.of(

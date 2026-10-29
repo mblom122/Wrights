@@ -30,6 +30,12 @@ public final class HangarOps {
     public static final int TAKE = 9;
     public static final int DOWNGRADE = 10;
 
+    public static final int ADD_COUNT = 1;
+    public static final int TO_TIER = 2;
+    public static final int MAX_AFFORD = 3;
+    public static final int TAKE_MARKED = 4;
+    public static final int DOWN_ONE = 5;
+
     public static final int ONE = 0;
     public static final int SIXTEEN = 1;
     public static final int STACK = 2;
@@ -67,6 +73,38 @@ public final class HangarOps {
         open.broadcastChanges();
     }
 
+    public static void batch(ServerPlayer player, HangarMenu menu, int action, int value, int[] units) {
+        if (!(player.level() instanceof Level level)) {
+            return;
+        }
+        if (!(level.getBlockEntity(menu.pos()) instanceof HangarBlockEntity hangar)) {
+            return;
+        }
+        if (!(player.containerMenu instanceof HangarMenu open) || !open.pos().equals(menu.pos())) {
+            return;
+        }
+        ItemStack worn = hangar.items().getItem(0);
+        if (worn.isEmpty()) {
+            Messages.actionBar(player, "message.wrights.dock_wrightport");
+            return;
+        }
+        Swarm swarm = Swarm.from(worn);
+        Swarm next = switch (action) {
+            case ADD_COUNT -> insertCount(player, swarm, value);
+            case TO_TIER -> moveMarked(player, swarm, units, WrightTier.clamp(value));
+            case MAX_AFFORD -> raiseMarked(player, swarm, units);
+            case TAKE_MARKED -> takeMarked(player, swarm, units);
+            case DOWN_ONE -> downOne(player, swarm, units);
+            default -> swarm;
+        };
+        if (next == swarm) {
+            return;
+        }
+        Swarm.write(worn, next);
+        hangar.setChanged();
+        open.broadcastChanges();
+    }
+
     public static Swarm edit(ServerPlayer player, Swarm swarm, int action, int index) {
         return switch (action) {
             case BUILD -> build(player, swarm);
@@ -96,11 +134,19 @@ public final class HangarOps {
 
     private static Swarm insert(ServerPlayer player, Swarm swarm, int mode) {
         int room = Swarm.capacity() - swarm.units().size();
+        return insertCount(player, swarm, wanted(mode, room));
+    }
+
+    private static Swarm insertCount(ServerPlayer player, Swarm swarm, int count) {
+        int room = Swarm.capacity() - swarm.units().size();
         if (room <= 0) {
             Messages.actionBar(player, "message.wrights.drone_full", Swarm.capacity());
             return swarm;
         }
-        List<Integer> tiers = pullWrights(player, wanted(mode, room));
+        if (count <= 0) {
+            return swarm;
+        }
+        List<Integer> tiers = pullWrights(player, Math.min(room, count));
         if (tiers.isEmpty()) {
             Messages.actionBar(player, "message.wrights.need_wright_item");
             return swarm;
@@ -187,6 +233,217 @@ public final class HangarOps {
         }
         Messages.actionBar(player, "message.wrights.downgrade_done", Component.translatable(WrightTier.nameKey(tier)));
         return swarm.withSpeed(index, tier - 1);
+    }
+
+    private static Swarm moveMarked(ServerPlayer player, Swarm swarm, int[] units, int target) {
+        int[] picked = unique(swarm, units);
+        if (picked.length == 0) {
+            return swarm;
+        }
+        if (picked.length == 1) {
+            return setTier(player, swarm, picked[0], target);
+        }
+        Swarm next = swarm;
+        int moved = 0;
+        int stuck = 0;
+        for (int index : picked) {
+            int tier = WrightTier.clamp(next.units().get(index).speed());
+            if (tier == target) {
+                continue;
+            }
+            if (target > tier && !canAfford(player, tier, target)) {
+                stuck++;
+                continue;
+            }
+            next = applyTier(player, next, index, tier, target);
+            moved++;
+        }
+        if (moved == 0 && stuck == 0) {
+            Messages.actionBar(player, "message.wrights.marked_already", Component.translatable(WrightTier.nameKey(target)));
+            return swarm;
+        }
+        if (moved == 0) {
+            Messages.actionBar(player, "message.wrights.marked_none");
+            return swarm;
+        }
+        if (stuck > 0) {
+            Messages.actionBar(player, "message.wrights.marked_short", moved, stuck);
+        } else {
+            Messages.actionBar(player, "message.wrights.marked_set", moved, Component.translatable(WrightTier.nameKey(target)));
+        }
+        return next;
+    }
+
+    private static Swarm setTier(ServerPlayer player, Swarm swarm, int index, int target) {
+        int tier = WrightTier.clamp(swarm.units().get(index).speed());
+        target = WrightTier.clamp(target);
+        if (tier == target) {
+            Messages.actionBar(player, "message.wrights.tier_same", Component.translatable(WrightTier.nameKey(target)));
+            return swarm;
+        }
+        if (target > tier && !canAfford(player, tier, target)) {
+            Messages.actionBar(player, "message.wrights.upgrade_need", Component.translatable(WrightTier.nameKey(missingStep(player, tier, target))));
+            return swarm;
+        }
+        Messages.actionBar(player, "message.wrights.tier_set", Component.translatable(WrightTier.nameKey(target)));
+        return applyTier(player, swarm, index, tier, target);
+    }
+
+    private static Swarm raiseMarked(ServerPlayer player, Swarm swarm, int[] units) {
+        int[] picked = unique(swarm, units);
+        if (picked.length == 0) {
+            return swarm;
+        }
+        boolean below = false;
+        for (int index : picked) {
+            if (WrightTier.clamp(swarm.units().get(index).speed()) < WrightTier.NETHERITE) {
+                below = true;
+                break;
+            }
+        }
+        if (!below) {
+            Messages.actionBar(player, "message.wrights.marked_max");
+            return swarm;
+        }
+        Swarm next = swarm;
+        boolean[] raised = new boolean[picked.length];
+        int guard = picked.length * WrightTier.NETHERITE;
+        while (guard-- > 0) {
+            int best = -1;
+            int bestTier = Integer.MAX_VALUE;
+            for (int i = 0; i < picked.length; i++) {
+                int tier = WrightTier.clamp(next.units().get(picked[i]).speed());
+                if (tier >= WrightTier.NETHERITE || tier >= bestTier) {
+                    continue;
+                }
+                Item upgrade = WrightTier.upgradeItem(tier + 1);
+                if (upgrade != null && afford(player, upgrade, 1)) {
+                    best = i;
+                    bestTier = tier;
+                }
+            }
+            if (best < 0) {
+                break;
+            }
+            take(player, WrightTier.upgradeItem(bestTier + 1), 1);
+            next = next.withSpeed(picked[best], bestTier + 1);
+            raised[best] = true;
+        }
+        int count = 0;
+        for (boolean one : raised) {
+            if (one) {
+                count++;
+            }
+        }
+        if (count == 0) {
+            Messages.actionBar(player, "message.wrights.marked_raised_none");
+            return swarm;
+        }
+        Messages.actionBar(player, "message.wrights.marked_raised", count);
+        return next;
+    }
+
+    private static Swarm downOne(ServerPlayer player, Swarm swarm, int[] units) {
+        int[] picked = unique(swarm, units);
+        Swarm next = swarm;
+        int moved = 0;
+        for (int index : picked) {
+            int tier = WrightTier.clamp(next.units().get(index).speed());
+            if (tier <= WrightTier.COPPER) {
+                continue;
+            }
+            next = applyTier(player, next, index, tier, tier - 1);
+            moved++;
+        }
+        if (moved == 0) {
+            Messages.actionBar(player, "message.wrights.marked_copper");
+            return swarm;
+        }
+        Messages.actionBar(player, "message.wrights.marked_down", moved);
+        return next;
+    }
+
+    private static Swarm takeMarked(ServerPlayer player, Swarm swarm, int[] units) {
+        int[] picked = unique(swarm, units);
+        if (picked.length == 0) {
+            Messages.actionBar(player, "message.wrights.no_wrights");
+            return swarm;
+        }
+        int[] order = picked.clone();
+        java.util.Arrays.sort(order);
+        Swarm next = swarm;
+        for (int i = order.length - 1; i >= 0; i--) {
+            int index = order[i];
+            give(player, WrightTier.clamp(next.units().get(index).speed()), 1);
+            next = next.removeUnit(index);
+        }
+        Messages.actionBar(player, "message.wrights.wrights_removed", order.length);
+        return next;
+    }
+
+    private static Swarm applyTier(ServerPlayer player, Swarm swarm, int index, int tier, int target) {
+        if (target > tier) {
+            for (int step = tier + 1; step <= target; step++) {
+                Item upgrade = WrightTier.upgradeItem(step);
+                if (upgrade != null) {
+                    take(player, upgrade, 1);
+                }
+            }
+        } else {
+            for (int step = tier; step > target; step--) {
+                Item upgrade = WrightTier.upgradeItem(step);
+                if (upgrade != null) {
+                    giveStack(player, new ItemStack(upgrade));
+                }
+            }
+        }
+        return swarm.withSpeed(index, target);
+    }
+
+    private static boolean canAfford(ServerPlayer player, int tier, int target) {
+        for (int step = tier + 1; step <= target; step++) {
+            Item upgrade = WrightTier.upgradeItem(step);
+            if (upgrade == null || !afford(player, upgrade, 1)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static int missingStep(ServerPlayer player, int tier, int target) {
+        for (int step = tier + 1; step <= target; step++) {
+            Item upgrade = WrightTier.upgradeItem(step);
+            if (upgrade == null || !afford(player, upgrade, 1)) {
+                return step;
+            }
+        }
+        return target;
+    }
+
+    private static boolean afford(Player player, Item item, int count) {
+        return player.getAbilities().instabuild || pay(player, item, count);
+    }
+
+    private static int[] unique(Swarm swarm, int[] units) {
+        if (units == null || units.length == 0) {
+            return new int[0];
+        }
+        boolean[] seen = new boolean[swarm.units().size()];
+        int count = 0;
+        for (int unit : units) {
+            if (unit >= 0 && unit < seen.length && !seen[unit]) {
+                seen[unit] = true;
+                count++;
+            }
+        }
+        int[] picked = new int[count];
+        int cursor = 0;
+        for (int i = 0; i < seen.length; i++) {
+            if (seen[i]) {
+                picked[cursor++] = i;
+            }
+        }
+        return picked;
     }
 
     private static void giveStack(ServerPlayer player, ItemStack stack) {

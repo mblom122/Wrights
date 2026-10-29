@@ -50,6 +50,7 @@ public final class BlueprintNetwork {
         registrar.playToServer(BlueprintPayloads.SetJobDrones.TYPE, BlueprintPayloads.SetJobDrones.STREAM_CODEC, BlueprintNetwork::jobDrones);
         registrar.playToServer(BlueprintPayloads.MoveDrone.TYPE, BlueprintPayloads.MoveDrone.STREAM_CODEC, BlueprintNetwork::moveDrone);
         registrar.playToServer(BlueprintPayloads.HangarEdit.TYPE, BlueprintPayloads.HangarEdit.STREAM_CODEC, BlueprintNetwork::hangar);
+        registrar.playToServer(BlueprintPayloads.HangarBatch.TYPE, BlueprintPayloads.HangarBatch.STREAM_CODEC, BlueprintNetwork::hangarBatch);
         registrar.playToServer(BlueprintPayloads.BindSupply.TYPE, BlueprintPayloads.BindSupply.STREAM_CODEC, BlueprintNetwork::bindSupply);
         registrar.playToServer(BlueprintPayloads.SetAnchor.TYPE, BlueprintPayloads.SetAnchor.STREAM_CODEC, BlueprintNetwork::anchor);
         registrar.playToServer(BlueprintPayloads.EditCell.TYPE, BlueprintPayloads.EditCell.STREAM_CODEC, BlueprintNetwork::editCell);
@@ -300,6 +301,15 @@ public final class BlueprintNetwork {
         context.enqueueWork(() -> {
             com.wrights.drone.Swarm swarm = com.wrights.drone.Wrightports.swarm(player);
             com.wrights.drone.Wrightports.replaceWorn(player, swarm.withAssign(payload.count()));
+        });
+    }
+
+    private static void hangarBatch(BlueprintPayloads.HangarBatch payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> {
+            if (player.containerMenu instanceof com.wrights.menu.HangarMenu menu && menu.pos().equals(payload.pos())) {
+                com.wrights.drone.HangarOps.batch(player, menu, payload.action(), payload.value(), payload.units());
+            }
         });
     }
 
