@@ -376,9 +376,7 @@ public final class BlueprintActions {
         if (schematic == null) {
             return;
         }
-        Schematic updated = schematic.withAnchor(x, y, z);
-        SchematicLibrary.get(player.getServer()).putSchematic(updated);
-        BlueprintNetwork.preview(player, updated, building(player, id), false);
+        remember(player, id, schematic.withAnchor(x, y, z));
     }
 
     public static void editCell(ServerPlayer player, java.util.UUID id, int x, int y, int z, int stateId, boolean remove) {
@@ -412,11 +410,7 @@ public final class BlueprintActions {
             next.add(new Schematic.Entry((short) x, (short) y, (short) z, state, com.autobots.util.BlockFilters.isSecondary(state)));
             next.sort(java.util.Comparator.comparing(Schematic.Entry::secondary));
         }
-        Schematic updated = schematic.withEntries(next);
-        SchematicLibrary library = SchematicLibrary.get(player.getServer());
-        library.putSchematic(updated);
-        BlueprintNetwork.syncLibrary(player);
-        BlueprintNetwork.preview(player, updated, building(player, id), false);
+        remember(player, id, schematic.withEntries(next));
     }
 
     public static void editLayer(ServerPlayer player, java.util.UUID id, int operation, int from, int to) {
@@ -529,11 +523,7 @@ public final class BlueprintActions {
     }
 
     private static void storeLayout(ServerPlayer player, java.util.UUID id, Schematic schematic, int sizeY, java.util.List<Schematic.Entry> entries, int anchorY) {
-        Schematic updated = schematic.withLayout(sizeY, entries, anchorY);
-        SchematicLibrary library = SchematicLibrary.get(player.getServer());
-        library.putSchematic(updated);
-        BlueprintNetwork.syncLibrary(player);
-        BlueprintNetwork.preview(player, updated, building(player, id), false);
+        remember(player, id, schematic.withLayout(sizeY, entries, anchorY));
     }
 
     public static void transform(ServerPlayer player, java.util.UUID id, int operation) {
@@ -548,10 +538,7 @@ public final class BlueprintActions {
         if (operation < 0 || operation >= ops.length) {
             return;
         }
-        Schematic updated = BlueprintTransforms.apply(schematic, ops[operation]);
-        SchematicLibrary.get(player.getServer()).putSchematic(updated);
-        BlueprintNetwork.syncLibrary(player);
-        BlueprintNetwork.preview(player, updated, building(player, id), false);
+        remember(player, id, BlueprintTransforms.apply(schematic, ops[operation]));
     }
 
     public static void previewBlueprint(ServerPlayer player, java.util.UUID id) {
@@ -569,12 +556,40 @@ public final class BlueprintActions {
         if (!held(player)) {
             return;
         }
-        Schematic schematic = SchematicLibrary.get(player.getServer()).schematic(id).orElse(null);
+        Schematic schematic = workingCopy(player, id);
+        if (schematic == null) {
+            schematic = SchematicLibrary.get(player.getServer()).schematic(id).orElse(null);
+        }
         if (schematic == null) {
             Messages.actionBar(player, "message.autobots.blueprint_missing");
             return;
         }
         BlueprintNetwork.materials(player, id, false, Requirements.of(schematic, clipX, clipY, clipZ));
+    }
+
+    public static void saveSession(ServerPlayer player) {
+        if (!held(player)) {
+            return;
+        }
+        BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
+        Schematic draft = session.draft();
+        if (session.mode() != BlueprintSessions.Mode.BUILD || draft == null || session.buildId() == null) {
+            Messages.actionBar(player, "message.autobots.blueprint_missing");
+            return;
+        }
+        if (!session.draftDirty()) {
+            Messages.actionBar(player, "message.autobots.session_clean");
+            return;
+        }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        if (library.isInUse(session.buildId())) {
+            Messages.actionBar(player, "message.autobots.blueprint_in_use");
+            return;
+        }
+        library.putSchematic(draft);
+        session.setDraftDirty(false);
+        BlueprintNetwork.syncLibrary(player);
+        Messages.actionBar(player, "message.autobots.session_saved", draft.name());
     }
 
     public static void beginBuild(ServerPlayer player, java.util.UUID id) {
@@ -593,7 +608,10 @@ public final class BlueprintActions {
         session.setMode(BlueprintSessions.Mode.BUILD);
         session.setBuildId(id);
         session.setName(schematic.name());
+        session.setDraft(schematic);
+        session.setDraftDirty(false);
         BlueprintNetwork.preview(player, schematic, true, false);
+        BlueprintNetwork.syncSupply(player);
     }
 
     public static void stop(ServerPlayer player) {
@@ -613,7 +631,8 @@ public final class BlueprintActions {
             Messages.actionBar(player, "message.autobots.blueprint_missing");
             return;
         }
-        Schematic schematic = SchematicLibrary.get(player.getServer()).schematic(id).orElse(null);
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        Schematic schematic = session.draft() != null ? session.draft() : library.schematic(id).orElse(null);
         if (schematic == null) {
             Messages.actionBar(player, "message.autobots.blueprint_missing");
             return;
@@ -634,7 +653,16 @@ public final class BlueprintActions {
         if (!missing.isEmpty()) {
             BlueprintNetwork.materials(player, id, true, missing);
         }
-        JobManager.startBlueprintBuild(player, id, origin, sx, sy, sz);
+        java.util.UUID buildSchematicId = schematic.id();
+        Schematic snapshot = null;
+        if (session.draftDirty()) {
+            snapshot = schematic.ephemeralCopy();
+            library.putSchematic(snapshot);
+            buildSchematicId = snapshot.id();
+        }
+        if (!JobManager.startBlueprintBuild(player, buildSchematicId, origin, sx, sy, sz) && snapshot != null) {
+            library.removeSchematic(snapshot.id());
+        }
         BlueprintNetwork.syncLibrary(player);
     }
 
@@ -644,6 +672,9 @@ public final class BlueprintActions {
         schematics.sort(Comparator.comparing(Schematic::name, String.CASE_INSENSITIVE_ORDER).thenComparing(Schematic::id));
         List<BlueprintPayloads.Summary> summaries = new ArrayList<>(schematics.size());
         for (Schematic schematic : schematics) {
+            if (schematic.ephemeral()) {
+                continue;
+            }
             String source = "";
             if (schematic.hasSource()) {
                 BlockPos min = schematic.sourceMin();
@@ -711,7 +742,31 @@ public final class BlueprintActions {
         return session.mode() == BlueprintSessions.Mode.BUILD && id.equals(session.buildId());
     }
 
+    private static Schematic workingCopy(ServerPlayer player, java.util.UUID id) {
+        if (!building(player, id)) {
+            return null;
+        }
+        return BlueprintSessions.get(player).draft();
+    }
+
+    private static void remember(ServerPlayer player, java.util.UUID id, Schematic updated) {
+        if (building(player, id)) {
+            BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
+            session.setDraft(updated);
+            session.setDraftDirty(true);
+            BlueprintNetwork.preview(player, updated, true, false);
+            return;
+        }
+        SchematicLibrary.get(player.getServer()).putSchematic(updated);
+        BlueprintNetwork.syncLibrary(player);
+        BlueprintNetwork.preview(player, updated, false, false);
+    }
+
     private static Schematic editable(ServerPlayer player, java.util.UUID id, boolean changing) {
+        Schematic draft = workingCopy(player, id);
+        if (draft != null) {
+            return draft;
+        }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         Schematic schematic = library.schematic(id).orElse(null);
         if (schematic == null) {

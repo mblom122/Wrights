@@ -498,7 +498,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record JobLine(UUID id, String name, int done, int total, int skipped, boolean paused, boolean saving, boolean finished) {
+    public record JobLine(UUID id, String name, int done, int total, int skipped, boolean paused, boolean saving, boolean finished, boolean canUndo, boolean undoing) {
         public void write(RegistryFriendlyByteBuf buf) {
             buf.writeUUID(id);
             buf.writeUtf(name, 48);
@@ -508,10 +508,22 @@ public final class BlueprintPayloads {
             buf.writeBoolean(paused);
             buf.writeBoolean(saving);
             buf.writeBoolean(finished);
+            buf.writeBoolean(canUndo);
+            buf.writeBoolean(undoing);
         }
 
         public static JobLine read(RegistryFriendlyByteBuf buf) {
-            return new JobLine(buf.readUUID(), buf.readUtf(48), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean());
+            return new JobLine(
+                    buf.readUUID(),
+                    buf.readUtf(48),
+                    buf.readVarInt(),
+                    buf.readVarInt(),
+                    buf.readVarInt(),
+                    buf.readBoolean(),
+                    buf.readBoolean(),
+                    buf.readBoolean(),
+                    buf.readBoolean(),
+                    buf.readBoolean());
         }
     }
 
@@ -546,6 +558,8 @@ public final class BlueprintPayloads {
         public static final int RESUME = 1;
         public static final int STOP = 2;
         public static final int REDO = 3;
+        public static final int UNDO = 4;
+        public static final int UNDO_FORCE = 5;
         public static final Type<JobControl> TYPE = payloadType("job_control");
         public static final StreamCodec<RegistryFriendlyByteBuf, JobControl> STREAM_CODEC = StreamCodec.of(
                 (buf, value) -> {
@@ -553,6 +567,55 @@ public final class BlueprintPayloads {
                     buf.writeByte(value.action);
                 },
                 buf -> new JobControl(buf.readUUID(), buf.readByte()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record BindSupply(BlockPos pos, boolean clear) implements CustomPacketPayload {
+        public static final Type<BindSupply> TYPE = payloadType("bind_supply");
+        public static final StreamCodec<RegistryFriendlyByteBuf, BindSupply> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeBlockPos(value.pos);
+                    buf.writeBoolean(value.clear);
+                },
+                buf -> new BindSupply(buf.readBlockPos(), buf.readBoolean()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record SupplySync(boolean chest, BlockPos pos) implements CustomPacketPayload {
+        public static final Type<SupplySync> TYPE = payloadType("supply_sync");
+        public static final StreamCodec<RegistryFriendlyByteBuf, SupplySync> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeBoolean(value.chest);
+                    buf.writeBlockPos(value.pos);
+                },
+                buf -> new SupplySync(buf.readBoolean(), buf.readBlockPos()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record UndoPrompt(UUID id, int extra, int drop) implements CustomPacketPayload {
+        public static final int AT_PLAYER = 0;
+        public static final int AT_CHEST = 1;
+        public static final int CHEST_GONE = 2;
+        public static final Type<UndoPrompt> TYPE = payloadType("undo_prompt");
+        public static final StreamCodec<RegistryFriendlyByteBuf, UndoPrompt> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeUUID(value.id);
+                    buf.writeVarInt(value.extra);
+                    buf.writeByte(value.drop);
+                },
+                buf -> new UndoPrompt(buf.readUUID(), buf.readVarInt(), buf.readByte()));
 
         @Override
         public Type<? extends CustomPacketPayload> type() {
@@ -630,6 +693,16 @@ public final class BlueprintPayloads {
     public record StopJob() implements CustomPacketPayload {
         public static final Type<StopJob> TYPE = payloadType("stop_job");
         public static final StreamCodec<RegistryFriendlyByteBuf, StopJob> STREAM_CODEC = empty(new StopJob());
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record SaveSession() implements CustomPacketPayload {
+        public static final Type<SaveSession> TYPE = payloadType("save_session");
+        public static final StreamCodec<RegistryFriendlyByteBuf, SaveSession> STREAM_CODEC = empty(new SaveSession());
 
         @Override
         public Type<? extends CustomPacketPayload> type() {

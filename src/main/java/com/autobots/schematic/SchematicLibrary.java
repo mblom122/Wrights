@@ -165,6 +165,12 @@ public final class SchematicLibrary extends SavedData {
     }
 
     public void removeJob(BuildJob job) {
+        if (job.schematicId() != null) {
+            Schematic schematic = schematics.get(job.schematicId());
+            if (schematic != null && schematic.ephemeral()) {
+                schematics.remove(schematic.id());
+            }
+        }
         jobs.remove(job.id());
         List<UUID> ids = jobsByPlayer.get(job.owner());
         if (ids != null) {

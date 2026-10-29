@@ -42,9 +42,10 @@ public class BlueprintEditScreen extends Screen {
 
     @Override
     protected void init() {
+        boolean map = !AutobotsClientState.previewConcealed && StructureGrid.oversized(AutobotsClientState.editX, AutobotsClientState.editZ);
         sideW = 188;
         int gap = 14;
-        int extra = 172;
+        int extra = map ? 192 : 172;
         modelSize = Math.min(140, Math.max(72, this.height - extra - 24));
         if (modelSize + gap + sideW > this.width - 16) {
             modelSize = Math.max(72, this.width - 16 - gap - sideW);
@@ -57,13 +58,17 @@ public class BlueprintEditScreen extends Screen {
         modelY = panelY + 28;
         sideX = modelX + modelSize + gap;
         layerY = modelY + modelSize + 2;
-        selectionY = layerY + 32;
+        int mapShift = map ? 20 : 0;
+        selectionY = layerY + 32 + mapShift;
         rotateY = selectionY + 48;
         flipY = rotateY + 30;
         layer = Mth.clamp(layer, 0, Math.max(0, AutobotsClientState.editY - 1));
         int half = Math.max(36, (modelSize - 4) / 2);
         addRenderableWidget(new AutobotsButton(modelX, layerY, 22, 16, Component.literal("-"), button -> changeLayer(-1)));
         addRenderableWidget(new AutobotsButton(modelX + modelSize - 22, layerY, 22, 16, Component.literal("+"), button -> changeLayer(1)));
+        if (map) {
+            addRenderableWidget(new AutobotsButton(modelX, layerY + 18, modelSize, 16, Component.translatable("screen.autobots.open_map"), button -> openMap()));
+        }
         removeButton = new AutobotsButton(modelX, selectionY, half, 16, Component.translatable("screen.autobots.remove_block"), button -> removeBlock());
         changeButton = new AutobotsButton(modelX + half + 4, selectionY, half, 16, Component.translatable("screen.autobots.change_block"), button -> changeBlock());
         addRenderableWidget(removeButton);
@@ -114,7 +119,7 @@ public class BlueprintEditScreen extends Screen {
         if (AutobotsClientState.previewConcealed) {
             graphics.drawCenteredString(this.font, Component.translatable("screen.autobots.preview_hidden"), modelX + modelSize / 2, modelY + modelSize / 2, AutobotsUi.MUTED);
         } else {
-            grid.layout(modelX + 12, modelY + 14, Math.max(32, modelSize - 28), AutobotsClientState.editX, AutobotsClientState.editZ);
+            layoutGrid();
             grid.render(graphics, AutobotsClientState.editGhosts, AutobotsClientState.editX, AutobotsClientState.editZ, layer, AutobotsClientState.editPivotX, AutobotsClientState.editPivotY, AutobotsClientState.editPivotZ, selX, selY, selZ);
         }
         graphics.drawCenteredString(this.font, Component.translatable("screen.autobots.layer", layer + 1, Math.max(1, AutobotsClientState.editY)), modelX + modelSize / 2, layerY + 4, AutobotsUi.MUTED);
@@ -131,7 +136,7 @@ public class BlueprintEditScreen extends Screen {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0 && AutobotsClientState.editId != null && !AutobotsClientState.previewConcealed) {
-            grid.layout(modelX + 12, modelY + 14, Math.max(32, modelSize - 28), AutobotsClientState.editX, AutobotsClientState.editZ);
+            layoutGrid();
             int[] hit = grid.hit(mouseX, mouseY, AutobotsClientState.editX, AutobotsClientState.editZ, layer);
             if (hit != null) {
                 selX = hit[0];
@@ -156,6 +161,40 @@ public class BlueprintEditScreen extends Screen {
     @Override
     public boolean isPauseScreen() {
         return false;
+    }
+
+    public void selectCell(int x, int y, int z) {
+        selX = x;
+        selY = y;
+        selZ = z;
+        layer = Mth.clamp(y, 0, Math.max(0, AutobotsClientState.editY - 1));
+        syncSelection();
+    }
+
+    private void openMap() {
+        if (this.minecraft == null || AutobotsClientState.previewConcealed || AutobotsClientState.editId == null) {
+            return;
+        }
+        this.minecraft.setScreen(new BlueprintMapScreen(
+                this,
+                this::selectCell,
+                AutobotsClientState.editGhosts,
+                AutobotsClientState.editX,
+                AutobotsClientState.editY,
+                AutobotsClientState.editZ,
+                layer,
+                AutobotsClientState.editPivotX,
+                AutobotsClientState.editPivotY,
+                AutobotsClientState.editPivotZ,
+                selX,
+                selY,
+                selZ));
+    }
+
+    private void layoutGrid() {
+        int focusX = selY == layer && selX >= 0 ? selX : AutobotsClientState.editPivotX;
+        int focusZ = selY == layer && selZ >= 0 ? selZ : AutobotsClientState.editPivotZ;
+        grid.layout(modelX + 12, modelY + 14, Math.max(32, modelSize - 28), AutobotsClientState.editX, AutobotsClientState.editZ, focusX, focusZ, StructureGrid.INLINE);
     }
 
     private void setAnchor() {

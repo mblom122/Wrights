@@ -15,6 +15,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
 
 import com.autobots.schematic.Schematic;
 
@@ -38,6 +39,7 @@ public final class BuildJob {
     private final BlockPos max;
     private final int total;
     private final List<Schematic.Entry> partial = new ArrayList<>();
+    private final List<Refund> refunds = new ArrayList<>();
 
     private UUID schematicId;
     private UUID resultSchematicId;
@@ -223,7 +225,10 @@ public final class BuildJob {
 
     private boolean paused;
     private boolean finished;
+    private boolean undoing;
     private int historyOrder;
+    private int undoTotal;
+    private int returned;
 
     public boolean paused() {
         return paused;
@@ -237,12 +242,89 @@ public final class BuildJob {
         return finished;
     }
 
+    public boolean undoing() {
+        return undoing;
+    }
+
     public int historyOrder() {
         return historyOrder;
     }
 
+    public int undoTotal() {
+        return undoTotal;
+    }
+
+    public int returned() {
+        return returned;
+    }
+
+    private BlockPos supplyPos;
+
+    public BlockPos supplyPos() {
+        return supplyPos;
+    }
+
+    public void setSupply(BlockPos supplyPos) {
+        this.supplyPos = supplyPos;
+    }
+
+    public List<Refund> refunds() {
+        return refunds;
+    }
+
+    public int refundCount() {
+        return refunds.size();
+    }
+
+    public boolean canUndo() {
+        return finished && kind == Kind.PASTE && !refunds.isEmpty();
+    }
+
+    public void recordPlaced(short x, short y, short z, BlockState state, boolean paid) {
+        refunds.add(new Refund(x, y, z, state, paid));
+    }
+
+    public Refund pollRefund() {
+        if (refunds.isEmpty()) {
+            return null;
+        }
+        return refunds.remove(refunds.size() - 1);
+    }
+
+    public void restoreRefund(Refund refund) {
+        refunds.add(refund);
+    }
+
+    public boolean hasRefunds() {
+        return !refunds.isEmpty();
+    }
+
+    public BlockPos lastRefundPos() {
+        Refund refund = refunds.get(refunds.size() - 1);
+        return min.offset(refund.x(), refund.y(), refund.z());
+    }
+
+    public void returnedOne() {
+        returned++;
+    }
+
+    public boolean beginUndo() {
+        if (refunds.isEmpty() || kind != Kind.PASTE) {
+            return false;
+        }
+        undoing = true;
+        finished = false;
+        paused = false;
+        undoTotal = refunds.size();
+        returned = 0;
+        skipped = 0;
+        cursor = 0;
+        return true;
+    }
+
     public void markFinished(int order) {
         finished = true;
+        undoing = false;
         historyOrder = order;
         paused = false;
         droneId = null;
@@ -250,6 +332,7 @@ public final class BuildJob {
 
     public void restart() {
         finished = false;
+        undoing = false;
         paused = false;
         cursor = 0;
         placed = 0;
@@ -316,9 +399,20 @@ public final class BuildJob {
         if (replaceSchematicId != null) {
             tag.putUUID("replace", replaceSchematicId);
         }
+        if (supplyPos != null) {
+            tag.put("supply", NbtUtils.writeBlockPos(supplyPos));
+        }
         tag.putBoolean("paused", paused);
         tag.putBoolean("finished", finished);
+        tag.putBoolean("undoing", undoing);
         tag.putInt("historyOrder", historyOrder);
+        tag.putInt("undoTotal", undoTotal);
+        tag.putInt("returned", returned);
+        ListTag refundList = new ListTag();
+        for (Refund refund : refunds) {
+            refundList.add(refund.save());
+        }
+        tag.put("refunds", refundList);
         if (clipX != Integer.MAX_VALUE) {
             tag.putInt("clipX", clipX);
             tag.putInt("clipY", clipY);
@@ -367,6 +461,9 @@ public final class BuildJob {
         if (tag.hasUUID("replace")) {
             job.replaceSchematicId = tag.getUUID("replace");
         }
+        if (tag.contains("supply")) {
+            job.supplyPos = NbtUtils.readBlockPos(tag, "supply").orElse(null);
+        }
         if (tag.contains("clipX")) {
             job.clipX = tag.getInt("clipX");
             job.clipY = tag.getInt("clipY");
@@ -374,11 +471,35 @@ public final class BuildJob {
         }
         job.paused = tag.getBoolean("paused");
         job.finished = tag.getBoolean("finished");
+        job.undoing = tag.getBoolean("undoing");
         job.historyOrder = tag.getInt("historyOrder");
+        job.undoTotal = tag.getInt("undoTotal");
+        job.returned = tag.getInt("returned");
+        ListTag refundList = tag.getList("refunds", Tag.TAG_COMPOUND);
+        for (int i = 0; i < refundList.size(); i++) {
+            job.refunds.add(Refund.load(refundList.getCompound(i), blocks));
+        }
         ListTag list = tag.getList("partial", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) {
             job.partial.add(Schematic.Entry.load(list.getCompound(i), blocks));
         }
         return job;
+    }
+
+    public record Refund(short x, short y, short z, BlockState state, boolean paid) {
+        public CompoundTag save() {
+            CompoundTag tag = new CompoundTag();
+            tag.putShort("x", x);
+            tag.putShort("y", y);
+            tag.putShort("z", z);
+            tag.putBoolean("paid", paid);
+            tag.put("state", NbtUtils.writeBlockState(state));
+            return tag;
+        }
+
+        public static Refund load(CompoundTag tag, HolderGetter<Block> blocks) {
+            BlockState state = NbtUtils.readBlockState(blocks, tag.getCompound("state"));
+            return new Refund(tag.getShort("x"), tag.getShort("y"), tag.getShort("z"), state, tag.getBoolean("paid"));
+        }
     }
 }

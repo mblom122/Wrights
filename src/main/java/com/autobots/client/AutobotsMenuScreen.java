@@ -702,7 +702,7 @@ public class AutobotsMenuScreen extends Screen {
             boolean hover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 40;
             graphics.fill(x, y, x + width, y + 40, hover ? 0xFF24303C : 0xFF18222C);
             graphics.drawString(this.font, Component.literal(job.name()), x + 6, y + 5, AutobotsUi.TEXT, false);
-            String status = job.finished() ? "menu.autobots.done" : job.saving() ? "menu.autobots.saving" : job.paused() ? "menu.autobots.paused" : "menu.autobots.running";
+            String status = job.undoing() ? "menu.autobots.undoing" : job.finished() ? "menu.autobots.done" : job.saving() ? "menu.autobots.saving" : job.paused() ? "menu.autobots.paused" : "menu.autobots.running";
             Component statusText = Component.translatable(status);
             int statusColor = job.finished() ? AutobotsUi.MUTED : job.paused() ? 0xFFE0B060 : AutobotsUi.COPPER;
             graphics.drawString(this.font, statusText, x + width - 130 - this.font.width(statusText), y + 5, statusColor, false);
@@ -713,6 +713,9 @@ public class AutobotsMenuScreen extends Screen {
             int filled = Mth.clamp(job.done() * barW / total, 0, barW);
             graphics.fill(x + 6, y + 30, x + 6 + filled, y + 34, job.finished() ? 0xFF6E8494 : AutobotsUi.COPPER);
             if (job.finished()) {
+                if (job.canUndo()) {
+                    drawJobButton(graphics, x + width - 124, y + 12, "menu.autobots.undo", mouseX, mouseY);
+                }
                 drawJobButton(graphics, x + width - 60, y + 12, "menu.autobots.redo", mouseX, mouseY);
             } else {
                 drawJobButton(graphics, x + width - 124, y + 12, job.paused() ? "menu.autobots.resume" : "menu.autobots.pause", mouseX, mouseY);
@@ -749,6 +752,10 @@ public class AutobotsMenuScreen extends Screen {
         }
         BlueprintPayloads.JobLine job = jobs.get(jobScroll + row);
         if (job.finished()) {
+            if (job.canUndo() && mouseX >= x + width - 124 && mouseX < x + width - 68 && mouseY >= y + 12 && mouseY < y + 28) {
+                PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.UNDO));
+                return true;
+            }
             if (mouseX >= x + width - 60 && mouseX < x + width - 4 && mouseY >= y + 12 && mouseY < y + 28) {
                 PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.REDO));
                 return true;

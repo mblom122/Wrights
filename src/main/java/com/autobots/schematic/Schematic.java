@@ -27,6 +27,7 @@ public final class Schematic {
     private final int anchorX;
     private final int anchorY;
     private final int anchorZ;
+    private final boolean ephemeral;
 
     public Schematic(UUID id, int sizeX, int sizeY, int sizeZ, List<Entry> entries) {
         this(id, "Blueprint", sizeX, sizeY, sizeZ, entries, BlockPos.ZERO, BlockPos.ZERO, "");
@@ -37,6 +38,10 @@ public final class Schematic {
     }
 
     public Schematic(UUID id, String name, int sizeX, int sizeY, int sizeZ, List<Entry> entries, BlockPos sourceMin, BlockPos sourceMax, String sourceDimension, int anchorX, int anchorY, int anchorZ) {
+        this(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, false);
+    }
+
+    public Schematic(UUID id, String name, int sizeX, int sizeY, int sizeZ, List<Entry> entries, BlockPos sourceMin, BlockPos sourceMax, String sourceDimension, int anchorX, int anchorY, int anchorZ, boolean ephemeral) {
         this.id = id;
         this.name = name == null || name.isBlank() ? "Blueprint" : name;
         this.sizeX = sizeX;
@@ -49,6 +54,7 @@ public final class Schematic {
         this.anchorX = clampAnchor(anchorX, sizeX);
         this.anchorY = clampAnchor(anchorY, sizeY);
         this.anchorZ = clampAnchor(anchorZ, sizeZ);
+        this.ephemeral = ephemeral;
     }
 
     public UUID id() {
@@ -91,20 +97,28 @@ public final class Schematic {
         return anchorZ;
     }
 
+    public boolean ephemeral() {
+        return ephemeral;
+    }
+
+    public Schematic ephemeralCopy() {
+        return new Schematic(UUID.randomUUID(), name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, true);
+    }
+
     public Schematic withName(String name) {
-        return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ);
+        return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, ephemeral);
     }
 
     public Schematic withAnchor(int anchorX, int anchorY, int anchorZ) {
-        return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ);
+        return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, ephemeral);
     }
 
     public Schematic withEntries(List<Entry> entries) {
-        return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ);
+        return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, ephemeral);
     }
 
     public Schematic withLayout(int sizeY, List<Entry> entries, int anchorY) {
-        return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ);
+        return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, ephemeral);
     }
 
     public int sizeX() {
@@ -137,6 +151,9 @@ public final class Schematic {
         tag.putInt("anchorX", anchorX);
         tag.putInt("anchorY", anchorY);
         tag.putInt("anchorZ", anchorZ);
+        if (ephemeral) {
+            tag.putBoolean("ephemeral", true);
+        }
         if (!sourceDimension.isEmpty()) {
             tag.putString("sourceDim", sourceDimension);
             tag.put("sourceMin", NbtUtils.writeBlockPos(sourceMin));
@@ -172,7 +189,7 @@ public final class Schematic {
         int anchorX = tag.contains("anchorX") ? tag.getInt("anchorX") : 0;
         int anchorY = tag.contains("anchorY") ? tag.getInt("anchorY") : 0;
         int anchorZ = tag.contains("anchorZ") ? tag.getInt("anchorZ") : 0;
-        return new Schematic(id, name, tag.getInt("sx"), tag.getInt("sy"), tag.getInt("sz"), entries, sourceMin, sourceMax, sourceDim, anchorX, anchorY, anchorZ);
+        return new Schematic(id, name, tag.getInt("sx"), tag.getInt("sy"), tag.getInt("sz"), entries, sourceMin, sourceMax, sourceDim, anchorX, anchorY, anchorZ, tag.getBoolean("ephemeral"));
     }
 
     private static int clampAnchor(int value, int size) {

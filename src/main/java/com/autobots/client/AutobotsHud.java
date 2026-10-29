@@ -55,7 +55,13 @@ public final class AutobotsHud {
             line = Component.translatable("hud.autobots.saving", AutobotsClientState.name);
         } else if (AutobotsClientState.mode == AutobotsClientState.Mode.BUILD) {
             line = Component.translatable("hud.autobots.build", AutobotsClientState.buildName);
-            sub = Component.translatable(AutobotsClientState.concealed ? "screen.autobots.preview_hidden" : "hud.autobots.build_sub");
+            if (AutobotsClientState.bindSupply) {
+                sub = Component.translatable("hud.autobots.bind_sub");
+            } else if (AutobotsClientState.supplyBound) {
+                sub = Component.translatable("hud.autobots.build_chest");
+            } else {
+                sub = Component.translatable("hud.autobots.build_inventory");
+            }
         } else if (AutobotsClientState.mode == AutobotsClientState.Mode.NONE) {
             line = Component.translatable("hud.autobots.task_ready_sub");
         }
@@ -84,7 +90,11 @@ public final class AutobotsHud {
             }
         }
         if (showModes(minecraft)) {
-            drawModes(graphics, minecraft);
+            if (AutobotsClientState.mode == AutobotsClientState.Mode.BUILD) {
+                drawBuildModes(graphics, minecraft);
+            } else {
+                drawModes(graphics, minecraft);
+            }
         }
     }
 
@@ -93,7 +103,7 @@ public final class AutobotsHud {
             return Component.translatable("hud.autobots.task_new", Component.translatable(styleKey(AutobotsClientState.captureStyle)));
         }
         if (AutobotsClientState.mode == AutobotsClientState.Mode.BUILD) {
-            return Component.translatable("hud.autobots.task_build");
+            return Component.translatable("hud.autobots.task_build_tool", Component.translatable(AutobotsClientState.bindSupply ? "hud.autobots.tool_bind" : "hud.autobots.tool_build"));
         }
         if (AutobotsClientState.mode == AutobotsClientState.Mode.SAVING) {
             return Component.translatable("hud.autobots.task_saving");
@@ -103,7 +113,44 @@ public final class AutobotsHud {
 
     private static boolean showModes(Minecraft minecraft) {
         return AutobotsClientState.mode == AutobotsClientState.Mode.CAPTURE
+                && (minecraft.player.isShiftKeyDown() || AutobotsClientState.styleHudTicks > 0)
+                || AutobotsClientState.mode == AutobotsClientState.Mode.BUILD
                 && (minecraft.player.isShiftKeyDown() || AutobotsClientState.styleHudTicks > 0);
+    }
+
+    private static void drawBuildModes(GuiGraphics graphics, Minecraft minecraft) {
+        Component title = Component.translatable("hud.autobots.build_modes");
+        Component how = AutobotsClientState.styleAnnounce
+                ? Component.translatable("hud.autobots.mode_now", Component.translatable(AutobotsClientState.bindSupply ? "hud.autobots.tool_bind" : "hud.autobots.tool_build"))
+                : Component.translatable("hud.autobots.mode_how");
+        Component build = Component.translatable("hud.autobots.tool_build");
+        Component bind = Component.translatable("hud.autobots.tool_bind");
+        Component selected = Component.translatable("hud.autobots.mode_selected");
+        int width = 188;
+        width = Math.max(width, minecraft.font.width(title) + 28);
+        width = Math.max(width, minecraft.font.width(how) + 28);
+        int row = 18;
+        int height = 28 + row * 2 + 18;
+        int x = (graphics.guiWidth() - width) / 2;
+        int y = graphics.guiHeight() / 2 + 8;
+        AutobotsUi.panel(graphics, x, y, width, height);
+        graphics.drawString(minecraft.font, title, x + 12, y + 8, AutobotsUi.TEXT, false);
+        drawToolRow(graphics, minecraft, x, y + 24, width, false, build, selected);
+        drawToolRow(graphics, minecraft, x, y + 24 + row, width, true, bind, selected);
+        int foot = AutobotsClientState.styleAnnounce ? 0xFFF2C14E : AutobotsUi.MUTED;
+        graphics.drawString(minecraft.font, how, x + 12, y + height - 14, foot, false);
+    }
+
+    private static void drawToolRow(GuiGraphics graphics, Minecraft minecraft, int x, int y, int width, boolean bind, Component label, Component selected) {
+        boolean on = AutobotsClientState.bindSupply == bind;
+        if (on) {
+            graphics.fill(x + 8, y - 3, x + width - 8, y + 11, 0xA0C47A3A);
+        }
+        graphics.drawString(minecraft.font, label, x + 14, y, on ? 0xFFFFFFFF : AutobotsUi.MUTED, false);
+        if (on) {
+            int markWidth = minecraft.font.width(selected);
+            graphics.drawString(minecraft.font, selected, x + width - markWidth - 14, y, 0xFFFFFFFF, false);
+        }
     }
 
     private static void drawModes(GuiGraphics graphics, Minecraft minecraft) {

@@ -62,6 +62,9 @@ public final class AutobotsClientState {
     public static boolean sampled;
     public static boolean concealed;
     public static boolean follow;
+    public static boolean bindSupply;
+    public static boolean supplyBound;
+    public static BlockPos supplyPos;
     public static BlockPos anchor;
     public static int pivotX;
     public static int pivotY;
@@ -533,6 +536,31 @@ public final class AutobotsClientState {
         styleHudTicks = 70;
         styleAnnounce = true;
         rememberMode();
+    }
+
+    public static void cycleBuildTool() {
+        bindSupply = !bindSupply;
+        styleHudTicks = 70;
+        styleAnnounce = true;
+    }
+
+    public static void applySupply(BlueprintPayloads.SupplySync payload) {
+        supplyBound = payload.chest();
+        supplyPos = payload.chest() ? payload.pos() : null;
+        if (payload.chest()) {
+            bindSupply = false;
+            styleHudTicks = 70;
+            styleAnnounce = true;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.screen instanceof PlacementScreen placement) {
+            placement.refresh();
+        }
+    }
+
+    public static void openUndoPrompt(BlueprintPayloads.UndoPrompt payload) {
+        Minecraft minecraft = Minecraft.getInstance();
+        minecraft.setScreen(new UndoConfirmScreen(payload.id(), payload.extra(), payload.drop(), minecraft.screen));
     }
 
     public static void onCaptureClick(BlockPos clicked, boolean shift) {

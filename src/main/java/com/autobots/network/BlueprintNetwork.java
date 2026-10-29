@@ -2,6 +2,7 @@ package com.autobots.network;
 
 import java.util.UUID;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.Util;
 import net.neoforged.api.distmarker.Dist;
@@ -39,7 +40,9 @@ public final class BlueprintNetwork {
         registrar.playToServer(BlueprintPayloads.BeginBuild.TYPE, BlueprintPayloads.BeginBuild.STREAM_CODEC, BlueprintNetwork::build);
         registrar.playToServer(BlueprintPayloads.LaunchBuild.TYPE, BlueprintPayloads.LaunchBuild.STREAM_CODEC, BlueprintNetwork::launch);
         registrar.playToServer(BlueprintPayloads.StopJob.TYPE, BlueprintPayloads.StopJob.STREAM_CODEC, BlueprintNetwork::stop);
+        registrar.playToServer(BlueprintPayloads.SaveSession.TYPE, BlueprintPayloads.SaveSession.STREAM_CODEC, BlueprintNetwork::saveSession);
         registrar.playToServer(BlueprintPayloads.JobControl.TYPE, BlueprintPayloads.JobControl.STREAM_CODEC, BlueprintNetwork::control);
+        registrar.playToServer(BlueprintPayloads.BindSupply.TYPE, BlueprintPayloads.BindSupply.STREAM_CODEC, BlueprintNetwork::bindSupply);
         registrar.playToServer(BlueprintPayloads.SetAnchor.TYPE, BlueprintPayloads.SetAnchor.STREAM_CODEC, BlueprintNetwork::anchor);
         registrar.playToServer(BlueprintPayloads.EditCell.TYPE, BlueprintPayloads.EditCell.STREAM_CODEC, BlueprintNetwork::editCell);
         registrar.playToServer(BlueprintPayloads.EditLayer.TYPE, BlueprintPayloads.EditLayer.STREAM_CODEC, BlueprintNetwork::editLayer);
@@ -53,6 +56,8 @@ public final class BlueprintNetwork {
         registrar.playToClient(BlueprintPayloads.CaptureFinished.TYPE, BlueprintPayloads.CaptureFinished.STREAM_CODEC, BlueprintNetwork::clientFinished);
         registrar.playToClient(BlueprintPayloads.JobHologram.TYPE, BlueprintPayloads.JobHologram.STREAM_CODEC, BlueprintNetwork::clientJobHologram);
         registrar.playToClient(BlueprintPayloads.JobSync.TYPE, BlueprintPayloads.JobSync.STREAM_CODEC, BlueprintNetwork::clientJobs);
+        registrar.playToClient(BlueprintPayloads.SupplySync.TYPE, BlueprintPayloads.SupplySync.STREAM_CODEC, BlueprintNetwork::clientSupply);
+        registrar.playToClient(BlueprintPayloads.UndoPrompt.TYPE, BlueprintPayloads.UndoPrompt.STREAM_CODEC, BlueprintNetwork::clientUndoPrompt);
     }
 
     public static void syncLibrary(ServerPlayer player) {
@@ -216,9 +221,19 @@ public final class BlueprintNetwork {
         });
     }
 
+    private static void saveSession(BlueprintPayloads.SaveSession payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> BlueprintActions.saveSession(player));
+    }
+
     private static void control(BlueprintPayloads.JobControl payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
         context.enqueueWork(() -> JobManager.control(player, payload.id(), payload.action()));
+    }
+
+    private static void bindSupply(BlueprintPayloads.BindSupply payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> JobManager.bindSupply(player, payload.pos(), payload.clear()));
     }
 
     private static void clientLibrary(BlueprintPayloads.LibrarySync payload, IPayloadContext context) {
@@ -270,6 +285,20 @@ public final class BlueprintNetwork {
         context.enqueueWork(() -> com.autobots.client.AutobotsClientState.applyJobs(payload));
     }
 
+    private static void clientSupply(BlueprintPayloads.SupplySync payload, IPayloadContext context) {
+        if (FMLEnvironment.dist != Dist.CLIENT) {
+            return;
+        }
+        context.enqueueWork(() -> com.autobots.client.AutobotsClientState.applySupply(payload));
+    }
+
+    private static void clientUndoPrompt(BlueprintPayloads.UndoPrompt payload, IPayloadContext context) {
+        if (FMLEnvironment.dist != Dist.CLIENT) {
+            return;
+        }
+        context.enqueueWork(() -> com.autobots.client.AutobotsClientState.openUndoPrompt(payload));
+    }
+
     public static void syncJobs(ServerPlayer player) {
         com.autobots.schematic.SchematicLibrary library = com.autobots.schematic.SchematicLibrary.get(player.getServer());
         java.util.List<BuildJob> jobs = new java.util.ArrayList<>(library.jobsFor(player.getUUID()));
@@ -286,10 +315,20 @@ public final class BlueprintNetwork {
             if (name.length() > 48) {
                 name = name.substring(0, 48);
             }
-            int done = job.finished() ? job.placed() : job.cursor();
-            lines.add(new BlueprintPayloads.JobLine(job.id(), name, done, job.total(), job.skipped(), job.paused(), job.kind() == BuildJob.Kind.COPY, job.finished()));
+            int done = job.undoing() ? job.undoTotal() - job.refundCount() : job.finished() ? job.placed() : job.cursor();
+            int total = job.undoing() ? Math.max(1, job.undoTotal()) : job.total();
+            lines.add(new BlueprintPayloads.JobLine(job.id(), name, done, total, job.skipped(), job.paused(), job.kind() == BuildJob.Kind.COPY, job.finished(), job.canUndo(), job.undoing()));
         }
         PacketDistributor.sendToPlayer(player, new BlueprintPayloads.JobSync(lines));
+    }
+
+    public static void syncSupply(ServerPlayer player) {
+        BlockPos pos = BlueprintSessions.get(player).supplyPos();
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.SupplySync(pos != null, pos == null ? BlockPos.ZERO : pos));
+    }
+
+    public static void undoPrompt(ServerPlayer player, java.util.UUID id, int extra, int drop) {
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.UndoPrompt(id, extra, drop));
     }
 
     public static void showJobHologram(ServerPlayer player, BuildJob job, Schematic schematic) {

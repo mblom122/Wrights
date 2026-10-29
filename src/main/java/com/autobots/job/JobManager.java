@@ -14,13 +14,18 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.Container;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.phys.Vec3;
@@ -33,8 +38,10 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import com.autobots.AutobotsConfig;
 import com.autobots.blueprint.BlueprintActions;
+import com.autobots.blueprint.BlueprintSessions;
 import com.autobots.blueprint.BoxEdits;
 import com.autobots.network.BlueprintNetwork;
+import com.autobots.network.BlueprintPayloads;
 import com.autobots.AutobotsMod;
 import com.autobots.entity.DroneEntity;
 import com.autobots.entity.ModEntities;
@@ -61,11 +68,13 @@ public final class JobManager {
         SchematicLibrary library = SchematicLibrary.get(server);
         List<BuildJob> jobs = new ArrayList<>(library.jobs());
         for (BuildJob job : jobs) {
-            if (job.finished()) {
+            if (job.finished() && !job.undoing()) {
                 continue;
             }
             try {
-                if (job.kind() == BuildJob.Kind.COPY) {
+                if (job.undoing()) {
+                    tickUndo(server, library, job);
+                } else if (job.kind() == BuildJob.Kind.COPY) {
                     tickCopy(server, library, job);
                 } else {
                     tickPaste(server, library, job);
@@ -135,6 +144,12 @@ public final class JobManager {
         } else if (action == com.autobots.network.BlueprintPayloads.JobControl.REDO) {
             redo(player, library, job);
             return;
+        } else if (action == com.autobots.network.BlueprintPayloads.JobControl.UNDO) {
+            startUndo(player, library, job, false);
+            return;
+        } else if (action == com.autobots.network.BlueprintPayloads.JobControl.UNDO_FORCE) {
+            startUndo(player, library, job, true);
+            return;
         }
         com.autobots.network.BlueprintNetwork.syncJobs(player);
     }
@@ -180,6 +195,67 @@ public final class JobManager {
         BlueprintNetwork.showJobHologram(player, job, schematic);
         BlueprintNetwork.syncJobs(player);
         Messages.actionBar(player, "message.autobots.launched");
+    }
+
+    private static void startUndo(ServerPlayer player, SchematicLibrary library, BuildJob job, boolean force) {
+        if (job.undoing() || job.kind() != BuildJob.Kind.PASTE || !job.finished()) {
+            return;
+        }
+        if (job.refundCount() == 0) {
+            Messages.actionBar(player, "message.autobots.undo_none");
+            BlueprintNetwork.syncJobs(player);
+            return;
+        }
+        if (!force) {
+            int extra = overflow(player, job);
+            if (extra > 0) {
+                BlueprintNetwork.undoPrompt(player, job.id(), extra, dropKind(player, job));
+                return;
+            }
+        }
+        if (!job.beginUndo()) {
+            Messages.actionBar(player, "message.autobots.undo_none");
+            BlueprintNetwork.syncJobs(player);
+            return;
+        }
+        library.setDirty();
+        if (player.level() instanceof ServerLevel level && level.dimension().equals(job.dimension())) {
+            ensureDrone(level, player, job, job.lastRefundPos());
+        }
+        BlueprintNetwork.clearJobHologram(player, job.id());
+        BlueprintNetwork.syncJobs(player);
+        Messages.actionBar(player, "message.autobots.undo_started");
+    }
+
+    public static void bindSupply(ServerPlayer player, BlockPos pos, boolean clear) {
+        if (!ControllerItem.isHeld(player)) {
+            return;
+        }
+        BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
+        if (session.mode() != BlueprintSessions.Mode.BUILD) {
+            return;
+        }
+        if (clear || pos == null) {
+            session.setSupply(null);
+            BlueprintNetwork.syncSupply(player);
+            Messages.actionBar(player, "message.autobots.supply_inventory");
+            return;
+        }
+        if (!(player.level() instanceof ServerLevel level)) {
+            return;
+        }
+        double range = AutobotsConfig.MAX_RANGE.getAsInt();
+        if (!level.mayInteract(player, pos) || player.distanceToSqr(Vec3.atCenterOf(pos)) > range * range) {
+            Messages.actionBar(player, "message.autobots.out_of_range");
+            return;
+        }
+        if (containerAt(level, pos) == null) {
+            Messages.actionBar(player, "message.autobots.supply_not_container");
+            return;
+        }
+        session.setSupply(pos.immutable());
+        BlueprintNetwork.syncSupply(player);
+        Messages.actionBar(player, "message.autobots.supply_chest");
     }
 
     private static void archive(SchematicLibrary library, BuildJob job) {
@@ -284,6 +360,7 @@ public final class JobManager {
                 schematic.id(),
                 schematic.blockCount());
         job.setClip(sizeX, sizeY, sizeZ);
+        job.setSupply(com.autobots.blueprint.BlueprintSessions.get(player).supplyPos());
         library.addJob(job);
         if (player.level() instanceof ServerLevel level) {
             ensureDrone(level, player, job, origin);
@@ -592,6 +669,105 @@ public final class JobManager {
         }
     }
 
+    private static void tickUndo(MinecraftServer server, SchematicLibrary library, BuildJob job) {
+        ServerLevel level = server.getLevel(job.dimension());
+        ServerPlayer player = server.getPlayerList().getPlayer(job.owner());
+        if (level == null) {
+            discardDrone(server, job);
+            archive(library, job);
+            return;
+        }
+        if (player == null || job.paused()) {
+            return;
+        }
+        if (!player.level().dimension().equals(job.dimension())) {
+            if (job.tickMessage()) {
+                Messages.actionBar(player, "message.autobots.other_dimension");
+            }
+            return;
+        }
+        if (!nearSite(player, job)) {
+            if (job.tickMessage()) {
+                Messages.actionBar(player, "message.autobots.out_of_range");
+            }
+            return;
+        }
+        if (!job.hasRefunds()) {
+            finishUndo(server, library, player, job);
+            return;
+        }
+        BlockPos nextPos = job.lastRefundPos();
+        DroneEntity drone = ensureDrone(level, player, job, nextPos);
+        if (drone == null) {
+            if (job.tickMessage()) {
+                Messages.actionBar(player, "message.autobots.paused_chunk");
+            }
+            return;
+        }
+        Vec3 hover = Vec3.atCenterOf(nextPos).add(0.0D, 0.9D, 0.0D);
+        if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
+            double step = drone.distanceToSqr(hover) > 64.0D ? 0.85D : 0.4D;
+            drone.moveToward(hover, step);
+            job.setLastDronePos(drone.blockPosition());
+            return;
+        }
+        int budget = AutobotsConfig.BLOCKS_PER_TICK.getAsInt();
+        for (int i = 0; i < budget && job.hasRefunds(); i++) {
+            BuildJob.Refund refund = job.pollRefund();
+            BlockPos pos = job.min().offset(refund.x(), refund.y(), refund.z());
+            if (drone.distanceToSqr(Vec3.atCenterOf(pos)) > 9.0D) {
+                job.restoreRefund(refund);
+                break;
+            }
+            if (!level.isLoaded(pos)) {
+                if (AutobotsConfig.REQUIRE_CHUNKS_LOADED.getAsBoolean()) {
+                    job.restoreRefund(refund);
+                    if (job.tickMessage()) {
+                        Messages.actionBar(player, "message.autobots.paused_chunk");
+                    }
+                    return;
+                }
+                job.skippedOne();
+                continue;
+            }
+            removeOne(level, player, job, pos, refund);
+        }
+        if (!job.hasRefunds()) {
+            finishUndo(server, library, player, job);
+        } else if (job.tickMessage()) {
+            Messages.actionBar(player, "message.autobots.undo_progress", job.undoTotal() - job.refundCount(), job.undoTotal(), job.returned());
+        }
+    }
+
+    private static void removeOne(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos pos, BuildJob.Refund refund) {
+        BlockState current = level.getBlockState(pos);
+        if (current.getBlock() != refund.state().getBlock()) {
+            job.skippedOne();
+            return;
+        }
+        level.levelEvent(2001, pos, Block.getId(current));
+        level.playSound(null, pos, current.getSoundType(level, pos, player).getBreakSound(), SoundSource.BLOCKS, 1.0F, 1.0F);
+        level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_SUPPRESS_DROPS);
+        Item item = refund.state().getBlock().asItem();
+        if (refund.paid() && item != Items.AIR) {
+            giveBack(level, player, job, item);
+            job.returnedOne();
+        }
+    }
+
+    private static void finishUndo(MinecraftServer server, SchematicLibrary library, ServerPlayer player, BuildJob job) {
+        discardDrone(server, job);
+        int removed = Math.max(0, job.undoTotal() - job.skipped() - job.refundCount());
+        int returned = job.returned();
+        archive(library, job);
+        BlueprintNetwork.syncJobs(player);
+        if (removed <= 0) {
+            Messages.actionBar(player, "message.autobots.undo_none");
+        } else {
+            Messages.actionBar(player, "message.autobots.undo_done", removed, returned);
+        }
+    }
+
     private static void finishPaste(MinecraftServer server, SchematicLibrary library, ServerPlayer player, BuildJob job) {
         discardDrone(server, job);
         int placed = job.placed();
@@ -669,8 +845,15 @@ public final class JobManager {
                 return PlaceResult.DONE;
             }
         } else if (!freePlace(player)) {
+            if (job.supplyPos() != null && supply(level, player, job) == null) {
+                if (job.tickMessage()) {
+                    Messages.actionBar(player, "message.autobots.supply_missing");
+                }
+                job.skippedOne();
+                return PlaceResult.DONE;
+            }
             Item item = state.getBlock().asItem();
-            if (item == Items.AIR || !hasItem(player, item)) {
+            if (item == Items.AIR || !hasItem(player, level, job, item)) {
                 job.skippedOne();
                 return PlaceResult.DONE;
             }
@@ -694,8 +877,9 @@ public final class JobManager {
             return PlaceResult.DONE;
         }
         if (!entry.secondary() && !freePlace(player)) {
-            consumeItem(player, state.getBlock().asItem());
+            consumeItem(player, level, job, state.getBlock().asItem());
         }
+        job.recordPlaced(entry.x(), entry.y(), entry.z(), after, !entry.secondary() && !freePlace(player));
         level.gameEvent(player, GameEvent.BLOCK_PLACE, pos);
         level.playSound(null, pos, state.getSoundType(level, pos, player).getPlaceSound(), SoundSource.BLOCKS, 1.0F, 1.0F);
         level.levelEvent(2001, pos, Block.getId(state));
@@ -717,7 +901,19 @@ public final class JobManager {
         return player.getAbilities().instabuild && !player.isSpectator();
     }
 
-    private static boolean hasItem(ServerPlayer player, Item item) {
+    private static boolean hasItem(ServerPlayer player, ServerLevel level, BuildJob job, Item item) {
+        Container container = supply(level, player, job);
+        if (job.supplyPos() != null) {
+            if (container == null) {
+                return false;
+            }
+            for (int slot = 0; slot < container.getContainerSize(); slot++) {
+                if (container.getItem(slot).is(item)) {
+                    return true;
+                }
+            }
+            return false;
+        }
         Inventory inventory = player.getInventory();
         for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
             if (inventory.getItem(slot).is(item)) {
@@ -727,7 +923,22 @@ public final class JobManager {
         return false;
     }
 
-    private static void consumeItem(ServerPlayer player, Item item) {
+    private static void consumeItem(ServerPlayer player, ServerLevel level, BuildJob job, Item item) {
+        Container container = supply(level, player, job);
+        if (job.supplyPos() != null && container != null) {
+            for (int slot = 0; slot < container.getContainerSize(); slot++) {
+                ItemStack stack = container.getItem(slot);
+                if (stack.is(item)) {
+                    stack.shrink(1);
+                    if (stack.isEmpty()) {
+                        container.setItem(slot, ItemStack.EMPTY);
+                    }
+                    container.setChanged();
+                    return;
+                }
+            }
+            return;
+        }
         Inventory inventory = player.getInventory();
         for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
             ItemStack stack = inventory.getItem(slot);
@@ -739,6 +950,150 @@ public final class JobManager {
                 return;
             }
         }
+    }
+
+    private static void giveBack(ServerLevel level, ServerPlayer player, BuildJob job, Item item) {
+        ItemStack stack = new ItemStack(item);
+        BlockPos supplyPos = job.supplyPos();
+        if (supplyPos != null) {
+            Container container = supply(level, player, job);
+            if (container != null) {
+                stack = insert(container, stack);
+                container.setChanged();
+            }
+            if (!stack.isEmpty()) {
+                dropStack(level, container == null ? player.blockPosition() : supplyPos, stack);
+            }
+            return;
+        }
+        if (!player.getInventory().add(stack)) {
+            player.drop(stack, false);
+        }
+    }
+
+    private static Container supply(ServerLevel level, ServerPlayer player, BuildJob job) {
+        BlockPos pos = job.supplyPos();
+        if (pos == null || !level.mayInteract(player, pos)) {
+            return null;
+        }
+        return containerAt(level, pos);
+    }
+
+    private static Container containerAt(ServerLevel level, BlockPos pos) {
+        BlockState state = level.getBlockState(pos);
+        if (state.getBlock() instanceof ChestBlock chest) {
+            return ChestBlock.getContainer(chest, state, level, pos, false);
+        }
+        BlockEntity entity = level.getBlockEntity(pos);
+        if (entity instanceof Container container) {
+            return container;
+        }
+        return null;
+    }
+
+    private static ItemStack insert(Container container, ItemStack stack) {
+        for (int slot = 0; slot < container.getContainerSize() && !stack.isEmpty(); slot++) {
+            ItemStack existing = container.getItem(slot);
+            if (!existing.isEmpty() && ItemStack.isSameItemSameComponents(existing, stack) && existing.getCount() < existing.getMaxStackSize()) {
+                int move = Math.min(stack.getCount(), existing.getMaxStackSize() - existing.getCount());
+                existing.grow(move);
+                stack.shrink(move);
+                container.setItem(slot, existing);
+            }
+        }
+        for (int slot = 0; slot < container.getContainerSize() && !stack.isEmpty(); slot++) {
+            if (container.getItem(slot).isEmpty()) {
+                container.setItem(slot, stack);
+                return ItemStack.EMPTY;
+            }
+        }
+        return stack;
+    }
+
+    private static void dropStack(ServerLevel level, BlockPos pos, ItemStack stack) {
+        level.addFreshEntity(new ItemEntity(level, pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D, stack));
+    }
+
+    private static int dropKind(ServerPlayer player, BuildJob job) {
+        if (job.supplyPos() == null) {
+            return BlueprintPayloads.UndoPrompt.AT_PLAYER;
+        }
+        if (!(player.level() instanceof ServerLevel level) || supply(level, player, job) == null) {
+            return BlueprintPayloads.UndoPrompt.CHEST_GONE;
+        }
+        return BlueprintPayloads.UndoPrompt.AT_CHEST;
+    }
+
+    private static int overflow(ServerPlayer player, BuildJob job) {
+        java.util.List<Item> paid = new java.util.ArrayList<>();
+        for (BuildJob.Refund refund : job.refunds()) {
+            if (!refund.paid()) {
+                continue;
+            }
+            Item item = refund.state().getBlock().asItem();
+            if (item != Items.AIR) {
+                paid.add(item);
+            }
+        }
+        if (paid.isEmpty()) {
+            return 0;
+        }
+        ItemStack[] slots = slotsFor(player, job);
+        if (slots == null) {
+            return paid.size();
+        }
+        int extra = 0;
+        for (Item item : paid) {
+            if (!fits(slots, item)) {
+                extra++;
+            }
+        }
+        return extra;
+    }
+
+    private static ItemStack[] slotsFor(ServerPlayer player, BuildJob job) {
+        if (job.supplyPos() == null) {
+            Inventory inventory = player.getInventory();
+            ItemStack[] slots = new ItemStack[36];
+            for (int slot = 0; slot < slots.length; slot++) {
+                slots[slot] = inventory.getItem(slot).copy();
+            }
+            return slots;
+        }
+        if (!(player.level() instanceof ServerLevel level)) {
+            return null;
+        }
+        Container container = supply(level, player, job);
+        if (container == null) {
+            return null;
+        }
+        ItemStack[] slots = new ItemStack[container.getContainerSize()];
+        for (int slot = 0; slot < slots.length; slot++) {
+            slots[slot] = container.getItem(slot).copy();
+        }
+        return slots;
+    }
+
+    private static boolean fits(ItemStack[] slots, Item item) {
+        ItemStack stack = new ItemStack(item);
+        for (int slot = 0; slot < slots.length; slot++) {
+            ItemStack existing = slots[slot];
+            if (!existing.isEmpty() && ItemStack.isSameItemSameComponents(existing, stack) && existing.getCount() < existing.getMaxStackSize()) {
+                int move = Math.min(stack.getCount(), existing.getMaxStackSize() - existing.getCount());
+                existing.grow(move);
+                stack.shrink(move);
+                if (stack.isEmpty()) {
+                    return true;
+                }
+            }
+        }
+        for (int slot = 0; slot < slots.length; slot++) {
+            if (slots[slot].isEmpty()) {
+                slots[slot] = stack;
+                return true;
+            }
+        }
+        return false;
     }
 
     private static DroneEntity ensureDrone(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos workPos) {

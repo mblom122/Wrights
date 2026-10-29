@@ -28,12 +28,15 @@ public class PlacementScreen extends Screen {
     private int selectionY;
     private int rotateY;
     private int flipY;
+    private int centerY;
+    private int layersY;
     private int selX = -1;
     private int selY = -1;
     private int selZ = -1;
     private AutobotsButton anchorButton;
     private AutobotsButton removeButton;
     private AutobotsButton changeButton;
+    private EditBox layerTo;
     private EditBox xBox;
     private EditBox yBox;
     private EditBox zBox;
@@ -42,6 +45,8 @@ public class PlacementScreen extends Screen {
     private EditBox szBox;
     private AutobotsButton lockButton;
     private AutobotsButton followButton;
+    private AutobotsButton inventoryButton;
+    private AutobotsButton chestButton;
     private boolean suppress;
     private boolean edited;
 
@@ -51,10 +56,11 @@ public class PlacementScreen extends Screen {
 
     @Override
     protected void init() {
+        boolean map = !AutobotsClientState.concealed && StructureGrid.oversized(AutobotsClientState.fullX, AutobotsClientState.fullZ);
         panelW = 214;
-        panelH = 248;
-        int extra = 176;
-        modelSize = Math.min(140, Math.max(88, this.height - extra - 24));
+        panelH = 296;
+        int extra = map ? 292 : 274;
+        modelSize = Math.min(120, Math.max(64, this.height - extra - 12));
         int gap = 12;
         if (modelSize + gap + panelW > this.width - 16) {
             modelSize = Math.max(88, this.width - 16 - gap - panelW);
@@ -68,9 +74,12 @@ public class PlacementScreen extends Screen {
         modelY = panelY;
         gridY = modelY;
         layerY = gridY + modelSize + 4;
-        selectionY = layerY + 34;
+        int mapShift = map ? 18 : 0;
+        selectionY = layerY + 34 + mapShift;
         rotateY = selectionY + 64;
         flipY = rotateY + 34;
+        centerY = flipY + 20;
+        layersY = centerY + 32;
         layer = AutobotsClientState.pivotY;
         if (AutobotsClientState.anchor == null) {
             AutobotsClientState.anchor = AutobotsClientState.lookTarget();
@@ -95,14 +104,22 @@ public class PlacementScreen extends Screen {
         step(panelX + 114, panelY + 156, "+", () -> resize(2, 1));
         int half = Math.max(40, (modelSize - 4) / 2);
         int aimW = (panelW - 28) / 2;
-        lockButton = new AutobotsButton(panelX + 12, panelY + 190, aimW, 16, Component.translatable("screen.autobots.lock"), button -> setAim(false));
-        followButton = new AutobotsButton(panelX + 16 + aimW, panelY + 190, aimW, 16, Component.translatable("screen.autobots.follow"), button -> setAim(true));
+        lockButton = new AutobotsButton(panelX + 12, panelY + 208, aimW, 16, Component.translatable("screen.autobots.lock"), button -> setAim(false));
+        followButton = new AutobotsButton(panelX + 16 + aimW, panelY + 208, aimW, 16, Component.translatable("screen.autobots.follow"), button -> setAim(true));
         addRenderableWidget(lockButton);
         addRenderableWidget(followButton);
-        addRenderableWidget(new AutobotsButton(panelX + 12, panelY + 212, 118, 18, Component.translatable("menu.autobots.build"), button -> send()));
-        addRenderableWidget(new AutobotsButton(panelX + 134, panelY + 212, 68, 18, Component.translatable("screen.autobots.back"), button -> onClose()));
+        inventoryButton = new AutobotsButton(panelX + 12, panelY + 188, aimW, 16, Component.translatable("screen.autobots.supply_inventory"), button -> useInventory());
+        chestButton = new AutobotsButton(panelX + 16 + aimW, panelY + 188, aimW, 16, Component.translatable("screen.autobots.supply_chest"), button -> bindChest());
+        addRenderableWidget(inventoryButton);
+        addRenderableWidget(chestButton);
+        addRenderableWidget(new AutobotsButton(panelX + 12, panelY + 230, 118, 18, Component.translatable("menu.autobots.build"), button -> send()));
+        addRenderableWidget(new AutobotsButton(panelX + 134, panelY + 230, 68, 18, Component.translatable("screen.autobots.back"), button -> onClose()));
+        addRenderableWidget(new AutobotsButton(panelX + 12, panelY + 252, panelW - 24, 18, Component.translatable("screen.autobots.save_blueprint"), button -> saveBlueprint()));
         addRenderableWidget(new AutobotsButton(modelX, layerY, 22, 16, Component.literal("-"), button -> changeLayer(-1)));
         addRenderableWidget(new AutobotsButton(modelX + modelSize - 22, layerY, 22, 16, Component.literal("+"), button -> changeLayer(1)));
+        if (map) {
+            addRenderableWidget(new AutobotsButton(modelX, layerY + 18, modelSize, 16, Component.translatable("screen.autobots.open_map"), button -> openMap()));
+        }
         anchorButton = new AutobotsButton(modelX, selectionY, modelSize, 16, Component.translatable("screen.autobots.set_anchor"), button -> setSelectedAnchor());
         removeButton = new AutobotsButton(modelX, selectionY + 18, half, 16, Component.translatable("screen.autobots.remove_block"), button -> removeSelected());
         changeButton = new AutobotsButton(modelX + half + 4, selectionY + 18, half, 16, Component.translatable("screen.autobots.change_block"), button -> changeSelected());
@@ -113,11 +130,27 @@ public class PlacementScreen extends Screen {
         addRenderableWidget(new AutobotsButton(modelX + half + 4, rotateY, half, 16, Component.translatable("screen.autobots.rotate_right"), button -> transform(BlueprintTransforms.Op.ROTATE)));
         addRenderableWidget(new AutobotsButton(modelX, flipY, half, 16, Component.translatable("screen.autobots.flip_horizontal"), button -> transform(BlueprintTransforms.Op.FLIP_X)));
         addRenderableWidget(new AutobotsButton(modelX + half + 4, flipY, half, 16, Component.translatable("screen.autobots.flip_vertical"), button -> transform(BlueprintTransforms.Op.FLIP_Y)));
-        addRenderableWidget(new AutobotsButton(modelX, flipY + 20, modelSize, 16, Component.translatable("menu.autobots.materials"), button -> MaterialsScreen.request(AutobotsClientState.buildId, AutobotsClientState.viewX, AutobotsClientState.viewY, AutobotsClientState.viewZ, this)));
+        addRenderableWidget(new AutobotsButton(modelX, centerY, half, 16, Component.translatable("screen.autobots.center_short"), button -> transform(BlueprintTransforms.Op.CENTER)));
+        addRenderableWidget(new AutobotsButton(modelX + half + 4, centerY, half, 16, Component.translatable("screen.autobots.ground"), button -> transform(BlueprintTransforms.Op.GROUND)));
+        addRenderableWidget(new AutobotsButton(modelX, layersY, half, 16, Component.translatable("screen.autobots.remove_layer"), button -> editLayer(BlueprintPayloads.EditLayer.REMOVE, layer)));
+        addRenderableWidget(new AutobotsButton(modelX + half + 4, layersY, half, 16, Component.translatable("screen.autobots.add_layer"), button -> editLayer(BlueprintPayloads.EditLayer.INSERT, layer)));
+        layerTo = new EditBox(this.font, modelX + modelSize - 42, layersY + 18, 42, 16, Component.translatable("screen.autobots.layer_at"));
+        layerTo.setFilter(text -> text.matches("\\d{0,3}"));
+        layerTo.setMaxLength(3);
+        addRenderableWidget(layerTo);
+        addRenderableWidget(new AutobotsButton(modelX, layersY + 36, half, 16, Component.translatable("screen.autobots.move_layer"), button -> editLayer(BlueprintPayloads.EditLayer.MOVE, targetLayer())));
+        addRenderableWidget(new AutobotsButton(modelX + half + 4, layersY + 36, half, 16, Component.translatable("screen.autobots.copy_layer"), button -> editLayer(BlueprintPayloads.EditLayer.COPY, targetLayer())));
+        addRenderableWidget(new AutobotsButton(modelX, layersY + 56, modelSize, 16, Component.translatable("menu.autobots.materials"), button -> MaterialsScreen.request(AutobotsClientState.buildId, AutobotsClientState.viewX, AutobotsClientState.viewY, AutobotsClientState.viewZ, this)));
         refresh();
     }
 
     public void refresh() {
+        layer = Mth.clamp(layer, 0, Math.max(0, AutobotsClientState.fullY - 1));
+        if (!inside(selX, selY, selZ)) {
+            selX = -1;
+            selY = -1;
+            selZ = -1;
+        }
         if (xBox == null) {
             return;
         }
@@ -132,6 +165,10 @@ public class PlacementScreen extends Screen {
         if (lockButton != null) {
             lockButton.setPicked(!AutobotsClientState.follow);
             followButton.setPicked(AutobotsClientState.follow);
+        }
+        if (inventoryButton != null) {
+            inventoryButton.setPicked(!AutobotsClientState.supplyBound && !AutobotsClientState.bindSupply);
+            chestButton.setPicked(AutobotsClientState.supplyBound || AutobotsClientState.bindSupply);
         }
         suppress = false;
     }
@@ -156,13 +193,12 @@ public class PlacementScreen extends Screen {
         axis(graphics, panelY + 122, "X");
         axis(graphics, panelY + 140, "Y");
         axis(graphics, panelY + 158, "Z");
-        Component note = note();
-        graphics.drawString(this.font, this.font.plainSubstrByWidth(note.getString(), panelW - 24), panelX + 12, panelY + 176, AutobotsUi.MUTED, false);
+        graphics.drawString(this.font, Component.translatable("screen.autobots.items_from"), panelX + 12, panelY + 176, AutobotsUi.BLUE, false);
         syncSelection();
         if (AutobotsClientState.concealed) {
             graphics.drawCenteredString(this.font, Component.translatable("screen.autobots.preview_hidden"), modelX + modelSize / 2, gridY + modelSize / 2, AutobotsUi.MUTED);
         } else {
-            grid.layout(modelX + 12, gridY + 14, Math.max(32, modelSize - 28), AutobotsClientState.fullX, AutobotsClientState.fullZ);
+            layoutGrid();
             grid.render(graphics, AutobotsClientState.ghosts, AutobotsClientState.fullX, AutobotsClientState.fullZ, layer, AutobotsClientState.pivotX, AutobotsClientState.pivotY, AutobotsClientState.pivotZ, selX, selY, selZ);
         }
         graphics.drawCenteredString(this.font, Component.translatable("screen.autobots.layer", layer + 1, AutobotsClientState.fullY), modelX + modelSize / 2, layerY + 4, AutobotsUi.MUTED);
@@ -170,6 +206,8 @@ public class PlacementScreen extends Screen {
         graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("screen.autobots.mark_hint").getString(), modelSize), modelX, selectionY + 36, AutobotsUi.MUTED, false);
         graphics.drawString(this.font, Component.translatable("screen.autobots.rotate"), modelX, rotateY - 12, AutobotsUi.BLUE, false);
         graphics.drawString(this.font, Component.translatable("screen.autobots.flip"), modelX, flipY - 12, AutobotsUi.BLUE, false);
+        graphics.drawString(this.font, Component.translatable("screen.autobots.layers"), modelX, layersY - 12, AutobotsUi.BLUE, false);
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("screen.autobots.layer_at").getString(), Math.max(8, modelSize - 46)), modelX, layersY + 22, AutobotsUi.MUTED, false);
     }
 
     @Override
@@ -193,7 +231,7 @@ public class PlacementScreen extends Screen {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0 && AutobotsClientState.buildId != null && !AutobotsClientState.concealed) {
-            grid.layout(modelX + 12, gridY + 14, Math.max(32, modelSize - 28), AutobotsClientState.fullX, AutobotsClientState.fullZ);
+            layoutGrid();
             int[] hit = grid.hit(mouseX, mouseY, AutobotsClientState.fullX, AutobotsClientState.fullZ, layer);
             if (hit != null) {
                 selX = hit[0];
@@ -311,10 +349,89 @@ public class PlacementScreen extends Screen {
         refresh();
     }
 
+    private void useInventory() {
+        AutobotsClientState.bindSupply = false;
+        AutobotsClientState.supplyBound = false;
+        AutobotsClientState.supplyPos = null;
+        PacketDistributor.sendToServer(new BlueprintPayloads.BindSupply(BlockPos.ZERO, true));
+        refresh();
+    }
+
+    private void bindChest() {
+        AutobotsClientState.bindSupply = true;
+        AutobotsClientState.styleHudTicks = 70;
+        AutobotsClientState.styleAnnounce = true;
+        this.minecraft.setScreen(null);
+    }
+
     private void send() {
         if (AutobotsClientState.tryBuild()) {
             AutobotsClientState.stepAnchor();
             refresh();
+        }
+    }
+
+    public void selectCell(int x, int y, int z) {
+        selX = x;
+        selY = y;
+        selZ = z;
+        layer = Mth.clamp(y, 0, Math.max(0, AutobotsClientState.fullY - 1));
+        syncSelection();
+    }
+
+    private void openMap() {
+        if (this.minecraft == null || AutobotsClientState.concealed || AutobotsClientState.buildId == null) {
+            return;
+        }
+        this.minecraft.setScreen(new BlueprintMapScreen(
+                this,
+                this::selectCell,
+                AutobotsClientState.ghosts,
+                AutobotsClientState.fullX,
+                AutobotsClientState.fullY,
+                AutobotsClientState.fullZ,
+                layer,
+                AutobotsClientState.pivotX,
+                AutobotsClientState.pivotY,
+                AutobotsClientState.pivotZ,
+                selX,
+                selY,
+                selZ));
+    }
+
+    private void layoutGrid() {
+        int focusX = selY == layer && selX >= 0 ? selX : AutobotsClientState.pivotX;
+        int focusZ = selY == layer && selZ >= 0 ? selZ : AutobotsClientState.pivotZ;
+        grid.layout(modelX + 12, gridY + 14, Math.max(32, modelSize - 28), AutobotsClientState.fullX, AutobotsClientState.fullZ, focusX, focusZ, StructureGrid.INLINE);
+    }
+
+    private void saveBlueprint() {
+        PacketDistributor.sendToServer(new BlueprintPayloads.SaveSession());
+    }
+
+    private void editLayer(int operation, int target) {
+        if (AutobotsClientState.buildId == null || target < 0) {
+            return;
+        }
+        int from = layer;
+        if (operation == BlueprintPayloads.EditLayer.INSERT) {
+            layer = Math.min(layer, AutobotsClientState.fullY);
+        } else if (operation == BlueprintPayloads.EditLayer.MOVE || operation == BlueprintPayloads.EditLayer.COPY) {
+            layer = target;
+        }
+        clearSelection();
+        PacketDistributor.sendToServer(new BlueprintPayloads.EditLayer(AutobotsClientState.buildId, operation, from, operation == BlueprintPayloads.EditLayer.INSERT ? from : target));
+    }
+
+    private int targetLayer() {
+        if (layerTo == null || layerTo.getValue().isBlank()) {
+            return -1;
+        }
+        try {
+            int number = Integer.parseInt(layerTo.getValue());
+            return Math.max(0, number - 1);
+        } catch (NumberFormatException exception) {
+            return -1;
         }
     }
 

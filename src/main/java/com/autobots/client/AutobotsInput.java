@@ -134,6 +134,8 @@ public final class AutobotsInput {
             event.setUseItem(TriState.FALSE);
             if (event.getEntity().isShiftKeyDown()) {
                 Minecraft.getInstance().setScreen(new PlacementScreen());
+            } else if (AutobotsClientState.bindSupply) {
+                net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.autobots.network.BlueprintPayloads.BindSupply(event.getPos(), false));
             } else {
                 AutobotsClientState.tryBuild();
             }
@@ -160,6 +162,11 @@ public final class AutobotsInput {
             event.setCanceled(true);
             if (event.getEntity().isShiftKeyDown()) {
                 Minecraft.getInstance().setScreen(new PlacementScreen());
+            } else if (AutobotsClientState.bindSupply) {
+                if (!(Minecraft.getInstance().hitResult instanceof net.minecraft.world.phys.BlockHitResult hit)
+                        || hit.getType() != net.minecraft.world.phys.HitResult.Type.BLOCK) {
+                    event.getEntity().displayClientMessage(net.minecraft.network.chat.Component.translatable("message.autobots.bind_aim"), true);
+                }
             } else {
                 AutobotsClientState.tryBuild();
             }
@@ -175,13 +182,15 @@ public final class AutobotsInput {
         if (!com.autobots.item.ControllerItem.isHeld(minecraft.player)) {
             return;
         }
-        if (AutobotsClientState.mode != AutobotsClientState.Mode.CAPTURE || !minecraft.player.isShiftKeyDown()) {
+        if (!minecraft.player.isShiftKeyDown() || event.getScrollDeltaY() == 0.0D) {
             return;
         }
-        if (event.getScrollDeltaY() == 0.0D) {
-            return;
+        if (AutobotsClientState.mode == AutobotsClientState.Mode.CAPTURE) {
+            AutobotsClientState.cycleStyle(event.getScrollDeltaY() > 0.0D ? -1 : 1);
+            event.setCanceled(true);
+        } else if (AutobotsClientState.mode == AutobotsClientState.Mode.BUILD) {
+            AutobotsClientState.cycleBuildTool();
+            event.setCanceled(true);
         }
-        AutobotsClientState.cycleStyle(event.getScrollDeltaY() > 0.0D ? -1 : 1);
-        event.setCanceled(true);
     }
 }

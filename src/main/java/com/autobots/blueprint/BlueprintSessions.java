@@ -13,6 +13,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 
 import com.autobots.AutobotsMod;
+import com.autobots.schematic.Schematic;
 
 @EventBusSubscriber(modid = AutobotsMod.MOD_ID)
 public final class BlueprintSessions {
@@ -54,6 +55,7 @@ public final class BlueprintSessions {
             com.autobots.item.ControllerItem.quietLegacy(player);
             com.autobots.network.BlueprintNetwork.syncCapture(player);
             com.autobots.network.BlueprintNetwork.syncJobHolograms(player);
+            com.autobots.network.BlueprintNetwork.syncSupply(player);
         }
     }
 
@@ -65,6 +67,8 @@ public final class BlueprintSessions {
         private String name = "Blueprint";
         private UUID editingId;
         private UUID buildId;
+        private Schematic draft;
+        private boolean draftDirty;
         private int generation;
         private int seq;
 
@@ -124,6 +128,22 @@ public final class BlueprintSessions {
             this.buildId = buildId;
         }
 
+        public Schematic draft() {
+            return draft;
+        }
+
+        public void setDraft(Schematic draft) {
+            this.draft = draft;
+        }
+
+        public boolean draftDirty() {
+            return draftDirty;
+        }
+
+        public void setDraftDirty(boolean draftDirty) {
+            this.draftDirty = draftDirty;
+        }
+
         public int generation() {
             return generation;
         }
@@ -147,9 +167,21 @@ public final class BlueprintSessions {
             cornerB = null;
             editingId = null;
             buildId = null;
+            draft = null;
+            draftDirty = false;
             name = "Blueprint";
             this.dimension = dimension;
             bump();
+        }
+
+        private BlockPos supplyPos;
+
+        public BlockPos supplyPos() {
+            return supplyPos;
+        }
+
+        public void setSupply(BlockPos supplyPos) {
+            this.supplyPos = supplyPos;
         }
 
         public void clear() {
@@ -158,6 +190,8 @@ public final class BlueprintSessions {
             cornerB = null;
             editingId = null;
             buildId = null;
+            draft = null;
+            draftDirty = false;
             bump();
         }
     }
