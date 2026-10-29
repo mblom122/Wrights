@@ -164,7 +164,12 @@ public final class BlueprintModelView {
                         continue;
                     }
                     VertexBuffer buffer = new VertexBuffer(VertexBuffer.Usage.STATIC);
-                    buffer.upload(mesh);
+                    buffer.bind();
+                    try {
+                        buffer.upload(mesh);
+                    } finally {
+                        VertexBuffer.unbind();
+                    }
                     Layer layer = new Layer(entry.getKey(), buffer);
                     if (entry.getKey().sortOnUpload()) {
                         clear.add(layer);
