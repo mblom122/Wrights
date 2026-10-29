@@ -40,6 +40,13 @@ repositories {
         name = "Illusive"
         url = "https://maven.theillusivec4.top/"
     }
+    maven {
+        name = "Modrinth"
+        url = "https://api.modrinth.com/maven"
+        content {
+            includeGroup "maven.modrinth"
+        }
+    }
 }
 
 base {
@@ -139,6 +146,11 @@ dependencies {
     compileOnly "top.theillusivec4.curios:curios-neoforge:${curios_version}"
     localRuntime "top.theillusivec4.curios:curios-neoforge:${curios_version}"
 
+    // Jade is present for runClient and other dev runs, same as JEI. compileOnly keeps it out of the
+    // published jar. A hand-built instance still needs the Jade jar next to Wrights; see modpack/INSTANCE.txt.
+    compileOnly "maven.modrinth:jade:${jade_version}"
+    localRuntime "maven.modrinth:jade:${jade_version}"
+
     // Example mod dependency using a mod jar from ./libs with a flat dir repository
     // This maps to ./libs/coolmod-${mc_version}-${coolmod_version}.jar
     // The group id is ignored when searching -- in this case, it is "blank"
@@ -197,11 +209,11 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
 }
 
-// Copies the built jar into modpack/mods. That folder is the mod list for a NeoForge 1.21.1
-// instance that should contain nothing else while Wrights is still being tested.
+// Copies the built jar into modpack/mods. Curios is still required in that instance, and Jade
+// has to be installed beside this jar when the wright tooltip should be tested. See modpack/INSTANCE.txt.
 tasks.register('isolatedPack', Copy) {
     group = 'wrights'
-    description = 'Copy the Wrights jar into modpack/mods for an otherwise empty NeoForge instance.'
+    description = 'Copy the Wrights jar into modpack/mods. Install Jade beside it to test the wright tooltip.'
     dependsOn tasks.named('build')
     from(layout.buildDirectory.dir('libs')) {
         include "${mod_id}-*.jar"

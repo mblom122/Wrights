@@ -2,7 +2,7 @@
 
 A NeoForge mod for Minecraft 1.21.1. The Wright Controller copies a region of blocks, then a small wright pastes that copy where you aim it.
 
-The first test instance is this mod alone. `gradlew runClient` opens that instance. Do not add All the Mods until a build has been checked here.
+`gradlew runClient` opens the test instance. That client includes Jade, so looking at a wright shows its tier and the build it is working on. Do not add All the Mods until a build has been checked here.
 
 ## Run the isolated instance
 
@@ -25,7 +25,7 @@ The jar for a hand-made empty NeoForge 1.21.1 instance is produced with:
 gradlew isolatedPack
 ```
 
-It is written to `modpack/mods`. That instance should not contain any other mods.
+It is written to `modpack/mods`. That instance still needs Curios. Install Jade next to the Wrights jar when you want to test the wright tooltip. Leave every other mod out. See `modpack/INSTANCE.txt`.
 
 ## Controls
 
@@ -46,7 +46,8 @@ Survival spends matching blocks from your inventory. Creative places them for fr
 
 ## Test checklist
 
-- Mods screen lists only Wrights (plus NeoForge and Minecraft).
+- Mods screen lists Wrights, Curios, Jade, and JEI (plus NeoForge and Minecraft).
+- Looking at a wright with Jade shows its tier, the blueprint name, progress, skipped blocks, and the build size.
 - Creative tab "Wrights" contains the controller. The crafting recipe uses copper, redstone, an amethyst shard, and iron.
 - Corner 1, corner 2, and the gold box appear. A third click starts a new corner 1.
 - A selection larger than 32 on a side, or 32768 blocks, is rejected.

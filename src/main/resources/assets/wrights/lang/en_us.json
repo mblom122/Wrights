@@ -390,5 +390,13 @@
   "message.wrights.speed_parts": "That tune needs %s gold and %s redstone",
   "message.wrights.speed_up": "Wright speed is now %s",
   "message.wrights.launched_crew": "Sent %s wrights",
-  "message.wrights.drone_block_cap": "This job has %s blocks, so it can't use more wrights than that."
+  "message.wrights.drone_block_cap": "This job has %s blocks, so it can't use more wrights than that.",
+  "config.jade.plugin_wrights.wright": "Wright",
+  "jade.wrights.tier": "%s wright",
+  "jade.wrights.building": "Building %s",
+  "jade.wrights.paused": "Paused · %s",
+  "jade.wrights.undoing": "Undoing %s",
+  "jade.wrights.saving": "Saving %s",
+  "jade.wrights.waiting": "Waiting · %s",
+  "jade.wrights.size": "%s × %s × %s"
 }

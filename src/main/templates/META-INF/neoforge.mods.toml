@@ -103,6 +103,14 @@ First tested in an otherwise empty NeoForge 1.21.1 instance.
     ordering="AFTER"
     side="CLIENT"
 
+# Jade is optional. The dev client has it. Install it beside Wrights when you want the wright tooltip.
+[[dependencies.${mod_id}]]
+    modId="jade"
+    type="optional"
+    versionRange="[15.10,)"
+    ordering="AFTER"
+    side="BOTH"
+
 # Features are specific properties of the game environment, that you may want to declare you require. This example declares
 # that your mod requires GL version 3.2 or higher. Other features will be added. They are side aware so declaring this won't
 # stop your mod loading on the server for example.
