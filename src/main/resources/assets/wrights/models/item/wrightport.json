@@ -1,3 +1,6 @@
 {
-  "parent": "wrights:block/wrightport"
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "wrights:item/wrightport"
+  }
 }

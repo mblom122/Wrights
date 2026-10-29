@@ -12,6 +12,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.RenderShape;
@@ -22,11 +23,21 @@ import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.shapes.VoxelShape;
 
 import com.wrights.drone.Swarm;
 
 public class WrightportBlock extends BaseEntityBlock {
     public static final MapCodec<WrightportBlock> CODEC = simpleCodec(WrightportBlock::new);
+    private static final VoxelShape SHAPE = Shapes.or(
+            box(1, 0, 1, 15, 2, 15),
+            box(1, 2, 1, 4, 14, 4),
+            box(12, 2, 1, 15, 14, 4),
+            box(1, 2, 12, 4, 14, 15),
+            box(12, 2, 12, 15, 14, 15),
+            box(5, 2, 5, 11, 8, 11));
 
     public WrightportBlock(Properties properties) {
         super(properties.strength(3.5F, 6.0F).sound(SoundType.COPPER).mapColor(MapColor.COLOR_ORANGE).requiresCorrectToolForDrops());
@@ -45,6 +56,11 @@ public class WrightportBlock extends BaseEntityBlock {
     @Override
     protected RenderShape getRenderShape(BlockState state) {
         return RenderShape.MODEL;
+    }
+
+    @Override
+    protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
+        return SHAPE;
     }
 
     @Override
