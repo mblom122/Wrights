@@ -112,8 +112,36 @@ public final class Schematic {
         return new Schematic(UUID.randomUUID(), name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, true);
     }
 
+    /** Keeps this blueprint's id and name, and takes the blocks stored on {@code source}. */
+    public Schematic withContents(Schematic source) {
+        return new Schematic(id, name, source.sizeX, source.sizeY, source.sizeZ, source.entries, source.sourceMin, source.sourceMax, source.sourceDimension, source.anchorX, source.anchorY, source.anchorZ, ephemeral);
+    }
+
+    /** True when both blueprints store the same blocks in the same cells. Name and id are ignored. */
+    public boolean sameBlocks(Schematic other) {
+        if (other == null || sizeX != other.sizeX || sizeY != other.sizeY || sizeZ != other.sizeZ || entries.size() != other.entries.size()) {
+            return false;
+        }
+        for (Entry entry : entries) {
+            int index = other.indexAt(entry.x(), entry.y(), entry.z());
+            if (index < 0) {
+                return false;
+            }
+            Entry theirs = other.entry(index);
+            if (entry.secondary() != theirs.secondary() || !entry.state().equals(theirs.state())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public Schematic withName(String name) {
         return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, ephemeral);
+    }
+
+    /** A saved copy with its own id. Use counts and favorites stay with the original. */
+    public Schematic duplicate(UUID id, String name) {
+        return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, false);
     }
 
     public Schematic withAnchor(int anchorX, int anchorY, int anchorZ) {

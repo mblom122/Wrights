@@ -19,6 +19,7 @@ public final class ModCreativeTabs {
             .icon(() -> ModItems.CONTROLLER.get().getDefaultInstance())
             .displayItems((parameters, output) -> {
                 output.accept(ModItems.CONTROLLER.get());
+                output.accept(ModItems.BLUEPRINT.get());
                 output.accept(ModItems.WRIGHT.get());
                 output.accept(ModItems.UPGRADE_IRON.get());
                 output.accept(ModItems.UPGRADE_GOLD.get());

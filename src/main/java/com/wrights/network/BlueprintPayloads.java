@@ -285,6 +285,21 @@ public final class BlueprintPayloads {
         }
     }
 
+    public record DuplicateBlueprint(UUID id, UUID copyId) implements CustomPacketPayload {
+        public static final Type<DuplicateBlueprint> TYPE = payloadType("duplicate_blueprint");
+        public static final StreamCodec<RegistryFriendlyByteBuf, DuplicateBlueprint> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeUUID(value.id);
+                    buf.writeUUID(value.copyId);
+                },
+                buf -> new DuplicateBlueprint(buf.readUUID(), buf.readUUID()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public record RenameBlueprint(UUID id, String name) implements CustomPacketPayload {
         public static final Type<RenameBlueprint> TYPE = payloadType("rename_blueprint");
         public static final StreamCodec<RegistryFriendlyByteBuf, RenameBlueprint> STREAM_CODEC = StreamCodec.of((buf, value) -> value.write(buf), RenameBlueprint::read);
@@ -917,6 +932,110 @@ public final class BlueprintPayloads {
     public record StopJob() implements CustomPacketPayload {
         public static final Type<StopJob> TYPE = payloadType("stop_job");
         public static final StreamCodec<RegistryFriendlyByteBuf, StopJob> STREAM_CODEC = empty(new StopJob());
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record RequestBlueprintItems() implements CustomPacketPayload {
+        public static final Type<RequestBlueprintItems> TYPE = payloadType("request_blueprint_items");
+        public static final StreamCodec<RegistryFriendlyByteBuf, RequestBlueprintItems> STREAM_CODEC = empty(new RequestBlueprintItems());
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record RequestSlipLibrary() implements CustomPacketPayload {
+        public static final Type<RequestSlipLibrary> TYPE = payloadType("request_slip_library");
+        public static final StreamCodec<RegistryFriendlyByteBuf, RequestSlipLibrary> STREAM_CODEC = empty(new RequestSlipLibrary());
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record BlueprintItemLine(int slot, String name, int sizeX, int sizeY, int sizeZ, int blocks, int kind, String nextName, int libraryBlocks) {
+        public void write(RegistryFriendlyByteBuf buf) {
+            buf.writeVarInt(slot);
+            buf.writeUtf(name, 48);
+            buf.writeVarInt(sizeX);
+            buf.writeVarInt(sizeY);
+            buf.writeVarInt(sizeZ);
+            buf.writeVarInt(blocks);
+            buf.writeByte(kind);
+            buf.writeUtf(nextName, 48);
+            buf.writeVarInt(libraryBlocks + 1);
+        }
+
+        public static BlueprintItemLine read(RegistryFriendlyByteBuf buf) {
+            return new BlueprintItemLine(
+                    buf.readVarInt(),
+                    buf.readUtf(48),
+                    buf.readVarInt(),
+                    buf.readVarInt(),
+                    buf.readVarInt(),
+                    buf.readVarInt(),
+                    buf.readByte(),
+                    buf.readUtf(48),
+                    buf.readVarInt() - 1);
+        }
+    }
+
+    public record BlueprintItemList(List<BlueprintItemLine> lines) implements CustomPacketPayload {
+        public static final Type<BlueprintItemList> TYPE = payloadType("blueprint_item_list");
+        public static final StreamCodec<RegistryFriendlyByteBuf, BlueprintItemList> STREAM_CODEC = StreamCodec.of((buf, value) -> value.write(buf), BlueprintItemList::read);
+
+        public void write(RegistryFriendlyByteBuf buf) {
+            buf.writeVarInt(lines.size());
+            for (BlueprintItemLine line : lines) {
+                line.write(buf);
+            }
+        }
+
+        public static BlueprintItemList read(RegistryFriendlyByteBuf buf) {
+            int count = buf.readVarInt();
+            List<BlueprintItemLine> lines = new ArrayList<>(count);
+            for (int i = 0; i < count; i++) {
+                lines.add(BlueprintItemLine.read(buf));
+            }
+            return new BlueprintItemList(lines);
+        }
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record WriteBlueprintItem(int slot, UUID schematicId) implements CustomPacketPayload {
+        public static final Type<WriteBlueprintItem> TYPE = payloadType("write_blueprint_item");
+        public static final StreamCodec<RegistryFriendlyByteBuf, WriteBlueprintItem> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeVarInt(value.slot + 1);
+                    buf.writeUUID(value.schematicId);
+                },
+                buf -> new WriteBlueprintItem(buf.readVarInt() - 1, buf.readUUID()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record LoadBlueprintItem(int slot, int mode, String name) implements CustomPacketPayload {
+        public static final Type<LoadBlueprintItem> TYPE = payloadType("load_blueprint_item");
+        public static final StreamCodec<RegistryFriendlyByteBuf, LoadBlueprintItem> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeVarInt(value.slot);
+                    buf.writeByte(value.mode);
+                    buf.writeUtf(value.name == null ? "" : value.name, 48);
+                },
+                buf -> new LoadBlueprintItem(buf.readVarInt(), buf.readByte(), buf.readUtf(48)));
 
         @Override
         public Type<? extends CustomPacketPayload> type() {

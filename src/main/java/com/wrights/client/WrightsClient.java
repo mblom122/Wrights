@@ -2,15 +2,19 @@ package com.wrights.client;
 
 import com.wrights.WrightsMod;
 import com.wrights.entity.ModEntities;
+import com.wrights.item.BlueprintItem;
+import com.wrights.item.ModItems;
 import com.wrights.menu.ModMenus;
 
 import net.minecraft.client.model.geom.ModelLayerLocation;
+import net.minecraft.client.renderer.item.ItemProperties;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
@@ -34,6 +38,14 @@ public class WrightsClient {
     @SubscribeEvent
     public static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(ModEntities.DRONE.get(), DroneRenderer::new);
+    }
+
+    @SubscribeEvent
+    public static void registerItemProperties(FMLClientSetupEvent event) {
+        event.enqueueWork(() -> ItemProperties.register(
+                ModItems.BLUEPRINT.get(),
+                ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "filled"),
+                (stack, level, entity, seed) -> BlueprintItem.hasData(stack) ? 1.0F : 0.0F));
     }
 
     @SubscribeEvent

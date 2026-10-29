@@ -1,0 +1,14 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "wrights:item/blueprint"
+  },
+  "overrides": [
+    {
+      "predicate": {
+        "wrights:filled": 1.0
+      },
+      "model": "wrights:item/blueprint_filled"
+    }
+  ]
+}

@@ -20,6 +20,8 @@ public final class ModItems {
             .rarity(Rarity.UNCOMMON)
             .component(ModDataComponents.SWARM.get(), com.wrights.drone.Swarm.EMPTY)));
 
+    public static final DeferredItem<BlueprintItem> BLUEPRINT = ITEMS.register("blueprint", () -> new BlueprintItem(new net.minecraft.world.item.Item.Properties().stacksTo(16)));
+
     public static final DeferredItem<WrightItem> WRIGHT = ITEMS.register("wright", () -> new WrightItem(new net.minecraft.world.item.Item.Properties().stacksTo(64)));
 
     public static final DeferredItem<WrightUpgradeItem> UPGRADE_IRON = ITEMS.register("wright_upgrade_iron",

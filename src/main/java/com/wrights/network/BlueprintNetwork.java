@@ -35,6 +35,7 @@ public final class BlueprintNetwork {
         registrar.playToServer(BlueprintPayloads.Resume.TYPE, BlueprintPayloads.Resume.STREAM_CODEC, BlueprintNetwork::resume);
         registrar.playToServer(BlueprintPayloads.DeleteBlueprint.TYPE, BlueprintPayloads.DeleteBlueprint.STREAM_CODEC, BlueprintNetwork::delete);
         registrar.playToServer(BlueprintPayloads.RenameBlueprint.TYPE, BlueprintPayloads.RenameBlueprint.STREAM_CODEC, BlueprintNetwork::rename);
+        registrar.playToServer(BlueprintPayloads.DuplicateBlueprint.TYPE, BlueprintPayloads.DuplicateBlueprint.STREAM_CODEC, BlueprintNetwork::duplicate);
         registrar.playToServer(BlueprintPayloads.PreviewBlueprint.TYPE, BlueprintPayloads.PreviewBlueprint.STREAM_CODEC, BlueprintNetwork::previewBlueprint);
         registrar.playToServer(BlueprintPayloads.MaterialsRequest.TYPE, BlueprintPayloads.MaterialsRequest.STREAM_CODEC, BlueprintNetwork::materialsRequest);
         registrar.playToServer(BlueprintPayloads.BeginEdit.TYPE, BlueprintPayloads.BeginEdit.STREAM_CODEC, BlueprintNetwork::edit);
@@ -55,6 +56,10 @@ public final class BlueprintNetwork {
         registrar.playToServer(BlueprintPayloads.EditLayer.TYPE, BlueprintPayloads.EditLayer.STREAM_CODEC, BlueprintNetwork::editLayer);
         registrar.playToServer(BlueprintPayloads.TransformBlueprint.TYPE, BlueprintPayloads.TransformBlueprint.STREAM_CODEC, BlueprintNetwork::transform);
         registrar.playToServer(BlueprintPayloads.RecaptureBlueprint.TYPE, BlueprintPayloads.RecaptureBlueprint.STREAM_CODEC, BlueprintNetwork::recapture);
+        registrar.playToServer(BlueprintPayloads.RequestBlueprintItems.TYPE, BlueprintPayloads.RequestBlueprintItems.STREAM_CODEC, BlueprintNetwork::requestBlueprintItems);
+        registrar.playToServer(BlueprintPayloads.RequestSlipLibrary.TYPE, BlueprintPayloads.RequestSlipLibrary.STREAM_CODEC, BlueprintNetwork::requestSlipLibrary);
+        registrar.playToServer(BlueprintPayloads.WriteBlueprintItem.TYPE, BlueprintPayloads.WriteBlueprintItem.STREAM_CODEC, BlueprintNetwork::writeBlueprintItem);
+        registrar.playToServer(BlueprintPayloads.LoadBlueprintItem.TYPE, BlueprintPayloads.LoadBlueprintItem.STREAM_CODEC, BlueprintNetwork::loadBlueprintItem);
 
         registrar.playToClient(BlueprintPayloads.LibrarySync.TYPE, BlueprintPayloads.LibrarySync.STREAM_CODEC, BlueprintNetwork::clientLibrary);
         registrar.playToClient(BlueprintPayloads.CaptureSync.TYPE, BlueprintPayloads.CaptureSync.STREAM_CODEC, BlueprintNetwork::clientCapture);
@@ -66,6 +71,7 @@ public final class BlueprintNetwork {
         registrar.playToClient(BlueprintPayloads.SupplySync.TYPE, BlueprintPayloads.SupplySync.STREAM_CODEC, BlueprintNetwork::clientSupply);
         registrar.playToClient(BlueprintPayloads.UndoPrompt.TYPE, BlueprintPayloads.UndoPrompt.STREAM_CODEC, BlueprintNetwork::clientUndoPrompt);
         registrar.playToClient(BlueprintPayloads.JobDone.TYPE, BlueprintPayloads.JobDone.STREAM_CODEC, BlueprintNetwork::clientJobDone);
+        registrar.playToClient(BlueprintPayloads.BlueprintItemList.TYPE, BlueprintPayloads.BlueprintItemList.STREAM_CODEC, BlueprintNetwork::clientBlueprintItems);
     }
 
     public static void syncLibrary(ServerPlayer player) {
@@ -169,6 +175,11 @@ public final class BlueprintNetwork {
     private static void rename(BlueprintPayloads.RenameBlueprint payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
         context.enqueueWork(() -> BlueprintActions.rename(player, payload.id(), payload.name()));
+    }
+
+    private static void duplicate(BlueprintPayloads.DuplicateBlueprint payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> BlueprintActions.duplicate(player, payload.id(), payload.copyId()));
     }
 
     private static void previewBlueprint(BlueprintPayloads.PreviewBlueprint payload, IPayloadContext context) {
@@ -367,6 +378,33 @@ public final class BlueprintNetwork {
             return;
         }
         context.enqueueWork(() -> com.wrights.client.WrightsClientState.openUndoPrompt(payload));
+    }
+
+    public static void sendBlueprintItems(ServerPlayer player, java.util.List<BlueprintPayloads.BlueprintItemLine> lines) {
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.BlueprintItemList(lines));
+    }
+
+    private static void requestBlueprintItems(BlueprintPayloads.RequestBlueprintItems payload, IPayloadContext context) {
+        context.enqueueWork(() -> com.wrights.item.BlueprintSlips.sendList((ServerPlayer) context.player()));
+    }
+
+    private static void requestSlipLibrary(BlueprintPayloads.RequestSlipLibrary payload, IPayloadContext context) {
+        context.enqueueWork(() -> syncLibrary((ServerPlayer) context.player()));
+    }
+
+    private static void writeBlueprintItem(BlueprintPayloads.WriteBlueprintItem payload, IPayloadContext context) {
+        context.enqueueWork(() -> com.wrights.item.BlueprintSlips.write((ServerPlayer) context.player(), payload.slot(), payload.schematicId()));
+    }
+
+    private static void loadBlueprintItem(BlueprintPayloads.LoadBlueprintItem payload, IPayloadContext context) {
+        context.enqueueWork(() -> com.wrights.item.BlueprintSlips.load((ServerPlayer) context.player(), payload.slot(), payload.mode(), payload.name()));
+    }
+
+    private static void clientBlueprintItems(BlueprintPayloads.BlueprintItemList payload, IPayloadContext context) {
+        if (FMLEnvironment.dist != Dist.CLIENT) {
+            return;
+        }
+        context.enqueueWork(() -> com.wrights.client.BlueprintSlipScreens.applyItems(payload.lines()));
     }
 
     public static void syncJobs(ServerPlayer player) {

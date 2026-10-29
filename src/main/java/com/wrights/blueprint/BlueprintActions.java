@@ -90,6 +90,21 @@ public final class BlueprintActions {
         return base;
     }
 
+    /** Same name with "1" added. Another "1" is added while that name is already used. */
+    public static String copyName(String original, Iterable<String> existing) {
+        Set<String> taken = keys(existing);
+        String stem = cleanName(original);
+        for (int extra = 1; extra <= 48; extra++) {
+            int keep = Math.max(0, 48 - extra);
+            String head = stem.length() > keep ? stem.substring(0, keep) : stem;
+            String candidate = head + "1".repeat(extra);
+            if (!taken.contains(key(candidate))) {
+                return candidate;
+            }
+        }
+        return "Blueprint1";
+    }
+
     private static Set<String> keys(Iterable<String> names) {
         Set<String> taken = new HashSet<>();
         if (names == null) {
@@ -105,6 +120,10 @@ public final class BlueprintActions {
 
     private static String key(String name) {
         return name.trim().toLowerCase(Locale.ROOT);
+    }
+
+    public static List<String> takenBlueprintNames(SchematicLibrary library) {
+        return blueprintNames(library, null);
     }
 
     private static List<String> blueprintNames(SchematicLibrary library, UUID except) {
@@ -432,6 +451,85 @@ public final class BlueprintActions {
         BlueprintNetwork.syncLibrary(player);
     }
 
+    public static void duplicate(ServerPlayer player, UUID id, UUID copyId) {
+        if (!held(player) || id == null || copyId == null || id.equals(copyId)) {
+            return;
+        }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        BlueprintShelf shelf = library.shelf();
+        if (shelf.isFolder(copyId) || library.schematic(copyId).isPresent()) {
+            return;
+        }
+        Map<UUID, String> names = schematicNames(library);
+        if (shelf.isFolder(id)) {
+            BlueprintShelf.Folder source = shelf.folder(id);
+            if (source == null || !shelf.createFolder(copyId, source.parent(), source.name(), names)) {
+                BlueprintNetwork.syncLibrary(player);
+                return;
+            }
+            shelf.placeAfter(copyId, true, source.parent(), id, names);
+            copyContents(library, shelf, id, copyId, names, 0);
+            reveal(shelf, player.getUUID(), copyId);
+            Messages.actionBar(player, "message.wrights.folder_duplicated", source.name());
+        } else {
+            Schematic schematic = library.schematic(id).orElse(null);
+            if (schematic == null || schematic.ephemeral()) {
+                Messages.actionBar(player, "message.wrights.blueprint_missing");
+                BlueprintNetwork.syncLibrary(player);
+                return;
+            }
+            String name = copyName(schematic.name(), blueprintNames(library, null));
+            library.putSchematic(schematic.duplicate(copyId, name));
+            names.put(copyId, name);
+            UUID parent = shelf.parentOf(id);
+            shelf.placeAfter(copyId, false, parent, id, names);
+            if (parent != null) {
+                reveal(shelf, player.getUUID(), parent);
+            }
+            Messages.actionBar(player, "message.wrights.blueprint_duplicated", name);
+        }
+        library.setDirty();
+        BlueprintNetwork.syncLibrary(player);
+    }
+
+    private static void copyContents(SchematicLibrary library, BlueprintShelf shelf, UUID from, UUID to, Map<UUID, String> names, int depth) {
+        if (depth > 32) {
+            return;
+        }
+        for (UUID child : List.copyOf(shelf.contents(from, names))) {
+            if (shelf.isFolder(child)) {
+                BlueprintShelf.Folder folder = shelf.folder(child);
+                if (folder == null) {
+                    continue;
+                }
+                UUID copyId = UUID.randomUUID();
+                if (!shelf.createFolder(copyId, to, folder.name(), names)) {
+                    continue;
+                }
+                copyContents(library, shelf, child, copyId, names, depth + 1);
+                continue;
+            }
+            Schematic schematic = library.schematic(child).orElse(null);
+            if (schematic == null || schematic.ephemeral()) {
+                continue;
+            }
+            String name = copyName(schematic.name(), blueprintNames(library, null));
+            UUID copyId = UUID.randomUUID();
+            library.putSchematic(schematic.duplicate(copyId, name));
+            names.put(copyId, name);
+            shelf.placeAfter(copyId, false, to, null, names);
+        }
+    }
+
+    private static void reveal(BlueprintShelf shelf, UUID player, UUID folder) {
+        UUID cursor = folder;
+        for (int guard = 0; cursor != null && guard < 64; guard++) {
+            shelf.setOpen(player, cursor, true);
+            BlueprintShelf.Folder node = shelf.folder(cursor);
+            cursor = node == null ? null : node.parent();
+        }
+    }
+
     public static void beginEdit(ServerPlayer player, java.util.UUID id) {
         if (!held(player)) {
             return;
@@ -454,10 +552,12 @@ public final class BlueprintActions {
         Schematic baseline = session.editBaseline();
         boolean wasDraft = session.editWasDraft();
         boolean baselineDirty = session.editBaselineDirty();
+        Schematic draft = session.draft();
         session.clearEdit();
         if (baseline == null) {
             return;
         }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
         if (wasDraft && session.mode() == BlueprintSessions.Mode.BUILD && baseline.id().equals(session.buildId())) {
             if (!keep) {
                 session.setDraft(baseline);
@@ -466,17 +566,25 @@ public final class BlueprintActions {
                 Messages.actionBar(player, "message.wrights.edit_discarded");
                 return;
             }
-            Schematic draft = session.draft();
-            if (draft != null && draft != baseline) {
-                Messages.actionBar(player, "message.wrights.session_saved", draft.name());
+            Schematic saved = draft != null ? draft : baseline;
+            library.putSchematic(saved);
+            session.setDraft(saved);
+            session.setDraftDirty(false);
+            BlueprintNetwork.syncLibrary(player);
+            BlueprintNetwork.preview(player, saved, false, false);
+            if (saved != baseline) {
+                Messages.actionBar(player, "message.wrights.session_saved", saved.name());
             } else {
                 Messages.actionBar(player, "message.wrights.session_clean");
             }
             return;
         }
-        SchematicLibrary library = SchematicLibrary.get(player.getServer());
         Schematic current = library.schematic(baseline.id()).orElse(null);
         if (keep) {
+            if (current != null) {
+                BlueprintNetwork.syncLibrary(player);
+                BlueprintNetwork.preview(player, current, false, false);
+            }
             if (current != null && current != baseline) {
                 Messages.actionBar(player, "message.wrights.session_saved", current.name());
             } else {

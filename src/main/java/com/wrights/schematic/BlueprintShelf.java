@@ -100,6 +100,40 @@ public final class BlueprintShelf {
         return folders.containsKey(id);
     }
 
+    public Folder folder(UUID id) {
+        return folders.get(id);
+    }
+
+    public List<UUID> contents(UUID parent, Map<UUID, String> schematicNames) {
+        return children(parent, schematicNames);
+    }
+
+    /** Puts {@code id} in {@code parent}, directly after {@code after}. A null {@code after} appends it. */
+    public void placeAfter(UUID id, boolean folder, UUID parent, UUID after, Map<UUID, String> schematicNames) {
+        if (folder) {
+            if (!folders.containsKey(id)) {
+                return;
+            }
+            if (parent != null && (!folders.containsKey(parent) || id.equals(parent) || holds(id, parent))) {
+                parent = null;
+            }
+        } else if (parent != null && !folders.containsKey(parent)) {
+            parent = null;
+        }
+        setParent(id, folder, parent);
+        List<UUID> destination = children(parent, schematicNames);
+        destination.remove(id);
+        int at = destination.size();
+        if (after != null) {
+            int found = destination.indexOf(after);
+            if (found >= 0) {
+                at = found + 1;
+            }
+        }
+        destination.add(Math.min(at, destination.size()), id);
+        writeOrder(destination);
+    }
+
     public void toggleFavorite(UUID player, UUID id) {
         if (folders.containsKey(id)) {
             return;
