@@ -21,7 +21,7 @@ public final class ModBlocks {
 
     public static final DeferredBlock<WrightportBlock> WRIGHTPORT = BLOCKS.register("wrightport", () -> new WrightportBlock(BlockBehaviour.Properties.of()));
     public static final DeferredItem<BlockItem> WRIGHTPORT_ITEM = ModItems.ITEMS.register("wrightport",
-            () -> new WrightportBlockItem(WRIGHTPORT.get(), new Item.Properties().stacksTo(1).component(ModDataComponents.SWARM.get(), Swarm.EMPTY)));
+            () -> new WrightportBlockItem(WRIGHTPORT.get(), new Item.Properties().stacksTo(64).component(ModDataComponents.SWARM.get(), Swarm.EMPTY)));
 
     private ModBlocks() {
     }
