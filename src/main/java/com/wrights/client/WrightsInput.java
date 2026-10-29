@@ -1,0 +1,254 @@
+package com.wrights.client;
+
+import org.lwjgl.glfw.GLFW;
+
+import com.wrights.WrightsMod;
+import com.wrights.network.BlueprintPayloads;
+
+import com.mojang.blaze3d.platform.InputConstants;
+
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.core.BlockPos;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.InputEvent;
+import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
+import net.neoforged.neoforge.common.util.TriState;
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+import net.neoforged.api.distmarker.Dist;
+
+@EventBusSubscriber(modid = WrightsMod.MOD_ID, value = Dist.CLIENT)
+public final class WrightsInput {
+    public static final KeyMapping MENU = new KeyMapping(
+            "key.wrights.menu",
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_B,
+            "key.categories.wrights");
+
+    private static boolean windowRaised;
+    private static boolean wasHeld;
+    private static int resumeDelay;
+    private static boolean paceSent;
+
+    private WrightsInput() {
+    }
+
+    @SubscribeEvent
+    public static void registerKeys(RegisterKeyMappingsEvent event) {
+        event.register(MENU);
+    }
+
+    private static void raiseWindow(Minecraft minecraft) {
+        if (windowRaised) {
+            return;
+        }
+        long handle = minecraft.getWindow().getWindow();
+        if (handle == 0L) {
+            return;
+        }
+        windowRaised = true;
+        GLFW.glfwRestoreWindow(handle);
+        GLFW.glfwShowWindow(handle);
+        GLFW.glfwFocusWindow(handle);
+    }
+
+    @SubscribeEvent
+    public static void onLogin(ClientPlayerNetworkEvent.LoggingIn event) {
+        WrightsClientState.prepareJoin();
+        resumeDelay = 20;
+        wasHeld = false;
+        paceSent = false;
+    }
+
+    @SubscribeEvent
+    public static void onTick(ClientTickEvent.Post event) {
+        Minecraft minecraft = Minecraft.getInstance();
+        raiseWindow(minecraft);
+        if (minecraft.player == null) {
+            wasHeld = false;
+            return;
+        }
+        if (!paceSent && minecraft.getConnection() != null) {
+            net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.wrights.network.BlueprintPayloads.SetPace(com.wrights.WrightsClientConfig.INSTANT_JOBS.get()));
+            paceSent = true;
+        }
+        boolean held = com.wrights.item.ControllerItem.isHeld(minecraft.player);
+        if (held) {
+            if (resumeDelay > 0) {
+                resumeDelay--;
+                if (resumeDelay == 0) {
+                    WrightsClientState.tryResume();
+                }
+            } else if (!wasHeld) {
+                WrightsClientState.tryResume();
+            }
+        }
+        wasHeld = held;
+        if (!held) {
+            WrightsClientState.noteUnequipped();
+        }
+        WrightsClientState.tickCapture();
+        if (!com.wrights.item.ControllerItem.isHeld(minecraft.player)) {
+            if (minecraft.screen instanceof WrightsMenuScreen
+                    || minecraft.screen instanceof BlueprintAdjustScreen
+                    || minecraft.screen instanceof PlacementScreen
+                    || minecraft.screen instanceof BlueprintEditScreen
+                    || minecraft.screen instanceof BlockPickerScreen
+                    || minecraft.screen instanceof JobActionScreen) {
+                minecraft.setScreen(null);
+            }
+            while (MENU.consumeClick()) {
+            }
+            return;
+        }
+        WrightsClientState.tickFollow();
+        while (MENU.consumeClick()) {
+            if (minecraft.screen != null && minecraft.screen.getFocused() instanceof EditBox) {
+                continue;
+            }
+            if (minecraft.screen == null) {
+                minecraft.setScreen(new WrightsMenuScreen());
+                net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.wrights.network.BlueprintPayloads.LibraryRequest());
+            } else             if (minecraft.screen instanceof WrightsMenuScreen
+                    || minecraft.screen instanceof BlueprintAdjustScreen
+                    || minecraft.screen instanceof PlacementScreen
+                    || minecraft.screen instanceof BlueprintEditScreen
+                    || minecraft.screen instanceof BlockPickerScreen
+                    || minecraft.screen instanceof JobActionScreen) {
+                minecraft.setScreen(null);
+            }
+        }
+    }
+
+    @SubscribeEvent
+    public static void onBlock(PlayerInteractEvent.RightClickBlock event) {
+        if (!event.getLevel().isClientSide()) {
+            return;
+        }
+        if (!com.wrights.item.ControllerItem.isHeld(event.getEntity())) {
+            return;
+        }
+        if (com.wrights.blueprint.BlueprintClientFlags.capture) {
+            event.setCanceled(true);
+            event.setUseBlock(TriState.FALSE);
+            event.setUseItem(TriState.FALSE);
+            WrightsClientState.onCaptureClick(event.getPos(), event.getEntity().isShiftKeyDown());
+            return;
+        }
+        if (com.wrights.blueprint.BlueprintClientFlags.build && Minecraft.getInstance().screen == null) {
+            event.setCanceled(true);
+            event.setUseBlock(TriState.FALSE);
+            event.setUseItem(TriState.FALSE);
+            if (event.getEntity().isShiftKeyDown()) {
+                if (WrightsClientState.bindSupply && WrightsClientState.supplyBound) {
+                    WrightsClientState.supplyBound = false;
+                    WrightsClientState.supplyPos = null;
+                    net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.wrights.network.BlueprintPayloads.BindSupply(BlockPos.ZERO, true));
+                } else {
+                    Minecraft.getInstance().setScreen(new PlacementScreen());
+                }
+            } else if (WrightsClientState.bindSupply) {
+                BlockPos pos = event.getPos();
+                if (Minecraft.getInstance().level != null && SelectionRenderer.isSupplyContainer(Minecraft.getInstance().level, pos)) {
+                    WrightsClientState.supplyBound = true;
+                    WrightsClientState.supplyPos = pos.immutable();
+                    WrightsClientState.bindSupply = false;
+                    net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.wrights.network.BlueprintPayloads.BindSupply(pos, false));
+                } else {
+                    event.getEntity().displayClientMessage(net.minecraft.network.chat.Component.translatable("message.wrights.supply_not_container"), true);
+                }
+            } else {
+                WrightsClientState.tryBuild();
+            }
+            return;
+        }
+        if (WrightsClientState.mode == WrightsClientState.Mode.JOBS && Minecraft.getInstance().screen == null) {
+            event.setCanceled(true);
+            event.setUseBlock(TriState.FALSE);
+            event.setUseItem(TriState.FALSE);
+            openAimedJob();
+        }
+    }
+
+    @SubscribeEvent
+    public static void onItem(PlayerInteractEvent.RightClickItem event) {
+        if (!event.getLevel().isClientSide()) {
+            return;
+        }
+        if (!com.wrights.item.ControllerItem.isHeld(event.getEntity())) {
+            return;
+        }
+        if (com.wrights.blueprint.BlueprintClientFlags.capture) {
+            event.setCanceled(true);
+            if (!(Minecraft.getInstance().hitResult instanceof net.minecraft.world.phys.BlockHitResult hit)
+                    || hit.getType() != net.minecraft.world.phys.HitResult.Type.BLOCK) {
+                WrightsClientState.onCaptureClick(null, event.getEntity().isShiftKeyDown());
+            }
+            return;
+        }
+        if (com.wrights.blueprint.BlueprintClientFlags.build && Minecraft.getInstance().screen == null) {
+            event.setCanceled(true);
+            if (event.getEntity().isShiftKeyDown()) {
+                if (WrightsClientState.bindSupply && WrightsClientState.supplyBound) {
+                    WrightsClientState.supplyBound = false;
+                    WrightsClientState.supplyPos = null;
+                    net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.wrights.network.BlueprintPayloads.BindSupply(BlockPos.ZERO, true));
+                } else {
+                    Minecraft.getInstance().setScreen(new PlacementScreen());
+                }
+            } else if (WrightsClientState.bindSupply) {
+                event.getEntity().displayClientMessage(net.minecraft.network.chat.Component.translatable("message.wrights.supply_not_container"), true);
+            } else {
+                WrightsClientState.tryBuild();
+            }
+            return;
+        }
+        if (WrightsClientState.mode == WrightsClientState.Mode.JOBS && Minecraft.getInstance().screen == null) {
+            event.setCanceled(true);
+            openAimedJob();
+        }
+    }
+
+    private static void openAimedJob() {
+        BlueprintPayloads.JobLine job = WrightsClientState.jobAimed();
+        if (job != null) {
+            Minecraft.getInstance().setScreen(new JobActionScreen(job.id()));
+        }
+    }
+
+    @SubscribeEvent
+    public static void onScroll(InputEvent.MouseScrollingEvent event) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || minecraft.screen != null) {
+            return;
+        }
+        if (!com.wrights.item.ControllerItem.isHeld(minecraft.player)) {
+            return;
+        }
+        if (event.getScrollDeltaY() == 0.0D) {
+            return;
+        }
+        boolean shift = minecraft.player.isShiftKeyDown();
+        boolean control = InputConstants.isKeyDown(minecraft.getWindow().getWindow(), GLFW.GLFW_KEY_LEFT_CONTROL)
+                || InputConstants.isKeyDown(minecraft.getWindow().getWindow(), GLFW.GLFW_KEY_RIGHT_CONTROL);
+        if (shift && control) {
+            WrightsClientState.cycleMainMode(event.getScrollDeltaY() > 0.0D ? -1 : 1);
+            event.setCanceled(true);
+            return;
+        }
+        if (!shift) {
+            return;
+        }
+        if (WrightsClientState.mode == WrightsClientState.Mode.CAPTURE) {
+            WrightsClientState.cycleStyle(event.getScrollDeltaY() > 0.0D ? -1 : 1);
+            event.setCanceled(true);
+        } else if (WrightsClientState.mode == WrightsClientState.Mode.BUILD) {
+            WrightsClientState.cycleBuildTool();
+            event.setCanceled(true);
+        }
+    }
+}

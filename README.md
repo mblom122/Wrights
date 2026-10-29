@@ -16,7 +16,7 @@ Create a new world with cheats enabled. In that world:
 
 ```
 /gamemode creative
-/give @s autobots:controller
+/give @s wrights:controller
 ```
 
 The jar for a hand-made empty NeoForge 1.21.1 instance is produced with:
@@ -57,4 +57,4 @@ Survival spends matching blocks from your inventory. Creative places them for fr
 - Sneak-use on air stops the wright. Walking away pauses it. Rejoining the world lets it continue.
 - A door in the copy costs one door, not two.
 
-Server limits live in the world's `serverconfig/autobots-server.toml`.
+Server limits live in the world's `serverconfig/wrights-server.toml`.

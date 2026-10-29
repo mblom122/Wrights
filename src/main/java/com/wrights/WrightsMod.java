@@ -1,0 +1,51 @@
+package com.wrights;
+
+import org.slf4j.Logger;
+
+import com.mojang.logging.LogUtils;
+
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.config.ModConfig;
+
+import com.wrights.block.ModBlockEntities;
+import com.wrights.block.ModBlocks;
+import com.wrights.item.ModCreativeTabs;
+import com.wrights.item.ModDataComponents;
+import com.wrights.item.ModItems;
+import com.wrights.entity.ModEntities;
+import com.wrights.menu.ModMenus;
+import com.wrights.network.BlueprintNetwork;
+
+import net.minecraft.resources.ResourceLocation;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+
+import top.theillusivec4.curios.api.CuriosApi;
+
+@Mod(WrightsMod.MOD_ID)
+public class WrightsMod {
+    public static final String MOD_ID = "wrights";
+    public static final Logger LOGGER = LogUtils.getLogger();
+
+    public WrightsMod(IEventBus modBus, ModContainer container) {
+        ModDataComponents.DATA_COMPONENTS.register(modBus);
+        ModItems.ITEMS.register(modBus);
+        ModBlocks.BLOCKS.register(modBus);
+        ModBlockEntities.TYPES.register(modBus);
+        ModMenus.MENUS.register(modBus);
+        ModEntities.ENTITIES.register(modBus);
+        ModCreativeTabs.TABS.register(modBus);
+        modBus.addListener(BlueprintNetwork::register);
+        modBus.addListener(WrightsMod::commonSetup);
+        container.registerConfig(ModConfig.Type.SERVER, WrightsConfig.SPEC);
+        container.registerConfig(ModConfig.Type.CLIENT, WrightsClientConfig.SPEC);
+        LOGGER.info("Wrights loaded for an isolated NeoForge 1.21.1 test");
+    }
+
+    private static void commonSetup(FMLCommonSetupEvent event) {
+        event.enqueueWork(() -> CuriosApi.registerCurioPredicate(
+                ResourceLocation.fromNamespaceAndPath(MOD_ID, "drone_cradle"),
+                result -> result.stack().is(ModItems.CRADLE.get())));
+    }
+}

@@ -1,13 +1,13 @@
-Autobots isolated test instance
+Wrights isolated test instance
 =============================
 
-This folder is a mod list for a NeoForge 1.21.1 instance that should contain nothing except Autobots.
+This folder is a mod list for a NeoForge 1.21.1 instance that should contain nothing except Wrights.
 
 Fastest way to play that instance:
 
     gradlew runClient
 
-That downloads Minecraft 1.21.1 and NeoForge, then opens a game whose only mod is Autobots.
+That downloads Minecraft 1.21.1 and NeoForge, then opens a game whose only mod is Wrights.
 Do not copy All the Mods into the run folder while you are still testing.
 
 Launcher instance, still with no other mods:
@@ -15,5 +15,5 @@ Launcher instance, still with no other mods:
 1. Install NeoForge 21.1 for Minecraft 1.21.1.
 2. Create a new empty instance. Do not add the ATM10 Aeronautics pack.
 3. Run: gradlew isolatedPack
-4. Copy modpack/mods/autobots-0.1.0.jar into that instance's mods folder.
+4. Copy modpack/mods/wrights-0.1.0.jar into that instance's mods folder.
 5. Leave every other mod out.

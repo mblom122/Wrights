@@ -1,0 +1,2529 @@
+package com.wrights.job;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.Container;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.common.util.BlockSnapshot;
+import net.neoforged.neoforge.event.level.BlockEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
+
+import com.wrights.WrightsConfig;
+import com.wrights.blueprint.BlueprintActions;
+import com.wrights.blueprint.BlueprintSessions;
+import com.wrights.blueprint.BoxEdits;
+import com.wrights.network.BlueprintNetwork;
+import com.wrights.network.BlueprintPayloads;
+import com.wrights.WrightsMod;
+import com.wrights.drone.Cradles;
+import com.wrights.drone.CrewSplit;
+import com.wrights.drone.Swarm;
+import com.wrights.entity.DroneEntity;
+import com.wrights.entity.ModEntities;
+import com.wrights.item.ControllerData;
+import com.wrights.item.ControllerItem;
+import com.wrights.schematic.Schematic;
+import com.wrights.schematic.SchematicLibrary;
+import com.wrights.util.BlockFilters;
+import com.wrights.util.Messages;
+
+@EventBusSubscriber(modid = WrightsMod.MOD_ID)
+public final class JobManager {
+    private static final double DRONE_REACH_SQR = 2.25D;
+
+    private JobManager() {
+    }
+
+    @SubscribeEvent
+    public static void onServerTick(ServerTickEvent.Post event) {
+        tick(event.getServer());
+    }
+
+    public static void tick(MinecraftServer server) {
+        SchematicLibrary library = SchematicLibrary.get(server);
+        List<BuildJob> jobs = new ArrayList<>(library.jobs());
+        for (BuildJob job : jobs) {
+            if (job.finished() && !job.undoing()) {
+                continue;
+            }
+            try {
+                if (job.undoing()) {
+                    tickUndo(server, library, job);
+                } else if (job.kind() == BuildJob.Kind.COPY) {
+                    tickCopy(server, library, job);
+                } else {
+                    tickPaste(server, library, job);
+                }
+            } catch (RuntimeException ex) {
+                WrightsMod.LOGGER.error("Wrights job {} failed and was stopped", job.id(), ex);
+                discardDrone(server, job);
+                library.removeJob(job);
+            }
+            if (!job.finished() && library.job(job.id()).isPresent()) {
+                library.setDirty();
+            }
+        }
+        if (server.getTickCount() % 10 == 0) {
+            java.util.Set<java.util.UUID> owners = new java.util.HashSet<>();
+            for (BuildJob job : library.jobs()) {
+                owners.add(job.owner());
+            }
+            for (java.util.UUID owner : owners) {
+                net.minecraft.server.level.ServerPlayer player = server.getPlayerList().getPlayer(owner);
+                if (player != null) {
+                    com.wrights.network.BlueprintNetwork.syncJobs(player);
+                }
+            }
+        }
+    }
+
+    public static java.util.Optional<BuildJob> jobFor(ServerPlayer player) {
+        return SchematicLibrary.get(player.getServer()).jobFor(player.getUUID());
+    }
+
+    public static boolean cancel(ServerPlayer player, boolean tellPlayer) {
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        List<BuildJob> jobs = new ArrayList<>(library.jobsFor(player.getUUID()));
+        jobs.removeIf(BuildJob::finished);
+        if (jobs.isEmpty()) {
+            return false;
+        }
+        for (BuildJob job : jobs) {
+            stopOne(player, library, job, false);
+        }
+        if (tellPlayer) {
+            Messages.actionBar(player, jobs.size() == 1 ? "message.wrights.stopped" : "message.wrights.stopped_all");
+        }
+        com.wrights.network.BlueprintNetwork.syncJobs(player);
+        return true;
+    }
+
+    public static void control(ServerPlayer player, java.util.UUID id, int action) {
+        if (!com.wrights.item.ControllerItem.isHeld(player)) {
+            return;
+        }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        if (action == com.wrights.network.BlueprintPayloads.JobControl.PAUSE_ALL) {
+            setPausedAll(player, library, true);
+            return;
+        }
+        if (action == com.wrights.network.BlueprintPayloads.JobControl.RESUME_ALL) {
+            setPausedAll(player, library, false);
+            return;
+        }
+        if (action == com.wrights.network.BlueprintPayloads.JobControl.REMOVE_ACTIVE) {
+            removeSection(player, library, false);
+            return;
+        }
+        if (action == com.wrights.network.BlueprintPayloads.JobControl.REMOVE_DONE) {
+            removeSection(player, library, true);
+            return;
+        }
+        BuildJob job = library.job(id).orElse(null);
+        if (job == null || !job.owner().equals(player.getUUID())) {
+            com.wrights.network.BlueprintNetwork.syncJobs(player);
+            return;
+        }
+        if (action == com.wrights.network.BlueprintPayloads.JobControl.STOP) {
+            stopOne(player, library, job, true);
+        } else if (action == com.wrights.network.BlueprintPayloads.JobControl.PAUSE && !job.finished()) {
+            job.setPaused(true);
+            library.setDirty();
+        } else if (action == com.wrights.network.BlueprintPayloads.JobControl.RESUME && !job.finished()) {
+            if (missingDrones(player, job)) {
+                Messages.actionBar(player, "message.wrights.paused_no_drones");
+            } else {
+                job.setPaused(false);
+                library.setDirty();
+            }
+        } else if (action == com.wrights.network.BlueprintPayloads.JobControl.REDO) {
+            redo(player, library, job);
+            return;
+        } else if (action == com.wrights.network.BlueprintPayloads.JobControl.UNDO) {
+            startUndo(player, library, job, false);
+            return;
+        } else if (action == com.wrights.network.BlueprintPayloads.JobControl.UNDO_FORCE) {
+            startUndo(player, library, job, true);
+            return;
+        } else if (action == com.wrights.network.BlueprintPayloads.JobControl.REMOVE) {
+            removeOneJob(player, library, job);
+            return;
+        } else if (action == com.wrights.network.BlueprintPayloads.JobControl.VISIT) {
+            visit(player, job);
+            return;
+        }
+        com.wrights.network.BlueprintNetwork.syncJobs(player);
+    }
+
+    private static void stopOne(ServerPlayer player, SchematicLibrary library, BuildJob job, boolean tell) {
+        if (job.finished()) {
+            return;
+        }
+        if (job.kind() == BuildJob.Kind.COPY && job.resultSchematicId() != null) {
+            library.removeSchematic(job.resultSchematicId());
+        }
+        if (job.kind() == BuildJob.Kind.PASTE) {
+            com.wrights.network.BlueprintNetwork.clearJobHologram(player, job.id());
+            discardDrone(player.getServer(), job);
+            archive(library, job, true);
+        } else {
+            discardDrone(player.getServer(), job);
+            library.removeJob(job);
+        }
+        if (tell) {
+            Messages.actionBar(player, "message.wrights.stopped");
+        }
+    }
+
+    private static void redo(ServerPlayer player, SchematicLibrary library, BuildJob job) {
+        if (!job.finished() || job.kind() != BuildJob.Kind.PASTE || job.schematicId() == null) {
+            return;
+        }
+        Schematic schematic = library.schematic(job.schematicId()).orElse(null);
+        if (schematic == null || schematic.blockCount() == 0) {
+            Messages.actionBar(player, "message.wrights.blueprint_missing");
+            return;
+        }
+        if (overlapsBuild(library, job.dimension(), schematic, job.min(), job.clipX(), job.clipY(), job.clipZ())) {
+            Messages.actionBar(player, "message.wrights.build_overlap");
+            return;
+        }
+        if (!instant(player) && !job.hasCrew() && !assignCrew(player, job, schematic)) {
+            return;
+        }
+        job.restart();
+        library.setDirty();
+        if (!instant(player) && !job.hasCrew() && player.level() instanceof ServerLevel level && level.dimension().equals(job.dimension())) {
+            ensureDrone(level, player, job, job.min());
+        }
+        BlueprintNetwork.showJobHologram(player, job, schematic);
+        BlueprintNetwork.syncJobs(player);
+        Messages.actionBar(player, "message.wrights.launched");
+    }
+
+    private static void startUndo(ServerPlayer player, SchematicLibrary library, BuildJob job, boolean force) {
+        if (job.undoing() || job.kind() != BuildJob.Kind.PASTE || !job.finished()) {
+            return;
+        }
+        if (job.refundCount() == 0) {
+            Messages.actionBar(player, "message.wrights.undo_none");
+            BlueprintNetwork.syncJobs(player);
+            return;
+        }
+        if (!force) {
+            int extra = overflow(player, job);
+            if (extra > 0) {
+                BlueprintNetwork.undoPrompt(player, job.id(), extra, dropKind(player, job));
+                return;
+            }
+        }
+        if (!job.beginUndo()) {
+            Messages.actionBar(player, "message.wrights.undo_none");
+            BlueprintNetwork.syncJobs(player);
+            return;
+        }
+        library.setDirty();
+        if (!instant(player) && !job.hasCrew() && player.level() instanceof ServerLevel level && level.dimension().equals(job.dimension())) {
+            ensureDrone(level, player, job, job.lastRefundPos());
+        }
+        BlueprintNetwork.clearJobHologram(player, job.id());
+        BlueprintNetwork.syncJobs(player);
+        Messages.actionBar(player, "message.wrights.undo_started");
+    }
+
+    public static void bindSupply(ServerPlayer player, BlockPos pos, boolean clear) {
+        if (!ControllerItem.isHeld(player)) {
+            return;
+        }
+        BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
+        if (session.mode() != BlueprintSessions.Mode.BUILD) {
+            return;
+        }
+        if (clear || pos == null) {
+            session.setSupply(null);
+            BlueprintNetwork.syncSupply(player);
+            Messages.actionBar(player, "message.wrights.supply_inventory");
+            return;
+        }
+        if (!(player.level() instanceof ServerLevel level)) {
+            return;
+        }
+        double range = WrightsConfig.MAX_RANGE.getAsInt();
+        if (!level.mayInteract(player, pos) || player.distanceToSqr(Vec3.atCenterOf(pos)) > range * range) {
+            Messages.actionBar(player, "message.wrights.out_of_range");
+            return;
+        }
+        if (containerAt(level, pos) == null) {
+            Messages.actionBar(player, "message.wrights.supply_not_container");
+            return;
+        }
+        session.setSupply(pos.immutable());
+        BlueprintNetwork.syncSupply(player);
+        Messages.actionBar(player, "message.wrights.supply_chest");
+    }
+
+    private static void archive(SchematicLibrary library, BuildJob job, boolean stopped) {
+        job.markFinished(library.nextHistoryOrder(), stopped);
+        library.pruneHistory(job.owner());
+        library.setDirty();
+    }
+
+    private static void setPausedAll(ServerPlayer player, SchematicLibrary library, boolean paused) {
+        boolean changed = false;
+        int blocked = 0;
+        for (BuildJob job : library.jobsFor(player.getUUID())) {
+            if (!job.finished() && job.paused() != paused) {
+                if (!paused && missingDrones(player, job)) {
+                    blocked++;
+                    continue;
+                }
+                job.setPaused(paused);
+                changed = true;
+            }
+        }
+        if (changed) {
+            library.setDirty();
+            Messages.actionBar(player, paused ? "message.wrights.paused_all" : "message.wrights.resumed_all");
+        } else if (blocked > 0) {
+            Messages.actionBar(player, "message.wrights.paused_no_drones");
+        }
+        BlueprintNetwork.syncJobs(player);
+    }
+
+    private static void removeSection(ServerPlayer player, SchematicLibrary library, boolean finished) {
+        List<BuildJob> jobs = new ArrayList<>(library.jobsFor(player.getUUID()));
+        int count = 0;
+        for (BuildJob job : jobs) {
+            if (job.finished() == finished) {
+                discardJob(player, library, job);
+                count++;
+            }
+        }
+        if (count == 1) {
+            Messages.actionBar(player, "message.wrights.job_removed");
+        } else if (count > 1) {
+            Messages.actionBar(player, "message.wrights.removed_jobs", count);
+        }
+        BlueprintNetwork.syncJobs(player);
+    }
+
+    private static void removeOneJob(ServerPlayer player, SchematicLibrary library, BuildJob job) {
+        discardJob(player, library, job);
+        BlueprintNetwork.syncJobs(player);
+        Messages.actionBar(player, "message.wrights.job_removed");
+    }
+
+    private static void discardJob(ServerPlayer player, SchematicLibrary library, BuildJob job) {
+        if (job.kind() == BuildJob.Kind.COPY && job.resultSchematicId() != null && !job.finished()) {
+            library.removeSchematic(job.resultSchematicId());
+        }
+        if (job.kind() == BuildJob.Kind.PASTE) {
+            BlueprintNetwork.clearJobHologram(player, job.id());
+        }
+        discardDrone(player.getServer(), job);
+        library.removeJob(job);
+    }
+
+    private static void visit(ServerPlayer player, BuildJob job) {
+        if (!player.getAbilities().instabuild || player.isSpectator()) {
+            Messages.actionBar(player, "message.wrights.visit_survival");
+            return;
+        }
+        ServerLevel level = player.getServer().getLevel(job.dimension());
+        if (level == null) {
+            Messages.actionBar(player, "message.wrights.visit_blocked");
+            return;
+        }
+        BlockPos spot = standBefore(level, job);
+        if (spot == null) {
+            Messages.actionBar(player, "message.wrights.visit_blocked");
+            return;
+        }
+        player.teleportTo(level, spot.getX() + 0.5D, spot.getY(), spot.getZ() + 0.5D, player.getYRot(), player.getXRot());
+        Messages.actionBar(player, "message.wrights.visited", spot.getX(), spot.getY(), spot.getZ());
+    }
+
+    private static BlockPos standBefore(ServerLevel level, BuildJob job) {
+        BlockPos anchor = job.anchor();
+        BlockPos min = job.min();
+        int maxX = min.getX() + job.boxSizeX() - 1;
+        int maxY = min.getY() + job.boxSizeY() - 1;
+        int maxZ = min.getZ() + job.boxSizeZ() - 1;
+        int x = anchor.getX();
+        int y = anchor.getY();
+        int z = anchor.getZ();
+        boolean inside = x >= min.getX() && x <= maxX && y >= min.getY() && y <= maxY && z >= min.getZ() && z <= maxZ;
+        if (inside) {
+            int west = x - min.getX();
+            int east = maxX - x;
+            int north = z - min.getZ();
+            int south = maxZ - z;
+            int best = Math.min(Math.min(west, east), Math.min(north, south));
+            if (best == west) {
+                x = min.getX() - 1;
+            } else if (best == east) {
+                x = maxX + 1;
+            } else if (best == north) {
+                z = min.getZ() - 1;
+            } else {
+                z = maxZ + 1;
+            }
+        } else {
+            int cx = min.getX() + job.boxSizeX() / 2;
+            int cz = min.getZ() + job.boxSizeZ() / 2;
+            if (Math.abs(x - cx) >= Math.abs(z - cz)) {
+                x += x < cx ? -1 : 1;
+            } else {
+                z += z < cz ? -1 : 1;
+            }
+        }
+        BlockPos[] tries = {
+                new BlockPos(x, y, z),
+                new BlockPos(x, y + 1, z),
+                new BlockPos(x, y - 1, z),
+                new BlockPos(x + 1, y, z),
+                new BlockPos(x - 1, y, z),
+                new BlockPos(x, y, z + 1),
+                new BlockPos(x, y, z - 1),
+                new BlockPos(x, y + 2, z)
+        };
+        for (BlockPos candidate : tries) {
+            if (insideBox(candidate, min, maxX, maxY, maxZ)) {
+                continue;
+            }
+            if (!level.isLoaded(candidate)) {
+                level.getChunkAt(candidate);
+            }
+            if (openStand(level, candidate)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private static boolean insideBox(BlockPos pos, BlockPos min, int maxX, int maxY, int maxZ) {
+        return pos.getX() >= min.getX() && pos.getX() <= maxX
+                && pos.getY() >= min.getY() && pos.getY() <= maxY
+                && pos.getZ() >= min.getZ() && pos.getZ() <= maxZ;
+    }
+
+    private static boolean openStand(ServerLevel level, BlockPos feet) {
+        BlockState legs = level.getBlockState(feet);
+        BlockState head = level.getBlockState(feet.above());
+        return !legs.blocksMotion() && !head.blocksMotion() && !level.isOutsideBuildHeight(feet);
+    }
+
+    public static void startCopy(ServerPlayer player, ItemStack stack, ControllerData data) {
+        data = data.ensureId();
+        cancel(player, false);
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        UUID previous = data.schematicId().orElse(null);
+        if (previous != null && !library.isInUse(previous)) {
+            library.removeSchematic(previous);
+        }
+        data = data.withoutSchematic();
+        ControllerData.write(stack, data);
+
+        GlobalPos cornerA = data.cornerA().orElseThrow();
+        GlobalPos cornerB = data.cornerB().orElseThrow();
+        BlockPos min = new BlockPos(
+                Math.min(cornerA.pos().getX(), cornerB.pos().getX()),
+                Math.min(cornerA.pos().getY(), cornerB.pos().getY()),
+                Math.min(cornerA.pos().getZ(), cornerB.pos().getZ()));
+        BlockPos max = new BlockPos(
+                Math.max(cornerA.pos().getX(), cornerB.pos().getX()),
+                Math.max(cornerA.pos().getY(), cornerB.pos().getY()),
+                Math.max(cornerA.pos().getZ(), cornerB.pos().getZ()));
+        BuildJob job = BuildJob.copy(player.getUUID(), data.controllerId().orElseThrow(), cornerA.dimension(), min, max);
+        library.addJob(job);
+        Messages.actionBar(player, "message.wrights.copy_started");
+    }
+
+    public static void startPaste(ServerPlayer player, ItemStack stack, ControllerData data, GlobalPos origin) {
+        data = data.ensureId().withoutAim();
+        ControllerData.write(stack, data);
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        Schematic schematic = library.schematic(data.schematicId().orElseThrow()).orElse(null);
+        if (schematic == null || schematic.blockCount() == 0) {
+            Messages.actionBar(player, "message.wrights.need_copy");
+            return;
+        }
+        if (!instant(player) && !crewReady(player)) {
+            return;
+        }
+        cancel(player, false);
+        BuildJob job = BuildJob.paste(
+                player.getUUID(),
+                data.controllerId().orElseThrow(),
+                origin.dimension(),
+                origin.pos(),
+                schematic.id(),
+                schematic.blockCount());
+        job.setAnchor(origin.pos().offset(schematic.anchorX(), schematic.anchorY(), schematic.anchorZ()));
+        if (!instant(player) && !assignCrew(player, job, schematic)) {
+            return;
+        }
+        library.addJob(job);
+        ServerLevel level = player.getServer().getLevel(origin.dimension());
+        if (level != null && player.level() == level && !instant(player) && !job.hasCrew()) {
+            ensureDrone(level, player, job, origin.pos());
+        }
+        launched(player, job);
+    }
+
+    public static boolean startBlueprintSave(ServerPlayer player, String name, UUID replaceId, ResourceKey<Level> dimension, BlockPos cornerA, BlockPos cornerB) {
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        if (hasCopy(library, player.getUUID())) {
+            Messages.actionBar(player, "message.wrights.busy");
+            return false;
+        }
+        if (replaceId != null && library.isInUse(replaceId)) {
+            Messages.actionBar(player, "message.wrights.blueprint_in_use");
+            return false;
+        }
+        BlockPos min = new BlockPos(
+                Math.min(cornerA.getX(), cornerB.getX()),
+                Math.min(cornerA.getY(), cornerB.getY()),
+                Math.min(cornerA.getZ(), cornerB.getZ()));
+        BlockPos max = new BlockPos(
+                Math.max(cornerA.getX(), cornerB.getX()),
+                Math.max(cornerA.getY(), cornerB.getY()),
+                Math.max(cornerA.getZ(), cornerB.getZ()));
+        BuildJob job = BuildJob.copy(player.getUUID(), player.getUUID(), dimension, min, max);
+        job.setBlueprintName(name);
+        job.setReplaceSchematicId(replaceId);
+        library.addJob(job);
+        Messages.actionBar(player, "message.wrights.saving");
+        return true;
+    }
+
+    public static boolean startBlueprintBuild(ServerPlayer player, UUID schematicId, BlockPos origin, int sizeX, int sizeY, int sizeZ) {
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        Schematic schematic = library.schematic(schematicId).orElse(null);
+        if (schematic == null || schematic.blockCount() == 0) {
+            Messages.actionBar(player, "message.wrights.blueprint_missing");
+            return false;
+        }
+        if (overlapsBuild(library, player.level().dimension(), schematic, origin, sizeX, sizeY, sizeZ)) {
+            Messages.actionBar(player, "message.wrights.build_overlap");
+            return false;
+        }
+        BuildJob job = BuildJob.paste(
+                player.getUUID(),
+                player.getUUID(),
+                player.level().dimension(),
+                origin,
+                schematic.id(),
+                schematic.blockCount());
+        job.setClip(sizeX, sizeY, sizeZ);
+        job.setAnchor(origin.offset(schematic.anchorX(), schematic.anchorY(), schematic.anchorZ()));
+        job.setSupply(com.wrights.blueprint.BlueprintSessions.get(player).supplyPos());
+        if (!instant(player) && !assignCrew(player, job, schematic)) {
+            return false;
+        }
+        library.addJob(job);
+        if (player.level() instanceof ServerLevel level && !instant(player) && !job.hasCrew()) {
+            ensureDrone(level, player, job, origin);
+        }
+        launched(player, job);
+        BlueprintNetwork.showJobHologram(player, job, schematic);
+        BlueprintNetwork.syncJobs(player);
+        return true;
+    }
+
+    private static boolean hasCopy(SchematicLibrary library, UUID playerId) {
+        for (BuildJob job : library.jobsFor(playerId)) {
+            if (job.kind() == BuildJob.Kind.COPY) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean overlapsBuild(SchematicLibrary library, ResourceKey<Level> dimension, Schematic schematic, BlockPos origin, int sizeX, int sizeY, int sizeZ) {
+        Set<BlockPos> occupied = new HashSet<>();
+        for (BuildJob job : library.jobs()) {
+            if (job.kind() != BuildJob.Kind.PASTE || job.finished() || !job.dimension().equals(dimension) || job.schematicId() == null) {
+                continue;
+            }
+            Schematic existing = library.schematic(job.schematicId()).orElse(null);
+            if (existing == null) {
+                continue;
+            }
+            for (Schematic.Entry entry : existing.entries()) {
+                if (job.outsideClip(entry)) {
+                    continue;
+                }
+                occupied.add(job.min().offset(entry.x(), entry.y(), entry.z()));
+            }
+        }
+        for (Schematic.Entry entry : schematic.entries()) {
+            if (entry.x() >= sizeX || entry.y() >= sizeY || entry.z() >= sizeZ) {
+                continue;
+            }
+            if (occupied.contains(origin.offset(entry.x(), entry.y(), entry.z()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void tickCopy(MinecraftServer server, SchematicLibrary library, BuildJob job) {
+        if (job.paused()) {
+            return;
+        }
+        if (job.phase() == BuildJob.Phase.BINDING) {
+            tryBindCopy(server, library, job);
+            return;
+        }
+        ServerLevel level = server.getLevel(job.dimension());
+        ServerPlayer player = server.getPlayerList().getPlayer(job.owner());
+        if (level == null || player == null) {
+            return;
+        }
+        int budget = WrightsConfig.COPY_POSITIONS_PER_TICK.getAsInt();
+        for (int i = 0; i < budget && job.cursor() < job.total(); i++) {
+            BlockPos pos = job.scanPos();
+            if (level.isOutsideBuildHeight(pos)) {
+                job.advance();
+                continue;
+            }
+            if (!ready(player, level, pos, job, true)) {
+                return;
+            }
+            if (!level.isLoaded(pos)) {
+                if (WrightsConfig.REQUIRE_CHUNKS_LOADED.getAsBoolean()) {
+                    if (job.tickMessage()) {
+                        Messages.actionBar(player, "message.wrights.paused_chunk");
+                    }
+                    return;
+                }
+                job.advance();
+                continue;
+            }
+            BlockState state = level.getBlockState(pos);
+            if (!state.isAir()) {
+                if (!canStore(level, job, pos, state)) {
+                    job.skippedSpecialOne();
+                } else {
+                    job.partial().add(new Schematic.Entry(
+                            (short) (pos.getX() - job.min().getX()),
+                            (short) (pos.getY() - job.min().getY()),
+                            (short) (pos.getZ() - job.min().getZ()),
+                            state,
+                            BlockFilters.isSecondary(state)));
+                }
+            }
+            job.advance();
+        }
+        library.setDirty();
+        if (job.cursor() < job.total()) {
+            if (job.tickMessage()) {
+                Messages.actionBar(player, "message.wrights.copy_progress", job.cursor(), job.total());
+            }
+            return;
+        }
+        finishCopy(library, job);
+        tryBindCopy(server, library, job);
+    }
+
+    private static boolean canStore(ServerLevel level, BuildJob job, BlockPos pos, BlockState state) {
+        if (!BlockFilters.canCopy(level, pos, state)) {
+            return false;
+        }
+        if (!BlockFilters.isSecondary(state)) {
+            return true;
+        }
+        BlockPos below = pos.below();
+        return job.contains(below) && BlockFilters.canCopy(level, below, level.getBlockState(below));
+    }
+
+    private static void finishCopy(SchematicLibrary library, BuildJob job) {
+        int sizeX = job.max().getX() - job.min().getX() + 1;
+        int sizeY = job.max().getY() - job.min().getY() + 1;
+        int sizeZ = job.max().getZ() - job.min().getZ() + 1;
+        List<Schematic.Entry> entries = new ArrayList<>(job.partial());
+        entries.sort(Comparator.comparing(Schematic.Entry::secondary));
+        if (entries.isEmpty()) {
+            job.setPhase(BuildJob.Phase.BINDING);
+            job.setResultSchematicId(null);
+            return;
+        }
+        UUID id = job.replaceSchematicId() != null ? job.replaceSchematicId() : UUID.randomUUID();
+        String name = job.blueprintName() == null ? "Blueprint" : job.blueprintName();
+        int anchorX = 0;
+        int anchorY = 0;
+        int anchorZ = 0;
+        if (job.replaceSchematicId() != null) {
+            Schematic previous = library.schematic(job.replaceSchematicId()).orElse(null);
+            if (previous != null) {
+                anchorX = previous.anchorX();
+                anchorY = previous.anchorY();
+                anchorZ = previous.anchorZ();
+            }
+        }
+        Schematic schematic = new Schematic(
+                id,
+                name,
+                sizeX,
+                sizeY,
+                sizeZ,
+                entries,
+                job.min(),
+                job.max(),
+                job.dimension().location().toString(),
+                anchorX,
+                anchorY,
+                anchorZ);
+        library.putSchematic(schematic);
+        job.setResultSchematicId(schematic.id());
+        job.setPhase(BuildJob.Phase.BINDING);
+        job.partial().clear();
+    }
+
+    private static void tryBindCopy(MinecraftServer server, SchematicLibrary library, BuildJob job) {
+        ServerPlayer player = server.getPlayerList().getPlayer(job.owner());
+        if (player == null) {
+            return;
+        }
+        if (job.resultSchematicId() == null) {
+            if (job.skippedSpecial() > 0) {
+                Messages.actionBar(player, "message.wrights.copy_empty_skipped", job.skippedSpecial());
+            } else {
+                Messages.actionBar(player, "message.wrights.copy_empty");
+            }
+            library.removeJob(job);
+            if (job.blueprintName() != null) {
+                BlueprintActions.finishSave(player, null, false);
+            }
+            return;
+        }
+        if (job.blueprintName() != null) {
+            Schematic saved = library.schematic(job.resultSchematicId()).orElse(null);
+            library.removeJob(job);
+            if (saved == null) {
+                Messages.actionBar(player, "message.wrights.copy_empty");
+                BlueprintActions.finishSave(player, null, false);
+            } else if (job.skippedSpecial() > 0) {
+                Messages.actionBar(player, "message.wrights.copy_done_skipped", saved.blockCount(), BoxEdits.volume(saved.sizeX(), saved.sizeY(), saved.sizeZ()), job.skippedSpecial());
+                BlueprintActions.finishSave(player, saved.id(), true);
+            } else {
+                Messages.actionBar(player, "message.wrights.blueprint_saved", saved.name(), BoxEdits.volume(saved.sizeX(), saved.sizeY(), saved.sizeZ()), saved.blockCount());
+                BlueprintActions.finishSave(player, saved.id(), true);
+            }
+            return;
+        }
+        ItemStack stack = findController(player, job.controllerId());
+        if (stack.isEmpty()) {
+            if (job.tickMessage()) {
+                Messages.actionBar(player, "message.wrights.hold_controller");
+            }
+            return;
+        }
+        Schematic schematic = library.schematic(job.resultSchematicId()).orElse(null);
+        if (schematic == null) {
+            library.removeJob(job);
+            Messages.actionBar(player, "message.wrights.copy_empty");
+            return;
+        }
+        ControllerData data = ControllerData.from(stack);
+        UUID previous = data.schematicId().orElse(null);
+        if (previous != null && !previous.equals(schematic.id()) && !library.isInUse(previous)) {
+            library.removeSchematic(previous);
+        }
+        ControllerData.write(stack, data.withSchematic(schematic.id(), schematic.sizeX(), schematic.sizeY(), schematic.sizeZ(), schematic.blockCount()));
+        if (job.skippedSpecial() > 0) {
+            Messages.actionBar(player, "message.wrights.copy_done_skipped", schematic.blockCount(), BoxEdits.volume(schematic.sizeX(), schematic.sizeY(), schematic.sizeZ()), job.skippedSpecial());
+        } else {
+            Messages.actionBar(player, "message.wrights.copy_done", schematic.blockCount(), BoxEdits.volume(schematic.sizeX(), schematic.sizeY(), schematic.sizeZ()));
+        }
+        library.removeJob(job);
+    }
+
+    private static void tickPaste(MinecraftServer server, SchematicLibrary library, BuildJob job) {
+        ServerLevel level = server.getLevel(job.dimension());
+        ServerPlayer player = server.getPlayerList().getPlayer(job.owner());
+        Schematic schematic = job.schematicId() == null ? null : library.schematic(job.schematicId()).orElse(null);
+        if (level == null || schematic == null) {
+            discardDrone(server, job);
+            library.removeJob(job);
+            if (player != null) {
+                Messages.actionBar(player, "message.wrights.paste_missing");
+            }
+            return;
+        }
+        if (player == null) {
+            return;
+        }
+        if (!job.paused()) {
+            job.workedTick();
+        }
+        if (job.cursor() >= job.total()) {
+            finishPaste(server, library, player, job);
+            return;
+        }
+        if (job.paused()) {
+            return;
+        }
+        if (instant(player)) {
+            placeAll(level, player, library, job, schematic);
+            return;
+        }
+        if (holdWithoutDrones(player, library, job)) {
+            return;
+        }
+        if (job.hasCrew()) {
+            if (!player.level().dimension().equals(job.dimension())) {
+                if (job.tickMessage()) {
+                    Messages.actionBar(player, "message.wrights.other_dimension");
+                }
+                return;
+            }
+            if (!nearSite(player, job)) {
+                if (job.tickMessage()) {
+                    Messages.actionBar(player, "message.wrights.out_of_range");
+                }
+                return;
+            }
+            tickCrew(level, player, library, job, schematic);
+            return;
+        }
+        if (!player.level().dimension().equals(job.dimension())) {
+            if (job.tickMessage()) {
+                Messages.actionBar(player, "message.wrights.other_dimension");
+            }
+            return;
+        }
+        if (!nearSite(player, job)) {
+            if (job.tickMessage()) {
+                Messages.actionBar(player, "message.wrights.out_of_range");
+            }
+            return;
+        }
+        int skipBudget = 8192;
+        while (skipBudget > 0 && job.cursor() < schematic.blockCount() && satisfied(level, job, schematic.entry(job.cursor()))) {
+            job.advance();
+            skipBudget--;
+        }
+        if (job.cursor() >= job.total() || job.cursor() >= schematic.blockCount()) {
+            finishPaste(server, library, player, job);
+            return;
+        }
+        if (skipBudget == 0) {
+            library.setDirty();
+            return;
+        }
+        Schematic.Entry next = schematic.entry(job.cursor());
+        BlockPos nextPos = job.min().offset(next.x(), next.y(), next.z());
+        DroneEntity drone = ensureDrone(level, player, job, nextPos);
+        if (drone == null) {
+            if (job.tickMessage()) {
+                Messages.actionBar(player, "message.wrights.paused_chunk");
+            }
+            return;
+        }
+        Vec3 hover = Vec3.atCenterOf(nextPos).add(0.0D, 0.9D, 0.0D);
+        if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
+            double step = drone.distanceToSqr(hover) > 64.0D ? 0.85D : 0.4D;
+            drone.moveToward(hover, step);
+            job.setLastDronePos(drone.blockPosition());
+            library.setDirty();
+            return;
+        }
+        int budget = WrightsConfig.BLOCKS_PER_TICK.getAsInt();
+        for (int i = 0; i < budget && job.cursor() < schematic.blockCount(); i++) {
+            Schematic.Entry entry = schematic.entry(job.cursor());
+            BlockPos pos = job.min().offset(entry.x(), entry.y(), entry.z());
+            if (drone.distanceToSqr(Vec3.atCenterOf(pos)) > 9.0D) {
+                break;
+            }
+            if (job.outsideClip(entry)) {
+                job.advance();
+                continue;
+            }
+            if (placeOne(level, player, job, pos, entry, false) == PlaceResult.PAUSE) {
+                if (job.tickMessage()) {
+                    Messages.actionBar(player, "message.wrights.paused_chunk");
+                }
+                library.setDirty();
+                return;
+            }
+            job.advance();
+        }
+        library.setDirty();
+        if (job.cursor() >= job.total()) {
+            finishPaste(server, library, player, job);
+        }
+    }
+
+    private static void tickUndo(MinecraftServer server, SchematicLibrary library, BuildJob job) {
+        ServerLevel level = server.getLevel(job.dimension());
+        ServerPlayer player = server.getPlayerList().getPlayer(job.owner());
+        if (level == null) {
+            discardDrone(server, job);
+            archive(library, job, true);
+            return;
+        }
+        if (player == null || job.paused()) {
+            return;
+        }
+        if (instant(player)) {
+            undoAll(level, server, library, player, job);
+            return;
+        }
+        if (holdWithoutDrones(player, library, job)) {
+            return;
+        }
+        if (job.hasCrew()) {
+            if (!player.level().dimension().equals(job.dimension())) {
+                if (job.tickMessage()) {
+                    Messages.actionBar(player, "message.wrights.other_dimension");
+                }
+                return;
+            }
+            if (!nearSite(player, job)) {
+                if (job.tickMessage()) {
+                    Messages.actionBar(player, "message.wrights.out_of_range");
+                }
+                return;
+            }
+            tickUndoCrew(level, player, library, job);
+            return;
+        }
+        if (!player.level().dimension().equals(job.dimension())) {
+            if (job.tickMessage()) {
+                Messages.actionBar(player, "message.wrights.other_dimension");
+            }
+            return;
+        }
+        if (!nearSite(player, job)) {
+            if (job.tickMessage()) {
+                Messages.actionBar(player, "message.wrights.out_of_range");
+            }
+            return;
+        }
+        if (!job.hasRefunds()) {
+            finishUndo(server, library, player, job);
+            return;
+        }
+        BlockPos nextPos = job.lastRefundPos();
+        DroneEntity drone = ensureDrone(level, player, job, nextPos);
+        if (drone == null) {
+            if (job.tickMessage()) {
+                Messages.actionBar(player, "message.wrights.paused_chunk");
+            }
+            return;
+        }
+        Vec3 hover = Vec3.atCenterOf(nextPos).add(0.0D, 0.9D, 0.0D);
+        if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
+            double step = drone.distanceToSqr(hover) > 64.0D ? 0.85D : 0.4D;
+            drone.moveToward(hover, step);
+            job.setLastDronePos(drone.blockPosition());
+            return;
+        }
+        int budget = WrightsConfig.BLOCKS_PER_TICK.getAsInt();
+        for (int i = 0; i < budget && job.hasRefunds(); i++) {
+            BuildJob.Refund refund = job.pollRefund();
+            BlockPos pos = job.min().offset(refund.x(), refund.y(), refund.z());
+            if (drone.distanceToSqr(Vec3.atCenterOf(pos)) > 9.0D) {
+                job.restoreRefund(refund);
+                break;
+            }
+            if (!level.isLoaded(pos)) {
+                if (WrightsConfig.REQUIRE_CHUNKS_LOADED.getAsBoolean()) {
+                    job.restoreRefund(refund);
+                    if (job.tickMessage()) {
+                        Messages.actionBar(player, "message.wrights.paused_chunk");
+                    }
+                    return;
+                }
+                job.skippedOne();
+                continue;
+            }
+            removeOne(level, player, job, pos, refund, false);
+        }
+        if (!job.hasRefunds()) {
+            finishUndo(server, library, player, job);
+        } else if (job.tickMessage()) {
+            Messages.actionBar(player, "message.wrights.undo_progress", job.undoTotal() - job.refundCount(), job.undoTotal(), job.returned());
+        }
+    }
+
+    private static void removeOne(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos pos, BuildJob.Refund refund, boolean quiet) {
+        BlockState current = level.getBlockState(pos);
+        if (current.getBlock() != refund.state().getBlock()) {
+            job.skippedOne();
+            return;
+        }
+        if (!quiet) {
+            level.levelEvent(2001, pos, Block.getId(current));
+            level.playSound(null, pos, current.getSoundType(level, pos, player).getBreakSound(), SoundSource.BLOCKS, 1.0F, 1.0F);
+        }
+        level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_SUPPRESS_DROPS);
+        Item item = refund.state().getBlock().asItem();
+        if (refund.paid() && item != Items.AIR) {
+            giveBack(level, player, job, item);
+            job.returnedOne();
+        }
+    }
+
+    private static void finishUndo(MinecraftServer server, SchematicLibrary library, ServerPlayer player, BuildJob job) {
+        discardDrone(server, job);
+        int removed = Math.max(0, job.undoTotal() - job.skipped() - job.refundCount());
+        int returned = job.returned();
+        job.markUndone();
+        archive(library, job, false);
+        BlueprintNetwork.syncJobs(player);
+        if (removed <= 0) {
+            Messages.actionBar(player, "message.wrights.undo_none");
+        } else {
+            Messages.actionBar(player, "message.wrights.undo_done", removed, returned);
+        }
+    }
+
+    private static String finishedName(SchematicLibrary library, BuildJob job) {
+        String name = job.blueprintName();
+        if (name == null || name.isBlank()) {
+            name = "Build";
+            if (job.schematicId() != null) {
+                name = library.schematic(job.schematicId()).map(Schematic::name).orElse(name);
+            }
+        }
+        return name;
+    }
+
+    private static void finishPaste(MinecraftServer server, SchematicLibrary library, ServerPlayer player, BuildJob job) {
+        discardDrone(server, job);
+        int placed = job.placed();
+        int skipped = job.skipped();
+        archive(library, job, false);
+        com.wrights.network.BlueprintNetwork.clearJobHologram(player, job.id());
+        com.wrights.network.BlueprintNetwork.jobDone(player, finishedName(library, job), job.elapsedSeconds());
+        com.wrights.network.BlueprintNetwork.syncJobs(player);
+        if (placed == 0 && skipped > 0) {
+            Messages.actionBar(player, "message.wrights.all_skipped");
+        } else if (placed == 0) {
+            Messages.actionBar(player, "message.wrights.already_built");
+        } else {
+            Messages.actionBar(player, "message.wrights.paste_done", placed, skipped);
+        }
+    }
+
+    private static boolean nearSite(ServerPlayer player, BuildJob job) {
+        if (!player.level().dimension().equals(job.dimension())) {
+            return false;
+        }
+        double range = WrightsConfig.MAX_RANGE.getAsInt();
+        return player.distanceToSqr(Vec3.atCenterOf(job.min())) <= range * range;
+    }
+
+    private static boolean ready(ServerPlayer player, ServerLevel level, BlockPos pos, BuildJob job, boolean copy) {
+        if (!player.level().dimension().equals(job.dimension())) {
+            if (job.tickMessage()) {
+                Messages.actionBar(player, "message.wrights.other_dimension");
+            }
+            return false;
+        }
+        double range = WrightsConfig.MAX_RANGE.getAsInt();
+        if (player.distanceToSqr(Vec3.atCenterOf(pos)) > range * range) {
+            if (job.tickMessage()) {
+                Messages.actionBar(player, copy ? "message.wrights.copy_out_of_range" : "message.wrights.out_of_range");
+            }
+            return false;
+        }
+        return true;
+    }
+
+    private enum PlaceResult {
+        DONE,
+        PAUSE
+    }
+
+    private static boolean instant(ServerPlayer player) {
+        if (!player.getAbilities().instabuild || player.isSpectator()) {
+            return false;
+        }
+        return com.wrights.blueprint.BlueprintSessions.get(player).instantJobs();
+    }
+
+    private static void launched(ServerPlayer player, BuildJob job) {
+        if (job.hasCrew() && job.hands().size() > 1) {
+            Messages.actionBar(player, "message.wrights.launched_crew", job.hands().size());
+        } else {
+            Messages.actionBar(player, "message.wrights.launched");
+        }
+    }
+
+    public static int droneSlots(ServerPlayer player, BuildJob job) {
+        if (!usesDrones(job)) {
+            return 0;
+        }
+        if (!job.crewUnits().isEmpty()) {
+            return job.crewUnits().size();
+        }
+        if (job.hasCrew()) {
+            return job.hands().size();
+        }
+        return instant(player) ? 0 : 1;
+    }
+
+    public static void bindCrewIds(ServerPlayer player, SchematicLibrary library) {
+        Swarm swarm = Cradles.swarm(player);
+        Set<UUID> known = new HashSet<>();
+        for (Swarm.Unit unit : swarm.units()) {
+            known.add(unit.id());
+        }
+        Set<UUID> taken = new HashSet<>();
+        boolean dirty = false;
+        for (BuildJob job : library.jobsFor(player.getUUID())) {
+            if (!usesDrones(job) || job.awaitingDrones()) {
+                if (!job.crewUnits().isEmpty()) {
+                    job.setCrewUnits(List.of());
+                    dirty = true;
+                }
+                continue;
+            }
+            List<UUID> current = new ArrayList<>();
+            for (UUID unit : job.crewUnits()) {
+                if (known.contains(unit) && taken.add(unit)) {
+                    current.add(unit);
+                }
+            }
+            if (current.isEmpty() && job.crewUnits().isEmpty()) {
+                int need = job.hasCrew() ? job.hands().size() : (instant(player) ? 0 : 1);
+                for (Swarm.Unit unit : swarm.units()) {
+                    if (current.size() >= need) {
+                        break;
+                    }
+                    if (taken.add(unit.id())) {
+                        current.add(unit.id());
+                    }
+                }
+            }
+            if (!current.equals(job.crewUnits())) {
+                job.setCrewUnits(current);
+                dirty = true;
+            }
+            taken.addAll(current);
+            if (job.hasCrew() && current.size() != job.hands().size()) {
+                if (current.isEmpty()) {
+                    discardDrone(player.getServer(), job);
+                    job.clearAssigned();
+                    job.setPaused(true);
+                } else {
+                    fitCrew(player, library, job, current);
+                }
+                dirty = true;
+            }
+        }
+        if (dirty) {
+            library.setDirty();
+        }
+    }
+
+    public static void setJobDrones(ServerPlayer player, UUID id, UUID unitId, boolean add) {
+        if (!com.wrights.item.ControllerItem.isHeld(player)) {
+            return;
+        }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        bindCrewIds(player, library);
+        BuildJob job = library.job(id).orElse(null);
+        if (job == null || !job.owner().equals(player.getUUID()) || !usesDrones(job)) {
+            BlueprintNetwork.syncJobs(player);
+            return;
+        }
+        Swarm swarm = Cradles.swarm(player);
+        Swarm.Unit unit = null;
+        for (Swarm.Unit candidate : swarm.units()) {
+            if (candidate.id().equals(unitId)) {
+                unit = candidate;
+                break;
+            }
+        }
+        if (add && unit == null) {
+            BlueprintNetwork.syncJobs(player);
+            return;
+        }
+        if (add && claimedByOther(library, player.getUUID(), job.id(), unitId)) {
+            Messages.actionBar(player, "message.wrights.drones_busy");
+            BlueprintNetwork.syncJobs(player);
+            return;
+        }
+        List<UUID> ids = new ArrayList<>(job.crewUnits());
+        if (add) {
+            if (!ids.contains(unitId)) {
+                ids.add(unitId);
+            }
+        } else {
+            ids.remove(unitId);
+        }
+        if (ids.equals(job.crewUnits()) && (ids.isEmpty() || job.hands().size() == ids.size())) {
+            BlueprintNetwork.syncJobs(player);
+            return;
+        }
+        placeCrew(player, library, job, ids);
+        library.setDirty();
+        BlueprintNetwork.syncJobs(player);
+    }
+
+    public static void moveDrone(ServerPlayer player, UUID unitId, UUID targetId) {
+        if (!com.wrights.item.ControllerItem.isHeld(player)) {
+            return;
+        }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        bindCrewIds(player, library);
+        boolean free = targetId == null || (targetId.getMostSignificantBits() == 0L && targetId.getLeastSignificantBits() == 0L);
+        BuildJob target = null;
+        if (!free) {
+            target = library.job(targetId).orElse(null);
+            if (target == null || !target.owner().equals(player.getUUID()) || !usesDrones(target)) {
+                BlueprintNetwork.syncJobs(player);
+                return;
+            }
+        }
+        boolean known = false;
+        for (Swarm.Unit unit : Cradles.swarm(player).units()) {
+            if (unit.id().equals(unitId)) {
+                known = true;
+                break;
+            }
+        }
+        if (!known) {
+            BlueprintNetwork.syncJobs(player);
+            return;
+        }
+        BuildJob source = null;
+        for (BuildJob job : library.jobsFor(player.getUUID())) {
+            if (usesDrones(job) && !job.awaitingDrones() && job.crewUnits().contains(unitId)) {
+                source = job;
+                break;
+            }
+        }
+        if (source == null && free) {
+            BlueprintNetwork.syncJobs(player);
+            return;
+        }
+        if (source != null && target != null && source.id().equals(target.id())) {
+            BlueprintNetwork.syncJobs(player);
+            return;
+        }
+        if (source != null) {
+            List<UUID> ids = new ArrayList<>(source.crewUnits());
+            ids.remove(unitId);
+            placeCrew(player, library, source, ids);
+        }
+        if (target != null) {
+            List<UUID> ids = new ArrayList<>(target.crewUnits());
+            if (!ids.contains(unitId)) {
+                ids.add(unitId);
+            }
+            placeCrew(player, library, target, ids);
+        }
+        library.setDirty();
+        BlueprintNetwork.syncJobs(player);
+    }
+
+    private static void placeCrew(ServerPlayer player, SchematicLibrary library, BuildJob job, List<UUID> ids) {
+        if (ids.isEmpty()) {
+            discardDrone(player.getServer(), job);
+            job.clearAssigned();
+            job.setPaused(true);
+        } else {
+            fitCrew(player, library, job, ids);
+        }
+    }
+
+    private static int placeableBlocks(Schematic schematic, BuildJob job) {
+        if (schematic == null) {
+            return Integer.MAX_VALUE;
+        }
+        if (job.clipX() == Integer.MAX_VALUE) {
+            return Math.max(0, schematic.blockCount());
+        }
+        int count = 0;
+        for (Schematic.Entry entry : schematic.entries()) {
+            if (!job.outsideClip(entry)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static boolean usesDrones(BuildJob job) {
+        return job.kind() == BuildJob.Kind.PASTE && !job.finished();
+    }
+
+    private static boolean claimedByOther(SchematicLibrary library, UUID owner, UUID jobId, UUID unitId) {
+        for (BuildJob other : library.jobsFor(owner)) {
+            if (other.id().equals(jobId) || !usesDrones(other) || other.awaitingDrones()) {
+                continue;
+            }
+            if (other.crewUnits().contains(unitId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<Swarm.Unit> freeUnits(ServerPlayer player, SchematicLibrary library, UUID exceptJob, int limit) {
+        Swarm swarm = Cradles.swarm(player);
+        List<Swarm.Unit> free = new ArrayList<>();
+        for (Swarm.Unit unit : swarm.units()) {
+            if (claimedByOther(library, player.getUUID(), exceptJob, unit.id())) {
+                continue;
+            }
+            free.add(unit);
+            if (free.size() >= limit) {
+                break;
+            }
+        }
+        return free;
+    }
+
+    private static void fitCrew(ServerPlayer player, SchematicLibrary library, BuildJob job, List<UUID> ids) {
+        Swarm swarm = Cradles.swarm(player);
+        List<Integer> speeds = new ArrayList<>();
+        List<UUID> kept = new ArrayList<>();
+        for (UUID unitId : ids) {
+            for (Swarm.Unit unit : swarm.units()) {
+                if (unit.id().equals(unitId)) {
+                    speeds.add(Math.max(1, Math.min(Swarm.MAX_SPEED, unit.speed())));
+                    kept.add(unitId);
+                    break;
+                }
+            }
+        }
+        Schematic schematic = job.schematicId() == null ? null : library.schematic(job.schematicId()).orElse(null);
+        int room = placeableBlocks(schematic, job);
+        if (kept.size() > room) {
+            Messages.actionBar(player, "message.wrights.drone_block_cap", Math.max(0, room));
+            while (kept.size() > room) {
+                kept.remove(kept.size() - 1);
+                speeds.remove(speeds.size() - 1);
+            }
+        }
+        if (kept.isEmpty()) {
+            discardDrone(player.getServer(), job);
+            job.clearAssigned();
+            job.setPaused(true);
+            return;
+        }
+        if (!job.hasCrew() && job.droneId() != null) {
+            discardId(player.getServer().getLevel(job.dimension()), job.droneId());
+            job.setDroneId(null);
+        }
+        List<UUID> dropped = new ArrayList<>();
+        if (!job.hasCrew() || schematic == null) {
+            int sizeX = Math.max(1, job.spanX());
+            int sizeY = Math.max(1, job.spanY());
+            int sizeZ = Math.max(1, job.spanZ());
+            if (schematic != null) {
+                sizeX = schematic.sizeX();
+                sizeY = schematic.sizeY();
+                sizeZ = schematic.sizeZ();
+                if (job.clipX() != Integer.MAX_VALUE) {
+                    sizeX = Math.min(sizeX, job.clipX());
+                    sizeY = Math.min(sizeY, job.clipY());
+                    sizeZ = Math.min(sizeZ, job.clipZ());
+                }
+            }
+            int carried = job.hasCrew() ? 0 : job.cursor();
+            if (schematic == null) {
+                dropped = job.resizeCrew(speeds, sizeX, sizeY, sizeZ, job.hasCrew() || job.cursor() > 0);
+            } else {
+                job.setCrew(speeds, sizeX, sizeY, sizeZ);
+                if (carried > 0) {
+                    for (BuildJob.Hand hand : job.hands()) {
+                        hand.cursor = carried;
+                    }
+                }
+                evenOut(job, schematic);
+            }
+        } else {
+            int before = job.hands().size();
+            ensureSlices(job, true);
+            while (job.hands().size() > speeds.size()) {
+                BuildJob.Hand removed = job.hands().remove(job.hands().size() - 1);
+                if (removed.entityId != null) {
+                    dropped.add(removed.entityId);
+                }
+                if (!job.hands().isEmpty()) {
+                    job.hands().get(0).slices.addAll(removed.slices);
+                }
+            }
+            while (job.hands().size() < speeds.size()) {
+                BuildJob.Hand extra = new BuildJob.Hand();
+                extra.idle = true;
+                job.hands().add(extra);
+            }
+            for (int i = 0; i < job.hands().size(); i++) {
+                BuildJob.Hand hand = job.hands().get(i);
+                hand.lane = i;
+                hand.lanes = job.hands().size();
+                hand.speed = Math.max(1, Math.min(4, speeds.get(i)));
+            }
+            if (job.hands().size() != before) {
+                evenOut(job, schematic);
+            }
+        }
+        ServerLevel level = player.getServer().getLevel(job.dimension());
+        for (UUID droppedId : dropped) {
+            discardId(level, droppedId);
+        }
+        job.setCrewUnits(kept);
+    }
+
+    private static boolean missingDrones(ServerPlayer player, BuildJob job) {
+        if (instant(player) || job.kind() != BuildJob.Kind.PASTE) {
+            return false;
+        }
+        return Cradles.worn(player).isEmpty() || Cradles.swarm(player).units().isEmpty() || job.awaitingDrones();
+    }
+
+    private static boolean holdWithoutDrones(ServerPlayer player, SchematicLibrary library, BuildJob job) {
+        if (!missingDrones(player, job)) {
+            return false;
+        }
+        if (!job.paused()) {
+            job.setPaused(true);
+            library.setDirty();
+            Messages.actionBar(player, "message.wrights.paused_no_drones");
+            BlueprintNetwork.syncJobs(player);
+        }
+        return true;
+    }
+
+    private static boolean crewReady(ServerPlayer player) {
+        if (Cradles.worn(player).isEmpty()) {
+            Messages.actionBar(player, "message.wrights.need_cradle");
+            return false;
+        }
+        if (Swarm.from(Cradles.worn(player)).units().isEmpty()) {
+            Messages.actionBar(player, "message.wrights.need_drone");
+            return false;
+        }
+        return true;
+    }
+
+    private static boolean assignCrew(ServerPlayer player, BuildJob job, Schematic schematic) {
+        if (!crewReady(player)) {
+            return false;
+        }
+        int sizeX = schematic.sizeX();
+        int sizeY = schematic.sizeY();
+        int sizeZ = schematic.sizeZ();
+        if (job.clipX() != Integer.MAX_VALUE) {
+            sizeX = Math.min(sizeX, job.clipX());
+            sizeY = Math.min(sizeY, job.clipY());
+            sizeZ = Math.min(sizeZ, job.clipZ());
+        }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        bindCrewIds(player, library);
+        int blocks = placeableBlocks(schematic, job);
+        if (blocks <= 0) {
+            Messages.actionBar(player, "message.wrights.drone_block_cap", 0);
+            return false;
+        }
+        int wanted = Math.min(Swarm.from(Cradles.worn(player)).assignCount(), blocks);
+        List<Swarm.Unit> units = freeUnits(player, library, job.id(), wanted);
+        if (units.isEmpty()) {
+            Messages.actionBar(player, "message.wrights.drones_busy");
+            return false;
+        }
+        List<Integer> speeds = new ArrayList<>();
+        List<UUID> ids = new ArrayList<>();
+        for (Swarm.Unit unit : units) {
+            speeds.add(Math.max(1, Math.min(Swarm.MAX_SPEED, unit.speed())));
+            ids.add(unit.id());
+        }
+        job.setCrew(speeds, sizeX, sizeY, sizeZ);
+        job.setCrewUnits(ids);
+        evenOut(job, schematic);
+        return job.hasCrew();
+    }
+
+    private static void tickCrew(ServerLevel level, ServerPlayer player, SchematicLibrary library, BuildJob job, Schematic schematic) {
+        boolean working = false;
+        boolean scanning = false;
+        boolean waitingChunk = false;
+        int[] skipBudget = {8192};
+        for (BuildJob.Hand hand : job.hands()) {
+            int index = nextWork(level, schematic, job, hand, skipBudget);
+            if (index == -2) {
+                scanning = true;
+                continue;
+            }
+            if (index < 0) {
+                hand.idle = true;
+                continue;
+            }
+            hand.idle = false;
+            working = true;
+            Schematic.Entry next = schematic.entry(index);
+            BlockPos nextPos = job.min().offset(next.x(), next.y(), next.z());
+            DroneEntity drone = ensureHand(level, player, job, hand, nextPos);
+            if (drone == null) {
+                waitingChunk = true;
+                continue;
+            }
+            Vec3 hover = Vec3.atCenterOf(nextPos).add(0.0D, 0.85D + (hand.lane % 2) * 0.45D, 0.0D);
+            if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
+                drone.moveToward(hover, flyStep(hand.speed, drone.distanceToSqr(hover)));
+                hand.lastPos = drone.blockPosition();
+                continue;
+            }
+            int budget = Math.min(Math.max(1, hand.speed), WrightsConfig.BLOCKS_PER_TICK.getAsInt());
+            for (int n = 0; n < budget; n++) {
+                int at = nextWork(level, schematic, job, hand, skipBudget);
+                if (at == -2) {
+                    scanning = true;
+                    break;
+                }
+                if (at < 0) {
+                    hand.idle = true;
+                    break;
+                }
+                Schematic.Entry entry = schematic.entry(at);
+                BlockPos pos = job.min().offset(entry.x(), entry.y(), entry.z());
+                if (drone.distanceToSqr(Vec3.atCenterOf(pos)) > 9.0D) {
+                    break;
+                }
+                if (entry.secondary() && supportWaiting(level, job, hand, at, pos, entry)) {
+                    break;
+                }
+                if (job.outsideClip(entry)) {
+                    noteProgress(hand, entry, at);
+                    job.advance();
+                    continue;
+                }
+                if (placeOne(level, player, job, pos, entry, false) == PlaceResult.PAUSE) {
+                    waitingChunk = true;
+                    library.setDirty();
+                    if (job.tickMessage()) {
+                        Messages.actionBar(player, "message.wrights.paused_chunk");
+                    }
+                    return;
+                }
+                noteProgress(hand, entry, at);
+                job.advance();
+            }
+        }
+        shareWithIdle(job, schematic);
+        if (!working && !scanning) {
+            for (BuildJob.Hand hand : job.hands()) {
+                if (nextInLane(schematic, job, hand) >= 0) {
+                    working = true;
+                    break;
+                }
+            }
+        }
+        library.setDirty();
+        if (!working && !scanning) {
+            finishPaste(level.getServer(), library, player, job);
+        } else if (waitingChunk && job.tickMessage()) {
+            Messages.actionBar(player, "message.wrights.paused_chunk");
+        }
+    }
+
+    private static void tickUndoCrew(ServerLevel level, ServerPlayer player, SchematicLibrary library, BuildJob job) {
+        if (!job.hasRefunds()) {
+            finishUndo(level.getServer(), library, player, job);
+            return;
+        }
+        boolean working = false;
+        for (BuildJob.Hand hand : job.hands()) {
+            int index = refundIndex(job, hand);
+            if (index < 0) {
+                hand.idle = true;
+                continue;
+            }
+            hand.idle = false;
+            working = true;
+            BuildJob.Refund peek = job.refunds().get(index);
+            BlockPos nextPos = job.min().offset(peek.x(), peek.y(), peek.z());
+            DroneEntity drone = ensureHand(level, player, job, hand, nextPos);
+            if (drone == null) {
+                continue;
+            }
+            Vec3 hover = Vec3.atCenterOf(nextPos).add(0.0D, 0.85D + (hand.lane % 2) * 0.45D, 0.0D);
+            if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
+                drone.moveToward(hover, flyStep(hand.speed, drone.distanceToSqr(hover)));
+                hand.lastPos = drone.blockPosition();
+                continue;
+            }
+            int budget = Math.min(Math.max(1, hand.speed), WrightsConfig.BLOCKS_PER_TICK.getAsInt());
+            for (int n = 0; n < budget; n++) {
+                int at = refundIndex(job, hand);
+                if (at < 0) {
+                    hand.idle = true;
+                    break;
+                }
+                BuildJob.Refund refund = job.refunds().get(at);
+                BlockPos pos = job.min().offset(refund.x(), refund.y(), refund.z());
+                if (drone.distanceToSqr(Vec3.atCenterOf(pos)) > 9.0D) {
+                    break;
+                }
+                job.takeRefund(at);
+                if (!level.isLoaded(pos)) {
+                    if (WrightsConfig.REQUIRE_CHUNKS_LOADED.getAsBoolean()) {
+                        job.restoreRefund(at, refund);
+                        if (job.tickMessage()) {
+                            Messages.actionBar(player, "message.wrights.paused_chunk");
+                        }
+                        return;
+                    }
+                    job.skippedOne();
+                    continue;
+                }
+                removeOne(level, player, job, pos, refund, false);
+            }
+        }
+        shareUndo(job);
+        if (!working) {
+            for (BuildJob.Hand hand : job.hands()) {
+                if (refundIndex(job, hand) >= 0) {
+                    working = true;
+                    break;
+                }
+            }
+        }
+        if (!working || !job.hasRefunds()) {
+            finishUndo(level.getServer(), library, player, job);
+        } else if (job.tickMessage()) {
+            Messages.actionBar(player, "message.wrights.undo_progress", job.undoTotal() - job.refundCount(), job.undoTotal(), job.returned());
+        }
+    }
+
+    private static boolean supportWaiting(ServerLevel level, BuildJob job, BuildJob.Hand hand, int index, BlockPos pos, Schematic.Entry entry) {
+        BlockState below = level.getBlockState(pos.below());
+        if (below.getBlock() == entry.state().getBlock() || (!below.isAir() && !below.canBeReplaced())) {
+            return false;
+        }
+        for (BuildJob.Hand other : job.hands()) {
+            if (other == hand) {
+                continue;
+            }
+            if (other.slices.isEmpty()) {
+                if (other.cursor <= index) {
+                    return true;
+                }
+                continue;
+            }
+            for (BuildJob.Slice slice : other.slices) {
+                if (slice.contains(entry.x(), entry.y() - 1, entry.z()) && slice.cursor <= index) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean satisfied(ServerLevel level, BuildJob job, Schematic.Entry entry) {
+        if (job.outsideClip(entry)) {
+            return true;
+        }
+        BlockPos pos = job.min().offset(entry.x(), entry.y(), entry.z());
+        if (level.isOutsideBuildHeight(pos)) {
+            return true;
+        }
+        if (!level.isLoaded(pos)) {
+            return false;
+        }
+        return level.getBlockState(pos).equals(entry.state());
+    }
+
+    private static int nextWork(ServerLevel level, Schematic schematic, BuildJob job, BuildJob.Hand hand, int[] budget) {
+        while (budget[0] > 0) {
+            int index = nextInLane(schematic, job, hand);
+            if (index < 0) {
+                hand.rescan = false;
+                return -1;
+            }
+            if (!satisfied(level, job, schematic.entry(index))) {
+                return index;
+            }
+            budget[0]--;
+            noteProgress(hand, schematic.entry(index), index);
+            if (!hand.rescan) {
+                job.advance();
+            }
+        }
+        return nextInLane(schematic, job, hand) < 0 ? -1 : -2;
+    }
+
+    private static int nextInLane(Schematic schematic, BuildJob job, BuildJob.Hand hand) {
+        if (hand.slices.isEmpty()) {
+            for (BuildJob.Hand other : job.hands()) {
+                if (!other.slices.isEmpty()) {
+                    return -1;
+                }
+            }
+            for (int i = Math.max(0, hand.cursor); i < schematic.blockCount(); i++) {
+                Schematic.Entry entry = schematic.entry(i);
+                if (CrewSplit.lane(entry.x(), entry.y(), entry.z(), hand.lanes, job.spanX(), job.spanY(), job.spanZ()) == hand.lane) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+        int best = -1;
+        for (BuildJob.Slice slice : hand.slices) {
+            for (int i = Math.max(0, slice.cursor); i < schematic.blockCount(); i++) {
+                if (best >= 0 && i >= best) {
+                    break;
+                }
+                Schematic.Entry entry = schematic.entry(i);
+                if (slice.contains(entry.x(), entry.y(), entry.z())) {
+                    best = i;
+                    break;
+                }
+            }
+        }
+        return best;
+    }
+
+    private static int refundIndex(BuildJob job, BuildJob.Hand hand) {
+        List<BuildJob.Refund> refunds = job.refunds();
+        for (int i = refunds.size() - 1; i >= 0; i--) {
+            BuildJob.Refund refund = refunds.get(i);
+            if (ownsRefund(hand, job, refund)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean ownsRefund(BuildJob.Hand hand, BuildJob job, BuildJob.Refund refund) {
+        if (hand.slices.isEmpty()) {
+            return CrewSplit.lane(refund.x(), refund.y(), refund.z(), hand.lanes, job.spanX(), job.spanY(), job.spanZ()) == hand.lane;
+        }
+        for (BuildJob.Slice slice : hand.slices) {
+            if (slice.contains(refund.x(), refund.y(), refund.z())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void noteProgress(BuildJob.Hand hand, Schematic.Entry entry, int index) {
+        int next = index + 1;
+        if (hand.slices.isEmpty()) {
+            hand.cursor = next;
+            return;
+        }
+        for (BuildJob.Slice slice : hand.slices) {
+            if (slice.cursor <= index && slice.contains(entry.x(), entry.y(), entry.z())) {
+                slice.cursor = next;
+            }
+        }
+        int earliest = Integer.MAX_VALUE;
+        for (BuildJob.Slice slice : hand.slices) {
+            earliest = Math.min(earliest, slice.cursor);
+        }
+        hand.cursor = earliest == Integer.MAX_VALUE ? next : earliest;
+    }
+
+    private static void migrateSlices(BuildJob job) {
+        boolean any = false;
+        for (BuildJob.Hand hand : job.hands()) {
+            if (!hand.slices.isEmpty()) {
+                any = true;
+                break;
+            }
+        }
+        ensureSlices(job, !any);
+    }
+
+    private static void ensureSlices(BuildJob job, boolean includeIdle) {
+        for (BuildJob.Hand hand : job.hands()) {
+            if (!hand.slices.isEmpty() || hand.lanes <= 0 || (hand.idle && !includeIdle)) {
+                continue;
+            }
+            int lanes = Math.max(1, hand.lanes);
+            BuildJob.Slice slice = CrewSplit.slab(
+                    lanes,
+                    Math.max(1, job.spanX()),
+                    Math.max(1, job.spanY()),
+                    Math.max(1, job.spanZ()),
+                    Math.min(Math.max(0, hand.lane), lanes - 1));
+            slice.cursor = Math.max(0, hand.cursor);
+            hand.slices.add(slice);
+        }
+    }
+
+    private static void evenOut(BuildJob job, Schematic schematic) {
+        if (schematic == null || job.hands().size() < 2) {
+            ensureSlices(job, false);
+            return;
+        }
+        ensureSlices(job, false);
+        int passes = job.hands().size() * 8;
+        for (int pass = 0; pass < passes; pass++) {
+            BuildJob.Hand poor = null;
+            BuildJob.Hand rich = null;
+            BuildJob.Slice donor = null;
+            int least = Integer.MAX_VALUE;
+            int most = -1;
+            for (BuildJob.Hand hand : job.hands()) {
+                int load = 0;
+                BuildJob.Slice fullest = null;
+                int fullestCount = 0;
+                for (BuildJob.Slice slice : hand.slices) {
+                    int left = countPaste(schematic, slice);
+                    load += left;
+                    if (left > fullestCount) {
+                        fullestCount = left;
+                        fullest = slice;
+                    }
+                }
+                if (load < least) {
+                    least = load;
+                    poor = hand;
+                }
+                if (load > most) {
+                    most = load;
+                    rich = hand;
+                    donor = fullest;
+                }
+            }
+            if (poor == null || rich == null || poor == rich || donor == null || most < least + 2) {
+                return;
+            }
+            BuildJob.Slice half = splitPaste(schematic, donor);
+            if (half == null) {
+                return;
+            }
+            poor.slices.add(half);
+            poor.idle = false;
+        }
+    }
+
+    private static void shareWithIdle(BuildJob job, Schematic schematic) {
+        if (schematic == null || job.hands().size() < 2) {
+            return;
+        }
+        boolean pending = false;
+        for (BuildJob.Hand hand : job.hands()) {
+            if (hand.idle) {
+                pending = true;
+                break;
+            }
+        }
+        if (!pending) {
+            return;
+        }
+        migrateSlices(job);
+        for (int n = 0; n < job.hands().size(); n++) {
+            BuildJob.Hand receiver = null;
+            for (BuildJob.Hand hand : job.hands()) {
+                if (countPaste(schematic, hand) == 0) {
+                    receiver = hand;
+                    break;
+                }
+                hand.idle = false;
+            }
+            if (receiver == null) {
+                return;
+            }
+            BuildJob.Slice donor = fullestPaste(job, schematic, receiver);
+            BuildJob.Slice half = donor == null ? null : splitPaste(schematic, donor);
+            if (half == null) {
+                for (BuildJob.Hand hand : job.hands()) {
+                    if (countPaste(schematic, hand) == 0) {
+                        hand.idle = false;
+                    }
+                }
+                return;
+            }
+            receiver.slices.add(half);
+            receiver.idle = false;
+        }
+    }
+
+    private static void shareUndo(BuildJob job) {
+        if (job.hands().size() < 2) {
+            return;
+        }
+        boolean pending = false;
+        for (BuildJob.Hand hand : job.hands()) {
+            if (hand.idle) {
+                pending = true;
+                break;
+            }
+        }
+        if (!pending) {
+            return;
+        }
+        migrateSlices(job);
+        for (int n = 0; n < job.hands().size(); n++) {
+            BuildJob.Hand receiver = null;
+            for (BuildJob.Hand hand : job.hands()) {
+                if (countRefunds(job, hand) == 0) {
+                    receiver = hand;
+                    break;
+                }
+                hand.idle = false;
+            }
+            if (receiver == null) {
+                return;
+            }
+            BuildJob.Slice donor = fullestRefund(job, receiver);
+            BuildJob.Slice half = donor == null ? null : splitRefunds(job, donor);
+            if (half == null) {
+                for (BuildJob.Hand hand : job.hands()) {
+                    if (countRefunds(job, hand) == 0) {
+                        hand.idle = false;
+                    }
+                }
+                return;
+            }
+            receiver.slices.add(half);
+            receiver.idle = false;
+        }
+    }
+
+    private static int countPaste(Schematic schematic, BuildJob.Hand hand) {
+        int count = 0;
+        for (BuildJob.Slice slice : hand.slices) {
+            count += countPaste(schematic, slice);
+        }
+        return count;
+    }
+
+    private static int countPaste(Schematic schematic, BuildJob.Slice slice) {
+        int count = 0;
+        for (int i = Math.max(0, slice.cursor); i < schematic.blockCount(); i++) {
+            Schematic.Entry entry = schematic.entry(i);
+            if (slice.contains(entry.x(), entry.y(), entry.z())) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static int countRefunds(BuildJob job, BuildJob.Hand hand) {
+        int count = 0;
+        for (BuildJob.Slice slice : hand.slices) {
+            count += countRefunds(job, slice);
+        }
+        return count;
+    }
+
+    private static int countRefunds(BuildJob job, BuildJob.Slice slice) {
+        int count = 0;
+        for (BuildJob.Refund refund : job.refunds()) {
+            if (slice.contains(refund.x(), refund.y(), refund.z())) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static BuildJob.Slice fullestPaste(BuildJob job, Schematic schematic, BuildJob.Hand except) {
+        BuildJob.Slice donor = null;
+        int most = 1;
+        for (BuildJob.Hand hand : job.hands()) {
+            if (hand == except) {
+                continue;
+            }
+            for (BuildJob.Slice slice : hand.slices) {
+                int left = countPaste(schematic, slice);
+                if (left > most) {
+                    most = left;
+                    donor = slice;
+                }
+            }
+        }
+        return donor;
+    }
+
+    private static BuildJob.Slice fullestRefund(BuildJob job, BuildJob.Hand except) {
+        BuildJob.Slice donor = null;
+        int most = 1;
+        for (BuildJob.Hand hand : job.hands()) {
+            if (hand == except) {
+                continue;
+            }
+            for (BuildJob.Slice slice : hand.slices) {
+                int left = countRefunds(job, slice);
+                if (left > most) {
+                    most = left;
+                    donor = slice;
+                }
+            }
+        }
+        return donor;
+    }
+
+    private static BuildJob.Slice splitPaste(Schematic schematic, BuildJob.Slice slice) {
+        int start = Math.max(0, slice.cursor);
+        int count = countPaste(schematic, slice);
+        if (count < 2) {
+            return null;
+        }
+        int[] xs = new int[count];
+        int[] ys = new int[count];
+        int[] zs = new int[count];
+        int at = 0;
+        for (int i = start; i < schematic.blockCount() && at < count; i++) {
+            Schematic.Entry entry = schematic.entry(i);
+            if (!slice.contains(entry.x(), entry.y(), entry.z())) {
+                continue;
+            }
+            xs[at] = entry.x();
+            ys[at] = entry.y();
+            zs[at] = entry.z();
+            at++;
+        }
+        return splitPoints(slice, xs, ys, zs, at);
+    }
+
+    private static BuildJob.Slice splitRefunds(BuildJob job, BuildJob.Slice slice) {
+        int count = countRefunds(job, slice);
+        if (count < 2) {
+            return null;
+        }
+        int[] xs = new int[count];
+        int[] ys = new int[count];
+        int[] zs = new int[count];
+        int at = 0;
+        for (BuildJob.Refund refund : job.refunds()) {
+            if (!slice.contains(refund.x(), refund.y(), refund.z())) {
+                continue;
+            }
+            xs[at] = refund.x();
+            ys[at] = refund.y();
+            zs[at] = refund.z();
+            at++;
+            if (at >= count) {
+                break;
+            }
+        }
+        return splitPoints(slice, xs, ys, zs, at);
+    }
+
+    private static BuildJob.Slice splitPoints(BuildJob.Slice slice, int[] xs, int[] ys, int[] zs, int count) {
+        if (count < 2) {
+            return null;
+        }
+        int minX = xs[0];
+        int maxX = xs[0];
+        int minY = ys[0];
+        int maxY = ys[0];
+        int minZ = zs[0];
+        int maxZ = zs[0];
+        for (int i = 1; i < count; i++) {
+            minX = Math.min(minX, xs[i]);
+            maxX = Math.max(maxX, xs[i]);
+            minY = Math.min(minY, ys[i]);
+            maxY = Math.max(maxY, ys[i]);
+            minZ = Math.min(minZ, zs[i]);
+            maxZ = Math.max(maxZ, zs[i]);
+        }
+        int spanX = maxX - minX;
+        int spanY = maxY - minY;
+        int spanZ = maxZ - minZ;
+        int axis = spanX >= spanZ && spanX >= spanY ? 0 : spanZ >= spanY ? 2 : 1;
+        int minC = axis == 0 ? minX : axis == 1 ? minY : minZ;
+        int span = axis == 0 ? spanX : axis == 1 ? spanY : spanZ;
+        if (span <= 0) {
+            return null;
+        }
+        int[] bins = new int[span + 1];
+        for (int i = 0; i < count; i++) {
+            int coord = axis == 0 ? xs[i] : axis == 1 ? ys[i] : zs[i];
+            bins[coord - minC]++;
+        }
+        int running = 0;
+        int bestCut = -1;
+        int bestDiff = Integer.MAX_VALUE;
+        for (int bin = 0; bin < bins.length - 1; bin++) {
+            running += bins[bin];
+            int right = count - running;
+            if (running == 0 || right == 0) {
+                continue;
+            }
+            int diff = Math.abs(running - right);
+            if (diff < bestDiff) {
+                bestDiff = diff;
+                bestCut = bin + 1;
+            }
+        }
+        if (bestCut < 0) {
+            return null;
+        }
+        int cut = minC + bestCut;
+        BuildJob.Slice given = new BuildJob.Slice();
+        given.x0 = slice.x0;
+        given.y0 = slice.y0;
+        given.z0 = slice.z0;
+        given.x1 = slice.x1;
+        given.y1 = slice.y1;
+        given.z1 = slice.z1;
+        given.cursor = slice.cursor;
+        if (axis == 0) {
+            slice.x1 = cut - 1;
+            given.x0 = cut;
+        } else if (axis == 1) {
+            slice.y1 = cut - 1;
+            given.y0 = cut;
+        } else {
+            slice.z1 = cut - 1;
+            given.z0 = cut;
+        }
+        return given;
+    }
+
+    private static double flyStep(int speed, double distanceSqr) {
+        double step = 0.28D + Math.max(1, speed) * 0.18D;
+        if (distanceSqr > 64.0D) {
+            step *= 2.1D;
+        }
+        return step;
+    }
+
+    private static void placeAll(ServerLevel level, ServerPlayer player, SchematicLibrary library, BuildJob job, Schematic schematic) {
+        while (job.cursor() < job.total()) {
+            while (job.cursor() < schematic.blockCount() && job.outsideClip(schematic.entry(job.cursor()))) {
+                job.advance();
+            }
+            if (job.cursor() >= job.total()) {
+                break;
+            }
+            Schematic.Entry entry = schematic.entry(job.cursor());
+            BlockPos pos = job.min().offset(entry.x(), entry.y(), entry.z());
+            if (!level.isLoaded(pos)) {
+                level.getChunkAt(pos);
+            }
+            if (placeOne(level, player, job, pos, entry, true) == PlaceResult.PAUSE) {
+                break;
+            }
+            job.advance();
+        }
+        library.setDirty();
+        if (job.cursor() >= job.total()) {
+            finishPaste(player.getServer(), library, player, job);
+        }
+    }
+
+    private static void undoAll(ServerLevel level, MinecraftServer server, SchematicLibrary library, ServerPlayer player, BuildJob job) {
+        while (job.hasRefunds()) {
+            BuildJob.Refund refund = job.pollRefund();
+            BlockPos pos = job.min().offset(refund.x(), refund.y(), refund.z());
+            if (!level.isLoaded(pos)) {
+                level.getChunkAt(pos);
+            }
+            if (!level.isLoaded(pos)) {
+                job.skippedOne();
+                continue;
+            }
+            removeOne(level, player, job, pos, refund, true);
+        }
+        finishUndo(server, library, player, job);
+    }
+
+    private static PlaceResult placeOne(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos pos, Schematic.Entry entry, boolean quiet) {
+        if (level.isOutsideBuildHeight(pos)) {
+            job.skippedOne();
+            return PlaceResult.DONE;
+        }
+        if (!level.isLoaded(pos)) {
+            if (WrightsConfig.REQUIRE_CHUNKS_LOADED.getAsBoolean()) {
+                return PlaceResult.PAUSE;
+            }
+            job.skippedOne();
+            return PlaceResult.DONE;
+        }
+        if (!canBuild(player, level, pos)) {
+            job.skippedOne();
+            return PlaceResult.DONE;
+        }
+        BlockState state = entry.state();
+        BlockState existing = level.getBlockState(pos);
+        if (existing.equals(state)) {
+            return PlaceResult.DONE;
+        }
+        if (!existing.isAir() && !existing.canBeReplaced()) {
+            job.skippedOne();
+            return PlaceResult.DONE;
+        }
+        if (entry.secondary()) {
+            if (level.getBlockState(pos.below()).getBlock() != state.getBlock()) {
+                job.skippedOne();
+                return PlaceResult.DONE;
+            }
+        } else if (!freePlace(player)) {
+            if (job.supplyPos() != null && supply(level, player, job) == null) {
+                if (job.tickMessage()) {
+                    Messages.actionBar(player, "message.wrights.supply_missing");
+                }
+                job.skippedOne();
+                return PlaceResult.DONE;
+            }
+            Item item = state.getBlock().asItem();
+            if (item == Items.AIR || !hasItem(player, level, job, item)) {
+                job.skippedOne();
+                return PlaceResult.DONE;
+            }
+        }
+
+        BlockSnapshot snapshot = BlockSnapshot.create(level.dimension(), level, pos);
+        level.setBlock(pos, state, Block.UPDATE_ALL);
+        BlockState after = level.getBlockState(pos);
+        if (after.getBlock() != state.getBlock()) {
+            if (!after.equals(existing)) {
+                level.setBlock(pos, existing, Block.UPDATE_ALL);
+            }
+            job.skippedOne();
+            return PlaceResult.DONE;
+        }
+        BlockEvent.EntityPlaceEvent event = new BlockEvent.EntityPlaceEvent(snapshot, existing, player);
+        NeoForge.EVENT_BUS.post(event);
+        if (event.isCanceled()) {
+            level.setBlock(pos, existing, Block.UPDATE_ALL);
+            job.skippedOne();
+            return PlaceResult.DONE;
+        }
+        if (!entry.secondary() && !freePlace(player)) {
+            consumeItem(player, level, job, state.getBlock().asItem());
+        }
+        job.recordPlaced(entry.x(), entry.y(), entry.z(), after, !entry.secondary() && !freePlace(player));
+        if (!quiet) {
+            level.gameEvent(player, GameEvent.BLOCK_PLACE, pos);
+            level.playSound(null, pos, state.getSoundType(level, pos, player).getPlaceSound(), SoundSource.BLOCKS, 1.0F, 1.0F);
+            level.levelEvent(2001, pos, Block.getId(state));
+        }
+        job.placedOne();
+        return PlaceResult.DONE;
+    }
+
+    private static boolean canBuild(ServerPlayer player, ServerLevel level, BlockPos pos) {
+        if (player.isSpectator()) {
+            return false;
+        }
+        if (!level.mayInteract(player, pos)) {
+            return false;
+        }
+        return !player.blockActionRestricted(level, pos, player.gameMode.getGameModeForPlayer());
+    }
+
+    private static boolean freePlace(ServerPlayer player) {
+        return player.getAbilities().instabuild && !player.isSpectator();
+    }
+
+    private static boolean hasItem(ServerPlayer player, ServerLevel level, BuildJob job, Item item) {
+        Container container = supply(level, player, job);
+        if (job.supplyPos() != null) {
+            if (container == null) {
+                return false;
+            }
+            for (int slot = 0; slot < container.getContainerSize(); slot++) {
+                if (container.getItem(slot).is(item)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        Inventory inventory = player.getInventory();
+        for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
+            if (inventory.getItem(slot).is(item)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void consumeItem(ServerPlayer player, ServerLevel level, BuildJob job, Item item) {
+        Container container = supply(level, player, job);
+        if (job.supplyPos() != null && container != null) {
+            for (int slot = 0; slot < container.getContainerSize(); slot++) {
+                ItemStack stack = container.getItem(slot);
+                if (stack.is(item)) {
+                    stack.shrink(1);
+                    if (stack.isEmpty()) {
+                        container.setItem(slot, ItemStack.EMPTY);
+                    }
+                    container.setChanged();
+                    return;
+                }
+            }
+            return;
+        }
+        Inventory inventory = player.getInventory();
+        for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
+            ItemStack stack = inventory.getItem(slot);
+            if (stack.is(item)) {
+                stack.shrink(1);
+                if (stack.isEmpty()) {
+                    inventory.setItem(slot, ItemStack.EMPTY);
+                }
+                return;
+            }
+        }
+    }
+
+    private static void giveBack(ServerLevel level, ServerPlayer player, BuildJob job, Item item) {
+        ItemStack stack = new ItemStack(item);
+        BlockPos supplyPos = job.supplyPos();
+        if (supplyPos != null) {
+            Container container = supply(level, player, job);
+            if (container != null) {
+                stack = insert(container, stack);
+                container.setChanged();
+            }
+            if (!stack.isEmpty()) {
+                dropStack(level, container == null ? player.blockPosition() : supplyPos, stack);
+            }
+            return;
+        }
+        if (!player.getInventory().add(stack)) {
+            player.drop(stack, false);
+        }
+    }
+
+    private static Container supply(ServerLevel level, ServerPlayer player, BuildJob job) {
+        BlockPos pos = job.supplyPos();
+        if (pos == null || !level.mayInteract(player, pos)) {
+            return null;
+        }
+        return containerAt(level, pos);
+    }
+
+    private static Container containerAt(ServerLevel level, BlockPos pos) {
+        BlockState state = level.getBlockState(pos);
+        if (state.getBlock() instanceof ChestBlock chest) {
+            return ChestBlock.getContainer(chest, state, level, pos, false);
+        }
+        BlockEntity entity = level.getBlockEntity(pos);
+        if (entity instanceof Container container) {
+            return container;
+        }
+        return null;
+    }
+
+    private static ItemStack insert(Container container, ItemStack stack) {
+        for (int slot = 0; slot < container.getContainerSize() && !stack.isEmpty(); slot++) {
+            ItemStack existing = container.getItem(slot);
+            if (!existing.isEmpty() && ItemStack.isSameItemSameComponents(existing, stack) && existing.getCount() < existing.getMaxStackSize()) {
+                int move = Math.min(stack.getCount(), existing.getMaxStackSize() - existing.getCount());
+                existing.grow(move);
+                stack.shrink(move);
+                container.setItem(slot, existing);
+            }
+        }
+        for (int slot = 0; slot < container.getContainerSize() && !stack.isEmpty(); slot++) {
+            if (container.getItem(slot).isEmpty()) {
+                container.setItem(slot, stack);
+                return ItemStack.EMPTY;
+            }
+        }
+        return stack;
+    }
+
+    private static void dropStack(ServerLevel level, BlockPos pos, ItemStack stack) {
+        level.addFreshEntity(new ItemEntity(level, pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D, stack));
+    }
+
+    private static int dropKind(ServerPlayer player, BuildJob job) {
+        if (job.supplyPos() == null) {
+            return BlueprintPayloads.UndoPrompt.AT_PLAYER;
+        }
+        if (!(player.level() instanceof ServerLevel level) || supply(level, player, job) == null) {
+            return BlueprintPayloads.UndoPrompt.CHEST_GONE;
+        }
+        return BlueprintPayloads.UndoPrompt.AT_CHEST;
+    }
+
+    private static int overflow(ServerPlayer player, BuildJob job) {
+        java.util.List<Item> paid = new java.util.ArrayList<>();
+        for (BuildJob.Refund refund : job.refunds()) {
+            if (!refund.paid()) {
+                continue;
+            }
+            Item item = refund.state().getBlock().asItem();
+            if (item != Items.AIR) {
+                paid.add(item);
+            }
+        }
+        if (paid.isEmpty()) {
+            return 0;
+        }
+        ItemStack[] slots = slotsFor(player, job);
+        if (slots == null) {
+            return paid.size();
+        }
+        int extra = 0;
+        for (Item item : paid) {
+            if (!fits(slots, item)) {
+                extra++;
+            }
+        }
+        return extra;
+    }
+
+    private static ItemStack[] slotsFor(ServerPlayer player, BuildJob job) {
+        if (job.supplyPos() == null) {
+            Inventory inventory = player.getInventory();
+            ItemStack[] slots = new ItemStack[36];
+            for (int slot = 0; slot < slots.length; slot++) {
+                slots[slot] = inventory.getItem(slot).copy();
+            }
+            return slots;
+        }
+        if (!(player.level() instanceof ServerLevel level)) {
+            return null;
+        }
+        Container container = supply(level, player, job);
+        if (container == null) {
+            return null;
+        }
+        ItemStack[] slots = new ItemStack[container.getContainerSize()];
+        for (int slot = 0; slot < slots.length; slot++) {
+            slots[slot] = container.getItem(slot).copy();
+        }
+        return slots;
+    }
+
+    private static boolean fits(ItemStack[] slots, Item item) {
+        ItemStack stack = new ItemStack(item);
+        for (int slot = 0; slot < slots.length; slot++) {
+            ItemStack existing = slots[slot];
+            if (!existing.isEmpty() && ItemStack.isSameItemSameComponents(existing, stack) && existing.getCount() < existing.getMaxStackSize()) {
+                int move = Math.min(stack.getCount(), existing.getMaxStackSize() - existing.getCount());
+                existing.grow(move);
+                stack.shrink(move);
+                if (stack.isEmpty()) {
+                    return true;
+                }
+            }
+        }
+        for (int slot = 0; slot < slots.length; slot++) {
+            if (slots[slot].isEmpty()) {
+                slots[slot] = stack;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static DroneEntity ensureDrone(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos workPos) {
+        if (job.droneId() != null) {
+            Entity existing = level.getEntity(job.droneId());
+            if (existing instanceof DroneEntity drone && drone.isAlive()) {
+                return drone;
+            }
+            BlockPos last = job.lastDronePos();
+            if (last != null && !level.isLoaded(last) && !level.isLoaded(workPos)) {
+                return null;
+            }
+        }
+        net.minecraft.world.phys.AABB search = new net.minecraft.world.phys.AABB(workPos).inflate(96.0D);
+        for (DroneEntity drone : level.getEntitiesOfClass(DroneEntity.class, search, entity -> entity.jobId().filter(job.id()::equals).isPresent() && entity.isAlive())) {
+            job.setDroneId(drone.getUUID());
+            return drone;
+        }
+        DroneEntity drone = new DroneEntity(ModEntities.DRONE.get(), level);
+        drone.setJobId(job.id());
+        Vec3 site = Vec3.atCenterOf(workPos).add(0.0D, 1.15D, 0.0D);
+        drone.moveTo(site.x, site.y, site.z, player.getYRot(), 0.0F);
+        job.setDroneId(drone.getUUID());
+        job.setLastDronePos(drone.blockPosition());
+        level.addFreshEntity(drone);
+        return drone;
+    }
+
+    private static DroneEntity ensureHand(ServerLevel level, ServerPlayer player, BuildJob job, BuildJob.Hand hand, BlockPos workPos) {
+        if (hand.entityId != null) {
+            Entity existing = level.getEntity(hand.entityId);
+            if (existing instanceof DroneEntity drone && drone.isAlive()) {
+                return drone;
+            }
+            BlockPos last = hand.lastPos;
+            if (last != null && !level.isLoaded(last) && !level.isLoaded(workPos)) {
+                return null;
+            }
+            hand.entityId = null;
+        }
+        AABB search = new AABB(workPos).inflate(96.0D);
+        for (DroneEntity drone : level.getEntitiesOfClass(DroneEntity.class, search, entity -> entity.isAlive() && entity.jobId().filter(job.id()::equals).isPresent())) {
+            if (job.ownsDrone(drone.getUUID())) {
+                continue;
+            }
+            hand.entityId = drone.getUUID();
+            hand.lastPos = drone.blockPosition();
+            return drone;
+        }
+        DroneEntity drone = new DroneEntity(ModEntities.DRONE.get(), level);
+        drone.setJobId(job.id());
+        Vec3 site = Vec3.atCenterOf(workPos).add(0.0D, 1.15D, 0.0D);
+        double spread = (hand.lane - (hand.lanes - 1) * 0.5D) * 1.6D;
+        boolean alongZ = CrewSplit.splitOnX(hand.lanes, job.spanX(), job.spanZ());
+        double x = site.x + (alongZ ? 0.0D : spread);
+        double z = site.z + (alongZ ? spread : 0.0D);
+        drone.moveTo(x, site.y, z, player.getYRot(), 0.0F);
+        hand.entityId = drone.getUUID();
+        hand.lastPos = drone.blockPosition();
+        level.addFreshEntity(drone);
+        return drone;
+    }
+
+    private static void discardDrone(MinecraftServer server, BuildJob job) {
+        ServerLevel level = server.getLevel(job.dimension());
+        discardId(level, job.droneId());
+        job.setDroneId(null);
+        for (BuildJob.Hand hand : job.hands()) {
+            discardId(level, hand.entityId);
+            hand.entityId = null;
+        }
+    }
+
+    private static void discardId(ServerLevel level, UUID id) {
+        if (level == null || id == null) {
+            return;
+        }
+        Entity entity = level.getEntity(id);
+        if (entity != null) {
+            entity.discard();
+        }
+    }
+
+    private static ItemStack findController(ServerPlayer player, UUID controllerId) {
+        Inventory inventory = player.getInventory();
+        for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
+            ItemStack stack = inventory.getItem(slot);
+            if (stack.getItem() instanceof ControllerItem && controllerId.equals(ControllerData.from(stack).controllerId().orElse(null))) {
+                return stack;
+            }
+        }
+        return ItemStack.EMPTY;
+    }
+}

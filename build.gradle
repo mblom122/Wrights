@@ -19,7 +19,7 @@ group = mod_group_id
 
 // The project stays on Google Drive. Compiled output and the Minecraft world live on
 // the local disk, because a Drive hiccup while saving a chunk closes the game.
-def localDev = file("${System.getProperty('user.home')}/AppData/Local/Autobots")
+def localDev = file("${System.getProperty('user.home')}/AppData/Local/Wrights")
 layout.buildDirectory.set(new File(localDev, "build"))
 
 sourceSets.main.resources {
@@ -198,10 +198,10 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 // Copies the built jar into modpack/mods. That folder is the mod list for a NeoForge 1.21.1
-// instance that should contain nothing else while Autobots is still being tested.
+// instance that should contain nothing else while Wrights is still being tested.
 tasks.register('isolatedPack', Copy) {
-    group = 'autobots'
-    description = 'Copy the Autobots jar into modpack/mods for an otherwise empty NeoForge instance.'
+    group = 'wrights'
+    description = 'Copy the Wrights jar into modpack/mods for an otherwise empty NeoForge instance.'
     dependsOn tasks.named('build')
     from(layout.buildDirectory.dir('libs')) {
         include "${mod_id}-*.jar"
