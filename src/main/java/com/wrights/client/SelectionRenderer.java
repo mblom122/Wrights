@@ -57,9 +57,12 @@ public final class SelectionRenderer {
         Vec3 camera = event.getCamera().getPosition();
         MultiBufferSource.BufferSource buffers = minecraft.renderBuffers().bufferSource();
         boolean placing = minecraft.screen instanceof PlacementScreen;
+        boolean adjust = minecraft.screen instanceof BlueprintAdjustScreen;
         boolean gui = minecraft.screen != null;
-        if (!gui && (WrightsClientState.mode == WrightsClientState.Mode.CAPTURE || WrightsClientState.mode == WrightsClientState.Mode.SAVING)) {
+        boolean capture = WrightsClientState.mode == WrightsClientState.Mode.CAPTURE || WrightsClientState.mode == WrightsClientState.Mode.SAVING;
+        if ((adjust || !gui) && capture) {
             drawCapture(pose, buffers, camera);
+            drawCaptureGhosts(pose, buffers, camera, minecraft);
         } else if ((!gui || placing) && WrightsClientState.mode == WrightsClientState.Mode.BUILD && !WrightsClientState.bindSupply) {
             drawPreview(pose, buffers, camera);
         }
@@ -208,6 +211,53 @@ public final class SelectionRenderer {
             drawBox(pose, buffers.getBuffer(RenderType.lines()), box, camera, 1.0F, 0.78F, 0.2F, pulse);
         }
         buffers.endBatch(RenderType.lines());
+    }
+
+    private static void drawCaptureGhosts(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
+        if (WrightsClientState.captureConcealed || minecraft.level == null) {
+            return;
+        }
+        var ghosts = WrightsClientState.captureGhosts;
+        BlockPos first = WrightsClientState.cornerA;
+        BlockPos second = WrightsClientState.cornerB;
+        if (ghosts.isEmpty() || first == null || second == null) {
+            return;
+        }
+        BlockPos origin = com.wrights.blueprint.BoxEdits.min(first, second);
+        prepare(ghosts.size());
+        int count = 0;
+        for (int i = 0; i < ghosts.size(); i++) {
+            WrightsClientState.Ghost ghost = ghosts.get(i);
+            double x = origin.getX() + ghost.x();
+            double y = origin.getY() + ghost.y();
+            double z = origin.getZ() + ghost.z();
+            double dx = x + 0.5D - camera.x;
+            double dy = y + 0.5D - camera.y;
+            double dz = z + 0.5D - camera.z;
+            double distance = dx * dx + dy * dy + dz * dz;
+            if (distance > RANGE_SQR) {
+                continue;
+            }
+            BlockState state = Block.stateById(ghost.stateId());
+            if (state.isAir() || state.getRenderShape() == RenderShape.INVISIBLE) {
+                continue;
+            }
+            order[count] = i;
+            distanceSq[count] = distance;
+            count++;
+        }
+        int keep = Math.min(count, PREVIEW_BUDGET);
+        nearest(count, keep);
+        BlockRenderDispatcher renderer = minecraft.getBlockRenderer();
+        boolean any = false;
+        for (int n = 0; n < keep; n++) {
+            WrightsClientState.Ghost ghost = ghosts.get(order[n]);
+            any = true;
+            drawGhost(pose, buffers, renderer, camera, origin.getX() + ghost.x(), origin.getY() + ghost.y(), origin.getZ() + ghost.z(), Block.stateById(ghost.stateId()));
+        }
+        if (any) {
+            buffers.endBatch();
+        }
     }
 
     private static void drawPreview(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera) {

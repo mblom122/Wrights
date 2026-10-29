@@ -106,8 +106,8 @@ public final class BlueprintNetwork {
         PacketDistributor.sendToPlayer(player, new BlueprintPayloads.Materials(id, shortage, lines));
     }
 
-    public static void finished(ServerPlayer player, UUID id, boolean saved) {
-        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.CaptureFinished(id, saved));
+    public static void finished(ServerPlayer player, UUID id, boolean saved, boolean stay) {
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.CaptureFinished(id, saved, stay));
     }
 
     private static void library(BlueprintPayloads.LibraryRequest payload, IPayloadContext context) {
@@ -148,7 +148,7 @@ public final class BlueprintNetwork {
 
     private static void confirm(BlueprintPayloads.CaptureConfirm payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
-        context.enqueueWork(() -> BlueprintActions.confirm(player, payload.name(), payload.fluids()));
+        context.enqueueWork(() -> BlueprintActions.confirm(player, payload.name(), payload.fluids(), payload.buildAfter()));
     }
 
     private static void cancel(BlueprintPayloads.CaptureCancel payload, IPayloadContext context) {

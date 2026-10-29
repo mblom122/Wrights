@@ -203,14 +203,15 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record CaptureConfirm(String name, boolean fluids) implements CustomPacketPayload {
+    public record CaptureConfirm(String name, boolean fluids, boolean buildAfter) implements CustomPacketPayload {
         public static final Type<CaptureConfirm> TYPE = payloadType("capture_confirm");
         public static final StreamCodec<RegistryFriendlyByteBuf, CaptureConfirm> STREAM_CODEC = StreamCodec.of(
                 (buf, value) -> {
                     buf.writeUtf(value.name, 48);
                     buf.writeBoolean(value.fluids);
+                    buf.writeBoolean(value.buildAfter);
                 },
-                buf -> new CaptureConfirm(buf.readUtf(48), buf.readBoolean()));
+                buf -> new CaptureConfirm(buf.readUtf(48), buf.readBoolean(), buf.readBoolean()));
 
         @Override
         public Type<? extends CustomPacketPayload> type() {
@@ -493,14 +494,15 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record CaptureFinished(UUID id, boolean saved) implements CustomPacketPayload {
+    public record CaptureFinished(UUID id, boolean saved, boolean stay) implements CustomPacketPayload {
         public static final Type<CaptureFinished> TYPE = payloadType("capture_finished");
         public static final StreamCodec<RegistryFriendlyByteBuf, CaptureFinished> STREAM_CODEC = StreamCodec.of(
                 (buf, value) -> {
                     buf.writeUUID(value.id);
                     buf.writeBoolean(value.saved);
+                    buf.writeBoolean(value.stay);
                 },
-                buf -> new CaptureFinished(buf.readUUID(), buf.readBoolean()));
+                buf -> new CaptureFinished(buf.readUUID(), buf.readBoolean(), buf.readBoolean()));
 
         @Override
         public Type<? extends CustomPacketPayload> type() {

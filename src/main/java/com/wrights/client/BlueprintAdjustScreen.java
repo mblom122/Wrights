@@ -9,6 +9,7 @@ import net.minecraft.util.Mth;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.WrightsClientConfig;
+import com.wrights.WrightsConfig;
 import com.wrights.blueprint.BoxEdits;
 import com.wrights.network.BlueprintPayloads;
 
@@ -25,8 +26,10 @@ public class BlueprintAdjustScreen extends Screen {
     private EditBox syBox;
     private EditBox szBox;
     private WrightsButton saveButton;
+    private WrightsButton buildButton;
     private WrightsButton resetButton;
     private boolean suppress;
+    private String savedKey;
     private int modelX;
     private int modelY;
     private int modelW;
@@ -53,12 +56,12 @@ public class BlueprintAdjustScreen extends Screen {
         panelX = Math.max(8, (this.width - panelW) / 2);
         panelY = Math.max(6, (this.height - panelH) / 2);
         nameBox = box(panelX + 12, panelY + 28, 190, 16, 48, false);
-        xBox = number(panelX + 32, panelY + 64);
-        yBox = number(panelX + 32, panelY + 82);
-        zBox = number(panelX + 32, panelY + 100);
-        sxBox = number(panelX + 32, panelY + 136);
-        syBox = number(panelX + 32, panelY + 154);
-        szBox = number(panelX + 32, panelY + 172);
+        xBox = number(panelX + 32, panelY + 64, true);
+        yBox = number(panelX + 32, panelY + 82, true);
+        zBox = number(panelX + 32, panelY + 100, true);
+        sxBox = number(panelX + 32, panelY + 136, false);
+        syBox = number(panelX + 32, panelY + 154, false);
+        szBox = number(panelX + 32, panelY + 172, false);
         step(panelX + 12, panelY + 64, "-", () -> nudge(-1, 0, 0));
         step(panelX + 114, panelY + 64, "+", () -> nudge(1, 0, 0));
         step(panelX + 12, panelY + 82, "-", () -> nudge(0, -1, 0));
@@ -73,9 +76,11 @@ public class BlueprintAdjustScreen extends Screen {
         step(panelX + 114, panelY + 172, "+", () -> grow(2, 1));
         resetButton = new WrightsButton(panelX + 12, panelY + 208, 190, 16, Component.translatable(resetKey()), button -> reset());
         addRenderableWidget(resetButton);
-        saveButton = new WrightsButton(panelX + 12, panelY + 230, 118, 18, Component.translatable("screen.wrights.save"), button -> save());
+        saveButton = new WrightsButton(panelX + 12, panelY + 230, 60, 18, Component.translatable("screen.wrights.save"), button -> save(false));
         addRenderableWidget(saveButton);
-        addRenderableWidget(new WrightsButton(panelX + 134, panelY + 230, 68, 18, Component.translatable("screen.wrights.cancel"), button -> cancel(), true));
+        buildButton = new WrightsButton(panelX + 76, panelY + 230, 60, 18, Component.translatable("screen.wrights.send"), button -> build());
+        addRenderableWidget(buildButton);
+        addRenderableWidget(new WrightsButton(panelX + 140, panelY + 230, 66, 18, Component.translatable("screen.wrights.cancel"), button -> cancel(), true));
         refresh();
     }
 
@@ -84,10 +89,15 @@ public class BlueprintAdjustScreen extends Screen {
             return;
         }
         pushFields();
-        saveButton.active = WrightsClientState.cornerA != null && WrightsClientState.cornerB != null;
         if (resetButton != null) {
             resetButton.setMessage(Component.translatable(resetKey()));
         }
+        updateSaveButton();
+    }
+
+    public void onSaveFinished(boolean saved) {
+        savedKey = saved ? fingerprint() : null;
+        updateSaveButton();
     }
 
     private static String resetKey() {
@@ -107,7 +117,7 @@ public class BlueprintAdjustScreen extends Screen {
         Component title = Component.translatable(WrightsClientState.editingId == null ? "screen.wrights.adjust" : "screen.wrights.adjust_edit");
         graphics.drawString(this.font, title, panelX + 14, panelY + 8, WrightsUi.COPPER, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.location"), panelX + 12, panelY + 52, WrightsUi.BLUE, false);
-        graphics.drawString(this.font, Component.translatable("screen.wrights.border"), panelX + 12, panelY + 124, WrightsUi.BLUE, false);
+        graphics.drawString(this.font, Component.translatable("screen.wrights.size_label"), panelX + 12, panelY + 124, WrightsUi.BLUE, false);
         axis(graphics, panelY + 66, "X");
         axis(graphics, panelY + 84, "Y");
         axis(graphics, panelY + 102, "Z");
@@ -134,19 +144,54 @@ public class BlueprintAdjustScreen extends Screen {
     }
 
     private void nudge(int dx, int dy, int dz) {
-        if (WrightsClientState.cornerA == null || WrightsClientState.cornerB == null) {
+        if (saving() || WrightsClientState.cornerA == null || WrightsClientState.cornerB == null) {
             return;
         }
         BlockPos[] next = BoxEdits.move(WrightsClientState.cornerA, WrightsClientState.cornerB, dx, dy, dz);
         apply(next[0], next[1]);
     }
 
-    private void grow(int axis, int delta) {
-        if (WrightsClientState.cornerA == null || WrightsClientState.cornerB == null) {
+    private void grow(int axis, int direction) {
+        if (saving() || WrightsClientState.cornerA == null || WrightsClientState.cornerB == null || direction == 0) {
             return;
         }
-        BlockPos[] next = BoxEdits.resize(WrightsClientState.cornerA, WrightsClientState.cornerB, axis, delta);
-        apply(next[0], next[1]);
+        int current = BoxEdits.span(WrightsClientState.cornerA, WrightsClientState.cornerB, axis);
+        int target = WrightsClientState.stepped(current, direction, 1, WrightsConfig.MAX_AXIS.getAsInt());
+        if (target == current) {
+            return;
+        }
+        BlockPos[] next = fitSize(axis, current, target);
+        if (next != null) {
+            apply(next[0], next[1]);
+        }
+    }
+
+    private BlockPos[] fitSize(int axis, int current, int target) {
+        BlockPos[] exact = BoxEdits.resize(WrightsClientState.cornerA, WrightsClientState.cornerB, axis, target - current);
+        if (acceptable(exact[0], exact[1])) {
+            return exact;
+        }
+        if (target < current) {
+            return null;
+        }
+        int low = current + 1;
+        int high = target - 1;
+        BlockPos[] best = null;
+        while (low <= high) {
+            int mid = (low + high) >>> 1;
+            BlockPos[] trial = BoxEdits.resize(WrightsClientState.cornerA, WrightsClientState.cornerB, axis, mid - current);
+            if (acceptable(trial[0], trial[1])) {
+                best = trial;
+                low = mid + 1;
+            } else {
+                high = mid - 1;
+            }
+        }
+        return best;
+    }
+
+    private static boolean acceptable(BlockPos first, BlockPos second) {
+        return BoxEdits.inWorld(first) && BoxEdits.inWorld(second) && BoxEdits.fits(first, second);
     }
 
     private void apply(BlockPos first, BlockPos second) {
@@ -158,15 +203,18 @@ public class BlueprintAdjustScreen extends Screen {
         WrightsClientState.cornerB = second;
         pushFields();
         WrightsClientState.sendUpdate();
+        ensurePreview();
+        updateSaveButton();
     }
 
     private void onFields() {
-        if (suppress) {
+        if (suppress || saving()) {
             return;
         }
         WrightsClientState.name = nameBox.getValue();
         if (WrightsClientState.cornerA == null || WrightsClientState.cornerB == null) {
             WrightsClientState.sendUpdate();
+            updateSaveButton();
             return;
         }
         Integer x = parse(xBox);
@@ -176,19 +224,27 @@ public class BlueprintAdjustScreen extends Screen {
         Integer sy = parse(syBox);
         Integer sz = parse(szBox);
         if (x == null || y == null || z == null || sx == null || sy == null || sz == null) {
+            updateSaveButton();
             return;
         }
+        sx = Math.max(1, sx);
+        sy = Math.max(1, sy);
+        sz = Math.max(1, sz);
         BlockPos[] box = BoxEdits.fromMinAndSize(x, y, z, sx, sy, sz);
         if (!BoxEdits.inWorld(box[0]) || !BoxEdits.inWorld(box[1]) || !BoxEdits.fits(box[0], box[1])) {
+            updateSaveButton();
             return;
         }
         if (box[0].equals(WrightsClientState.cornerA) && box[1].equals(WrightsClientState.cornerB)) {
             WrightsClientState.sendUpdate();
+            updateSaveButton();
             return;
         }
         WrightsClientState.cornerA = box[0];
         WrightsClientState.cornerB = box[1];
         WrightsClientState.sendUpdate();
+        ensurePreview();
+        updateSaveButton();
     }
 
     private void pushFields() {
@@ -210,14 +266,61 @@ public class BlueprintAdjustScreen extends Screen {
         suppress = false;
     }
 
-    private void save() {
-        if (WrightsClientState.cornerA == null || WrightsClientState.cornerB == null) {
+    private void save(boolean buildAfter) {
+        if (saving() || WrightsClientState.cornerA == null || WrightsClientState.cornerB == null) {
+            return;
+        }
+        if (!buildAfter && savedKey != null && savedKey.equals(fingerprint())) {
             return;
         }
         WrightsClientState.name = nameBox.getValue();
         WrightsClientState.markSaving();
-        PacketDistributor.sendToServer(new BlueprintPayloads.CaptureConfirm(nameBox.getValue(), WrightsClientConfig.COPY_FLUIDS.get()));
-        this.minecraft.setScreen(null);
+        updateSaveButton();
+        PacketDistributor.sendToServer(new BlueprintPayloads.CaptureConfirm(nameBox.getValue(), WrightsClientConfig.COPY_FLUIDS.get(), buildAfter));
+    }
+
+    private void build() {
+        if (saving() || WrightsClientState.cornerA == null || WrightsClientState.cornerB == null) {
+            return;
+        }
+        if (savedKey != null && savedKey.equals(fingerprint()) && WrightsClientState.editingId != null) {
+            PacketDistributor.sendToServer(new BlueprintPayloads.BeginBuild(WrightsClientState.editingId));
+            return;
+        }
+        save(true);
+    }
+
+    private boolean saving() {
+        return WrightsClientState.mode == WrightsClientState.Mode.SAVING;
+    }
+
+    private String fingerprint() {
+        String label = nameBox == null ? "" : nameBox.getValue();
+        return label + "\n" + WrightsClientConfig.COPY_FLUIDS.get() + "\n" + WrightsClientState.cornerA + "\n" + WrightsClientState.cornerB;
+    }
+
+    private void updateSaveButton() {
+        if (saveButton == null) {
+            return;
+        }
+        boolean corners = WrightsClientState.cornerA != null && WrightsClientState.cornerB != null;
+        boolean clean = corners && savedKey != null && savedKey.equals(fingerprint());
+        if (saving()) {
+            saveButton.active = false;
+            saveButton.setPicked(false);
+            saveButton.setMessage(Component.translatable("screen.wrights.saving_short"));
+        } else if (clean) {
+            saveButton.active = false;
+            saveButton.setPicked(true);
+            saveButton.setMessage(Component.translatable("screen.wrights.saved"));
+        } else {
+            saveButton.active = corners;
+            saveButton.setPicked(false);
+            saveButton.setMessage(Component.translatable("screen.wrights.save"));
+        }
+        if (buildButton != null) {
+            buildButton.active = corners && !saving();
+        }
     }
 
     private void cancel() {
@@ -252,20 +355,27 @@ public class BlueprintAdjustScreen extends Screen {
     }
 
     private EditBox box(int x, int y, int width, int height, int max, boolean numeric) {
+        return box(x, y, width, height, max, numeric, true);
+    }
+
+    private EditBox box(int x, int y, int width, int height, int max, boolean numeric, boolean signed) {
         EditBox box = new EditBox(this.font, x, y, width, height, Component.empty());
         box.setMaxLength(max);
         if (numeric) {
-            box.setFilter(text -> text.matches("-?\\d{0,7}"));
+            box.setFilter(text -> text.matches(signed ? "-?\\d{0,7}" : "\\d{0,7}"));
             box.setResponder(value -> onFields());
         } else {
-            box.setResponder(value -> onFields());
+            box.setResponder(value -> {
+                onFields();
+                updateSaveButton();
+            });
         }
         addRenderableWidget(box);
         return box;
     }
 
-    private EditBox number(int x, int y) {
-        return box(x, y, 78, 14, 8, true);
+    private EditBox number(int x, int y, boolean signed) {
+        return box(x, y, 78, 14, 8, true, signed);
     }
 
     private void step(int x, int y, String label, Runnable action) {
@@ -320,6 +430,7 @@ public class BlueprintAdjustScreen extends Screen {
         preview = this.minecraft == null
                 ? SelectionPreview.Shot.empty()
                 : SelectionPreview.capture(this.minecraft.level, first, second, fluids);
+        WrightsClientState.showCapturePreview(preview.ghosts(), preview.concealed());
     }
 
     private static boolean same(BlockPos left, BlockPos right) {
@@ -333,8 +444,13 @@ public class BlueprintAdjustScreen extends Screen {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0 && mouseX >= fluidX && mouseX < fluidX + modelW && mouseY >= fluidY && mouseY < fluidY + 28) {
+            if (saving()) {
+                return true;
+            }
             WrightsClientConfig.setCopyFluids(!WrightsClientConfig.COPY_FLUIDS.get());
             previewReady = false;
+            ensurePreview();
+            updateSaveButton();
             return true;
         }
         if (button == 0 && insideModel(mouseX, mouseY)) {

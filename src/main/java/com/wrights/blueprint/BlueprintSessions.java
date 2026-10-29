@@ -73,6 +73,7 @@ public final class BlueprintSessions {
         private boolean editWasDraft;
         private boolean editBaselineDirty;
         private boolean instantJobs;
+        private boolean buildAfterSave;
         private int generation;
         private int seq;
 
@@ -180,6 +181,16 @@ public final class BlueprintSessions {
             this.instantJobs = instantJobs;
         }
 
+        public void setBuildAfterSave(boolean buildAfterSave) {
+            this.buildAfterSave = buildAfterSave;
+        }
+
+        public boolean consumeBuildAfterSave() {
+            boolean value = buildAfterSave;
+            buildAfterSave = false;
+            return value;
+        }
+
         public int generation() {
             return generation;
         }
@@ -207,6 +218,7 @@ public final class BlueprintSessions {
             draftDirty = false;
             clearEdit();
             name = "Blueprint";
+            buildAfterSave = false;
             this.dimension = dimension;
             bump();
         }
@@ -229,6 +241,7 @@ public final class BlueprintSessions {
             buildId = null;
             draft = null;
             draftDirty = false;
+            buildAfterSave = false;
             clearEdit();
             bump();
         }

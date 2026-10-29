@@ -229,7 +229,7 @@ public final class BlueprintActions {
         BlueprintNetwork.syncCapture(player);
     }
 
-    public static void confirm(ServerPlayer player, String name, boolean copyFluids) {
+    public static void confirm(ServerPlayer player, String name, boolean copyFluids, boolean buildAfter) {
         if (!held(player)) {
             return;
         }
@@ -253,6 +253,7 @@ public final class BlueprintActions {
         }
         String clean = cleanName(name);
         session.setName(clean);
+        session.setBuildAfterSave(buildAfter);
         session.setMode(BlueprintSessions.Mode.SAVING);
         BlueprintNetwork.syncCapture(player);
         boolean started = JobManager.startBlueprintSave(
@@ -264,6 +265,7 @@ public final class BlueprintActions {
                 session.cornerB(),
                 copyFluids);
         if (!started) {
+            session.setBuildAfterSave(false);
             session.setMode(BlueprintSessions.Mode.CAPTURE);
             BlueprintNetwork.syncCapture(player);
         }
@@ -278,10 +280,22 @@ public final class BlueprintActions {
     }
 
     public static void finishSave(ServerPlayer player, java.util.UUID id, boolean saved) {
-        BlueprintSessions.get(player).clear();
+        BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
+        boolean buildNext = session.consumeBuildAfterSave();
+        if (session.mode() != BlueprintSessions.Mode.SAVING) {
+            BlueprintNetwork.syncLibrary(player);
+            return;
+        }
+        if (saved && id != null) {
+            session.setEditingId(id);
+        }
+        session.setMode(BlueprintSessions.Mode.CAPTURE);
         BlueprintNetwork.syncLibrary(player);
         BlueprintNetwork.syncCapture(player);
-        BlueprintNetwork.finished(player, saved && id != null ? id : net.minecraft.Util.NIL_UUID, saved);
+        BlueprintNetwork.finished(player, saved && id != null ? id : net.minecraft.Util.NIL_UUID, saved, true);
+        if (buildNext && saved && id != null) {
+            beginBuild(player, id);
+        }
     }
 
     public static void delete(ServerPlayer player, java.util.UUID id) {
@@ -665,7 +679,7 @@ public final class BlueprintActions {
         session.setName(schematic.name());
         session.setDraft(schematic);
         session.setDraftDirty(false);
-        library.shelf().noteUse(id);
+        library.shelf().noteUse(player.getUUID(), id);
         library.setDirty();
         BlueprintNetwork.preview(player, schematic, true, false);
         BlueprintNetwork.syncSupply(player);

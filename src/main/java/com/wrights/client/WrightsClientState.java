@@ -80,6 +80,8 @@ public final class WrightsClientState {
     public static int pivotY;
     public static int pivotZ;
     public static List<Ghost> ghosts = List.of();
+    public static List<Ghost> captureGhosts = List.of();
+    public static boolean captureConcealed;
     public static List<Ghost> editGhosts = List.of();
     public static UUID editId;
     public static String editName = "";
@@ -377,6 +379,17 @@ public final class WrightsClientState {
         cornerB = null;
         boxDragging = false;
         moveGrabbed = false;
+        clearCapturePreview();
+    }
+
+    public static void showCapturePreview(List<Ghost> ghosts, boolean concealed) {
+        captureGhosts = ghosts == null ? List.of() : ghosts;
+        captureConcealed = concealed;
+    }
+
+    public static void clearCapturePreview() {
+        captureGhosts = List.of();
+        captureConcealed = false;
     }
 
     private static boolean resumeSent;
@@ -516,6 +529,7 @@ public final class WrightsClientState {
         editingId = null;
         buildId = null;
         ghosts = List.of();
+        clearCapturePreview();
         follow = false;
         boxDragging = false;
         moveGrabbed = false;
@@ -617,6 +631,9 @@ public final class WrightsClientState {
                 ghosts = List.of();
                 concealed = false;
                 follow = false;
+            }
+            if (incoming != Mode.CAPTURE && incoming != Mode.SAVING) {
+                clearCapturePreview();
             }
         }
         updateFlags();
@@ -1123,12 +1140,23 @@ public final class WrightsClientState {
         if (payload.saved() && !payload.id().equals(Util.NIL_UUID)) {
             selected = payload.id();
         }
+        if (payload.stay()) {
+            if (payload.saved() && !payload.id().equals(Util.NIL_UUID)) {
+                editingId = payload.id();
+            }
+            Minecraft minecraft = Minecraft.getInstance();
+            if (minecraft.screen instanceof BlueprintAdjustScreen adjust) {
+                adjust.onSaveFinished(payload.saved());
+            }
+            return;
+        }
         mode = Mode.NONE;
         cornerA = null;
         cornerB = null;
         editingId = null;
         boxDragging = false;
         moveGrabbed = false;
+        clearCapturePreview();
         updateFlags();
         Minecraft.getInstance().setScreen(new WrightsMenuScreen());
     }
