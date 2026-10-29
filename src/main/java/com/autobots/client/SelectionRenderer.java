@@ -370,9 +370,18 @@ public final class SelectionRenderer {
     }
 
     private static void drawGhost(PoseStack pose, MultiBufferSource buffers, BlockRenderDispatcher renderer, Vec3 camera, double x, double y, double z, BlockState state) {
+        float alpha = com.autobots.AutobotsClientConfig.ghostAlpha();
+        if (alpha <= 0.004F) {
+            return;
+        }
         pose.pushPose();
         pose.translate(x - camera.x, y - camera.y, z - camera.z);
-        renderer.renderSingleBlock(state, pose, buffers, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
+        MultiBufferSource output = buffers;
+        if (alpha < 0.996F && buffers instanceof MultiBufferSource.BufferSource source) {
+            int packed = Math.round(alpha * 255.0F);
+            output = type -> new GhostConsumer(source.getBuffer(RenderType.translucent()), packed);
+        }
+        renderer.renderSingleBlock(state, pose, output, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
         pose.popPose();
     }
 
@@ -428,5 +437,51 @@ public final class SelectionRenderer {
         double distance = distanceSq[first];
         distanceSq[first] = distanceSq[second];
         distanceSq[second] = distance;
+    }
+
+    private static final class GhostConsumer implements VertexConsumer {
+        private final VertexConsumer delegate;
+        private final int alpha;
+
+        private GhostConsumer(VertexConsumer delegate, int alpha) {
+            this.delegate = delegate;
+            this.alpha = alpha;
+        }
+
+        @Override
+        public VertexConsumer addVertex(float x, float y, float z) {
+            delegate.addVertex(x, y, z);
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setColor(int red, int green, int blue, int ignored) {
+            delegate.setColor(red, green, blue, alpha);
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setUv(float u, float v) {
+            delegate.setUv(u, v);
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setUv1(int u, int v) {
+            delegate.setUv1(u, v);
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setUv2(int u, int v) {
+            delegate.setUv2(u, v);
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setNormal(float x, float y, float z) {
+            delegate.setNormal(x, y, z);
+            return this;
+        }
     }
 }

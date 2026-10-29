@@ -70,6 +70,8 @@
   "menu.autobots.wall_transparency": "Wall transparency",
   "menu.autobots.edge_color": "Edge color",
   "menu.autobots.edge_opacity": "Edge strength",
+  "menu.autobots.ghost_transparency": "Ghost blocks",
+  "menu.autobots.ghost_hint": "How see-through blueprint blocks are in the world.",
   "menu.autobots.corner_markers": "Corner marks",
   "menu.autobots.place_offset": "Build offset",
   "menu.autobots.place_hint": "Default offset from you while building.",

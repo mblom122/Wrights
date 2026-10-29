@@ -33,12 +33,21 @@ public final class AutobotsClientConfig {
     public static final ModConfigSpec.IntValue EDGE_OPACITY = BUILDER
             .comment("How solid the selection outline is, from 0 to 100 percent.")
             .defineInRange("edgeOpacity", 100, 0, 100);
+    public static final ModConfigSpec.IntValue GHOST_TRANSPARENCY = BUILDER
+            .comment("How see-through blueprint blocks are in the world, from 0 to 100 percent. 0 is solid and 100 is invisible.")
+            .defineInRange("ghostTransparency", 50, 0, 100);
     public static final ModConfigSpec.BooleanValue CORNER_MARKERS = BUILDER
             .comment("Draw the small blocks on the eight corners of a selection.")
             .define("cornerMarkers", true);
     public static final ModConfigSpec.BooleanValue INSTANT_JOBS = BUILDER
             .comment("When true, building and undoing finish in one step. When false, the drone places and removes a few blocks at a time.")
             .define("instantJobs", false);
+    public static final ModConfigSpec.BooleanValue DRONE_MAX = BUILDER
+            .comment("When true, a new job uses every free drone. It still never uses more drones than the job has blocks.")
+            .define("droneMax", false);
+    public static final ModConfigSpec.IntValue DRONE_COUNT = BUILDER
+            .comment("How many drones a new job uses when droneMax is false. Still limited by free drones and by the number of blocks.")
+            .defineInRange("droneCount", 5, 1, 8);
     public static final ModConfigSpec.IntValue PLACE_X = BUILDER
             .comment("Blocks to your right when a paste is not aimed at a block.")
             .defineInRange("placeX", 0, -32, 32);
@@ -78,6 +87,10 @@ public final class AutobotsClientConfig {
         return 1.0F - WALL_TRANSPARENCY.get() / 100.0F;
     }
 
+    public static float ghostAlpha() {
+        return 1.0F - GHOST_TRANSPARENCY.get() / 100.0F;
+    }
+
     public static float edgeAlpha() {
         return EDGE_OPACITY.get() / 100.0F;
     }
@@ -104,6 +117,10 @@ public final class AutobotsClientConfig {
         WALL_TRANSPARENCY.set(clamp(value, 0, 100));
     }
 
+    public static void setGhostTransparency(int value) {
+        GHOST_TRANSPARENCY.set(clamp(value, 0, 100));
+    }
+
     public static void setEdgeOpacity(int value) {
         EDGE_OPACITY.set(clamp(value, 0, 100));
     }
@@ -123,6 +140,24 @@ public final class AutobotsClientConfig {
     public static void setInstantJobs(boolean enabled) {
         INSTANT_JOBS.set(enabled);
         save();
+    }
+
+    public static void setDroneMax(boolean enabled) {
+        DRONE_MAX.set(enabled);
+        save();
+    }
+
+    public static void setDroneCount(int count) {
+        DRONE_COUNT.set(clamp(count, 1, 8));
+        save();
+    }
+
+    public static int deployTarget(int freeDrones, int blocks) {
+        if (freeDrones <= 0 || blocks <= 0) {
+            return 0;
+        }
+        int wanted = DRONE_MAX.get() ? freeDrones : DRONE_COUNT.get();
+        return Math.max(1, Math.min(wanted, Math.min(freeDrones, blocks)));
     }
 
     public static void save() {

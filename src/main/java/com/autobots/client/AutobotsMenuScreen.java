@@ -95,6 +95,10 @@ public class AutobotsMenuScreen extends Screen {
     private int edgeSliderX;
     private int edgeSliderY;
     private int edgeSliderW;
+    private int ghostSliderX;
+    private int ghostSliderY;
+    private int ghostSliderW;
+    private int ghostHintY;
     private int swatchX;
     private int wallSwatchY;
     private int edgeSwatchY;
@@ -123,6 +127,7 @@ public class AutobotsMenuScreen extends Screen {
     private int optionOffsetY;
     private EditBox wallPercent;
     private EditBox edgePercent;
+    private EditBox ghostPercent;
     private EditBox placeX;
     private EditBox placeY;
     private EditBox placeZ;
@@ -189,6 +194,7 @@ public class AutobotsMenuScreen extends Screen {
         previewButton = add(new AutobotsButton(panelX + 14, panelY + panelH - 48, 92, 16, Component.translatable("menu.autobots.cancel_preview"), button -> cancelPreview()));
         wallPercent = percentBox(value -> AutobotsClientConfig.setWallTransparency(value));
         edgePercent = percentBox(value -> AutobotsClientConfig.setEdgeOpacity(value));
+        ghostPercent = percentBox(value -> AutobotsClientConfig.setGhostTransparency(value));
         placeX = offsetBox(0);
         placeY = offsetBox(1);
         placeZ = offsetBox(2);
@@ -313,12 +319,14 @@ public class AutobotsMenuScreen extends Screen {
         boolean showOptions = options;
         wallPercent.visible = showOptions;
         edgePercent.visible = showOptions;
+        ghostPercent.visible = showOptions;
         placeX.visible = showOptions;
         placeY.visible = showOptions;
         placeZ.visible = showOptions;
         if (showOptions) {
             showPercent(wallPercent, AutobotsClientConfig.WALL_TRANSPARENCY.get());
             showPercent(edgePercent, AutobotsClientConfig.EDGE_OPACITY.get());
+            showPercent(ghostPercent, AutobotsClientConfig.GHOST_TRANSPARENCY.get());
             showOffset(placeX, AutobotsClientConfig.PLACE_X.get());
             showOffset(placeY, AutobotsClientConfig.PLACE_Y.get());
             showOffset(placeZ, AutobotsClientConfig.PLACE_Z.get());
@@ -412,6 +420,13 @@ public class AutobotsMenuScreen extends Screen {
         edgeSliderW = 120;
         placeField(edgePercent, edgeSliderX + edgeSliderW + 8, edgeSliderY - 4);
         local += 22;
+        ghostSliderX = x + 108;
+        ghostSliderY = optionY(local);
+        ghostSliderW = 120;
+        placeField(ghostPercent, ghostSliderX + ghostSliderW + 8, ghostSliderY - 4);
+        local += 14;
+        ghostHintY = optionY(local);
+        local += 20;
         boolean marks = AutobotsClientConfig.CORNER_MARKERS.get();
         Component state = Component.translatable(marks ? "menu.autobots.on" : "menu.autobots.off");
         markerW = Math.max(36, this.font.width(state) + 16);
@@ -446,6 +461,7 @@ public class AutobotsMenuScreen extends Screen {
         }
         showOptionBox(wallPercent);
         showOptionBox(edgePercent);
+        showOptionBox(ghostPercent);
         showOptionBox(placeX);
         showOptionBox(placeY);
         showOptionBox(placeZ);
@@ -479,6 +495,9 @@ public class AutobotsMenuScreen extends Screen {
         drawSwatches(graphics, swatchX, edgeSwatchY, AutobotsClientConfig.edgeRgb());
         drawSlider(graphics, x, edgeSliderY, edgeSliderX, edgeSliderW, AutobotsClientConfig.EDGE_OPACITY.get(), 100, Component.translatable("menu.autobots.edge_opacity"));
         graphics.drawString(this.font, "%", edgePercent.getX() + 34, edgeSliderY, AutobotsUi.TEXT, false);
+        drawSlider(graphics, x, ghostSliderY, ghostSliderX, ghostSliderW, AutobotsClientConfig.GHOST_TRANSPARENCY.get(), 100, Component.translatable("menu.autobots.ghost_transparency"));
+        graphics.drawString(this.font, "%", ghostPercent.getX() + 34, ghostSliderY, AutobotsUi.TEXT, false);
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("menu.autobots.ghost_hint").getString(), optionViewW - 28), x, ghostHintY, 0xFF667480, false);
         graphics.drawString(this.font, Component.translatable("menu.autobots.corner_markers"), x, markerY + 3, AutobotsUi.MUTED, false);
         boolean marks = AutobotsClientConfig.CORNER_MARKERS.get();
         Component state = Component.translatable(marks ? "menu.autobots.on" : "menu.autobots.off");
@@ -700,6 +719,11 @@ public class AutobotsMenuScreen extends Screen {
                     applyDrag(mouseX);
                     return true;
                 }
+                if (hitSlider(mouseX, mouseY, ghostSliderX, ghostSliderY, ghostSliderW)) {
+                    drag = 3;
+                    applyDrag(mouseX);
+                    return true;
+                }
             }
             return super.mouseClicked(mouseX, mouseY, button);
         }
@@ -811,6 +835,9 @@ public class AutobotsMenuScreen extends Screen {
         } else if (drag == 2) {
             AutobotsClientConfig.setEdgeOpacity(along(mouseX, edgeSliderX, edgeSliderW, 0, 100));
             showPercent(edgePercent, AutobotsClientConfig.EDGE_OPACITY.get());
+        } else if (drag == 3) {
+            AutobotsClientConfig.setGhostTransparency(along(mouseX, ghostSliderX, ghostSliderW, 0, 100));
+            showPercent(ghostPercent, AutobotsClientConfig.GHOST_TRANSPARENCY.get());
         }
     }
 
