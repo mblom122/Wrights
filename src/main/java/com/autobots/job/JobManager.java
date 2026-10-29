@@ -132,6 +132,22 @@ public final class JobManager {
             return;
         }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        if (action == com.autobots.network.BlueprintPayloads.JobControl.PAUSE_ALL) {
+            setPausedAll(player, library, true);
+            return;
+        }
+        if (action == com.autobots.network.BlueprintPayloads.JobControl.RESUME_ALL) {
+            setPausedAll(player, library, false);
+            return;
+        }
+        if (action == com.autobots.network.BlueprintPayloads.JobControl.REMOVE_ACTIVE) {
+            removeSection(player, library, false);
+            return;
+        }
+        if (action == com.autobots.network.BlueprintPayloads.JobControl.REMOVE_DONE) {
+            removeSection(player, library, true);
+            return;
+        }
         BuildJob job = library.job(id).orElse(null);
         if (job == null || !job.owner().equals(player.getUUID())) {
             com.autobots.network.BlueprintNetwork.syncJobs(player);
@@ -277,7 +293,45 @@ public final class JobManager {
         library.setDirty();
     }
 
+    private static void setPausedAll(ServerPlayer player, SchematicLibrary library, boolean paused) {
+        boolean changed = false;
+        for (BuildJob job : library.jobsFor(player.getUUID())) {
+            if (!job.finished() && job.paused() != paused) {
+                job.setPaused(paused);
+                changed = true;
+            }
+        }
+        if (changed) {
+            library.setDirty();
+            Messages.actionBar(player, paused ? "message.autobots.paused_all" : "message.autobots.resumed_all");
+        }
+        BlueprintNetwork.syncJobs(player);
+    }
+
+    private static void removeSection(ServerPlayer player, SchematicLibrary library, boolean finished) {
+        List<BuildJob> jobs = new ArrayList<>(library.jobsFor(player.getUUID()));
+        int count = 0;
+        for (BuildJob job : jobs) {
+            if (job.finished() == finished) {
+                discardJob(player, library, job);
+                count++;
+            }
+        }
+        if (count == 1) {
+            Messages.actionBar(player, "message.autobots.job_removed");
+        } else if (count > 1) {
+            Messages.actionBar(player, "message.autobots.removed_jobs", count);
+        }
+        BlueprintNetwork.syncJobs(player);
+    }
+
     private static void removeOneJob(ServerPlayer player, SchematicLibrary library, BuildJob job) {
+        discardJob(player, library, job);
+        BlueprintNetwork.syncJobs(player);
+        Messages.actionBar(player, "message.autobots.job_removed");
+    }
+
+    private static void discardJob(ServerPlayer player, SchematicLibrary library, BuildJob job) {
         if (job.kind() == BuildJob.Kind.COPY && job.resultSchematicId() != null && !job.finished()) {
             library.removeSchematic(job.resultSchematicId());
         }
@@ -286,8 +340,6 @@ public final class JobManager {
         }
         discardDrone(player.getServer(), job);
         library.removeJob(job);
-        BlueprintNetwork.syncJobs(player);
-        Messages.actionBar(player, "message.autobots.job_removed");
     }
 
     private static void visit(ServerPlayer player, BuildJob job) {
@@ -760,11 +812,17 @@ public final class JobManager {
             }
             return;
         }
-        while (job.cursor() < schematic.blockCount() && job.outsideClip(schematic.entry(job.cursor()))) {
+        int skipBudget = 8192;
+        while (skipBudget > 0 && job.cursor() < schematic.blockCount() && satisfied(level, job, schematic.entry(job.cursor()))) {
             job.advance();
+            skipBudget--;
         }
-        if (job.cursor() >= job.total()) {
+        if (job.cursor() >= job.total() || job.cursor() >= schematic.blockCount()) {
             finishPaste(server, library, player, job);
+            return;
+        }
+        if (skipBudget == 0) {
+            library.setDirty();
             return;
         }
         Schematic.Entry next = schematic.entry(job.cursor());
@@ -1028,9 +1086,15 @@ public final class JobManager {
 
     private static void tickCrew(ServerLevel level, ServerPlayer player, SchematicLibrary library, BuildJob job, Schematic schematic) {
         boolean working = false;
+        boolean scanning = false;
         boolean waitingChunk = false;
+        int[] skipBudget = {8192};
         for (BuildJob.Hand hand : job.hands()) {
-            int index = nextInLane(schematic, job, hand);
+            int index = nextWork(level, schematic, job, hand, skipBudget);
+            if (index == -2) {
+                scanning = true;
+                continue;
+            }
             if (index < 0) {
                 continue;
             }
@@ -1050,7 +1114,11 @@ public final class JobManager {
             }
             int budget = Math.min(Math.max(1, hand.speed), AutobotsConfig.BLOCKS_PER_TICK.getAsInt());
             for (int n = 0; n < budget; n++) {
-                int at = nextInLane(schematic, job, hand);
+                int at = nextWork(level, schematic, job, hand, skipBudget);
+                if (at == -2) {
+                    scanning = true;
+                    break;
+                }
                 if (at < 0) {
                     break;
                 }
@@ -1080,7 +1148,7 @@ public final class JobManager {
             }
         }
         library.setDirty();
-        if (!working) {
+        if (!working && !scanning) {
             finishPaste(level.getServer(), library, player, job);
         } else if (waitingChunk && job.tickMessage()) {
             Messages.actionBar(player, "message.autobots.paused_chunk");
@@ -1157,6 +1225,36 @@ public final class JobManager {
             }
         }
         return false;
+    }
+
+    private static boolean satisfied(ServerLevel level, BuildJob job, Schematic.Entry entry) {
+        if (job.outsideClip(entry)) {
+            return true;
+        }
+        BlockPos pos = job.min().offset(entry.x(), entry.y(), entry.z());
+        if (level.isOutsideBuildHeight(pos)) {
+            return true;
+        }
+        if (!level.isLoaded(pos)) {
+            return false;
+        }
+        return level.getBlockState(pos).equals(entry.state());
+    }
+
+    private static int nextWork(ServerLevel level, Schematic schematic, BuildJob job, BuildJob.Hand hand, int[] budget) {
+        while (budget[0] > 0) {
+            int index = nextInLane(schematic, job, hand);
+            if (index < 0) {
+                return -1;
+            }
+            if (!satisfied(level, job, schematic.entry(index))) {
+                return index;
+            }
+            budget[0]--;
+            hand.cursor = index + 1;
+            job.advance();
+        }
+        return nextInLane(schematic, job, hand) < 0 ? -1 : -2;
     }
 
     private static int nextInLane(Schematic schematic, BuildJob job, BuildJob.Hand hand) {

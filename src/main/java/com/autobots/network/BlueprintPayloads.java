@@ -590,6 +590,10 @@ public final class BlueprintPayloads {
         public static final int UNDO_FORCE = 5;
         public static final int REMOVE = 6;
         public static final int VISIT = 7;
+        public static final int PAUSE_ALL = 8;
+        public static final int RESUME_ALL = 9;
+        public static final int REMOVE_ACTIVE = 10;
+        public static final int REMOVE_DONE = 11;
         public static final Type<JobControl> TYPE = payloadType("job_control");
         public static final StreamCodec<RegistryFriendlyByteBuf, JobControl> STREAM_CODEC = StreamCodec.of(
                 (buf, value) -> {

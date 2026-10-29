@@ -24,6 +24,7 @@ public class AutobotsMenuScreen extends Screen {
     private static int savedPage = PAGE_BUILDING;
     private static int savedScroll;
     private static int savedJobScroll;
+    private static int savedHistoryScroll;
     private static int savedOptionScroll;
     private static String savedSearch = "";
 
@@ -67,6 +68,22 @@ public class AutobotsMenuScreen extends Screen {
     private boolean options;
     private boolean jobsPage;
     private int jobScroll;
+    private int historyScroll;
+    private final List<BlueprintPayloads.JobLine> workingJobs = new ArrayList<>();
+    private final List<BlueprintPayloads.JobLine> finishedJobs = new ArrayList<>();
+    private int workHeaderY;
+    private int workListY;
+    private int workRows;
+    private int doneHeaderY;
+    private int doneListY;
+    private int doneRows;
+    private int workPauseRight;
+    private int workRemoveRight;
+    private int doneRemoveRight;
+    private int workPauseWidth;
+    private int workRemoveWidth;
+    private int doneRemoveWidth;
+    private boolean workAllPaused;
     private int drag;
     private int wallSliderX;
     private int wallSliderY;
@@ -115,6 +132,7 @@ public class AutobotsMenuScreen extends Screen {
         options = savedPage == PAGE_OPTIONS;
         scroll = savedScroll;
         jobScroll = savedJobScroll;
+        historyScroll = savedHistoryScroll;
         optionScroll = savedOptionScroll;
         searchText = savedSearch;
     }
@@ -168,6 +186,7 @@ public class AutobotsMenuScreen extends Screen {
         savedPage = jobsPage ? PAGE_JOBS : options ? PAGE_OPTIONS : PAGE_BUILDING;
         savedScroll = scroll;
         savedJobScroll = jobScroll;
+        savedHistoryScroll = historyScroll;
         savedOptionScroll = optionScroll;
         savedSearch = searchText == null ? "" : searchText;
         super.removed();
@@ -837,64 +856,118 @@ public class AutobotsMenuScreen extends Screen {
         return min + (int) Math.round(t * (max - min));
     }
 
-    private int activeJobs() {
-        int count = 0;
-        for (BlueprintPayloads.JobLine job : AutobotsClientState.jobs) {
-            if (!job.finished()) {
-                count++;
-            }
-        }
-        return count;
-    }
-
     private static final int JOB_ROW = 58;
 
-    private int jobRows() {
-        return Math.max(1, (panelH - 110) / JOB_ROW);
+    private void prepareJobs() {
+        workingJobs.clear();
+        finishedJobs.clear();
+        workAllPaused = true;
+        for (BlueprintPayloads.JobLine job : AutobotsClientState.jobs) {
+            if (job.finished()) {
+                finishedJobs.add(job);
+            } else {
+                workingJobs.add(job);
+                if (!job.paused()) {
+                    workAllPaused = false;
+                }
+            }
+        }
+        int top = panelY + 22;
+        int bottom = panelY + panelH - 12;
+        int gap = 8;
+        int header = 18;
+        int inner = Math.max(header * 2 + 28, bottom - top - gap);
+        boolean workOpen = !workingJobs.isEmpty();
+        boolean doneOpen = !finishedJobs.isEmpty();
+        int workBlock;
+        int doneBlock;
+        if (!workOpen && !doneOpen) {
+            workBlock = header + 16;
+            doneBlock = header + 16;
+        } else if (!workOpen) {
+            workBlock = header + 16;
+            doneBlock = Math.max(header + JOB_ROW, inner - workBlock);
+        } else if (!doneOpen) {
+            doneBlock = header + 16;
+            workBlock = Math.max(header + JOB_ROW, inner - doneBlock);
+        } else {
+            workBlock = Math.max(header + JOB_ROW, inner / 2);
+            doneBlock = Math.max(header + JOB_ROW, inner - workBlock);
+        }
+        workHeaderY = top;
+        workListY = top + header;
+        workRows = workOpen ? Math.max(1, (workBlock - header) / JOB_ROW) : 0;
+        doneHeaderY = top + workBlock + gap;
+        doneListY = doneHeaderY + header;
+        doneRows = doneOpen ? Math.max(1, (doneBlock - header) / JOB_ROW) : 0;
+        jobScroll = Mth.clamp(jobScroll, 0, Math.max(0, workingJobs.size() - workRows));
+        historyScroll = Mth.clamp(historyScroll, 0, Math.max(0, finishedJobs.size() - doneRows));
+        int right = listX + (panelX + panelW - 24 - listX);
+        workRemoveWidth = jobButtonWidth("menu.autobots.remove_all");
+        workPauseWidth = jobButtonWidth(workAllPaused ? "menu.autobots.resume_all" : "menu.autobots.pause_all");
+        workRemoveRight = right;
+        workPauseRight = right - workRemoveWidth - 4;
+        doneRemoveWidth = workRemoveWidth;
+        doneRemoveRight = right;
+    }
+
+    private int jobButtonWidth(String key) {
+        return Math.max(52, this.font.width(Component.translatable(key)) + 10);
     }
 
     private void renderJobs(GuiGraphics graphics, int mouseX, int mouseY) {
-        List<BlueprintPayloads.JobLine> jobs = AutobotsClientState.jobs;
+        prepareJobs();
         int x = listX;
         int width = panelX + panelW - 24 - x;
-        graphics.drawString(this.font, Component.translatable("menu.autobots.jobs"), x, panelY + 24, AutobotsUi.TEXT, false);
-        if (jobs.isEmpty()) {
-            graphics.drawString(this.font, Component.translatable("menu.autobots.jobs_empty"), x, panelY + 52, AutobotsUi.MUTED, false);
-            return;
-        }
-        boolean creative = creativeVisit();
-        jobScroll = Mth.clamp(jobScroll, 0, Math.max(0, jobs.size() - jobRows()));
-        for (int row = 0; row < jobRows() && jobScroll + row < jobs.size(); row++) {
-            BlueprintPayloads.JobLine job = jobs.get(jobScroll + row);
-            int y = panelY + 44 + row * JOB_ROW;
-            boolean hover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 54;
-            graphics.fill(x, y, x + width, y + 54, hover ? 0xFF24303C : 0xFF18222C);
-            String name = this.font.plainSubstrByWidth(job.name(), width / 2);
-            graphics.drawString(this.font, name, x + 6, y + 4, AutobotsUi.TEXT, false);
-            String status = jobStatus(job);
-            Component statusText = Component.translatable(status);
-            graphics.drawString(this.font, statusText, x + width - 8 - this.font.width(statusText), y + 4, jobColor(job), false);
-            BlockPos anchor = job.anchor();
-            graphics.drawString(this.font, Component.translatable("menu.autobots.job_anchor", anchor.getX(), anchor.getY(), anchor.getZ()), x + 6, y + 15, AutobotsUi.MUTED, false);
-            graphics.drawString(this.font, progressLine(job), x + 6, y + 26, AutobotsUi.TEXT, false);
-            int right = x + width - 4;
-            right = drawJobButton(graphics, right, y + 36, "menu.autobots.remove", mouseX, mouseY);
-            if (creative) {
-                right = drawJobButton(graphics, right, y + 36, "menu.autobots.visit", mouseX, mouseY);
-            }
-            right = drawJobButton(graphics, right, y + 36, AutobotsClientState.markedJobs.contains(job.id()) ? "menu.autobots.mark_on" : "menu.autobots.mark", mouseX, mouseY);
-            if (job.finished()) {
-                right = drawJobButton(graphics, right, y + 36, "menu.autobots.redo", mouseX, mouseY);
-                if (job.canUndo()) {
-                    drawJobButton(graphics, right, y + 36, "menu.autobots.undo", mouseX, mouseY);
-                }
-            } else {
-                right = drawJobButton(graphics, right, y + 36, "menu.autobots.stop", mouseX, mouseY);
-                drawJobButton(graphics, right, y + 36, job.paused() ? "menu.autobots.resume" : "menu.autobots.pause", mouseX, mouseY);
+        drawJobSection(graphics, x, workHeaderY, width, "menu.autobots.jobs_working", workingJobs.isEmpty() ? "menu.autobots.jobs_working_empty" : null, workingJobs.isEmpty() ? 0 : workPauseWidth + workRemoveWidth + 12);
+        if (!workingJobs.isEmpty()) {
+            drawJobButton(graphics, workRemoveRight, workHeaderY, "menu.autobots.remove_all", mouseX, mouseY, workRemoveWidth);
+            drawJobButton(graphics, workPauseRight, workHeaderY, workAllPaused ? "menu.autobots.resume_all" : "menu.autobots.pause_all", mouseX, mouseY, workPauseWidth);
+            for (int row = 0; row < workRows && jobScroll + row < workingJobs.size(); row++) {
+                drawJobRow(graphics, mouseX, mouseY, x, width, workListY + row * JOB_ROW, workingJobs.get(jobScroll + row));
             }
         }
-        if (activeJobs() > 1) {
-            drawJobButton(graphics, x + 64, panelY + panelH - 58, "menu.autobots.stop_all", mouseX, mouseY);
+        drawJobSection(graphics, x, doneHeaderY, width, "menu.autobots.jobs_finished", finishedJobs.isEmpty() ? "menu.autobots.jobs_finished_empty" : null, finishedJobs.isEmpty() ? 0 : doneRemoveWidth + 8);
+        if (!finishedJobs.isEmpty()) {
+            drawJobButton(graphics, doneRemoveRight, doneHeaderY, "menu.autobots.remove_all", mouseX, mouseY, doneRemoveWidth);
+            for (int row = 0; row < doneRows && historyScroll + row < finishedJobs.size(); row++) {
+                drawJobRow(graphics, mouseX, mouseY, x, width, doneListY + row * JOB_ROW, finishedJobs.get(historyScroll + row));
+            }
+        }
+    }
+
+    private void drawJobSection(GuiGraphics graphics, int x, int y, int width, String title, String empty, int reserved) {
+        String heading = this.font.plainSubstrByWidth(Component.translatable(title).getString(), Math.max(40, width - reserved));
+        graphics.drawString(this.font, heading, x, y + 4, AutobotsUi.TEXT, false);
+        if (empty != null) {
+            graphics.drawString(this.font, Component.translatable(empty), x, y + 20, AutobotsUi.MUTED, false);
+        }
+    }
+
+    private void drawJobRow(GuiGraphics graphics, int mouseX, int mouseY, int x, int width, int y, BlueprintPayloads.JobLine job) {
+        boolean hover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 54;
+        graphics.fill(x, y, x + width, y + 54, hover ? 0xFF24303C : 0xFF18222C);
+        String name = this.font.plainSubstrByWidth(job.name(), Math.max(40, width / 2));
+        graphics.drawString(this.font, name, x + 6, y + 4, AutobotsUi.TEXT, false);
+        Component statusText = Component.translatable(jobStatus(job));
+        graphics.drawString(this.font, statusText, x + width - 8 - this.font.width(statusText), y + 4, jobColor(job), false);
+        BlockPos anchor = job.anchor();
+        graphics.drawString(this.font, Component.translatable("menu.autobots.job_anchor", anchor.getX(), anchor.getY(), anchor.getZ()), x + 6, y + 15, AutobotsUi.MUTED, false);
+        graphics.drawString(this.font, progressLine(job), x + 6, y + 26, AutobotsUi.TEXT, false);
+        int right = x + width - 4;
+        right = drawJobButton(graphics, right, y + 36, "menu.autobots.remove", mouseX, mouseY, 52);
+        if (creativeVisit()) {
+            right = drawJobButton(graphics, right, y + 36, "menu.autobots.visit", mouseX, mouseY, 52);
+        }
+        right = drawJobButton(graphics, right, y + 36, AutobotsClientState.markedJobs.contains(job.id()) ? "menu.autobots.mark_on" : "menu.autobots.mark", mouseX, mouseY, 52);
+        if (job.finished()) {
+            right = drawJobButton(graphics, right, y + 36, "menu.autobots.redo", mouseX, mouseY, 52);
+            if (job.canUndo()) {
+                drawJobButton(graphics, right, y + 36, "menu.autobots.undo", mouseX, mouseY, 52);
+            }
+        } else {
+            right = drawJobButton(graphics, right, y + 36, "menu.autobots.stop", mouseX, mouseY, 52);
+            drawJobButton(graphics, right, y + 36, job.paused() ? "menu.autobots.resume" : "menu.autobots.pause", mouseX, mouseY, 52);
         }
     }
 
@@ -946,8 +1019,7 @@ public class AutobotsMenuScreen extends Screen {
         return this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild && !this.minecraft.player.isSpectator();
     }
 
-    private int drawJobButton(GuiGraphics graphics, int right, int y, String key, int mouseX, int mouseY) {
-        int width = Math.max(52, key.equals("menu.autobots.stop_all") ? 64 : 52);
+    private int drawJobButton(GuiGraphics graphics, int right, int y, String key, int mouseX, int mouseY, int width) {
         int left = right - width;
         boolean hover = mouseX >= left && mouseX < right && mouseY >= y && mouseY < y + 16;
         graphics.fill(left, y, right, y + 16, hover ? 0xFF3A5164 : 0xFF24384A);
@@ -958,23 +1030,42 @@ public class AutobotsMenuScreen extends Screen {
     }
 
     private boolean clickJob(double mouseX, double mouseY) {
-        List<BlueprintPayloads.JobLine> jobs = AutobotsClientState.jobs;
-        int x = listX;
-        int width = panelX + panelW - 24 - x;
-        if (activeJobs() > 1 && mouseX >= x && mouseX < x + 64 && mouseY >= panelY + panelH - 58 && mouseY < panelY + panelH - 42) {
-            PacketDistributor.sendToServer(new BlueprintPayloads.StopJob());
+        prepareJobs();
+        if (!workingJobs.isEmpty()) {
+            if (hitWide(mouseX, mouseY, workRemoveRight, workHeaderY, workRemoveWidth)) {
+                PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(new UUID(0L, 0L), BlueprintPayloads.JobControl.REMOVE_ACTIVE));
+                return true;
+            }
+            if (hitWide(mouseX, mouseY, workPauseRight, workHeaderY, workPauseWidth)) {
+                int action = workAllPaused ? BlueprintPayloads.JobControl.RESUME_ALL : BlueprintPayloads.JobControl.PAUSE_ALL;
+                PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(new UUID(0L, 0L), action));
+                return true;
+            }
+        }
+        if (!finishedJobs.isEmpty() && hitWide(mouseX, mouseY, doneRemoveRight, doneHeaderY, doneRemoveWidth)) {
+            PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(new UUID(0L, 0L), BlueprintPayloads.JobControl.REMOVE_DONE));
             return true;
         }
-        int row = (int) ((mouseY - (panelY + 44)) / JOB_ROW);
-        if (row < 0 || row >= jobRows() || jobScroll + row >= jobs.size()) {
-            return false;
+        if (mouseY >= workListY && mouseY < workListY + workRows * JOB_ROW) {
+            int row = (int) ((mouseY - workListY) / JOB_ROW);
+            if (row >= 0 && row < workRows && jobScroll + row < workingJobs.size()) {
+                return clickJobRow(mouseX, mouseY, workListY + row * JOB_ROW, workingJobs.get(jobScroll + row));
+            }
         }
-        int y = panelY + 44 + row * JOB_ROW;
+        if (mouseY >= doneListY && mouseY < doneListY + doneRows * JOB_ROW) {
+            int row = (int) ((mouseY - doneListY) / JOB_ROW);
+            if (row >= 0 && row < doneRows && historyScroll + row < finishedJobs.size()) {
+                return clickJobRow(mouseX, mouseY, doneListY + row * JOB_ROW, finishedJobs.get(historyScroll + row));
+            }
+        }
+        return false;
+    }
+
+    private boolean clickJobRow(double mouseX, double mouseY, int y, BlueprintPayloads.JobLine job) {
         if (mouseY < y + 36 || mouseY >= y + 52) {
             return false;
         }
-        BlueprintPayloads.JobLine job = jobs.get(jobScroll + row);
-        int right = x + width - 4;
+        int right = listX + (panelX + panelW - 24 - listX) - 4;
         if (hitJobButton(mouseX, right, y + 36)) {
             PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.REMOVE));
             return true;
@@ -1017,13 +1108,23 @@ public class AutobotsMenuScreen extends Screen {
     }
 
     private boolean hitJobButton(double mouseX, int right, int y) {
-        return mouseX >= right - 52 && mouseX < right;
+        return hitWide(mouseX, y, right, y, 52);
+    }
+
+    private boolean hitWide(double mouseX, double mouseY, int right, int y, int width) {
+        return mouseX >= right - width && mouseX < right && mouseY >= y && mouseY < y + 16;
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         if (jobsPage) {
-            jobScroll = Mth.clamp(jobScroll - (int) Math.signum(scrollY), 0, Math.max(0, AutobotsClientState.jobs.size() - jobRows()));
+            prepareJobs();
+            int delta = (int) Math.signum(scrollY);
+            if (mouseY >= doneHeaderY) {
+                historyScroll = Mth.clamp(historyScroll - delta, 0, Math.max(0, finishedJobs.size() - doneRows));
+            } else {
+                jobScroll = Mth.clamp(jobScroll - delta, 0, Math.max(0, workingJobs.size() - workRows));
+            }
             return true;
         }
         if (options && insideOptionView(mouseX, mouseY)) {
