@@ -36,7 +36,6 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 @EventBusSubscriber(modid = AutobotsMod.MOD_ID, value = Dist.CLIENT)
 public final class SelectionRenderer {
     private static final int PREVIEW_BUDGET = 4096;
-    private static final int ACTIVE_BUDGET = 480;
     private static final double RANGE_SQR = 48.0D * 48.0D;
     private static int[] order = new int[0];
     private static double[] distanceSq = new double[0];
@@ -276,11 +275,7 @@ public final class SelectionRenderer {
         BlockRenderDispatcher renderer = minecraft.getBlockRenderer();
         boolean any = false;
         if (models) {
-            int budget = ACTIVE_BUDGET;
             for (AutobotsClientState.ActiveBuild build : AutobotsClientState.activeBuilds.values()) {
-                if (budget <= 0) {
-                    break;
-                }
                 var ghosts = build.ghosts();
                 prepare(ghosts.size());
                 int count = 0;
@@ -304,7 +299,7 @@ public final class SelectionRenderer {
                     distanceSq[count] = distance;
                     count++;
                 }
-                int keep = Math.min(count, budget);
+                int keep = Math.min(count, PREVIEW_BUDGET);
                 nearest(count, keep);
                 for (int n = 0; n < keep; n++) {
                     AutobotsClientState.Ghost ghost = ghosts.get(order[n]);
@@ -314,7 +309,6 @@ public final class SelectionRenderer {
                     }
                     BlockPos world = build.origin().offset(ghost.x(), ghost.y(), ghost.z());
                     any = true;
-                    budget--;
                     drawGhost(pose, buffers, renderer, camera, world.getX(), world.getY(), world.getZ(), state);
                 }
             }
