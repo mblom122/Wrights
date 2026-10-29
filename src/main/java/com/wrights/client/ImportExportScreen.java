@@ -191,6 +191,15 @@ public class ImportExportScreen extends Screen {
         graphics.drawString(this.font, Component.translatable("screen.wrights.transfer_clip"), leftX, bodyY - 12, WrightsUi.COPPER, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.transfer_items"), rightX, bodyY - 12, WrightsUi.COPPER, false);
         int y = bodyY + 4;
+        if (asked && status.present() && !status.folder() && BlueprintClipboard.has()) {
+            SchematicViews.Shot shot = SchematicViews.fromClipboard();
+            int buttonTop = panelY + panelH - 82;
+            int modelH = Math.min(96, buttonTop - y - 28);
+            if (shot.visible() && modelH >= 36) {
+                SchematicViews.draw(graphics, this.font, leftX, y, columnW, modelH, shot);
+                y += modelH + 6;
+            }
+        }
         if (!BlueprintClipboard.has()) {
             for (var line : this.font.split(Component.translatable("screen.wrights.transfer_empty"), columnW - 8)) {
                 graphics.drawString(this.font, line, leftX, y, WrightsUi.MUTED, false);

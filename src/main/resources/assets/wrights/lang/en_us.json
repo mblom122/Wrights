@@ -431,6 +431,7 @@
   "item.wrights.blueprint.filled": "Blueprint: %s",
   "item.wrights.blueprint.hint_empty": "Right-click to copy a blueprint onto this sheet.",
   "item.wrights.blueprint.hint_filled": "Right-click to load the blueprints you are carrying.",
+  "item.wrights.blueprint.preview_hint": "Hold Shift to preview",
   "item.wrights.blueprint.stored": "%s × %s × %s, %s blocks",
   "item.wrights.blueprint_folder": "Blueprint Folder",
   "item.wrights.blueprint_folder.filled": "Folder: %s",

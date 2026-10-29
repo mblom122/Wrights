@@ -6,11 +6,14 @@ import java.util.List;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
+import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.blueprint.BlueprintActions;
+import com.wrights.item.BlueprintItem;
 import com.wrights.item.BlueprintSlips;
 import com.wrights.network.BlueprintPayloads;
 
@@ -148,6 +151,15 @@ public class BlueprintLoadScreen extends Screen {
         useNameButton.active = free;
     }
 
+    private CompoundTag selectedTag() {
+        BlueprintPayloads.BlueprintItemLine line = selected();
+        if (line == null || this.minecraft.player == null) {
+            return null;
+        }
+        ItemStack stack = this.minecraft.player.getInventory().getItem(line.slot());
+        return BlueprintItem.hasData(stack) ? BlueprintItem.data(stack) : null;
+    }
+
     private BlueprintPayloads.BlueprintItemLine selected() {
         for (BlueprintPayloads.BlueprintItemLine line : lines) {
             if (line.slot() == selectedSlot) {
@@ -270,6 +282,16 @@ public class BlueprintLoadScreen extends Screen {
                 y += 10;
             }
             return;
+        }
+        CompoundTag tag = selectedTag();
+        if (tag != null) {
+            SchematicViews.Shot shot = SchematicViews.fromTag(tag);
+            int limit = panelY + panelH - 116;
+            int modelH = Math.min(108, limit - y - 24);
+            if (shot.visible() && modelH >= 36) {
+                SchematicViews.draw(graphics, this.font, detailX + 4, y, detailW - 8, modelH, shot);
+                y += modelH + 6;
+            }
         }
         graphics.drawString(this.font, this.font.plainSubstrByWidth(line.name(), detailW - 12), detailX + 6, y, line.kind() == BlueprintSlips.EXACT ? WrightsUi.MUTED : WrightsUi.TEXT, false);
         y += 14;

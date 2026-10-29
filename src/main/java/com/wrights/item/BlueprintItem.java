@@ -55,6 +55,7 @@ public class BlueprintItem extends Item {
         int blocks = tag.getList("blocks", net.minecraft.nbt.Tag.TAG_COMPOUND).size();
         tooltip.add(Component.translatable("item.wrights.blueprint.stored", tag.getInt("sx"), tag.getInt("sy"), tag.getInt("sz"), blocks).withStyle(ChatFormatting.BLUE));
         tooltip.add(Component.translatable("item.wrights.blueprint.hint_filled").withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("item.wrights.blueprint.preview_hint").withStyle(ChatFormatting.DARK_GRAY));
     }
 
     @Override
