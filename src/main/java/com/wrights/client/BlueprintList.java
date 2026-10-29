@@ -37,11 +37,6 @@ public final class BlueprintList {
         }
         if (tab == Tab.FAVORITES) {
             List<Row> found = new ArrayList<>();
-            for (BlueprintPayloads.FolderLine folder : WrightsClientState.folders) {
-                if (folder.favorite() && (needle.isEmpty() || folder.name().toLowerCase(Locale.ROOT).contains(needle))) {
-                    found.add(new Row(folder.id(), true, 0, 0, Util.NIL_UUID, folder.name(), false, true, null));
-                }
-            }
             for (BlueprintPayloads.Summary summary : WrightsClientState.library) {
                 if (summary.favorite() && (needle.isEmpty() || summary.name().toLowerCase(Locale.ROOT).contains(needle))) {
                     found.add(new Row(summary.id(), false, 0, 0, Util.NIL_UUID, summary.name(), false, true, summary));
@@ -125,8 +120,7 @@ public final class BlueprintList {
                     continue;
                 }
                 boolean open = WrightsClientState.openFolders.contains(child.id) || below;
-                BlueprintPayloads.FolderLine line = folder(child.id);
-                out.add(new Row(child.id, true, depth, index, parentId, child.name, open, line != null && line.favorite(), null));
+                out.add(new Row(child.id, true, depth, index, parentId, child.name, open, false, null));
                 if (open) {
                     walk(child.id, depth + 1, query, out);
                 }

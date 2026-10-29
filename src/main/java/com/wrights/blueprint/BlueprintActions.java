@@ -775,6 +775,9 @@ public final class BlueprintActions {
     public static List<BlueprintPayloads.FolderLine> folders(ServerPlayer player) {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         BlueprintShelf shelf = library.shelf();
+        if (shelf.dropFolderFavorites()) {
+            library.setDirty();
+        }
         List<BlueprintPayloads.FolderLine> lines = new ArrayList<>();
         for (BlueprintShelf.Folder folder : shelf.folders()) {
             lines.add(new BlueprintPayloads.FolderLine(
@@ -782,7 +785,7 @@ public final class BlueprintActions {
                     folder.name(),
                     folder.parent() == null ? Util.NIL_UUID : folder.parent(),
                     shelf.orderOf(folder.id()),
-                    shelf.favorite(player.getUUID(), folder.id())));
+                    false));
         }
         return lines;
     }
@@ -816,10 +819,14 @@ public final class BlueprintActions {
             case BlueprintPayloads.ShelfEdit.DELETE -> shelf.deleteFolder(edit.id(), names);
             case BlueprintPayloads.ShelfEdit.MOVE -> shelf.move(edit.id(), edit.folder(), parent, edit.index(), names);
             case BlueprintPayloads.ShelfEdit.FAVORITE -> {
-                boolean known = edit.folder()
-                        ? shelf.folders().stream().anyMatch(folder -> folder.id().equals(edit.id()))
-                        : library.schematic(edit.id()).filter(schematic -> !schematic.ephemeral()).isPresent();
-                if (!known) {
+                if (edit.folder() || shelf.isFolder(edit.id())) {
+                    if (shelf.dropFolderFavorites()) {
+                        library.setDirty();
+                        BlueprintNetwork.syncLibrary(player);
+                    }
+                    return;
+                }
+                if (library.schematic(edit.id()).filter(schematic -> !schematic.ephemeral()).isEmpty()) {
                     return;
                 }
                 shelf.toggleFavorite(player.getUUID(), edit.id());

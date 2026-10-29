@@ -96,11 +96,27 @@ public final class BlueprintShelf {
         person.lastUsed.put(schematicId, System.currentTimeMillis());
     }
 
+    public boolean isFolder(UUID id) {
+        return folders.containsKey(id);
+    }
+
     public void toggleFavorite(UUID player, UUID id) {
+        if (folders.containsKey(id)) {
+            return;
+        }
         Person person = person(player);
         if (!person.favorites.remove(id)) {
             person.favorites.add(id);
         }
+    }
+
+    /** Folders are not favorites. Returns whether a saved mark was removed. */
+    public boolean dropFolderFavorites() {
+        boolean changed = false;
+        for (Person person : people.values()) {
+            changed |= person.favorites.removeIf(folders::containsKey);
+        }
+        return changed;
     }
 
     public void setOpen(UUID player, UUID folder, boolean opened) {
@@ -308,6 +324,7 @@ public final class BlueprintShelf {
             }
             Person person = person(node.getUUID("player"));
             readIds(node.getList("favorites", Tag.TAG_COMPOUND), person.favorites);
+            person.favorites.removeIf(folders::containsKey);
             readIds(node.getList("open", Tag.TAG_COMPOUND), person.open);
             person.open.removeIf(id -> !folders.containsKey(id));
             ListTag used = node.getList("used", Tag.TAG_COMPOUND);

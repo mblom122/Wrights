@@ -697,8 +697,10 @@ public class WrightsMenuScreen extends Screen {
             if (selected) {
                 graphics.fill(listX, y, listX + 2, y + ROW - 1, entry.folder() ? WrightsUi.COPPER : WrightsUi.BLUE);
             }
-            drawStar(graphics, listX + 4, y + 4, entry.favorite());
-            int x = listX + 16 + entry.depth() * 8;
+            if (!entry.folder()) {
+                drawStar(graphics, listX + 4, y + 4, entry.favorite());
+            }
+            int x = listX + (entry.folder() ? 4 : 16) + entry.depth() * 8;
             if (entry.folder()) {
                 drawDisclosure(graphics, x, y + 6, entry.open());
                 drawFolderGlyph(graphics, x + 8, y + 3, entry.open());
@@ -961,9 +963,9 @@ public class WrightsMenuScreen extends Screen {
             int index = scroll + (int) ((mouseY - listY) / ROW);
             if (index >= 0 && index < rows.size()) {
                 BlueprintList.Row entry = rows.get(index);
-                if (mouseX < listX + 14) {
-                    WrightsClientState.toggleFavoriteLocal(entry.id(), entry.folder());
-                    PacketDistributor.sendToServer(new BlueprintPayloads.ShelfEdit(BlueprintPayloads.ShelfEdit.FAVORITE, entry.id(), entry.folder(), Util.NIL_UUID, 0, ""));
+                if (!entry.folder() && mouseX < listX + 14) {
+                    WrightsClientState.toggleFavoriteLocal(entry.id());
+                    PacketDistributor.sendToServer(new BlueprintPayloads.ShelfEdit(BlueprintPayloads.ShelfEdit.FAVORITE, entry.id(), false, Util.NIL_UUID, 0, ""));
                     refresh();
                     return true;
                 }

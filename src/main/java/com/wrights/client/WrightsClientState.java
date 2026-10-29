@@ -586,15 +586,7 @@ public final class WrightsClientState {
         openFolders = Set.copyOf(next);
     }
 
-    public static void toggleFavoriteLocal(UUID id, boolean folder) {
-        if (folder) {
-            List<BlueprintPayloads.FolderLine> next = new ArrayList<>(folders.size());
-            for (BlueprintPayloads.FolderLine line : folders) {
-                next.add(line.id().equals(id) ? line.withFavorite(!line.favorite()) : line);
-            }
-            folders = List.copyOf(next);
-            return;
-        }
+    public static void toggleFavoriteLocal(UUID id) {
         List<BlueprintPayloads.Summary> next = new ArrayList<>(library.size());
         for (BlueprintPayloads.Summary summary : library) {
             next.add(summary.id().equals(id) ? summary.withFavorite(!summary.favorite()) : summary);
