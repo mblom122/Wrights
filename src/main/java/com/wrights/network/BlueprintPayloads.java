@@ -27,7 +27,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record Summary(UUID id, String name, int sizeX, int sizeY, int sizeZ, int blocks, String source) {
+    public record Summary(UUID id, String name, int sizeX, int sizeY, int sizeZ, int blocks, String source, UUID folder, int order, boolean favorite, int uses, long lastUsed) {
         public void write(RegistryFriendlyByteBuf buf) {
             buf.writeUUID(id);
             buf.writeUtf(name, 48);
@@ -36,6 +36,15 @@ public final class BlueprintPayloads {
             buf.writeVarInt(sizeZ);
             buf.writeVarInt(blocks);
             buf.writeUtf(source, 64);
+            buf.writeUUID(folder);
+            buf.writeVarInt(order);
+            buf.writeBoolean(favorite);
+            buf.writeVarInt(uses);
+            buf.writeLong(lastUsed);
+        }
+
+        public Summary withFavorite(boolean favorite) {
+            return new Summary(id, name, sizeX, sizeY, sizeZ, blocks, source, folder, order, favorite, uses, lastUsed);
         }
 
         public static Summary read(RegistryFriendlyByteBuf buf) {
@@ -46,11 +55,34 @@ public final class BlueprintPayloads {
                     buf.readVarInt(),
                     buf.readVarInt(),
                     buf.readVarInt(),
-                    buf.readUtf(64));
+                    buf.readUtf(64),
+                    buf.readUUID(),
+                    buf.readVarInt(),
+                    buf.readBoolean(),
+                    buf.readVarInt(),
+                    buf.readLong());
         }
     }
 
-    public record LibrarySync(List<Summary> entries, boolean busy) implements CustomPacketPayload {
+    public record FolderLine(UUID id, String name, UUID parent, int order, boolean favorite) {
+        public void write(RegistryFriendlyByteBuf buf) {
+            buf.writeUUID(id);
+            buf.writeUtf(name, 48);
+            buf.writeUUID(parent);
+            buf.writeVarInt(order);
+            buf.writeBoolean(favorite);
+        }
+
+        public FolderLine withFavorite(boolean favorite) {
+            return new FolderLine(id, name, parent, order, favorite);
+        }
+
+        public static FolderLine read(RegistryFriendlyByteBuf buf) {
+            return new FolderLine(buf.readUUID(), buf.readUtf(48), buf.readUUID(), buf.readVarInt(), buf.readBoolean());
+        }
+    }
+
+    public record LibrarySync(List<Summary> entries, boolean busy, List<FolderLine> folders, List<UUID> open) implements CustomPacketPayload {
         public static final Type<LibrarySync> TYPE = payloadType("library_sync");
         public static final StreamCodec<RegistryFriendlyByteBuf, LibrarySync> STREAM_CODEC = StreamCodec.of((buf, value) -> value.write(buf), LibrarySync::read);
 
@@ -60,6 +92,14 @@ public final class BlueprintPayloads {
                 entry.write(buf);
             }
             buf.writeBoolean(busy);
+            buf.writeVarInt(folders.size());
+            for (FolderLine folder : folders) {
+                folder.write(buf);
+            }
+            buf.writeVarInt(open.size());
+            for (UUID id : open) {
+                buf.writeUUID(id);
+            }
         }
 
         public static LibrarySync read(RegistryFriendlyByteBuf buf) {
@@ -68,7 +108,18 @@ public final class BlueprintPayloads {
             for (int i = 0; i < count; i++) {
                 entries.add(Summary.read(buf));
             }
-            return new LibrarySync(entries, buf.readBoolean());
+            boolean busy = buf.readBoolean();
+            int folders = buf.readVarInt();
+            List<FolderLine> folderLines = new ArrayList<>(folders);
+            for (int i = 0; i < folders; i++) {
+                folderLines.add(FolderLine.read(buf));
+            }
+            int openCount = buf.readVarInt();
+            List<UUID> open = new ArrayList<>(openCount);
+            for (int i = 0; i < openCount; i++) {
+                open.add(buf.readUUID());
+            }
+            return new LibrarySync(entries, busy, folderLines, open);
         }
 
         @Override
@@ -185,6 +236,35 @@ public final class BlueprintPayloads {
     public record CaptureCancel() implements CustomPacketPayload {
         public static final Type<CaptureCancel> TYPE = payloadType("capture_cancel");
         public static final StreamCodec<RegistryFriendlyByteBuf, CaptureCancel> STREAM_CODEC = empty(new CaptureCancel());
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record ShelfEdit(int action, UUID id, boolean folder, UUID parent, int index, String name) implements CustomPacketPayload {
+        public static final int CREATE = 0;
+        public static final int RENAME = 1;
+        public static final int DELETE = 2;
+        public static final int MOVE = 3;
+        public static final int FAVORITE = 4;
+        public static final int OPEN = 5;
+        public static final Type<ShelfEdit> TYPE = payloadType("shelf_edit");
+        public static final StreamCodec<RegistryFriendlyByteBuf, ShelfEdit> STREAM_CODEC = StreamCodec.of((buf, value) -> value.write(buf), ShelfEdit::read);
+
+        public void write(RegistryFriendlyByteBuf buf) {
+            buf.writeByte(action);
+            buf.writeUUID(id);
+            buf.writeBoolean(folder);
+            buf.writeUUID(parent);
+            buf.writeVarInt(index);
+            buf.writeUtf(name == null ? "" : name, 48);
+        }
+
+        public static ShelfEdit read(RegistryFriendlyByteBuf buf) {
+            return new ShelfEdit(buf.readByte(), buf.readUUID(), buf.readBoolean(), buf.readUUID(), buf.readVarInt(), buf.readUtf(48));
+        }
 
         @Override
         public Type<? extends CustomPacketPayload> type() {

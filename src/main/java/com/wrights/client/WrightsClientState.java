@@ -49,6 +49,8 @@ public final class WrightsClientState {
     public static int generation;
     public static int seq;
     public static List<BlueprintPayloads.Summary> library = List.of();
+    public static List<BlueprintPayloads.FolderLine> folders = List.of();
+    public static Set<UUID> openFolders = Set.of();
     public static boolean busy;
     public static List<BlueprintPayloads.JobLine> jobs = List.of();
     public static boolean libraryKnown;
@@ -546,15 +548,44 @@ public final class WrightsClientState {
 
     public static void applyLibrary(BlueprintPayloads.LibrarySync payload) {
         library = List.copyOf(payload.entries());
+        folders = List.copyOf(payload.folders());
+        openFolders = Set.copyOf(payload.open());
         busy = payload.busy();
         libraryKnown = true;
-        if (selected != null && library.stream().noneMatch(entry -> entry.id().equals(selected))) {
+        if (selected != null && library.stream().noneMatch(entry -> entry.id().equals(selected))
+                && folders.stream().noneMatch(folder -> folder.id().equals(selected))) {
             selected = null;
         }
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.screen instanceof WrightsMenuScreen menu) {
             menu.refresh();
         }
+    }
+
+    public static void setOpenLocal(UUID id, boolean open) {
+        Set<UUID> next = new HashSet<>(openFolders);
+        if (open) {
+            next.add(id);
+        } else {
+            next.remove(id);
+        }
+        openFolders = Set.copyOf(next);
+    }
+
+    public static void toggleFavoriteLocal(UUID id, boolean folder) {
+        if (folder) {
+            List<BlueprintPayloads.FolderLine> next = new ArrayList<>(folders.size());
+            for (BlueprintPayloads.FolderLine line : folders) {
+                next.add(line.id().equals(id) ? line.withFavorite(!line.favorite()) : line);
+            }
+            folders = List.copyOf(next);
+            return;
+        }
+        List<BlueprintPayloads.Summary> next = new ArrayList<>(library.size());
+        for (BlueprintPayloads.Summary summary : library) {
+            next.add(summary.id().equals(id) ? summary.withFavorite(!summary.favorite()) : summary);
+        }
+        library = List.copyOf(next);
     }
 
     public static void applyCapture(BlueprintPayloads.CaptureSync payload) {

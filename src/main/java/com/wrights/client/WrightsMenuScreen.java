@@ -11,6 +11,7 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
+import net.minecraft.Util;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.WrightsClientConfig;
@@ -28,6 +29,7 @@ public class WrightsMenuScreen extends Screen {
     private static int savedHistoryScroll;
     private static int savedOptionScroll;
     private static String savedSearch = "";
+    private static int savedTab;
 
     private int panelX;
     private int panelY;
@@ -48,6 +50,7 @@ public class WrightsMenuScreen extends Screen {
     private EditBox search;
     private EditBox rename;
     private WrightsButton newButton;
+    private WrightsButton folderButton;
     private WrightsButton editButton;
     private WrightsButton deleteButton;
     private WrightsButton buildButton;
@@ -67,7 +70,20 @@ public class WrightsMenuScreen extends Screen {
     private int modelY;
     private int modelW;
     private int modelH;
-    private final List<BlueprintPayloads.Summary> filtered = new ArrayList<>();
+    private final List<BlueprintList.Row> rows = new ArrayList<>();
+    private UUID pendingSelect;
+    private UUID shelfPress;
+    private boolean shelfPressFolder;
+    private UUID shelfPressParent = Util.NIL_UUID;
+    private int shelfPressIndex;
+    private double shelfPressX;
+    private double shelfPressY;
+    private boolean shelfDragging;
+    private UUID dropParent = Util.NIL_UUID;
+    private int dropIndex = -1;
+    private boolean dropInto;
+    private UUID dropHighlight;
+    private int dropLineY = -1;
     private boolean options;
     private boolean jobsPage;
     private int jobScroll;
@@ -198,12 +214,15 @@ public class WrightsMenuScreen extends Screen {
         addRenderableWidget(rename);
 
         int y = panelY + panelH - 26;
-        int buttonW = 58;
+        int gap = 4;
+        int buttonW = Math.max(36, (listW - gap * 3) / 4);
+        int detailButtonW = 58;
         newButton = add(new WrightsButton(listX, y, buttonW, 18, Component.translatable("menu.wrights.new"), button -> newBlueprint()));
-        editButton = add(new WrightsButton(listX + 62, y, buttonW, 18, Component.translatable("menu.wrights.edit"), button -> edit()));
-        deleteButton = add(new WrightsButton(listX + 124, y, buttonW, 18, Component.translatable("menu.wrights.delete"), button -> delete(), true));
-        buildButton = add(new WrightsButton(detailX + detailW - 120, y, buttonW, 18, Component.translatable("menu.wrights.build"), button -> build()));
-        addRenderableWidget(new WrightsButton(detailX + detailW - buttonW, y, buttonW, 18, Component.translatable("menu.wrights.close"), button -> onClose()));
+        folderButton = add(new WrightsButton(listX + buttonW + gap, y, buttonW, 18, Component.translatable("menu.wrights.folder"), button -> newFolder()));
+        editButton = add(new WrightsButton(listX + (buttonW + gap) * 2, y, buttonW, 18, Component.translatable("menu.wrights.edit"), button -> edit()));
+        deleteButton = add(new WrightsButton(listX + (buttonW + gap) * 3, y, buttonW, 18, Component.translatable("menu.wrights.delete"), button -> delete(), true));
+        buildButton = add(new WrightsButton(detailX + detailW - 120, y, detailButtonW, 18, Component.translatable("menu.wrights.build"), button -> build()));
+        addRenderableWidget(new WrightsButton(detailX + detailW - detailButtonW, y, detailButtonW, 18, Component.translatable("menu.wrights.close"), button -> onClose()));
         renameButton = add(new WrightsButton(detailX + Math.max(48, detailW - 78), detailSplit + 52, 74, 14, Component.translatable("menu.wrights.rename"), button -> rename()));
         materialsButton = add(new WrightsButton(detailX + 4, detailSplit + 72, Math.max(40, detailW - 8), 16, Component.translatable("menu.wrights.materials"), button -> openMaterials()));
         stopButton = add(new WrightsButton(detailX + 4, detailSplit + 92, Math.max(40, detailW - 8), 16, Component.translatable("menu.wrights.stop"), button -> PacketDistributor.sendToServer(new BlueprintPayloads.StopJob())));
@@ -253,7 +272,7 @@ public class WrightsMenuScreen extends Screen {
         headingY = panelY + 36;
         searchY = panelY + 50;
         listY = panelY + 72;
-        listW = Math.min(168, panelW - 300);
+        listW = Math.min(220, panelW - 300);
         if (listW < 120) {
             listW = Math.max(100, (panelW - 150) / 2);
         }
@@ -274,27 +293,32 @@ public class WrightsMenuScreen extends Screen {
             return;
         }
         String query = search.getValue().trim().toLowerCase(Locale.ROOT);
-        filtered.clear();
-        for (BlueprintPayloads.Summary summary : WrightsClientState.library) {
-            if (query.isEmpty() || summary.name().toLowerCase(Locale.ROOT).contains(query)) {
-                filtered.add(summary);
-            }
+        BlueprintList.Tab tab = BlueprintList.Tab.values()[Mth.clamp(savedTab, 0, BlueprintList.Tab.values().length - 1)];
+        rows.clear();
+        rows.addAll(BlueprintList.rows(tab, query));
+        if (pendingSelect != null && rows.stream().anyMatch(row -> row.id().equals(pendingSelect))) {
+            WrightsClientState.selected = pendingSelect;
+            pendingSelect = null;
         }
-        if (WrightsClientState.selected != null && filtered.stream().noneMatch(entry -> entry.id().equals(WrightsClientState.selected))) {
+        if (WrightsClientState.selected != null
+                && WrightsClientState.library.stream().noneMatch(entry -> entry.id().equals(WrightsClientState.selected))
+                && WrightsClientState.folders.stream().noneMatch(folder -> folder.id().equals(WrightsClientState.selected))) {
             WrightsClientState.selected = null;
             confirmDelete = null;
         }
-        int maxScroll = Math.max(0, filtered.size() - visibleRows());
+        int maxScroll = Math.max(0, rows.size() - visibleRows());
         scroll = Mth.clamp(scroll, 0, maxScroll);
-        BlueprintPayloads.Summary selected = selected();
-        boolean has = selected != null;
-        editButton.active = has;
-        deleteButton.active = has;
-        buildButton.active = has;
-        renameButton.active = has;
-        deleteButton.setMessage(Component.translatable(has && selected.id().equals(confirmDelete) ? "menu.wrights.delete_confirm" : "menu.wrights.delete"));
-        if (has && !rename.isFocused()) {
-            rename.setValue(selected.name());
+        BlueprintList.Row row = selectedRow();
+        BlueprintPayloads.Summary selected = row == null || row.folder() ? null : row.summary();
+        boolean blueprint = selected != null;
+        boolean any = row != null;
+        editButton.active = blueprint;
+        deleteButton.active = any;
+        buildButton.active = blueprint;
+        renameButton.active = any;
+        deleteButton.setMessage(Component.translatable(any && row.id().equals(confirmDelete) ? "menu.wrights.delete_confirm" : "menu.wrights.delete"));
+        if (any && !rename.isFocused()) {
+            rename.setValue(row.name());
         }
         boolean capture = WrightsClientState.mode == WrightsClientState.Mode.CAPTURE;
         boolean building = !options && !jobsPage;
@@ -304,6 +328,9 @@ public class WrightsMenuScreen extends Screen {
         search.visible = building;
         rename.visible = building;
         newButton.visible = building;
+        if (folderButton != null) {
+            folderButton.visible = building;
+        }
         editButton.visible = building;
         deleteButton.visible = building;
         buildButton.visible = building;
@@ -322,7 +349,7 @@ public class WrightsMenuScreen extends Screen {
         }
         if (materialsButton != null) {
             materialsButton.visible = building;
-            materialsButton.active = has;
+            materialsButton.active = blueprint;
             materialsButton.setX(detailX + 4);
             materialsButton.setY(detailSplit + 72);
             materialsButton.setWidth(Math.max(40, detailW - 8));
@@ -395,7 +422,7 @@ public class WrightsMenuScreen extends Screen {
             return;
         }
 
-        graphics.drawString(this.font, Component.translatable("menu.wrights.blueprints"), listX, headingY, WrightsUi.TEXT, false);
+        drawTabs(graphics, mouseX, mouseY);
         if (WrightsClientState.busy) {
             graphics.drawString(this.font, Component.translatable("menu.wrights.busy"), detailX, headingY, WrightsUi.COPPER, false);
         }
@@ -628,52 +655,157 @@ public class WrightsMenuScreen extends Screen {
         box.setHeight(14);
     }
 
+    private void drawTabs(GuiGraphics graphics, int mouseX, int mouseY) {
+        String[] keys = {"menu.wrights.tab_all", "menu.wrights.tab_last", "menu.wrights.tab_most", "menu.wrights.tab_fav"};
+        int width = listW / keys.length;
+        for (int i = 0; i < keys.length; i++) {
+            int x = listX + i * width;
+            int tabW = i == keys.length - 1 ? listX + listW - x : width;
+            boolean on = savedTab == i;
+            boolean hover = mouseX >= x && mouseX < x + tabW && mouseY >= headingY && mouseY < headingY + 14;
+            graphics.fill(x, headingY, x + tabW - 1, headingY + 13, on ? 0xFF24384A : (hover ? 0xFF1E2C38 : 0xFF141C24));
+            if (on) {
+                graphics.fill(x, headingY, x + tabW - 1, headingY + 2, WrightsUi.COPPER);
+            }
+            String label = this.font.plainSubstrByWidth(Component.translatable(keys[i]).getString(), tabW - 4);
+            graphics.drawString(this.font, label, x + (tabW - this.font.width(label)) / 2, headingY + 3, on ? WrightsUi.TEXT : WrightsUi.MUTED, false);
+        }
+    }
+
     private void renderList(GuiGraphics graphics, int mouseX, int mouseY) {
         if (!WrightsClientState.libraryKnown) {
             graphics.drawString(this.font, Component.translatable("menu.wrights.loading"), listX + 6, listY + 8, WrightsUi.MUTED, false);
             return;
         }
-        if (filtered.isEmpty()) {
-            graphics.drawString(this.font, Component.translatable("menu.wrights.empty"), listX + 6, listY + 8, WrightsUi.MUTED, false);
+        if (rows.isEmpty()) {
+            graphics.drawString(this.font, Component.translatable(emptyKey()), listX + 6, listY + 8, WrightsUi.MUTED, false);
             return;
         }
         graphics.enableScissor(listX, listY, listX + listW, listY + listH);
-        int row = 0;
-        for (int i = scroll; i < filtered.size() && row < visibleRows(); i++) {
-            BlueprintPayloads.Summary summary = filtered.get(i);
-            int y = listY + row * ROW;
-            boolean selected = summary.id().equals(WrightsClientState.selected);
+        int shown = 0;
+        for (int i = scroll; i < rows.size() && shown < visibleRows(); i++) {
+            BlueprintList.Row entry = rows.get(i);
+            int y = listY + shown * ROW;
+            boolean selected = entry.id().equals(WrightsClientState.selected);
             boolean hover = mouseX >= listX && mouseX < listX + listW && mouseY >= y && mouseY < y + ROW;
-            if (selected || hover) {
-                graphics.fill(listX, y, listX + listW - 4, y + ROW - 1, selected ? 0x664A78B0 : 0x332A3C4C);
+            boolean into = shelfDragging && dropInto && entry.id().equals(dropHighlight);
+            if (selected || hover || into) {
+                graphics.fill(listX, y, listX + listW - 4, y + ROW - 1, into ? 0x665C3E22 : (selected ? (entry.folder() ? 0x665C3E22 : 0x664A78B0) : 0x332A3C4C));
+            } else if (entry.folder()) {
+                graphics.fill(listX, y, listX + listW - 4, y + ROW - 1, 0x221C140C);
             }
             if (selected) {
-                graphics.fill(listX, y, listX + 2, y + ROW - 1, WrightsUi.BLUE);
+                graphics.fill(listX, y, listX + 2, y + ROW - 1, entry.folder() ? WrightsUi.COPPER : WrightsUi.BLUE);
             }
-            int swatch = 0xFF000000 | (0x5A6E82 + (summary.name().hashCode() & 0x3F4F5F));
-            graphics.fill(listX + 6, y + 5, listX + 12, y + 11, swatch);
-            String name = this.font.plainSubstrByWidth(summary.name(), listW - 58);
-            graphics.drawString(this.font, name, listX + 16, y + 5, WrightsUi.TEXT, false);
-            String size = summary.sizeX() + "×" + summary.sizeY() + "×" + summary.sizeZ();
-            graphics.drawString(this.font, size, listX + listW - 8 - this.font.width(size), y + 5, WrightsUi.MUTED, false);
-            row++;
+            drawStar(graphics, listX + 4, y + 4, entry.favorite());
+            int x = listX + 16 + entry.depth() * 8;
+            if (entry.folder()) {
+                drawDisclosure(graphics, x, y + 6, entry.open());
+                drawFolderGlyph(graphics, x + 8, y + 3, entry.open());
+                x += 22;
+            } else {
+                int swatch = 0xFF000000 | (0x5A6E82 + (entry.name().hashCode() & 0x3F4F5F));
+                graphics.fill(x, y + 5, x + 6, y + 11, swatch);
+                x += 10;
+            }
+            int nameRoom = Math.max(8, listX + listW - 8 - x);
+            String extra = entry.folder() ? Integer.toString(BlueprintList.childCount(entry.id())) : entry.summary().sizeX() + "×" + entry.summary().sizeY() + "×" + entry.summary().sizeZ();
+            int extraW = this.font.width(extra) + 6;
+            if (nameRoom - extraW < 24) {
+                extra = "";
+                extraW = 0;
+            }
+            String name = this.font.plainSubstrByWidth(entry.name(), Math.max(8, nameRoom - extraW));
+            graphics.drawString(this.font, name, x, y + 5, entry.folder() ? WrightsUi.COPPER : WrightsUi.TEXT, false);
+            if (!extra.isEmpty()) {
+                graphics.drawString(this.font, extra, listX + listW - 8 - this.font.width(extra), y + 5, WrightsUi.MUTED, false);
+            }
+            shown++;
         }
         graphics.disableScissor();
-        int maxScroll = Math.max(0, filtered.size() - visibleRows());
+        if (shelfDragging && !dropInto && dropLineY >= listY && dropLineY <= listY + listH) {
+            graphics.fill(listX + 4, dropLineY, listX + listW - 6, dropLineY + 2, WrightsUi.COPPER);
+        }
+        if (shelfDragging && shelfPress != null) {
+            String ghost = "";
+            for (BlueprintList.Row entry : rows) {
+                if (entry.id().equals(shelfPress)) {
+                    ghost = entry.name();
+                    break;
+                }
+            }
+            if (!ghost.isEmpty()) {
+                String label = this.font.plainSubstrByWidth(ghost, 120);
+                int gx = Mth.clamp(mouseX + 8, listX, listX + listW - this.font.width(label) - 8);
+                int gy = Mth.clamp(mouseY - 8, listY, listY + listH - 12);
+                graphics.fill(gx - 2, gy - 2, gx + this.font.width(label) + 2, gy + 10, 0xEE1A2633);
+                graphics.drawString(this.font, label, gx, gy, WrightsUi.TEXT, false);
+            }
+        }
+        int maxScroll = Math.max(0, rows.size() - visibleRows());
         if (maxScroll > 0) {
             int track = listH - 4;
-            int thumb = Math.max(12, track * visibleRows() / filtered.size());
+            int thumb = Math.max(12, track * visibleRows() / rows.size());
             int thumbY = listY + 2 + (track - thumb) * scroll / maxScroll;
             graphics.fill(listX + listW - 3, thumbY, listX + listW - 1, thumbY + thumb, WrightsUi.COPPER);
         }
     }
 
+    private String emptyKey() {
+        if (search != null && !search.getValue().trim().isEmpty()) {
+            return "menu.wrights.no_match";
+        }
+        if (savedTab == BlueprintList.Tab.LAST.ordinal() || savedTab == BlueprintList.Tab.MOST.ordinal()) {
+            return "menu.wrights.no_used";
+        }
+        if (savedTab == BlueprintList.Tab.FAVORITES.ordinal()) {
+            return "menu.wrights.no_favorites";
+        }
+        return "menu.wrights.empty";
+    }
+
+    private void drawStar(GuiGraphics graphics, int x, int y, boolean on) {
+        int color = on ? 0xFFFFC44D : 0xFF4C5964;
+        graphics.fill(x + 3, y, x + 5, y + 8, color);
+        graphics.fill(x, y + 3, x + 8, y + 5, color);
+        graphics.fill(x + 1, y + 1, x + 3, y + 3, color);
+        graphics.fill(x + 5, y + 1, x + 7, y + 3, color);
+        graphics.fill(x + 1, y + 5, x + 3, y + 7, color);
+        graphics.fill(x + 5, y + 5, x + 7, y + 7, color);
+    }
+
+    private void drawDisclosure(GuiGraphics graphics, int x, int y, boolean open) {
+        int color = WrightsUi.COPPER;
+        if (open) {
+            graphics.fill(x, y + 2, x + 5, y + 3, color);
+            graphics.fill(x + 1, y + 3, x + 4, y + 4, color);
+            graphics.fill(x + 2, y + 4, x + 3, y + 5, color);
+            return;
+        }
+        graphics.fill(x, y, x + 1, y + 5, color);
+        graphics.fill(x + 1, y + 1, x + 2, y + 4, color);
+        graphics.fill(x + 2, y + 2, x + 3, y + 3, color);
+    }
+
+    private void drawFolderGlyph(GuiGraphics graphics, int x, int y, boolean open) {
+        graphics.fill(x, y + 1, x + 5, y + 3, open ? 0xFFE0A15A : WrightsUi.COPPER);
+        graphics.fill(x, y + 3, x + 11, y + 10, open ? 0xFF8C5A2A : 0xFF5C3E22);
+        if (open) {
+            graphics.fill(x + 1, y + 4, x + 10, y + 6, 0xFF3D2A18);
+        }
+    }
+
     private void renderDetail(GuiGraphics graphics) {
-        BlueprintPayloads.Summary summary = selected();
+        BlueprintList.Row picked = selectedRow();
         modelX = detailX + 4;
         modelY = detailY + 4;
         modelW = Math.max(8, detailW - 8);
         modelH = Math.max(8, detailSplit - detailY - 10);
+        if (picked != null && picked.folder()) {
+            renderFolder(graphics, picked);
+            return;
+        }
+        BlueprintPayloads.Summary summary = picked == null ? null : picked.summary();
         if (summary == null) {
             graphics.drawString(this.font, Component.translatable("menu.wrights.detail_empty"), detailX + 4, detailY + 8, WrightsUi.MUTED, false);
             return;
@@ -818,24 +950,31 @@ public class WrightsMenuScreen extends Screen {
             }
             return super.mouseClicked(mouseX, mouseY, button);
         }
-        if (button == 0 && insideModel(mouseX, mouseY)) {
+        if (button == 0 && !options && !jobsPage && clickTab(mouseX, mouseY)) {
+            return true;
+        }
+        if (button == 0 && !options && !jobsPage && insideModel(mouseX, mouseY)) {
             spinning = true;
             return true;
         }
-        if (button == 0 && insideList(mouseX, mouseY) && !filtered.isEmpty()) {
+        if (button == 0 && !options && !jobsPage && insideList(mouseX, mouseY) && !rows.isEmpty()) {
             int index = scroll + (int) ((mouseY - listY) / ROW);
-            if (index >= 0 && index < filtered.size()) {
-                UUID id = filtered.get(index).id();
-                long now = System.currentTimeMillis();
-                if (id.equals(WrightsClientState.selected) && now - lastClick < 350) {
-                    build();
+            if (index >= 0 && index < rows.size()) {
+                BlueprintList.Row entry = rows.get(index);
+                if (mouseX < listX + 14) {
+                    WrightsClientState.toggleFavoriteLocal(entry.id(), entry.folder());
+                    PacketDistributor.sendToServer(new BlueprintPayloads.ShelfEdit(BlueprintPayloads.ShelfEdit.FAVORITE, entry.id(), entry.folder(), Util.NIL_UUID, 0, ""));
+                    refresh();
+                    return true;
                 }
-                WrightsClientState.selected = id;
-                if (!id.equals(confirmDelete)) {
-                    confirmDelete = null;
-                }
-                lastClick = now;
-                refresh();
+                shelfPress = entry.id();
+                shelfPressFolder = entry.folder();
+                shelfPressParent = entry.parent();
+                shelfPressIndex = entry.index();
+                shelfPressX = mouseX;
+                shelfPressY = mouseY;
+                shelfDragging = false;
+                dropIndex = -1;
                 return true;
             }
         }
@@ -844,6 +983,15 @@ public class WrightsMenuScreen extends Screen {
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (button == 0 && shelfPress != null) {
+            if (!shelfDragging && (Math.abs(mouseX - shelfPressX) > 4 || Math.abs(mouseY - shelfPressY) > 4) && canArrange()) {
+                shelfDragging = true;
+            }
+            if (shelfDragging) {
+                updateDrop(mouseX, mouseY);
+                return true;
+            }
+        }
         if (optionDragging && button == 0) {
             int max = Math.max(0, optionContentH - optionViewH);
             int travel = Math.max(1, optionViewH - optionThumbH);
@@ -864,6 +1012,25 @@ public class WrightsMenuScreen extends Screen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (button == 0 && shelfPress != null) {
+            UUID pressed = shelfPress;
+            boolean dragging = shelfDragging;
+            int index = dropIndex;
+            UUID parent = dropParent;
+            boolean folder = shelfPressFolder;
+            shelfPress = null;
+            shelfDragging = false;
+            dropIndex = -1;
+            dropInto = false;
+            dropHighlight = null;
+            dropLineY = -1;
+            if (dragging && index >= 0) {
+                PacketDistributor.sendToServer(new BlueprintPayloads.ShelfEdit(BlueprintPayloads.ShelfEdit.MOVE, pressed, folder, parent, index, ""));
+            } else if (!dragging) {
+                activateRow(pressed);
+            }
+            return true;
+        }
         if (button == 0) {
             spinning = false;
             optionDragging = false;
@@ -1379,7 +1546,7 @@ public class WrightsMenuScreen extends Screen {
             return true;
         }
         if (insideList(mouseX, mouseY)) {
-            scroll = Mth.clamp(scroll - (int) Math.signum(scrollY), 0, Math.max(0, filtered.size() - visibleRows()));
+            scroll = Mth.clamp(scroll - (int) Math.signum(scrollY), 0, Math.max(0, rows.size() - visibleRows()));
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
@@ -1422,28 +1589,36 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private void delete() {
-        BlueprintPayloads.Summary summary = selected();
-        if (summary == null) {
+        BlueprintList.Row row = selectedRow();
+        if (row == null) {
             return;
         }
-        if (summary.id().equals(confirmDelete)) {
-            PacketDistributor.sendToServer(new BlueprintPayloads.DeleteBlueprint(summary.id()));
+        if (row.id().equals(confirmDelete)) {
+            if (row.folder()) {
+                PacketDistributor.sendToServer(new BlueprintPayloads.ShelfEdit(BlueprintPayloads.ShelfEdit.DELETE, row.id(), true, Util.NIL_UUID, 0, ""));
+            } else {
+                PacketDistributor.sendToServer(new BlueprintPayloads.DeleteBlueprint(row.id()));
+            }
             confirmDelete = null;
-            if (summary.id().equals(WrightsClientState.selected)) {
+            if (row.id().equals(WrightsClientState.selected)) {
                 WrightsClientState.selected = null;
             }
         } else {
-            confirmDelete = summary.id();
+            confirmDelete = row.id();
         }
         refresh();
     }
 
     private void rename() {
-        BlueprintPayloads.Summary summary = selected();
-        if (summary == null) {
+        BlueprintList.Row row = selectedRow();
+        if (row == null) {
             return;
         }
-        PacketDistributor.sendToServer(new BlueprintPayloads.RenameBlueprint(summary.id(), rename.getValue()));
+        if (row.folder()) {
+            PacketDistributor.sendToServer(new BlueprintPayloads.ShelfEdit(BlueprintPayloads.ShelfEdit.RENAME, row.id(), true, Util.NIL_UUID, 0, rename.getValue()));
+            return;
+        }
+        PacketDistributor.sendToServer(new BlueprintPayloads.RenameBlueprint(row.id(), rename.getValue()));
     }
 
     private void discard() {
@@ -1461,15 +1636,167 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private BlueprintPayloads.Summary selected() {
+        BlueprintList.Row row = selectedRow();
+        return row == null || row.folder() ? null : row.summary();
+    }
+
+    private BlueprintList.Row selectedRow() {
         if (WrightsClientState.selected == null) {
             return null;
         }
-        for (BlueprintPayloads.Summary summary : filtered) {
-            if (summary.id().equals(WrightsClientState.selected)) {
-                return summary;
+        for (BlueprintList.Row row : rows) {
+            if (row.id().equals(WrightsClientState.selected)) {
+                return row;
             }
         }
         return null;
+    }
+
+    private void renderFolder(GuiGraphics graphics, BlueprintList.Row row) {
+        int cx = modelX + Math.max(0, modelW / 2 - 16);
+        int cy = modelY + Math.max(8, modelH / 2 - 18);
+        graphics.fill(cx, cy, cx + 14, cy + 6, WrightsUi.COPPER);
+        graphics.fill(cx, cy + 6, cx + 32, cy + 26, 0xFF8C5A2A);
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("menu.wrights.folder_keep").getString(), modelW), modelX, cy + 32, WrightsUi.MUTED, false);
+        graphics.fill(detailX + 4, detailSplit, detailX + detailW - 4, detailSplit + 1, 0xFF31404E);
+        int info = detailSplit + 4;
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(row.name(), detailW - 8), detailX + 4, info, WrightsUi.COPPER, false);
+        graphics.drawString(this.font, Component.translatable("menu.wrights.folder"), detailX + 4, info + 12, WrightsUi.TEXT, false);
+        graphics.drawString(this.font, Component.translatable("menu.wrights.folder_count", BlueprintList.childCount(row.id())), detailX + 4, info + 24, WrightsUi.MUTED, false);
+        graphics.drawString(this.font, Component.translatable("screen.wrights.name"), detailX + 4, detailSplit + 42, WrightsUi.MUTED, false);
+    }
+
+    private boolean clickTab(double mouseX, double mouseY) {
+        if (mouseY < headingY || mouseY >= headingY + 14 || mouseX < listX || mouseX >= listX + listW) {
+            return false;
+        }
+        int tab = (int) ((mouseX - listX) * 4 / Math.max(1, listW));
+        tab = Mth.clamp(tab, 0, 3);
+        if (tab != savedTab) {
+            savedTab = tab;
+            scroll = 0;
+            shelfPress = null;
+            shelfDragging = false;
+            refresh();
+        }
+        return true;
+    }
+
+    private boolean canArrange() {
+        return savedTab == BlueprintList.Tab.ALL.ordinal() && (search == null || search.getValue().trim().isEmpty());
+    }
+
+    private void newFolder() {
+        UUID id = UUID.randomUUID();
+        BlueprintList.Row row = selectedRow();
+        UUID parent = row == null ? Util.NIL_UUID : (row.folder() ? row.id() : row.parent());
+        savedTab = BlueprintList.Tab.ALL.ordinal();
+        for (UUID folder : BlueprintList.chain(parent)) {
+            WrightsClientState.setOpenLocal(folder, true);
+            PacketDistributor.sendToServer(new BlueprintPayloads.ShelfEdit(BlueprintPayloads.ShelfEdit.OPEN, folder, true, Util.NIL_UUID, 1, ""));
+        }
+        pendingSelect = id;
+        PacketDistributor.sendToServer(new BlueprintPayloads.ShelfEdit(
+                BlueprintPayloads.ShelfEdit.CREATE,
+                id,
+                true,
+                parent,
+                0,
+                Component.translatable("menu.wrights.folder").getString()));
+        refresh();
+    }
+
+    private void activateRow(UUID id) {
+        BlueprintList.Row row = null;
+        for (BlueprintList.Row candidate : rows) {
+            if (candidate.id().equals(id)) {
+                row = candidate;
+                break;
+            }
+        }
+        if (row == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        boolean again = id.equals(WrightsClientState.selected) && now - lastClick < 350;
+        WrightsClientState.selected = id;
+        if (!id.equals(confirmDelete)) {
+            confirmDelete = null;
+        }
+        lastClick = now;
+        if (row.folder()) {
+            if (savedTab == BlueprintList.Tab.ALL.ordinal()) {
+                boolean open = !WrightsClientState.openFolders.contains(id);
+                WrightsClientState.setOpenLocal(id, open);
+                PacketDistributor.sendToServer(new BlueprintPayloads.ShelfEdit(BlueprintPayloads.ShelfEdit.OPEN, id, true, Util.NIL_UUID, open ? 1 : 0, ""));
+            }
+            refresh();
+            return;
+        }
+        if (again) {
+            refresh();
+            build();
+            return;
+        }
+        refresh();
+    }
+
+    private void updateDrop(double mouseX, double mouseY) {
+        dropInto = false;
+        dropHighlight = null;
+        dropLineY = -1;
+        dropIndex = -1;
+        if (!insideList(mouseX, mouseY)) {
+            dropParent = Util.NIL_UUID;
+            dropIndex = 1_000_000;
+            dropLineY = listY + Math.min(visibleRows(), Math.max(0, rows.size() - scroll)) * ROW;
+            return;
+        }
+        int shown = Math.min(visibleRows(), Math.max(0, rows.size() - scroll));
+        int contentBottom = listY + shown * ROW;
+        if (rows.isEmpty() || mouseY >= contentBottom) {
+            dropParent = Util.NIL_UUID;
+            dropIndex = adjustedIndex(Util.NIL_UUID, 1_000_000);
+            dropLineY = contentBottom;
+            return;
+        }
+        int index = Mth.clamp(scroll + (int) ((mouseY - listY) / ROW), 0, rows.size() - 1);
+        BlueprintList.Row row = rows.get(index);
+        int y = listY + (index - scroll) * ROW;
+        int local = (int) mouseY - y;
+        if (row.folder() && local >= 4 && local < ROW - 4) {
+            if (shelfPress.equals(row.id()) || (shelfPressFolder && BlueprintList.holds(shelfPress, row.id()))) {
+                return;
+            }
+            dropInto = true;
+            dropHighlight = row.id();
+            dropParent = row.id();
+            dropIndex = 1_000_000;
+            return;
+        }
+        if (shelfPressFolder && BlueprintList.holds(shelfPress, row.parent())) {
+            return;
+        }
+        boolean before = local < ROW / 2;
+        if (!before && row.folder() && index + 1 < rows.size() && row.id().equals(rows.get(index + 1).parent())) {
+            if (shelfPress.equals(row.id()) || (shelfPressFolder && BlueprintList.holds(shelfPress, row.id()))) {
+                return;
+            }
+            dropParent = row.id();
+            dropIndex = adjustedIndex(row.id(), 0);
+            dropLineY = y + ROW - 1;
+            return;
+        }
+        dropParent = row.parent();
+        dropIndex = adjustedIndex(row.parent(), before ? row.index() : row.index() + 1);
+        dropLineY = before ? y : y + ROW - 1;
+    }
+
+    private int adjustedIndex(UUID parent, int index) {
+        if (shelfPressParent.equals(parent) && shelfPressIndex < index) {
+            return index - 1;
+        }
+        return index;
     }
 
     private int visibleRows() {

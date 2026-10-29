@@ -26,6 +26,7 @@ public final class SchematicLibrary extends SavedData {
             null);
 
     private final Map<UUID, Schematic> schematics = new HashMap<>();
+    private final BlueprintShelf shelf = new BlueprintShelf();
     private final Map<UUID, BuildJob> jobs = new HashMap<>();
     private final Map<UUID, List<UUID>> jobsByPlayer = new HashMap<>();
     private int historyClock;
@@ -49,6 +50,9 @@ public final class SchematicLibrary extends SavedData {
             library.jobsByPlayer.computeIfAbsent(job.owner(), id -> new ArrayList<>()).add(job.id());
         }
         library.historyClock = tag.getInt("historyClock");
+        if (tag.contains("shelf", Tag.TAG_COMPOUND)) {
+            library.shelf.load(tag.getCompound("shelf"));
+        }
         return library;
     }
 
@@ -65,6 +69,7 @@ public final class SchematicLibrary extends SavedData {
         }
         tag.put("jobs", jobs);
         tag.putInt("historyClock", historyClock);
+        tag.put("shelf", shelf.save());
         return tag;
     }
 
@@ -81,8 +86,13 @@ public final class SchematicLibrary extends SavedData {
         setDirty();
     }
 
+    public BlueprintShelf shelf() {
+        return shelf;
+    }
+
     public void removeSchematic(UUID id) {
         if (schematics.remove(id) != null) {
+            shelf.forget(id);
             setDirty();
         }
     }
@@ -169,6 +179,7 @@ public final class SchematicLibrary extends SavedData {
             Schematic schematic = schematics.get(job.schematicId());
             if (schematic != null && schematic.ephemeral()) {
                 schematics.remove(schematic.id());
+                shelf.forget(schematic.id());
             }
         }
         jobs.remove(job.id());

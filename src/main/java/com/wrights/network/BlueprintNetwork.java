@@ -26,6 +26,7 @@ public final class BlueprintNetwork {
     public static void register(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar("1");
         registrar.playToServer(BlueprintPayloads.LibraryRequest.TYPE, BlueprintPayloads.LibraryRequest.STREAM_CODEC, BlueprintNetwork::library);
+        registrar.playToServer(BlueprintPayloads.ShelfEdit.TYPE, BlueprintPayloads.ShelfEdit.STREAM_CODEC, BlueprintNetwork::shelf);
         registrar.playToServer(BlueprintPayloads.StartCapture.TYPE, BlueprintPayloads.StartCapture.STREAM_CODEC, BlueprintNetwork::startCapture);
         registrar.playToServer(BlueprintPayloads.CaptureUpdate.TYPE, BlueprintPayloads.CaptureUpdate.STREAM_CODEC, BlueprintNetwork::update);
         registrar.playToServer(BlueprintPayloads.CapturePick.TYPE, BlueprintPayloads.CapturePick.STREAM_CODEC, BlueprintNetwork::pick);
@@ -68,7 +69,11 @@ public final class BlueprintNetwork {
     }
 
     public static void syncLibrary(ServerPlayer player) {
-        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.LibrarySync(BlueprintActions.summaries(player), BlueprintActions.busy(player)));
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.LibrarySync(
+                BlueprintActions.summaries(player),
+                BlueprintActions.busy(player),
+                BlueprintActions.folders(player),
+                BlueprintActions.openFolders(player)));
     }
 
     public static void syncCapture(ServerPlayer player) {
@@ -111,6 +116,11 @@ public final class BlueprintNetwork {
             BlueprintActions.requestLibrary(player);
             BlueprintNetwork.syncJobs(player);
         });
+    }
+
+    private static void shelf(BlueprintPayloads.ShelfEdit payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> BlueprintActions.shelf(player, payload));
     }
 
     private static void startCapture(BlueprintPayloads.StartCapture payload, IPayloadContext context) {

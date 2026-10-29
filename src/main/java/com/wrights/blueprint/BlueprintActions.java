@@ -2,8 +2,12 @@ package com.wrights.blueprint;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
+import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
@@ -15,6 +19,7 @@ import com.wrights.item.ControllerItem;
 import com.wrights.job.JobManager;
 import com.wrights.network.BlueprintNetwork;
 import com.wrights.network.BlueprintPayloads;
+import com.wrights.schematic.BlueprintShelf;
 import com.wrights.schematic.Requirements;
 import com.wrights.schematic.Schematic;
 import com.wrights.schematic.SchematicLibrary;
@@ -660,6 +665,8 @@ public final class BlueprintActions {
         session.setName(schematic.name());
         session.setDraft(schematic);
         session.setDraftDirty(false);
+        library.shelf().noteUse(id);
+        library.setDirty();
         BlueprintNetwork.preview(player, schematic, true, false);
         BlueprintNetwork.syncSupply(player);
     }
@@ -741,9 +748,85 @@ public final class BlueprintActions {
                     schematic.sizeY(),
                     schematic.sizeZ(),
                     schematic.blockCount(),
-                    source));
+                    source,
+                    library.shelf().parentOf(schematic.id()) == null ? Util.NIL_UUID : library.shelf().parentOf(schematic.id()),
+                    library.shelf().orderOf(schematic.id()),
+                    library.shelf().favorite(player.getUUID(), schematic.id()),
+                    library.shelf().uses(player.getUUID(), schematic.id()),
+                    library.shelf().lastUsed(player.getUUID(), schematic.id())));
         }
         return summaries;
+    }
+
+    public static List<BlueprintPayloads.FolderLine> folders(ServerPlayer player) {
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        BlueprintShelf shelf = library.shelf();
+        List<BlueprintPayloads.FolderLine> lines = new ArrayList<>();
+        for (BlueprintShelf.Folder folder : shelf.folders()) {
+            lines.add(new BlueprintPayloads.FolderLine(
+                    folder.id(),
+                    folder.name(),
+                    folder.parent() == null ? Util.NIL_UUID : folder.parent(),
+                    shelf.orderOf(folder.id()),
+                    shelf.favorite(player.getUUID(), folder.id())));
+        }
+        return lines;
+    }
+
+    public static List<UUID> openFolders(ServerPlayer player) {
+        return new ArrayList<>(SchematicLibrary.get(player.getServer()).shelf().openFolders(player.getUUID()));
+    }
+
+    public static void shelf(ServerPlayer player, BlueprintPayloads.ShelfEdit edit) {
+        if (!held(player)) {
+            return;
+        }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        BlueprintShelf shelf = library.shelf();
+        Map<UUID, String> names = schematicNames(library);
+        UUID parent = edit.parent() == null || edit.parent().equals(Util.NIL_UUID) ? null : edit.parent();
+        switch (edit.action()) {
+            case BlueprintPayloads.ShelfEdit.CREATE -> {
+                if (shelf.createFolder(edit.id(), parent, edit.name(), names)) {
+                    if (parent != null) {
+                        shelf.setOpen(player.getUUID(), parent, true);
+                    }
+                    Messages.actionBar(player, "message.wrights.folder_created", shelf.folders().stream()
+                            .filter(folder -> folder.id().equals(edit.id()))
+                            .map(BlueprintShelf.Folder::name)
+                            .findFirst()
+                            .orElse("Folder"));
+                }
+            }
+            case BlueprintPayloads.ShelfEdit.RENAME -> shelf.rename(edit.id(), edit.name());
+            case BlueprintPayloads.ShelfEdit.DELETE -> shelf.deleteFolder(edit.id(), names);
+            case BlueprintPayloads.ShelfEdit.MOVE -> shelf.move(edit.id(), edit.folder(), parent, edit.index(), names);
+            case BlueprintPayloads.ShelfEdit.FAVORITE -> {
+                boolean known = edit.folder()
+                        ? shelf.folders().stream().anyMatch(folder -> folder.id().equals(edit.id()))
+                        : library.schematic(edit.id()).filter(schematic -> !schematic.ephemeral()).isPresent();
+                if (!known) {
+                    return;
+                }
+                shelf.toggleFavorite(player.getUUID(), edit.id());
+            }
+            case BlueprintPayloads.ShelfEdit.OPEN -> shelf.setOpen(player.getUUID(), edit.id(), edit.index() != 0);
+            default -> {
+                return;
+            }
+        }
+        library.setDirty();
+        BlueprintNetwork.syncLibrary(player);
+    }
+
+    private static Map<UUID, String> schematicNames(SchematicLibrary library) {
+        Map<UUID, String> names = new HashMap<>();
+        for (Schematic schematic : library.schematics()) {
+            if (!schematic.ephemeral()) {
+                names.put(schematic.id(), schematic.name());
+            }
+        }
+        return names;
     }
 
     public static boolean busy(ServerPlayer player) {
