@@ -854,9 +854,6 @@ public final class JobManager {
             drone.moveToward(hover, step);
             job.setLastDronePos(drone.blockPosition());
             library.setDirty();
-            if (job.tickMessage()) {
-                Messages.actionBar(player, "message.autobots.paste_progress", job.cursor(), job.total(), job.skipped());
-            }
             return;
         }
         int budget = AutobotsConfig.BLOCKS_PER_TICK.getAsInt();
@@ -882,8 +879,6 @@ public final class JobManager {
         library.setDirty();
         if (job.cursor() >= job.total()) {
             finishPaste(server, library, player, job);
-        } else if (job.tickMessage()) {
-            Messages.actionBar(player, "message.autobots.paste_progress", job.cursor(), job.total(), job.skipped());
         }
     }
 
@@ -1541,8 +1536,6 @@ public final class JobManager {
             finishPaste(level.getServer(), library, player, job);
         } else if (waitingChunk && job.tickMessage()) {
             Messages.actionBar(player, "message.autobots.paused_chunk");
-        } else if (job.tickMessage()) {
-            Messages.actionBar(player, "message.autobots.paste_progress", job.cursor(), job.total(), job.skipped());
         }
     }
 

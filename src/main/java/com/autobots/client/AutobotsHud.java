@@ -67,7 +67,18 @@ public final class AutobotsHud {
                 sub = Component.translatable(AutobotsClientState.supplyBound ? "hud.autobots.build_chest" : "hud.autobots.build_inventory");
             }
         } else if (AutobotsClientState.mode == AutobotsClientState.Mode.JOBS) {
-            line = Component.translatable("hud.autobots.jobs_explain");
+            com.autobots.network.BlueprintPayloads.JobLine aimed = AutobotsClientState.jobAimed();
+            if (aimed == null) {
+                line = Component.translatable("hud.autobots.jobs_explain");
+            } else {
+                String title = aimed.undoing() ? "hud.autobots.job_undoing" : aimed.paused() ? "hud.autobots.job_paused" : "hud.autobots.job_building";
+                line = Component.translatable(title, aimed.name());
+                String time = AutobotsClientState.timeLeft(aimed);
+                int percent = AutobotsClientState.percent(aimed);
+                sub = time.isEmpty()
+                        ? Component.translatable("hud.autobots.job_detail", aimed.done(), aimed.total(), percent, aimed.skipped())
+                        : Component.translatable("hud.autobots.job_detail_time", aimed.done(), aimed.total(), percent, aimed.skipped(), time);
+            }
         } else if (AutobotsClientState.mode == AutobotsClientState.Mode.NONE) {
             line = Component.translatable("hud.autobots.task_ready_sub");
         }
