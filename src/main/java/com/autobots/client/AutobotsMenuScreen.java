@@ -953,7 +953,7 @@ public class AutobotsMenuScreen extends Screen {
         graphics.drawString(this.font, statusText, x + width - 8 - this.font.width(statusText), y + 4, jobColor(job), false);
         BlockPos anchor = job.anchor();
         graphics.drawString(this.font, Component.translatable("menu.autobots.job_anchor", anchor.getX(), anchor.getY(), anchor.getZ()), x + 6, y + 15, AutobotsUi.MUTED, false);
-        graphics.drawString(this.font, progressLine(job), x + 6, y + 26, AutobotsUi.TEXT, false);
+        drawProgress(graphics, x + 6, y + 26, Math.max(40, width - 12), job);
         int right = x + width - 4;
         right = drawJobButton(graphics, right, y + 36, "menu.autobots.remove", mouseX, mouseY, 52);
         if (creativeVisit()) {
@@ -1006,13 +1006,42 @@ public class AutobotsMenuScreen extends Screen {
         return job.finished() ? AutobotsUi.MUTED : AutobotsUi.COPPER;
     }
 
+    private void drawProgress(GuiGraphics graphics, int x, int y, int width, BlueprintPayloads.JobLine job) {
+        String progress = progressLine(job).getString();
+        String skipped = skippedLine(job);
+        int skipWidth = skipped.isEmpty() ? 0 : this.font.width(skipped);
+        int gap = skipWidth > 0 ? 10 : 0;
+        int progressRoom = Math.max(24, width - skipWidth - gap);
+        String shown = this.font.plainSubstrByWidth(progress, progressRoom);
+        graphics.drawString(this.font, shown, x, y, AutobotsUi.TEXT, false);
+        if (skipWidth > 0) {
+            graphics.drawString(this.font, this.font.plainSubstrByWidth(skipped, Math.max(24, width - this.font.width(shown) - gap)), x + this.font.width(shown) + gap, y, 0xFFF0C14A, false);
+        }
+    }
+
     private Component progressLine(BlueprintPayloads.JobLine job) {
-        int percent = AutobotsClientState.percent(job);
+        int percent = progressPercent(job);
         String left = AutobotsClientState.timeLeft(job);
         if (job.finished() || left.isEmpty()) {
             return Component.translatable("menu.autobots.job_percent", percent, job.done(), job.total());
         }
         return Component.translatable("menu.autobots.job_eta", percent, job.done(), job.total(), left);
+    }
+
+    private int progressPercent(BlueprintPayloads.JobLine job) {
+        if (job.finished() && !job.stopped() && !job.undone() && !job.undoing()) {
+            return 100;
+        }
+        return AutobotsClientState.percent(job);
+    }
+
+    private String skippedLine(BlueprintPayloads.JobLine job) {
+        if (job.skipped() <= 0 && !(job.finished() && !job.undoing() && !job.undone())) {
+            return "";
+        }
+        int total = Math.max(1, job.total());
+        int percent = job.skipped() * 100 / total;
+        return Component.translatable("menu.autobots.job_skipped", job.skipped(), percent).getString();
     }
 
     private boolean creativeVisit() {

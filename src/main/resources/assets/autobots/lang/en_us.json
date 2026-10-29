@@ -101,6 +101,7 @@
   "menu.autobots.job_progress": "%s / %s  ·  skipped %s",
   "menu.autobots.job_anchor": "Anchor %s, %s, %s",
   "menu.autobots.job_percent": "%s%%  ·  %s / %s",
+  "menu.autobots.job_skipped": "skipped %s (%s%%)",
   "menu.autobots.job_eta": "%s%%  ·  %s / %s  ·  %s left",
   "menu.autobots.mark": "Mark",
   "menu.autobots.mark_on": "Marked",

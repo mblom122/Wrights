@@ -352,7 +352,7 @@ public final class BlueprintNetwork {
             if (name.length() > 48) {
                 name = name.substring(0, 48);
             }
-            int done = job.undoing() ? job.undoTotal() - job.refundCount() : job.finished() ? job.placed() : job.cursor();
+            int done = job.undoing() ? job.undoTotal() - job.refundCount() : job.cursor();
             int total = job.undoing() ? Math.max(1, job.undoTotal()) : job.total();
             lines.add(new BlueprintPayloads.JobLine(
                     job.id(),
