@@ -1,5 +1,6 @@
 {
   "parent": "minecraft:block/block",
+  "gui_light": "front",
   "textures": {
     "particle": "wrights:item/personal_wrightport",
     "front": "wrights:item/personal_wrightport",

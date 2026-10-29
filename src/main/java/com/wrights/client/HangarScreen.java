@@ -1,14 +1,18 @@
 package com.wrights.client;
 
+import org.jetbrains.annotations.Nullable;
+
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.drone.Swarm;
+import com.wrights.item.PersonalWrightportItem;
 import com.wrights.network.BlueprintPayloads;
 
 public class HangarScreen extends AbstractContainerScreen<com.wrights.menu.HangarMenu> {
@@ -78,6 +82,18 @@ public class HangarScreen extends AbstractContainerScreen<com.wrights.menu.Hanga
     private Swarm swarm() {
         ItemStack stack = menu.getSlot(0).getItem();
         return Swarm.from(stack);
+    }
+
+    @Override
+    protected void renderSlotContents(GuiGraphics graphics, ItemStack stack, Slot slot, @Nullable String countString) {
+        super.renderSlotContents(graphics, stack, slot, countString);
+        if (stack.isEmpty() || stack.getItem() instanceof PersonalWrightportItem) {
+            return;
+        }
+        graphics.pose().pushPose();
+        graphics.pose().translate(0.0F, 0.0F, 400.0F);
+        graphics.fill(slot.x, slot.y, slot.x + 16, slot.y + 16, 0xB4000000);
+        graphics.pose().popPose();
     }
 
     @Override
