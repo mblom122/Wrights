@@ -84,6 +84,9 @@ public class AutobotsMenuScreen extends Screen {
     private int workPauseWidth;
     private int workRemoveWidth;
     private int doneRemoveWidth;
+    private int manageAllWidth;
+    private int manageAllRight;
+    private int manageAllY;
     private boolean workAllPaused;
     private int drag;
     private int wallSliderX;
@@ -878,7 +881,7 @@ public class AutobotsMenuScreen extends Screen {
         return min + (int) Math.round(t * (max - min));
     }
 
-    private static final int JOB_ROW = 70;
+    private static final int JOB_ROW = 58;
 
     private void prepareJobs() {
         workingJobs.clear();
@@ -894,7 +897,10 @@ public class AutobotsMenuScreen extends Screen {
                 }
             }
         }
-        int top = panelY + 48;
+        int top = panelY + 40;
+        manageAllWidth = jobButtonWidth("menu.autobots.manage_all");
+        manageAllRight = listX + (panelX + panelW - 24 - listX);
+        manageAllY = panelY + 18;
         int bottom = panelY + panelH - 12;
         int gap = 8;
         int header = 18;
@@ -942,10 +948,9 @@ public class AutobotsMenuScreen extends Screen {
         int x = listX;
         int width = panelX + panelW - 24 - x;
         int[] pool = dronePool();
-        String drones = this.font.plainSubstrByWidth(Component.translatable("menu.autobots.drones_pool", pool[0], pool[1]).getString(), Math.max(40, width));
+        String drones = this.font.plainSubstrByWidth(Component.translatable("menu.autobots.drones_pool", pool[0], pool[1]).getString(), Math.max(40, width - manageAllWidth - 8));
         graphics.drawString(this.font, drones, x, panelY + 22, AutobotsUi.TEXT, false);
-        String roster = this.font.plainSubstrByWidth(JobDroneScreen.cradleLine(this.minecraft.player, AutobotsClientState.jobs), Math.max(40, width));
-        graphics.drawString(this.font, roster, x, panelY + 34, AutobotsUi.MUTED, false);
+        drawJobButton(graphics, manageAllRight, manageAllY, "menu.autobots.manage_all", mouseX, mouseY, manageAllWidth);
         drawJobSection(graphics, x, workHeaderY, width, "menu.autobots.jobs_working", workingJobs.isEmpty() ? "menu.autobots.jobs_working_empty" : null, workingJobs.isEmpty() ? 0 : workPauseWidth + workRemoveWidth + 12);
         if (!workingJobs.isEmpty()) {
             drawJobButton(graphics, workRemoveRight, workHeaderY, "menu.autobots.remove_all", mouseX, mouseY, workRemoveWidth);
@@ -973,9 +978,9 @@ public class AutobotsMenuScreen extends Screen {
 
     private void drawJobRow(GuiGraphics graphics, int mouseX, int mouseY, int x, int width, int y, BlueprintPayloads.JobLine job) {
         boolean working = !job.finished() && !job.saving();
-        int buttonY = working ? y + 48 : y + 36;
-        boolean hover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + (working ? 66 : 54);
-        graphics.fill(x, y, x + width, y + (working ? 66 : 54), hover ? 0xFF24303C : 0xFF18222C);
+        int buttonY = y + 36;
+        boolean hover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 54;
+        graphics.fill(x, y, x + width, y + 54, hover ? 0xFF24303C : 0xFF18222C);
         String name = this.font.plainSubstrByWidth(job.name(), Math.max(40, width / 2));
         graphics.drawString(this.font, name, x + 6, y + 4, AutobotsUi.TEXT, false);
         Component statusText = Component.translatable(jobStatus(job));
@@ -983,14 +988,12 @@ public class AutobotsMenuScreen extends Screen {
         BlockPos anchor = job.anchor();
         graphics.drawString(this.font, Component.translatable("menu.autobots.job_anchor", anchor.getX(), anchor.getY(), anchor.getZ()), x + 6, y + 15, AutobotsUi.MUTED, false);
         drawProgress(graphics, x + 6, y + 26, Math.max(40, width - 12), job);
-        if (working) {
-            String crew = this.font.plainSubstrByWidth(JobDroneScreen.jobSpeeds(this.minecraft.player, job), Math.max(40, width - 12));
-            graphics.drawString(this.font, crew, x + 6, y + 36, AutobotsUi.MUTED, false);
-        }
         int right = x + width - 4;
         if (working) {
+            String count = Component.translatable("menu.autobots.job_drone_count", job.crew().size()).getString();
+            graphics.drawString(this.font, count, x + 6, buttonY + 4, AutobotsUi.MUTED, false);
             int manageW = jobButtonWidth("menu.autobots.manage_drones");
-            drawJobButton(graphics, x + 6 + manageW, buttonY, "menu.autobots.manage_drones", mouseX, mouseY, manageW);
+            drawJobButton(graphics, x + 6 + this.font.width(count) + 6 + manageW, buttonY, "menu.autobots.manage_drones", mouseX, mouseY, manageW);
         }
         right = drawJobButton(graphics, right, buttonY, "menu.autobots.remove", mouseX, mouseY, 52);
         if (creativeVisit()) {
@@ -1097,6 +1100,10 @@ public class AutobotsMenuScreen extends Screen {
 
     private boolean clickJob(double mouseX, double mouseY) {
         prepareJobs();
+        if (hitWide(mouseX, mouseY, manageAllRight, manageAllY, manageAllWidth)) {
+            this.minecraft.setScreen(new DroneRosterScreen(null));
+            return true;
+        }
         if (!workingJobs.isEmpty()) {
             if (hitWide(mouseX, mouseY, workRemoveRight, workHeaderY, workRemoveWidth)) {
                 PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(new UUID(0L, 0L), BlueprintPayloads.JobControl.REMOVE_ACTIVE));
@@ -1129,13 +1136,15 @@ public class AutobotsMenuScreen extends Screen {
 
     private boolean clickJobRow(double mouseX, double mouseY, int y, BlueprintPayloads.JobLine job) {
         boolean working = !job.finished() && !job.saving();
-        int buttonY = working ? y + 48 : y + 36;
+        int buttonY = y + 36;
         if (mouseY < buttonY || mouseY >= buttonY + 16) {
             return false;
         }
         if (working) {
+            String count = Component.translatable("menu.autobots.job_drone_count", job.crew().size()).getString();
             int manageW = jobButtonWidth("menu.autobots.manage_drones");
-            if (mouseX >= listX + 6 && mouseX < listX + 6 + manageW) {
+            int manageRight = listX + 6 + this.font.width(count) + 6 + manageW;
+            if (mouseX >= manageRight - manageW && mouseX < manageRight) {
                 this.minecraft.setScreen(new JobDroneScreen(job.id(), null));
                 return true;
             }
@@ -1184,13 +1193,13 @@ public class AutobotsMenuScreen extends Screen {
 
     private int[] dronePool() {
         int total = this.minecraft.player == null ? 0 : Cradles.swarm(this.minecraft.player).units().size();
-        int used = 0;
+        int working = 0;
         for (BlueprintPayloads.JobLine job : AutobotsClientState.jobs) {
             if (!job.finished() && !job.saving()) {
-                used += job.crew().size();
+                working += job.crew().size();
             }
         }
-        return new int[] {Math.max(0, total - used), total};
+        return new int[] {working, total};
     }
 
     private boolean hitJobButton(double mouseX, int right, int y) {

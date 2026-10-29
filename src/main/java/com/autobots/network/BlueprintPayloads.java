@@ -652,6 +652,21 @@ public final class BlueprintPayloads {
         }
     }
 
+    public record MoveDrone(UUID unit, UUID job) implements CustomPacketPayload {
+        public static final Type<MoveDrone> TYPE = payloadType("move_drone");
+        public static final StreamCodec<RegistryFriendlyByteBuf, MoveDrone> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeUUID(value.unit);
+                    buf.writeUUID(value.job);
+                },
+                buf -> new MoveDrone(buf.readUUID(), buf.readUUID()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public record SetAssign(int count) implements CustomPacketPayload {
         public static final Type<SetAssign> TYPE = payloadType("set_assign");
         public static final StreamCodec<RegistryFriendlyByteBuf, SetAssign> STREAM_CODEC = StreamCodec.of(

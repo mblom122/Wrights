@@ -1180,6 +1180,69 @@ public final class JobManager {
             BlueprintNetwork.syncJobs(player);
             return;
         }
+        placeCrew(player, library, job, ids);
+        library.setDirty();
+        BlueprintNetwork.syncJobs(player);
+    }
+
+    public static void moveDrone(ServerPlayer player, UUID unitId, UUID targetId) {
+        if (!com.autobots.item.ControllerItem.isHeld(player)) {
+            return;
+        }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        bindCrewIds(player, library);
+        boolean free = targetId == null || (targetId.getMostSignificantBits() == 0L && targetId.getLeastSignificantBits() == 0L);
+        BuildJob target = null;
+        if (!free) {
+            target = library.job(targetId).orElse(null);
+            if (target == null || !target.owner().equals(player.getUUID()) || !usesDrones(target)) {
+                BlueprintNetwork.syncJobs(player);
+                return;
+            }
+        }
+        boolean known = false;
+        for (Swarm.Unit unit : Cradles.swarm(player).units()) {
+            if (unit.id().equals(unitId)) {
+                known = true;
+                break;
+            }
+        }
+        if (!known) {
+            BlueprintNetwork.syncJobs(player);
+            return;
+        }
+        BuildJob source = null;
+        for (BuildJob job : library.jobsFor(player.getUUID())) {
+            if (usesDrones(job) && !job.awaitingDrones() && job.crewUnits().contains(unitId)) {
+                source = job;
+                break;
+            }
+        }
+        if (source == null && free) {
+            BlueprintNetwork.syncJobs(player);
+            return;
+        }
+        if (source != null && target != null && source.id().equals(target.id())) {
+            BlueprintNetwork.syncJobs(player);
+            return;
+        }
+        if (source != null) {
+            List<UUID> ids = new ArrayList<>(source.crewUnits());
+            ids.remove(unitId);
+            placeCrew(player, library, source, ids);
+        }
+        if (target != null) {
+            List<UUID> ids = new ArrayList<>(target.crewUnits());
+            if (!ids.contains(unitId)) {
+                ids.add(unitId);
+            }
+            placeCrew(player, library, target, ids);
+        }
+        library.setDirty();
+        BlueprintNetwork.syncJobs(player);
+    }
+
+    private static void placeCrew(ServerPlayer player, SchematicLibrary library, BuildJob job, List<UUID> ids) {
         if (ids.isEmpty()) {
             discardDrone(player.getServer(), job);
             job.clearAssigned();
@@ -1187,8 +1250,6 @@ public final class JobManager {
         } else {
             fitCrew(player, library, job, ids);
         }
-        library.setDirty();
-        BlueprintNetwork.syncJobs(player);
     }
 
     private static boolean usesDrones(BuildJob job) {
@@ -1241,15 +1302,16 @@ public final class JobManager {
             job.setPaused(true);
             return;
         }
+        Schematic schematic = job.schematicId() == null ? null : library.schematic(job.schematicId()).orElse(null);
         if (!job.hasCrew() && job.droneId() != null) {
             discardId(player.getServer().getLevel(job.dimension()), job.droneId());
             job.setDroneId(null);
         }
-        int sizeX = Math.max(1, job.spanX());
-        int sizeY = Math.max(1, job.spanY());
-        int sizeZ = Math.max(1, job.spanZ());
-        if (!job.hasCrew() && job.schematicId() != null) {
-            Schematic schematic = library.schematic(job.schematicId()).orElse(null);
+        List<UUID> dropped = new ArrayList<>();
+        if (!job.hasCrew() || schematic == null) {
+            int sizeX = Math.max(1, job.spanX());
+            int sizeY = Math.max(1, job.spanY());
+            int sizeZ = Math.max(1, job.spanZ());
             if (schematic != null) {
                 sizeX = schematic.sizeX();
                 sizeY = schematic.sizeY();
@@ -1260,9 +1322,45 @@ public final class JobManager {
                     sizeZ = Math.min(sizeZ, job.clipZ());
                 }
             }
+            int carried = job.hasCrew() ? 0 : job.cursor();
+            if (schematic == null) {
+                dropped = job.resizeCrew(speeds, sizeX, sizeY, sizeZ, job.hasCrew() || job.cursor() > 0);
+            } else {
+                job.setCrew(speeds, sizeX, sizeY, sizeZ);
+                if (carried > 0) {
+                    for (BuildJob.Hand hand : job.hands()) {
+                        hand.cursor = carried;
+                    }
+                }
+                evenOut(job, schematic);
+            }
+        } else {
+            int before = job.hands().size();
+            ensureSlices(job, schematic);
+            while (job.hands().size() > speeds.size()) {
+                BuildJob.Hand removed = job.hands().remove(job.hands().size() - 1);
+                if (removed.entityId != null) {
+                    dropped.add(removed.entityId);
+                }
+                if (!job.hands().isEmpty()) {
+                    job.hands().get(0).slices.addAll(removed.slices);
+                }
+            }
+            while (job.hands().size() < speeds.size()) {
+                BuildJob.Hand extra = new BuildJob.Hand();
+                extra.idle = true;
+                job.hands().add(extra);
+            }
+            for (int i = 0; i < job.hands().size(); i++) {
+                BuildJob.Hand hand = job.hands().get(i);
+                hand.lane = i;
+                hand.lanes = job.hands().size();
+                hand.speed = Math.max(1, Math.min(4, speeds.get(i)));
+            }
+            if (job.hands().size() != before) {
+                evenOut(job, schematic);
+            }
         }
-        boolean rescan = job.hasCrew() || job.cursor() > 0;
-        List<UUID> dropped = job.resizeCrew(speeds, sizeX, sizeY, sizeZ, rescan);
         ServerLevel level = player.getServer().getLevel(job.dimension());
         for (UUID droppedId : dropped) {
             discardId(level, droppedId);
@@ -1329,6 +1427,7 @@ public final class JobManager {
         }
         job.setCrew(speeds, sizeX, sizeY, sizeZ);
         job.setCrewUnits(ids);
+        evenOut(job, schematic);
         return job.hasCrew();
     }
 
@@ -1344,8 +1443,10 @@ public final class JobManager {
                 continue;
             }
             if (index < 0) {
+                hand.idle = true;
                 continue;
             }
+            hand.idle = false;
             working = true;
             Schematic.Entry next = schematic.entry(index);
             BlockPos nextPos = job.min().offset(next.x(), next.y(), next.z());
@@ -1368,6 +1469,7 @@ public final class JobManager {
                     break;
                 }
                 if (at < 0) {
+                    hand.idle = true;
                     break;
                 }
                 Schematic.Entry entry = schematic.entry(at);
@@ -1379,7 +1481,7 @@ public final class JobManager {
                     break;
                 }
                 if (job.outsideClip(entry)) {
-                    hand.cursor = at + 1;
+                    noteProgress(hand, entry, at);
                     job.advance();
                     continue;
                 }
@@ -1391,8 +1493,17 @@ public final class JobManager {
                     }
                     return;
                 }
-                hand.cursor = at + 1;
+                noteProgress(hand, entry, at);
                 job.advance();
+            }
+        }
+        shareWithIdle(job, schematic);
+        if (!working && !scanning) {
+            for (BuildJob.Hand hand : job.hands()) {
+                if (nextInLane(schematic, job, hand) >= 0) {
+                    working = true;
+                    break;
+                }
             }
         }
         library.setDirty();
@@ -1414,8 +1525,10 @@ public final class JobManager {
         for (BuildJob.Hand hand : job.hands()) {
             int index = refundIndex(job, hand);
             if (index < 0) {
+                hand.idle = true;
                 continue;
             }
+            hand.idle = false;
             working = true;
             BuildJob.Refund peek = job.refunds().get(index);
             BlockPos nextPos = job.min().offset(peek.x(), peek.y(), peek.z());
@@ -1433,6 +1546,7 @@ public final class JobManager {
             for (int n = 0; n < budget; n++) {
                 int at = refundIndex(job, hand);
                 if (at < 0) {
+                    hand.idle = true;
                     break;
                 }
                 BuildJob.Refund refund = job.refunds().get(at);
@@ -1455,6 +1569,15 @@ public final class JobManager {
                 removeOne(level, player, job, pos, refund, false);
             }
         }
+        shareUndo(job);
+        if (!working) {
+            for (BuildJob.Hand hand : job.hands()) {
+                if (refundIndex(job, hand) >= 0) {
+                    working = true;
+                    break;
+                }
+            }
+        }
         if (!working || !job.hasRefunds()) {
             finishUndo(level.getServer(), library, player, job);
         } else if (job.tickMessage()) {
@@ -1468,8 +1591,19 @@ public final class JobManager {
             return false;
         }
         for (BuildJob.Hand other : job.hands()) {
-            if (other != hand && other.cursor <= index) {
-                return true;
+            if (other == hand) {
+                continue;
+            }
+            if (other.slices.isEmpty()) {
+                if (other.cursor <= index) {
+                    return true;
+                }
+                continue;
+            }
+            for (BuildJob.Slice slice : other.slices) {
+                if (slice.contains(entry.x(), entry.y() - 1, entry.z()) && slice.cursor <= index) {
+                    return true;
+                }
             }
         }
         return false;
@@ -1500,7 +1634,7 @@ public final class JobManager {
                 return index;
             }
             budget[0]--;
-            hand.cursor = index + 1;
+            noteProgress(hand, schematic.entry(index), index);
             if (!hand.rescan) {
                 job.advance();
             }
@@ -1509,24 +1643,425 @@ public final class JobManager {
     }
 
     private static int nextInLane(Schematic schematic, BuildJob job, BuildJob.Hand hand) {
-        for (int i = Math.max(0, hand.cursor); i < schematic.blockCount(); i++) {
-            Schematic.Entry entry = schematic.entry(i);
-            if (CrewSplit.lane(entry.x(), entry.y(), entry.z(), hand.lanes, job.spanX(), job.spanY(), job.spanZ()) == hand.lane) {
-                return i;
+        if (hand.slices.isEmpty()) {
+            for (BuildJob.Hand other : job.hands()) {
+                if (!other.slices.isEmpty()) {
+                    return -1;
+                }
+            }
+            for (int i = Math.max(0, hand.cursor); i < schematic.blockCount(); i++) {
+                Schematic.Entry entry = schematic.entry(i);
+                if (CrewSplit.lane(entry.x(), entry.y(), entry.z(), hand.lanes, job.spanX(), job.spanY(), job.spanZ()) == hand.lane) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+        int best = -1;
+        for (BuildJob.Slice slice : hand.slices) {
+            for (int i = Math.max(0, slice.cursor); i < schematic.blockCount(); i++) {
+                if (best >= 0 && i >= best) {
+                    break;
+                }
+                Schematic.Entry entry = schematic.entry(i);
+                if (slice.contains(entry.x(), entry.y(), entry.z())) {
+                    best = i;
+                    break;
+                }
             }
         }
-        return -1;
+        return best;
     }
 
     private static int refundIndex(BuildJob job, BuildJob.Hand hand) {
         List<BuildJob.Refund> refunds = job.refunds();
         for (int i = refunds.size() - 1; i >= 0; i--) {
             BuildJob.Refund refund = refunds.get(i);
-            if (CrewSplit.lane(refund.x(), refund.y(), refund.z(), hand.lanes, job.spanX(), job.spanY(), job.spanZ()) == hand.lane) {
+            if (ownsRefund(hand, job, refund)) {
                 return i;
             }
         }
         return -1;
+    }
+
+    private static boolean ownsRefund(BuildJob.Hand hand, BuildJob job, BuildJob.Refund refund) {
+        if (hand.slices.isEmpty()) {
+            return CrewSplit.lane(refund.x(), refund.y(), refund.z(), hand.lanes, job.spanX(), job.spanY(), job.spanZ()) == hand.lane;
+        }
+        for (BuildJob.Slice slice : hand.slices) {
+            if (slice.contains(refund.x(), refund.y(), refund.z())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void noteProgress(BuildJob.Hand hand, Schematic.Entry entry, int index) {
+        int next = index + 1;
+        if (hand.slices.isEmpty()) {
+            hand.cursor = next;
+            return;
+        }
+        for (BuildJob.Slice slice : hand.slices) {
+            if (slice.cursor <= index && slice.contains(entry.x(), entry.y(), entry.z())) {
+                slice.cursor = next;
+            }
+        }
+        int earliest = Integer.MAX_VALUE;
+        for (BuildJob.Slice slice : hand.slices) {
+            earliest = Math.min(earliest, slice.cursor);
+        }
+        hand.cursor = earliest == Integer.MAX_VALUE ? next : earliest;
+    }
+
+    private static void migrateSlices(BuildJob job) {
+        boolean any = false;
+        for (BuildJob.Hand hand : job.hands()) {
+            if (!hand.slices.isEmpty()) {
+                any = true;
+                break;
+            }
+        }
+        ensureSlices(job, !any);
+    }
+
+    private static void ensureSlices(BuildJob job, boolean includeIdle) {
+        for (BuildJob.Hand hand : job.hands()) {
+            if (!hand.slices.isEmpty() || hand.lanes <= 0 || (hand.idle && !includeIdle)) {
+                continue;
+            }
+            int lanes = Math.max(1, hand.lanes);
+            BuildJob.Slice slice = CrewSplit.slab(
+                    lanes,
+                    Math.max(1, job.spanX()),
+                    Math.max(1, job.spanY()),
+                    Math.max(1, job.spanZ()),
+                    Math.min(Math.max(0, hand.lane), lanes - 1));
+            slice.cursor = Math.max(0, hand.cursor);
+            hand.slices.add(slice);
+        }
+    }
+
+    private static void evenOut(BuildJob job, Schematic schematic) {
+        if (schematic == null || job.hands().size() < 2) {
+            ensureSlices(job, schematic);
+            return;
+        }
+        ensureSlices(job, schematic);
+        int passes = job.hands().size() * 8;
+        for (int pass = 0; pass < passes; pass++) {
+            BuildJob.Hand poor = null;
+            BuildJob.Hand rich = null;
+            BuildJob.Slice donor = null;
+            int least = Integer.MAX_VALUE;
+            int most = -1;
+            for (BuildJob.Hand hand : job.hands()) {
+                int load = 0;
+                BuildJob.Slice fullest = null;
+                int fullestCount = 0;
+                for (BuildJob.Slice slice : hand.slices) {
+                    int left = countPaste(schematic, slice);
+                    load += left;
+                    if (left > fullestCount) {
+                        fullestCount = left;
+                        fullest = slice;
+                    }
+                }
+                if (load < least) {
+                    least = load;
+                    poor = hand;
+                }
+                if (load > most) {
+                    most = load;
+                    rich = hand;
+                    donor = fullest;
+                }
+            }
+            if (poor == null || rich == null || poor == rich || donor == null || most < least + 2) {
+                return;
+            }
+            BuildJob.Slice half = splitPaste(schematic, donor);
+            if (half == null) {
+                return;
+            }
+            poor.slices.add(half);
+            poor.idle = false;
+        }
+    }
+
+    private static void shareWithIdle(BuildJob job, Schematic schematic) {
+        if (schematic == null || job.hands().size() < 2) {
+            return;
+        }
+        boolean pending = false;
+        for (BuildJob.Hand hand : job.hands()) {
+            if (hand.idle) {
+                pending = true;
+                break;
+            }
+        }
+        if (!pending) {
+            return;
+        }
+        ensureSlices(job, schematic);
+        for (int n = 0; n < job.hands().size(); n++) {
+            BuildJob.Hand receiver = null;
+            for (BuildJob.Hand hand : job.hands()) {
+                if (countPaste(schematic, hand) == 0) {
+                    receiver = hand;
+                    break;
+                }
+                hand.idle = false;
+            }
+            if (receiver == null) {
+                return;
+            }
+            BuildJob.Slice donor = fullestPaste(job, schematic, receiver);
+            if (donor == null) {
+                receiver.idle = false;
+                return;
+            }
+            BuildJob.Slice half = splitPaste(schematic, donor);
+            if (half == null) {
+                receiver.idle = false;
+                return;
+            }
+            receiver.slices.add(half);
+            receiver.idle = false;
+        }
+    }
+
+    private static void shareUndo(BuildJob job) {
+        if (job.hands().size() < 2) {
+            return;
+        }
+        boolean pending = false;
+        for (BuildJob.Hand hand : job.hands()) {
+            if (hand.idle) {
+                pending = true;
+                break;
+            }
+        }
+        if (!pending) {
+            return;
+        }
+        for (int n = 0; n < job.hands().size(); n++) {
+            BuildJob.Hand receiver = null;
+            for (BuildJob.Hand hand : job.hands()) {
+                if (countRefunds(job, hand) == 0) {
+                    receiver = hand;
+                    break;
+                }
+                hand.idle = false;
+            }
+            if (receiver == null) {
+                return;
+            }
+            BuildJob.Slice donor = fullestRefund(job, receiver);
+            if (donor == null) {
+                receiver.idle = false;
+                return;
+            }
+            BuildJob.Slice half = splitRefunds(job, donor);
+            if (half == null) {
+                receiver.idle = false;
+                return;
+            }
+            receiver.slices.add(half);
+            receiver.idle = false;
+        }
+    }
+
+    private static int countPaste(Schematic schematic, BuildJob.Hand hand) {
+        int count = 0;
+        for (BuildJob.Slice slice : hand.slices) {
+            count += countPaste(schematic, slice);
+        }
+        return count;
+    }
+
+    private static int countPaste(Schematic schematic, BuildJob.Slice slice) {
+        int count = 0;
+        for (int i = Math.max(0, slice.cursor); i < schematic.blockCount(); i++) {
+            Schematic.Entry entry = schematic.entry(i);
+            if (slice.contains(entry.x(), entry.y(), entry.z())) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static int countRefunds(BuildJob job, BuildJob.Hand hand) {
+        int count = 0;
+        for (BuildJob.Slice slice : hand.slices) {
+            count += countRefunds(job, slice);
+        }
+        return count;
+    }
+
+    private static int countRefunds(BuildJob job, BuildJob.Slice slice) {
+        int count = 0;
+        for (BuildJob.Refund refund : job.refunds()) {
+            if (slice.contains(refund.x(), refund.y(), refund.z())) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static BuildJob.Slice fullestPaste(BuildJob job, Schematic schematic, BuildJob.Hand except) {
+        BuildJob.Slice donor = null;
+        int most = 1;
+        for (BuildJob.Hand hand : job.hands()) {
+            if (hand == except) {
+                continue;
+            }
+            for (BuildJob.Slice slice : hand.slices) {
+                int left = countPaste(schematic, slice);
+                if (left > most) {
+                    most = left;
+                    donor = slice;
+                }
+            }
+        }
+        return donor;
+    }
+
+    private static BuildJob.Slice fullestRefund(BuildJob job, BuildJob.Hand except) {
+        BuildJob.Slice donor = null;
+        int most = 1;
+        for (BuildJob.Hand hand : job.hands()) {
+            if (hand == except) {
+                continue;
+            }
+            for (BuildJob.Slice slice : hand.slices) {
+                int left = countRefunds(job, slice);
+                if (left > most) {
+                    most = left;
+                    donor = slice;
+                }
+            }
+        }
+        return donor;
+    }
+
+    private static BuildJob.Slice splitPaste(Schematic schematic, BuildJob.Slice slice) {
+        int start = Math.max(0, slice.cursor);
+        int count = countPaste(schematic, slice);
+        if (count < 2) {
+            return null;
+        }
+        int[] xs = new int[count];
+        int[] ys = new int[count];
+        int[] zs = new int[count];
+        int at = 0;
+        for (int i = start; i < schematic.blockCount() && at < count; i++) {
+            Schematic.Entry entry = schematic.entry(i);
+            if (!slice.contains(entry.x(), entry.y(), entry.z())) {
+                continue;
+            }
+            xs[at] = entry.x();
+            ys[at] = entry.y();
+            zs[at] = entry.z();
+            at++;
+        }
+        return splitPoints(slice, xs, ys, zs, at);
+    }
+
+    private static BuildJob.Slice splitRefunds(BuildJob job, BuildJob.Slice slice) {
+        int count = countRefunds(job, slice);
+        if (count < 2) {
+            return null;
+        }
+        int[] xs = new int[count];
+        int[] ys = new int[count];
+        int[] zs = new int[count];
+        int at = 0;
+        for (BuildJob.Refund refund : job.refunds()) {
+            if (!slice.contains(refund.x(), refund.y(), refund.z())) {
+                continue;
+            }
+            xs[at] = refund.x();
+            ys[at] = refund.y();
+            zs[at] = refund.z();
+            at++;
+            if (at >= count) {
+                break;
+            }
+        }
+        return splitPoints(slice, xs, ys, zs, at);
+    }
+
+    private static BuildJob.Slice splitPoints(BuildJob.Slice slice, int[] xs, int[] ys, int[] zs, int count) {
+        if (count < 2) {
+            return null;
+        }
+        int minX = xs[0];
+        int maxX = xs[0];
+        int minY = ys[0];
+        int maxY = ys[0];
+        int minZ = zs[0];
+        int maxZ = zs[0];
+        for (int i = 1; i < count; i++) {
+            minX = Math.min(minX, xs[i]);
+            maxX = Math.max(maxX, xs[i]);
+            minY = Math.min(minY, ys[i]);
+            maxY = Math.max(maxY, ys[i]);
+            minZ = Math.min(minZ, zs[i]);
+            maxZ = Math.max(maxZ, zs[i]);
+        }
+        int spanX = maxX - minX;
+        int spanY = maxY - minY;
+        int spanZ = maxZ - minZ;
+        int axis = spanX >= spanZ && spanX >= spanY ? 0 : spanZ >= spanY ? 2 : 1;
+        int minC = axis == 0 ? minX : axis == 1 ? minY : minZ;
+        int span = axis == 0 ? spanX : axis == 1 ? spanY : spanZ;
+        if (span <= 0) {
+            return null;
+        }
+        int[] bins = new int[span + 1];
+        for (int i = 0; i < count; i++) {
+            int coord = axis == 0 ? xs[i] : axis == 1 ? ys[i] : zs[i];
+            bins[coord - minC]++;
+        }
+        int running = 0;
+        int bestCut = -1;
+        int bestDiff = Integer.MAX_VALUE;
+        for (int bin = 0; bin < bins.length - 1; bin++) {
+            running += bins[bin];
+            int right = count - running;
+            if (running == 0 || right == 0) {
+                continue;
+            }
+            int diff = Math.abs(running - right);
+            if (diff < bestDiff) {
+                bestDiff = diff;
+                bestCut = bin + 1;
+            }
+        }
+        if (bestCut < 0) {
+            return null;
+        }
+        int cut = minC + bestCut;
+        BuildJob.Slice given = new BuildJob.Slice();
+        given.x0 = slice.x0;
+        given.y0 = slice.y0;
+        given.z0 = slice.z0;
+        given.x1 = slice.x1;
+        given.y1 = slice.y1;
+        given.z1 = slice.z1;
+        given.cursor = slice.cursor;
+        if (axis == 0) {
+            slice.x1 = cut - 1;
+            given.x0 = cut;
+        } else if (axis == 1) {
+            slice.y1 = cut - 1;
+            given.y0 = cut;
+        } else {
+            slice.z1 = cut - 1;
+            given.z0 = cut;
+        }
+        return given;
     }
 
     private static double flyStep(int speed, double distanceSqr) {

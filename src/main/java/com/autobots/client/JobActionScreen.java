@@ -69,8 +69,7 @@ public class JobActionScreen extends Screen {
         graphics.drawString(this.font, Component.translatable(status), panelX + 16, panelY + 28, job.paused() ? 0xFFE0B060 : AutobotsUi.TEXT, false);
         int percent = job.finished() ? 100 : AutobotsClientState.percent(job);
         graphics.drawString(this.font, Component.translatable("menu.autobots.job_percent", percent, job.done(), job.total()), panelX + 16, panelY + 44, AutobotsUi.MUTED, false);
-        String crew = this.font.plainSubstrByWidth(JobDroneScreen.jobSpeeds(this.minecraft.player, job), 208);
-        graphics.drawString(this.font, crew, panelX + 16, panelY + 60, AutobotsUi.TEXT, false);
+        graphics.drawString(this.font, Component.translatable("menu.autobots.job_drone_count", job.crew().size()), panelX + 16, panelY + 60, AutobotsUi.TEXT, false);
     }
 
     @Override

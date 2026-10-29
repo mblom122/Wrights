@@ -177,7 +177,7 @@ public class JobDroneScreen extends Screen {
                 used += job.crew().size();
             }
         }
-        return new int[] {Math.max(0, total - used), total};
+        return new int[] {used, total};
     }
 
     private String otherJob(UUID unit) {
@@ -203,48 +203,6 @@ public class JobDroneScreen extends Screen {
 
     private Swarm swarm() {
         return this.minecraft == null || this.minecraft.player == null ? Swarm.EMPTY : Cradles.swarm(this.minecraft.player);
-    }
-
-    public static String jobSpeeds(net.minecraft.world.entity.player.Player player, BlueprintPayloads.JobLine job) {
-        if (job.crew().isEmpty()) {
-            return Component.translatable("screen.autobots.drones_none_on").getString();
-        }
-        Swarm swarm = player == null ? Swarm.EMPTY : Cradles.swarm(player);
-        List<String> parts = new ArrayList<>();
-        for (UUID unit : job.crew()) {
-            Swarm.Unit found = find(swarm, unit);
-            if (found == null) {
-                parts.add(Component.translatable("screen.autobots.drone_missing").getString());
-            } else {
-                parts.add(Component.translatable("screen.autobots.drone_name", numberOf(swarm, unit)).getString()
-                        + " " + Component.translatable(speedKey(found.speed())).getString());
-            }
-        }
-        return String.join(" · ", parts);
-    }
-
-    public static String cradleLine(net.minecraft.world.entity.player.Player player, List<BlueprintPayloads.JobLine> jobs) {
-        Swarm swarm = player == null ? Swarm.EMPTY : Cradles.swarm(player);
-        if (swarm.units().isEmpty()) {
-            return Component.translatable("screen.autobots.hangar_empty").getString();
-        }
-        List<String> parts = new ArrayList<>();
-        for (int i = 0; i < swarm.units().size(); i++) {
-            Swarm.Unit unit = swarm.units().get(i);
-            String where = null;
-            for (BlueprintPayloads.JobLine job : jobs) {
-                if (!job.finished() && !job.saving() && job.crew().contains(unit.id())) {
-                    where = job.name();
-                    break;
-                }
-            }
-            String speed = Component.translatable(speedKey(unit.speed())).getString();
-            String state = where == null
-                    ? Component.translatable("screen.autobots.drone_free").getString()
-                    : Component.translatable("screen.autobots.drone_on_other", where).getString();
-            parts.add((i + 1) + " " + speed + " " + state);
-        }
-        return String.join("  ·  ", parts);
     }
 
     private static String stat(Swarm.Unit unit) {
