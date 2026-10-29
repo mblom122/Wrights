@@ -152,11 +152,14 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record CaptureConfirm(String name) implements CustomPacketPayload {
+    public record CaptureConfirm(String name, boolean fluids) implements CustomPacketPayload {
         public static final Type<CaptureConfirm> TYPE = payloadType("capture_confirm");
         public static final StreamCodec<RegistryFriendlyByteBuf, CaptureConfirm> STREAM_CODEC = StreamCodec.of(
-                (buf, value) -> buf.writeUtf(value.name, 48),
-                buf -> new CaptureConfirm(buf.readUtf(48)));
+                (buf, value) -> {
+                    buf.writeUtf(value.name, 48);
+                    buf.writeBoolean(value.fluids);
+                },
+                buf -> new CaptureConfirm(buf.readUtf(48), buf.readBoolean()));
 
         @Override
         public Type<? extends CustomPacketPayload> type() {

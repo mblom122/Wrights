@@ -138,7 +138,7 @@ public final class BlueprintNetwork {
 
     private static void confirm(BlueprintPayloads.CaptureConfirm payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
-        context.enqueueWork(() -> BlueprintActions.confirm(player, payload.name()));
+        context.enqueueWork(() -> BlueprintActions.confirm(player, payload.name(), payload.fluids()));
     }
 
     private static void cancel(BlueprintPayloads.CaptureCancel payload, IPayloadContext context) {

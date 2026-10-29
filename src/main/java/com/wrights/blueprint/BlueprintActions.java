@@ -224,7 +224,7 @@ public final class BlueprintActions {
         BlueprintNetwork.syncCapture(player);
     }
 
-    public static void confirm(ServerPlayer player, String name) {
+    public static void confirm(ServerPlayer player, String name, boolean copyFluids) {
         if (!held(player)) {
             return;
         }
@@ -256,7 +256,8 @@ public final class BlueprintActions {
                 session.editingId(),
                 session.dimension(),
                 session.cornerA(),
-                session.cornerB());
+                session.cornerB(),
+                copyFluids);
         if (!started) {
             session.setMode(BlueprintSessions.Mode.CAPTURE);
             BlueprintNetwork.syncCapture(player);

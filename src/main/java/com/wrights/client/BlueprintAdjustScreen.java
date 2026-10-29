@@ -5,8 +5,10 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 import net.neoforged.neoforge.network.PacketDistributor;
 
+import com.wrights.WrightsClientConfig;
 import com.wrights.blueprint.BoxEdits;
 import com.wrights.network.BlueprintPayloads;
 
@@ -25,6 +27,20 @@ public class BlueprintAdjustScreen extends Screen {
     private WrightsButton saveButton;
     private WrightsButton resetButton;
     private boolean suppress;
+    private int modelX;
+    private int modelY;
+    private int modelW;
+    private int modelH;
+    private int fluidX;
+    private int fluidY;
+    private boolean spinning;
+    private float yaw = 35.0F;
+    private float pitch = 28.0F;
+    private BlockPos previewA;
+    private BlockPos previewB;
+    private boolean previewFluids;
+    private boolean previewReady;
+    private SelectionPreview.Shot preview = SelectionPreview.Shot.empty();
 
     public BlueprintAdjustScreen() {
         super(Component.translatable("screen.wrights.adjust"));
@@ -32,7 +48,7 @@ public class BlueprintAdjustScreen extends Screen {
 
     @Override
     protected void init() {
-        panelW = 214;
+        panelW = 392;
         panelH = 268;
         panelX = Math.max(8, (this.width - panelW) / 2);
         panelY = Math.max(6, (this.height - panelH) / 2);
@@ -98,14 +114,15 @@ public class BlueprintAdjustScreen extends Screen {
         axis(graphics, panelY + 138, "X");
         axis(graphics, panelY + 156, "Y");
         axis(graphics, panelY + 174, "Z");
+        renderModel(graphics);
         if (WrightsClientState.cornerA != null && WrightsClientState.cornerB != null) {
-            graphics.drawString(this.font, Component.translatable(
+            graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable(
                     "screen.wrights.volume",
                     BoxEdits.span(WrightsClientState.cornerA, WrightsClientState.cornerB, 0),
                     BoxEdits.span(WrightsClientState.cornerA, WrightsClientState.cornerB, 1),
                     BoxEdits.span(WrightsClientState.cornerA, WrightsClientState.cornerB, 2),
                     BoxEdits.volume(WrightsClientState.cornerA, WrightsClientState.cornerB),
-                    WrightsClientState.solidSelection()), panelX + 12, panelY + 192, WrightsUi.MUTED, false);
+                    WrightsClientState.solidSelection()).getString(), 198), panelX + 12, panelY + 192, WrightsUi.MUTED, false);
         } else {
             graphics.drawString(this.font, Component.translatable("hud.wrights.capture"), panelX + 12, panelY + 192, WrightsUi.MUTED, false);
         }
@@ -199,7 +216,7 @@ public class BlueprintAdjustScreen extends Screen {
         }
         WrightsClientState.name = nameBox.getValue();
         WrightsClientState.markSaving();
-        PacketDistributor.sendToServer(new BlueprintPayloads.CaptureConfirm(nameBox.getValue()));
+        PacketDistributor.sendToServer(new BlueprintPayloads.CaptureConfirm(nameBox.getValue(), WrightsClientConfig.COPY_FLUIDS.get()));
         this.minecraft.setScreen(null);
     }
 
@@ -257,5 +274,91 @@ public class BlueprintAdjustScreen extends Screen {
 
     private void axis(GuiGraphics graphics, int y, String label) {
         graphics.drawString(this.font, label, panelX + 134, y, WrightsUi.MUTED, false);
+    }
+
+    private void renderModel(GuiGraphics graphics) {
+        modelX = panelX + 222;
+        modelY = panelY + 28;
+        modelW = panelW - 234;
+        modelH = 176;
+        fluidX = modelX;
+        fluidY = modelY + modelH + 14;
+        WrightsUi.inset(graphics, modelX - 4, modelY - 4, modelW + 8, modelH + 8);
+        ensurePreview();
+        if (!spinning) {
+            yaw += 0.35F;
+        }
+        if (preview.concealed()) {
+            graphics.drawCenteredString(this.font, Component.translatable("screen.wrights.preview_hidden"), modelX + modelW / 2, modelY + modelH / 2, WrightsUi.MUTED);
+        } else if (!preview.ghosts().isEmpty()) {
+            BlueprintModelView.render(graphics, modelX, modelY, modelW, modelH, preview.ghosts(), preview.sizeX(), preview.sizeY(), preview.sizeZ(), yaw, pitch);
+            graphics.drawCenteredString(this.font, Component.translatable("menu.wrights.spin"), modelX + modelW / 2, modelY + modelH - 10, WrightsUi.MUTED);
+        } else if (WrightsClientState.cornerA != null && WrightsClientState.cornerB != null) {
+            graphics.drawCenteredString(this.font, Component.translatable("message.wrights.copy_empty"), modelX + modelW / 2, modelY + modelH / 2, WrightsUi.MUTED);
+        }
+        boolean fluids = WrightsClientConfig.COPY_FLUIDS.get();
+        graphics.fill(fluidX, fluidY, fluidX + 12, fluidY + 12, 0xFF18222C);
+        WrightsUi.border(graphics, fluidX, fluidY, 12, 12, fluids ? WrightsUi.COPPER : 0xFF3D4E5E);
+        if (fluids) {
+            graphics.fill(fluidX + 3, fluidY + 3, fluidX + 9, fluidY + 9, WrightsUi.COPPER);
+        }
+        graphics.drawString(this.font, Component.translatable("screen.wrights.copy_fluids"), fluidX + 16, fluidY + 2, WrightsUi.TEXT, false);
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("screen.wrights.copy_fluids_hint").getString(), modelW - 4), fluidX, fluidY + 16, WrightsUi.MUTED, false);
+    }
+
+    private void ensurePreview() {
+        BlockPos first = WrightsClientState.cornerA;
+        BlockPos second = WrightsClientState.cornerB;
+        boolean fluids = WrightsClientConfig.COPY_FLUIDS.get();
+        if (previewReady && same(previewA, first) && same(previewB, second) && previewFluids == fluids) {
+            return;
+        }
+        previewA = first;
+        previewB = second;
+        previewFluids = fluids;
+        previewReady = true;
+        preview = this.minecraft == null
+                ? SelectionPreview.Shot.empty()
+                : SelectionPreview.capture(this.minecraft.level, first, second, fluids);
+    }
+
+    private static boolean same(BlockPos left, BlockPos right) {
+        return left == null ? right == null : left.equals(right);
+    }
+
+    private boolean insideModel(double mouseX, double mouseY) {
+        return mouseX >= modelX && mouseX < modelX + modelW && mouseY >= modelY && mouseY < modelY + modelH;
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 0 && mouseX >= fluidX && mouseX < fluidX + modelW && mouseY >= fluidY && mouseY < fluidY + 28) {
+            WrightsClientConfig.setCopyFluids(!WrightsClientConfig.COPY_FLUIDS.get());
+            previewReady = false;
+            return true;
+        }
+        if (button == 0 && insideModel(mouseX, mouseY)) {
+            spinning = true;
+            return true;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (spinning && button == 0) {
+            yaw += (float) dragX * 0.75F;
+            pitch = Mth.clamp(pitch + (float) dragY * 0.45F, -70.0F, 70.0F);
+            return true;
+        }
+        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (button == 0) {
+            spinning = false;
+        }
+        return super.mouseReleased(mouseX, mouseY, button);
     }
 }

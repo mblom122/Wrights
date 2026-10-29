@@ -58,6 +58,7 @@ public final class BuildJob {
     private Phase phase = Phase.RUNNING;
     private int messageDelay;
     private String blueprintName;
+    private boolean copyFluids;
     private UUID replaceSchematicId;
     private int clipX = Integer.MAX_VALUE;
     private int clipY = Integer.MAX_VALUE;
@@ -345,6 +346,14 @@ public final class BuildJob {
 
     public void setBlueprintName(String blueprintName) {
         this.blueprintName = blueprintName;
+    }
+
+    public boolean copyFluids() {
+        return copyFluids;
+    }
+
+    public void setCopyFluids(boolean copyFluids) {
+        this.copyFluids = copyFluids;
     }
 
     public UUID replaceSchematicId() {
@@ -677,6 +686,7 @@ public final class BuildJob {
         if (blueprintName != null) {
             tag.putString("blueprintName", blueprintName);
         }
+        tag.putBoolean("copyFluids", copyFluids);
         if (replaceSchematicId != null) {
             tag.putUUID("replace", replaceSchematicId);
         }
@@ -793,6 +803,7 @@ public final class BuildJob {
         if (tag.contains("blueprintName")) {
             job.blueprintName = tag.getString("blueprintName");
         }
+        job.copyFluids = tag.getBoolean("copyFluids");
         if (tag.hasUUID("replace")) {
             job.replaceSchematicId = tag.getUUID("replace");
         }

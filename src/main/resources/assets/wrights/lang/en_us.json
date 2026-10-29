@@ -173,6 +173,8 @@
   "screen.wrights.reset": "Set corners again",
   "screen.wrights.reset_box": "Set the box again",
   "screen.wrights.volume": "%s x %s x %s, box %s, blocks %s",
+  "screen.wrights.copy_fluids": "Copy fluids",
+  "screen.wrights.copy_fluids_hint": "Also save water and lava.",
   "screen.wrights.place": "Place blueprint",
   "screen.wrights.send": "Build",
   "screen.wrights.rotate": "Rotate",

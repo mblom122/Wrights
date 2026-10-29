@@ -24,12 +24,19 @@ public final class BlockFilters {
      * Block entities are refused so chests and machines cannot duplicate their contents.
      */
     public static boolean canCopy(BlockGetter level, BlockPos pos, BlockState state) {
+        return canCopy(level, pos, state, false);
+    }
+
+    /** {@code fluids} also keeps water and lava. Those blocks have no item to pay with. */
+    public static boolean canCopy(BlockGetter level, BlockPos pos, BlockState state, boolean fluids) {
         if (state.isAir() || state.hasBlockEntity()) {
             return false;
         }
         var block = state.getBlock();
-        if (block instanceof LiquidBlock
-                || block instanceof NetherPortalBlock
+        if (block instanceof LiquidBlock) {
+            return fluids;
+        }
+        if (block instanceof NetherPortalBlock
                 || block instanceof EndPortalBlock
                 || block instanceof EndGatewayBlock
                 || block instanceof PistonHeadBlock
@@ -40,6 +47,10 @@ public final class BlockFilters {
             return false;
         }
         return block.asItem() != Items.AIR;
+    }
+
+    public static boolean isFluid(BlockState state) {
+        return state.getBlock() instanceof LiquidBlock;
     }
 
     public static boolean canStore(BlockState state) {

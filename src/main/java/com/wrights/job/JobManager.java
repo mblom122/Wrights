@@ -505,7 +505,7 @@ public final class JobManager {
         launched(player, job);
     }
 
-    public static boolean startBlueprintSave(ServerPlayer player, String name, UUID replaceId, ResourceKey<Level> dimension, BlockPos cornerA, BlockPos cornerB) {
+    public static boolean startBlueprintSave(ServerPlayer player, String name, UUID replaceId, ResourceKey<Level> dimension, BlockPos cornerA, BlockPos cornerB, boolean copyFluids) {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         if (hasCopy(library, player.getUUID())) {
             Messages.actionBar(player, "message.wrights.busy");
@@ -525,6 +525,7 @@ public final class JobManager {
                 Math.max(cornerA.getZ(), cornerB.getZ()));
         BuildJob job = BuildJob.copy(player.getUUID(), player.getUUID(), dimension, min, max);
         job.setBlueprintName(name);
+        job.setCopyFluids(copyFluids);
         job.setReplaceSchematicId(replaceId);
         library.addJob(job);
         Messages.actionBar(player, "message.wrights.saving");
@@ -671,7 +672,7 @@ public final class JobManager {
     }
 
     private static boolean canStore(ServerLevel level, BuildJob job, BlockPos pos, BlockState state) {
-        if (!BlockFilters.canCopy(level, pos, state)) {
+        if (!BlockFilters.canCopy(level, pos, state, job.copyFluids())) {
             return false;
         }
         if (!BlockFilters.isSecondary(state)) {
@@ -2567,7 +2568,7 @@ public final class JobManager {
                 job.skippedOne();
                 return PlaceResult.DONE;
             }
-        } else if (!freePlace(player)) {
+        } else if (!freePlace(player) && !BlockFilters.isFluid(state)) {
             if (job.supplyPos() != null && supply(level, player, job) == null) {
                 if (job.tickMessage()) {
                     Messages.actionBar(player, "message.wrights.supply_missing");
@@ -2605,10 +2606,11 @@ public final class JobManager {
             job.skippedOne();
             return PlaceResult.DONE;
         }
-        if (!entry.secondary() && !freePlace(player)) {
+        boolean paid = !entry.secondary() && !freePlace(player) && !BlockFilters.isFluid(state);
+        if (paid) {
             consumeItem(player, level, job, state.getBlock().asItem());
         }
-        job.recordPlaced(entry.x(), entry.y(), entry.z(), after, !entry.secondary() && !freePlace(player));
+        job.recordPlaced(entry.x(), entry.y(), entry.z(), after, paid);
         if (!quiet) {
             level.gameEvent(player, GameEvent.BLOCK_PLACE, pos);
             level.playSound(null, pos, state.getSoundType(level, pos, player).getPlaceSound(), SoundSource.BLOCKS, 1.0F, 1.0F);
