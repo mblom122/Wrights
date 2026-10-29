@@ -1,8 +1,5 @@
 package com.wrights.item;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -12,7 +9,6 @@ import java.util.UUID;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
@@ -64,9 +60,9 @@ public final class BlueprintFolders {
             return;
         }
         Node tree = fromLibrary(library, folderId);
-        CompoundTag tag = save(tree);
-        if (!fits(tag)) {
-            Messages.actionBar(player, "message.wrights.slip_too_big");
+        CompoundTag tag = pack(save(tree), countFolders(tree), countBlueprints(tree));
+        if (tag == null) {
+            Messages.actionBar(player, "message.wrights.slip_folder_too_big");
             return;
         }
         Inventory inventory = player.getInventory();
@@ -386,7 +382,10 @@ public final class BlueprintFolders {
             return null;
         }
         try {
-            CompoundTag tag = BlueprintFolderItem.data(stack);
+            CompoundTag tag = expand(BlueprintFolderItem.data(stack));
+            if (tag == null) {
+                return null;
+            }
             ListTag entries = tag.getList("entries", Tag.TAG_COMPOUND);
             if (entries.isEmpty()) {
                 return null;
@@ -480,14 +479,25 @@ public final class BlueprintFolders {
         return slots;
     }
 
-    private static boolean fits(CompoundTag tag) {
-        try {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            NbtIo.write(tag, new DataOutputStream(out));
-            return out.size() <= MAX_BYTES;
-        } catch (IOException ignored) {
-            return false;
+    /** Stores the folder gzipped. Block lists shrink a lot, so a folder of large blueprints still fits on the item. */
+    private static CompoundTag pack(CompoundTag logical, int folders, int blueprints) {
+        byte[] gzip = ClipboardExchange.encode(logical);
+        if (gzip == null || gzip.length > MAX_BYTES) {
+            return null;
         }
+        CompoundTag packed = new CompoundTag();
+        packed.putString("name", logical.getString("name"));
+        packed.putInt("folders", folders);
+        packed.putInt("blueprints", blueprints);
+        packed.putByteArray("gzip", gzip);
+        return packed;
+    }
+
+    private static CompoundTag expand(CompoundTag tag) {
+        if (tag == null || !tag.contains("gzip")) {
+            return tag;
+        }
+        return ClipboardExchange.decode(tag.getByteArray("gzip"));
     }
 
     private static final class Node {

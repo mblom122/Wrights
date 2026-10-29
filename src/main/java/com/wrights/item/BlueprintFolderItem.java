@@ -22,7 +22,7 @@ public class BlueprintFolderItem extends Item {
 
     public static boolean hasData(ItemStack stack) {
         CompoundTag tag = data(stack);
-        return tag != null && tag.contains("entries");
+        return tag != null && (tag.contains("entries") || tag.contains("gzip"));
     }
 
     public static CompoundTag data(ItemStack stack) {
@@ -45,14 +45,21 @@ public class BlueprintFolderItem extends Item {
             tooltip.add(Component.translatable("item.wrights.blueprint_folder.hint_empty").withStyle(ChatFormatting.GRAY));
             return;
         }
-        int folders = 0;
-        int blueprints = 0;
-        ListTag entries = tag.getList("entries", Tag.TAG_COMPOUND);
-        for (int i = 0; i < entries.size(); i++) {
-            if (entries.getCompound(i).getBoolean("folder")) {
-                folders++;
-            } else {
-                blueprints++;
+        int folders;
+        int blueprints;
+        if (tag.contains("gzip")) {
+            folders = tag.getInt("folders");
+            blueprints = tag.getInt("blueprints");
+        } else {
+            folders = 0;
+            blueprints = 0;
+            ListTag entries = tag.getList("entries", Tag.TAG_COMPOUND);
+            for (int i = 0; i < entries.size(); i++) {
+                if (entries.getCompound(i).getBoolean("folder")) {
+                    folders++;
+                } else {
+                    blueprints++;
+                }
             }
         }
         tooltip.add(Component.translatable("item.wrights.blueprint_folder.stored", folders, blueprints).withStyle(ChatFormatting.BLUE));

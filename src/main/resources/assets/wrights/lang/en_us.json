@@ -343,6 +343,7 @@
   "message.wrights.slip_saved": "Copied %s onto a blueprint",
   "message.wrights.slip_need_blank": "You need an empty blueprint item",
   "message.wrights.slip_too_big": "That blueprint is too large to store on an item",
+  "message.wrights.slip_folder_too_big": "That folder is too large to store on an item",
   "message.wrights.slip_loaded": "Loaded %s",
   "message.wrights.slip_replaced": "Replaced %s with the copy on this blueprint",
   "message.wrights.slip_same": "That item is an exact copy of %s",
