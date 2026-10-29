@@ -16,10 +16,17 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.Container;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -54,11 +61,81 @@ public final class SelectionRenderer {
         boolean gui = minecraft.screen != null;
         if (!gui && (AutobotsClientState.mode == AutobotsClientState.Mode.CAPTURE || AutobotsClientState.mode == AutobotsClientState.Mode.SAVING)) {
             drawCapture(pose, buffers, camera);
-        } else if ((!gui || placing) && AutobotsClientState.mode == AutobotsClientState.Mode.BUILD) {
+        } else if ((!gui || placing) && AutobotsClientState.mode == AutobotsClientState.Mode.BUILD && !AutobotsClientState.bindSupply) {
             drawPreview(pose, buffers, camera);
+        }
+        if ((!gui || placing) && AutobotsClientState.mode == AutobotsClientState.Mode.BUILD && (AutobotsClientState.bindSupply || AutobotsClientState.supplyBound)) {
+            drawSupplyMarkers(pose, buffers, camera, minecraft);
         }
         drawActiveBuilds(pose, buffers, camera, minecraft, !gui);
         drawMarkedJobs(pose, buffers, camera, minecraft);
+    }
+
+    public static BlockPos supplyTarget(Minecraft minecraft) {
+        if (minecraft.level == null || minecraft.player == null || !(minecraft.hitResult instanceof BlockHitResult hit) || hit.getType() != HitResult.Type.BLOCK) {
+            return null;
+        }
+        BlockPos pos = hit.getBlockPos();
+        if (!isSupplyContainer(minecraft.level, pos) || minecraft.player.distanceToSqr(Vec3.atCenterOf(pos)) > 96.0D * 96.0D) {
+            return null;
+        }
+        return pos;
+    }
+
+    public static boolean isSupplyContainer(Level level, BlockPos pos) {
+        BlockState state = level.getBlockState(pos);
+        if (state.getBlock() instanceof ChestBlock) {
+            return true;
+        }
+        BlockEntity entity = level.getBlockEntity(pos);
+        return entity instanceof Container;
+    }
+
+    private static void drawSupplyMarkers(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
+        Level level = minecraft.level;
+        if (level == null) {
+            return;
+        }
+        BlockPos bound = AutobotsClientState.supplyBound ? AutobotsClientState.supplyPos : null;
+        BlockPos aim = AutobotsClientState.bindSupply ? supplyTarget(minecraft) : null;
+        if (bound != null && !level.isLoaded(bound)) {
+            bound = null;
+        }
+        boolean same = bound != null && aim != null && sameContainer(level, bound, aim);
+        VertexConsumer lines = buffers.getBuffer(RenderType.lines());
+        boolean any = false;
+        if (bound != null && !same) {
+            drawBox(pose, lines, supplyBox(level, bound), camera, 0.35F, 0.62F, 1.0F, 1.0F);
+            any = true;
+        }
+        if (aim != null) {
+            drawBox(pose, lines, supplyBox(level, aim), camera, 0.95F, 0.78F, 0.22F, 1.0F);
+            any = true;
+        }
+        if (any) {
+            buffers.endBatch(RenderType.lines());
+        }
+    }
+
+    private static boolean sameContainer(Level level, BlockPos first, BlockPos second) {
+        return first.equals(second) || connectedChest(level, first).equals(second) || connectedChest(level, second).equals(first);
+    }
+
+    private static BlockPos connectedChest(Level level, BlockPos pos) {
+        BlockState state = level.getBlockState(pos);
+        if (state.getBlock() instanceof ChestBlock && state.getValue(ChestBlock.TYPE) != ChestType.SINGLE) {
+            return pos.relative(ChestBlock.getConnectedDirection(state));
+        }
+        return pos;
+    }
+
+    private static AABB supplyBox(Level level, BlockPos pos) {
+        AABB box = new AABB(pos.getX(), pos.getY(), pos.getZ(), pos.getX() + 1.0D, pos.getY() + 1.0D, pos.getZ() + 1.0D);
+        BlockPos other = connectedChest(level, pos);
+        if (!other.equals(pos)) {
+            box = box.minmax(new AABB(other.getX(), other.getY(), other.getZ(), other.getX() + 1.0D, other.getY() + 1.0D, other.getZ() + 1.0D));
+        }
+        return box.inflate(0.02D);
     }
 
     private static void drawMarkedJobs(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {

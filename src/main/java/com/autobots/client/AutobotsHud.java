@@ -2,6 +2,7 @@ package com.autobots.client;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -54,13 +55,12 @@ public final class AutobotsHud {
         } else if (AutobotsClientState.mode == AutobotsClientState.Mode.SAVING) {
             line = Component.translatable("hud.autobots.saving", AutobotsClientState.name);
         } else if (AutobotsClientState.mode == AutobotsClientState.Mode.BUILD) {
-            line = Component.translatable("hud.autobots.build", AutobotsClientState.buildName);
             if (AutobotsClientState.bindSupply) {
-                sub = Component.translatable("hud.autobots.bind_sub");
-            } else if (AutobotsClientState.supplyBound) {
-                sub = Component.translatable("hud.autobots.build_chest");
+                line = supplyChoice(minecraft);
+                sub = Component.translatable("hud.autobots.bind_explain");
             } else {
-                sub = Component.translatable("hud.autobots.build_inventory");
+                line = Component.translatable("hud.autobots.build", AutobotsClientState.buildName);
+                sub = Component.translatable(AutobotsClientState.supplyBound ? "hud.autobots.build_chest" : "hud.autobots.build_inventory");
             }
         } else if (AutobotsClientState.mode == AutobotsClientState.Mode.NONE) {
             line = Component.translatable("hud.autobots.task_ready_sub");
@@ -120,9 +120,7 @@ public final class AutobotsHud {
 
     private static void drawBuildModes(GuiGraphics graphics, Minecraft minecraft) {
         Component title = Component.translatable("hud.autobots.build_modes");
-        Component how = AutobotsClientState.styleAnnounce
-                ? Component.translatable("hud.autobots.mode_now", Component.translatable(AutobotsClientState.bindSupply ? "hud.autobots.tool_bind" : "hud.autobots.tool_build"))
-                : Component.translatable("hud.autobots.mode_how");
+        Component how = Component.translatable(AutobotsClientState.bindSupply ? "hud.autobots.bind_explain" : "hud.autobots.build_explain");
         Component build = Component.translatable("hud.autobots.tool_build");
         Component bind = Component.translatable("hud.autobots.tool_bind");
         Component selected = Component.translatable("hud.autobots.mode_selected");
@@ -181,6 +179,14 @@ public final class AutobotsHud {
         drawModeRow(graphics, minecraft, x, y + 24 + row * 2, width, AutobotsClientState.CaptureStyle.MOVE, move, selected, canMove, need);
         int foot = AutobotsClientState.styleAnnounce ? 0xFFF2C14E : AutobotsUi.MUTED;
         graphics.drawString(minecraft.font, how, x + 12, y + height - 14, foot, false);
+    }
+
+    private static Component supplyChoice(Minecraft minecraft) {
+        BlockPos aim = SelectionRenderer.supplyTarget(minecraft);
+        if (aim == null || minecraft.level == null) {
+            return Component.translatable("hud.autobots.supply_yours");
+        }
+        return minecraft.level.getBlockState(aim).getBlock().getName();
     }
 
     private static Component volumeLine() {
