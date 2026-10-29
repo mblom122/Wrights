@@ -438,12 +438,15 @@ public class WrightsMenuScreen extends Screen {
         if (toItemButton != null && fromItemsButton != null) {
             int slipY = panelY + panelH - 48;
             int half = Math.max(36, (detailW - 8) / 2);
+            boolean folderRow = row != null && row.folder();
             toItemButton.visible = building;
-            toItemButton.active = blueprint;
+            toItemButton.active = blueprint || folderRow;
+            toItemButton.setMessage(Component.translatable(folderRow ? "menu.wrights.to_folder" : "menu.wrights.to_item"));
             toItemButton.setX(detailX + 4);
             toItemButton.setY(slipY);
             toItemButton.setWidth(half);
             fromItemsButton.visible = building;
+            fromItemsButton.setMessage(Component.translatable(folderRow ? "menu.wrights.from_folders" : "menu.wrights.from_items"));
             fromItemsButton.setX(detailX + 8 + half);
             fromItemsButton.setY(slipY);
             fromItemsButton.setWidth(Math.max(36, detailW - half - 12));
@@ -1688,14 +1691,24 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private void saveToItem() {
-        BlueprintPayloads.Summary summary = selected();
-        if (summary == null) {
+        BlueprintList.Row row = selectedRow();
+        if (row == null) {
             return;
         }
-        PacketDistributor.sendToServer(new BlueprintPayloads.WriteBlueprintItem(-1, summary.id()));
+        if (row.folder()) {
+            PacketDistributor.sendToServer(new BlueprintPayloads.WriteFolderItem(-1, row.id()));
+            return;
+        }
+        PacketDistributor.sendToServer(new BlueprintPayloads.WriteBlueprintItem(-1, row.id()));
     }
 
     private void openBlueprintItems() {
+        BlueprintList.Row row = selectedRow();
+        if (row != null && row.folder()) {
+            this.minecraft.setScreen(new FolderLoadScreen(this));
+            PacketDistributor.sendToServer(new BlueprintPayloads.RequestFolderItems());
+            return;
+        }
         this.minecraft.setScreen(new BlueprintLoadScreen(this));
         PacketDistributor.sendToServer(new BlueprintPayloads.RequestBlueprintItems());
     }

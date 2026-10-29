@@ -233,6 +233,26 @@ public final class BlueprintShelf {
         }
     }
 
+    /** Removes a folder record. Children should already have been moved or removed. */
+    public void removeFolder(UUID id) {
+        if (folders.remove(id) == null) {
+            return;
+        }
+        order.remove(id);
+        schematicParent.entrySet().removeIf(entry -> id.equals(entry.getValue()));
+        for (Folder folder : folders.values()) {
+            if (id.equals(folder.parent)) {
+                folder.parent = null;
+            }
+        }
+        for (Person person : people.values()) {
+            person.favorites.remove(id);
+            person.open.remove(id);
+            person.uses.remove(id);
+            person.lastUsed.remove(id);
+        }
+    }
+
     public void forget(UUID schematicId) {
         schematicParent.remove(schematicId);
         order.remove(schematicId);

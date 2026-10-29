@@ -2,6 +2,7 @@ package com.wrights.client;
 
 import com.wrights.WrightsMod;
 import com.wrights.entity.ModEntities;
+import com.wrights.item.BlueprintFolderItem;
 import com.wrights.item.BlueprintItem;
 import com.wrights.item.ModItems;
 import com.wrights.menu.ModMenus;
@@ -46,6 +47,10 @@ public class WrightsClient {
                 ModItems.BLUEPRINT.get(),
                 ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "filled"),
                 (stack, level, entity, seed) -> BlueprintItem.hasData(stack) ? 1.0F : 0.0F));
+        event.enqueueWork(() -> ItemProperties.register(
+                ModItems.BLUEPRINT_FOLDER.get(),
+                ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "filled"),
+                (stack, level, entity, seed) -> BlueprintFolderItem.hasData(stack) ? 1.0F : 0.0F));
     }
 
     @SubscribeEvent

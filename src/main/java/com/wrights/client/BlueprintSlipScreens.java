@@ -22,8 +22,25 @@ public final class BlueprintSlipScreens {
         }
     }
 
+    public static void openFolder(int slot, boolean filled) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (filled) {
+            minecraft.setScreen(new FolderLoadScreen(null));
+            PacketDistributor.sendToServer(new BlueprintPayloads.RequestFolderItems());
+        } else {
+            minecraft.setScreen(new FolderSaveScreen(slot, null));
+            PacketDistributor.sendToServer(new BlueprintPayloads.RequestSlipLibrary());
+        }
+    }
+
     public static void applyItems(List<BlueprintPayloads.BlueprintItemLine> lines) {
         if (Minecraft.getInstance().screen instanceof BlueprintLoadScreen screen) {
+            screen.apply(lines);
+        }
+    }
+
+    public static void applyFolders(List<BlueprintPayloads.FolderItemLine> lines) {
+        if (Minecraft.getInstance().screen instanceof FolderLoadScreen screen) {
             screen.apply(lines);
         }
     }

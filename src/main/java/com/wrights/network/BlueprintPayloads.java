@@ -1043,6 +1043,89 @@ public final class BlueprintPayloads {
         }
     }
 
+    public record RequestFolderItems() implements CustomPacketPayload {
+        public static final Type<RequestFolderItems> TYPE = payloadType("request_folder_items");
+        public static final StreamCodec<RegistryFriendlyByteBuf, RequestFolderItems> STREAM_CODEC = empty(new RequestFolderItems());
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record FolderItemLine(int slot, String name, int folders, int blueprints, int kind, String nextName, int libraryBlueprints) {
+        public void write(RegistryFriendlyByteBuf buf) {
+            buf.writeVarInt(slot);
+            buf.writeUtf(name, 48);
+            buf.writeVarInt(folders);
+            buf.writeVarInt(blueprints);
+            buf.writeByte(kind);
+            buf.writeUtf(nextName, 48);
+            buf.writeVarInt(libraryBlueprints + 1);
+        }
+
+        public static FolderItemLine read(RegistryFriendlyByteBuf buf) {
+            return new FolderItemLine(buf.readVarInt(), buf.readUtf(48), buf.readVarInt(), buf.readVarInt(), buf.readByte(), buf.readUtf(48), buf.readVarInt() - 1);
+        }
+    }
+
+    public record FolderItemList(List<FolderItemLine> lines) implements CustomPacketPayload {
+        public static final Type<FolderItemList> TYPE = payloadType("folder_item_list");
+        public static final StreamCodec<RegistryFriendlyByteBuf, FolderItemList> STREAM_CODEC = StreamCodec.of((buf, value) -> value.write(buf), FolderItemList::read);
+
+        public void write(RegistryFriendlyByteBuf buf) {
+            buf.writeVarInt(lines.size());
+            for (FolderItemLine line : lines) {
+                line.write(buf);
+            }
+        }
+
+        public static FolderItemList read(RegistryFriendlyByteBuf buf) {
+            int count = buf.readVarInt();
+            List<FolderItemLine> lines = new ArrayList<>(count);
+            for (int i = 0; i < count; i++) {
+                lines.add(FolderItemLine.read(buf));
+            }
+            return new FolderItemList(lines);
+        }
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record WriteFolderItem(int slot, UUID folderId) implements CustomPacketPayload {
+        public static final Type<WriteFolderItem> TYPE = payloadType("write_folder_item");
+        public static final StreamCodec<RegistryFriendlyByteBuf, WriteFolderItem> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeVarInt(value.slot + 1);
+                    buf.writeUUID(value.folderId);
+                },
+                buf -> new WriteFolderItem(buf.readVarInt() - 1, buf.readUUID()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record LoadFolderItem(int slot, int mode, String name) implements CustomPacketPayload {
+        public static final Type<LoadFolderItem> TYPE = payloadType("load_folder_item");
+        public static final StreamCodec<RegistryFriendlyByteBuf, LoadFolderItem> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeVarInt(value.slot);
+                    buf.writeByte(value.mode);
+                    buf.writeUtf(value.name == null ? "" : value.name, 48);
+                },
+                buf -> new LoadFolderItem(buf.readVarInt(), buf.readByte(), buf.readUtf(48)));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public record SaveSession() implements CustomPacketPayload {
         public static final Type<SaveSession> TYPE = payloadType("save_session");
         public static final StreamCodec<RegistryFriendlyByteBuf, SaveSession> STREAM_CODEC = empty(new SaveSession());

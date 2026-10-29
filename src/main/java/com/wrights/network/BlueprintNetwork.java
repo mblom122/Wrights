@@ -60,6 +60,9 @@ public final class BlueprintNetwork {
         registrar.playToServer(BlueprintPayloads.RequestSlipLibrary.TYPE, BlueprintPayloads.RequestSlipLibrary.STREAM_CODEC, BlueprintNetwork::requestSlipLibrary);
         registrar.playToServer(BlueprintPayloads.WriteBlueprintItem.TYPE, BlueprintPayloads.WriteBlueprintItem.STREAM_CODEC, BlueprintNetwork::writeBlueprintItem);
         registrar.playToServer(BlueprintPayloads.LoadBlueprintItem.TYPE, BlueprintPayloads.LoadBlueprintItem.STREAM_CODEC, BlueprintNetwork::loadBlueprintItem);
+        registrar.playToServer(BlueprintPayloads.RequestFolderItems.TYPE, BlueprintPayloads.RequestFolderItems.STREAM_CODEC, BlueprintNetwork::requestFolderItems);
+        registrar.playToServer(BlueprintPayloads.WriteFolderItem.TYPE, BlueprintPayloads.WriteFolderItem.STREAM_CODEC, BlueprintNetwork::writeFolderItem);
+        registrar.playToServer(BlueprintPayloads.LoadFolderItem.TYPE, BlueprintPayloads.LoadFolderItem.STREAM_CODEC, BlueprintNetwork::loadFolderItem);
 
         registrar.playToClient(BlueprintPayloads.LibrarySync.TYPE, BlueprintPayloads.LibrarySync.STREAM_CODEC, BlueprintNetwork::clientLibrary);
         registrar.playToClient(BlueprintPayloads.CaptureSync.TYPE, BlueprintPayloads.CaptureSync.STREAM_CODEC, BlueprintNetwork::clientCapture);
@@ -72,6 +75,7 @@ public final class BlueprintNetwork {
         registrar.playToClient(BlueprintPayloads.UndoPrompt.TYPE, BlueprintPayloads.UndoPrompt.STREAM_CODEC, BlueprintNetwork::clientUndoPrompt);
         registrar.playToClient(BlueprintPayloads.JobDone.TYPE, BlueprintPayloads.JobDone.STREAM_CODEC, BlueprintNetwork::clientJobDone);
         registrar.playToClient(BlueprintPayloads.BlueprintItemList.TYPE, BlueprintPayloads.BlueprintItemList.STREAM_CODEC, BlueprintNetwork::clientBlueprintItems);
+        registrar.playToClient(BlueprintPayloads.FolderItemList.TYPE, BlueprintPayloads.FolderItemList.STREAM_CODEC, BlueprintNetwork::clientFolderItems);
     }
 
     public static void syncLibrary(ServerPlayer player) {
@@ -398,6 +402,29 @@ public final class BlueprintNetwork {
 
     private static void loadBlueprintItem(BlueprintPayloads.LoadBlueprintItem payload, IPayloadContext context) {
         context.enqueueWork(() -> com.wrights.item.BlueprintSlips.load((ServerPlayer) context.player(), payload.slot(), payload.mode(), payload.name()));
+    }
+
+    public static void sendFolderItems(ServerPlayer player, java.util.List<BlueprintPayloads.FolderItemLine> lines) {
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.FolderItemList(lines));
+    }
+
+    private static void requestFolderItems(BlueprintPayloads.RequestFolderItems payload, IPayloadContext context) {
+        context.enqueueWork(() -> com.wrights.item.BlueprintFolders.sendList((ServerPlayer) context.player()));
+    }
+
+    private static void writeFolderItem(BlueprintPayloads.WriteFolderItem payload, IPayloadContext context) {
+        context.enqueueWork(() -> com.wrights.item.BlueprintFolders.write((ServerPlayer) context.player(), payload.slot(), payload.folderId()));
+    }
+
+    private static void loadFolderItem(BlueprintPayloads.LoadFolderItem payload, IPayloadContext context) {
+        context.enqueueWork(() -> com.wrights.item.BlueprintFolders.load((ServerPlayer) context.player(), payload.slot(), payload.mode(), payload.name()));
+    }
+
+    private static void clientFolderItems(BlueprintPayloads.FolderItemList payload, IPayloadContext context) {
+        if (FMLEnvironment.dist != Dist.CLIENT) {
+            return;
+        }
+        context.enqueueWork(() -> com.wrights.client.BlueprintSlipScreens.applyFolders(payload.lines()));
     }
 
     private static void clientBlueprintItems(BlueprintPayloads.BlueprintItemList payload, IPayloadContext context) {

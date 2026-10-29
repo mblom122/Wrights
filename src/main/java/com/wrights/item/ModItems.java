@@ -22,6 +22,8 @@ public final class ModItems {
 
     public static final DeferredItem<BlueprintItem> BLUEPRINT = ITEMS.register("blueprint", () -> new BlueprintItem(new net.minecraft.world.item.Item.Properties().stacksTo(16)));
 
+    public static final DeferredItem<BlueprintFolderItem> BLUEPRINT_FOLDER = ITEMS.register("blueprint_folder", () -> new BlueprintFolderItem(new net.minecraft.world.item.Item.Properties().stacksTo(16)));
+
     public static final DeferredItem<WrightItem> WRIGHT = ITEMS.register("wright", () -> new WrightItem(new net.minecraft.world.item.Item.Properties().stacksTo(64)));
 
     public static final DeferredItem<WrightUpgradeItem> UPGRADE_IRON = ITEMS.register("wright_upgrade_iron",

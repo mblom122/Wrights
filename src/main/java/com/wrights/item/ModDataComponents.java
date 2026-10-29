@@ -28,6 +28,11 @@ public final class ModDataComponents {
                     .persistent(CompoundTag.CODEC)
                     .networkSynchronized(ByteBufCodecs.TRUSTED_COMPOUND_TAG));
 
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<CompoundTag>> FOLDER =
+            DATA_COMPONENTS.registerComponentType("blueprint_folder", builder -> builder
+                    .persistent(CompoundTag.CODEC)
+                    .networkSynchronized(ByteBufCodecs.TRUSTED_COMPOUND_TAG));
+
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> WRIGHT_TIER =
             DATA_COMPONENTS.registerComponentType("wright_tier", builder -> builder
                     .persistent(Codec.INT)

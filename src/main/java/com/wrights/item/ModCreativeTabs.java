@@ -20,6 +20,7 @@ public final class ModCreativeTabs {
             .displayItems((parameters, output) -> {
                 output.accept(ModItems.CONTROLLER.get());
                 output.accept(ModItems.BLUEPRINT.get());
+                output.accept(ModItems.BLUEPRINT_FOLDER.get());
                 output.accept(ModItems.WRIGHT.get());
                 output.accept(ModItems.UPGRADE_IRON.get());
                 output.accept(ModItems.UPGRADE_GOLD.get());
