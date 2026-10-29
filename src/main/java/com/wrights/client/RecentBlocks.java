@@ -7,40 +7,56 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.Block;
 
 import com.wrights.WrightsClientConfig;
+import com.wrights.util.BlockFilters;
 
 public final class RecentBlocks {
     private static final int LIMIT = 18;
-    private static final List<Item> ITEMS = new ArrayList<>();
+    private static final List<String> ORDER = new ArrayList<>();
     private static boolean loaded;
 
     private RecentBlocks() {
     }
 
-    public static List<Item> items() {
+    public record Pick(Item item, Block fluid) {
+    }
+
+    public static List<Pick> picks() {
         load();
-        return List.copyOf(ITEMS);
+        List<Pick> out = new ArrayList<>();
+        for (String token : ORDER) {
+            Pick pick = decode(token);
+            if (pick != null) {
+                out.add(pick);
+            }
+        }
+        return out;
     }
 
     public static void remember(Item item) {
         if (!(item instanceof BlockItem)) {
             return;
         }
+        bump(BuiltInRegistries.ITEM.getKey(item).toString());
+    }
+
+    public static void rememberFluid(Block block) {
+        if (block == null || !BlockFilters.isSourceFluid(block.defaultBlockState())) {
+            return;
+        }
+        bump("~" + BuiltInRegistries.BLOCK.getKey(block));
+    }
+
+    private static void bump(String token) {
         load();
-        ITEMS.remove(item);
-        ITEMS.add(0, item);
-        if (ITEMS.size() > LIMIT) {
-            ITEMS.subList(LIMIT, ITEMS.size()).clear();
+        ORDER.remove(token);
+        ORDER.add(0, token);
+        if (ORDER.size() > LIMIT) {
+            ORDER.subList(LIMIT, ORDER.size()).clear();
         }
-        StringBuilder joined = new StringBuilder();
-        for (int i = 0; i < ITEMS.size(); i++) {
-            if (i > 0) {
-                joined.append(',');
-            }
-            joined.append(BuiltInRegistries.ITEM.getKey(ITEMS.get(i)));
-        }
-        WrightsClientConfig.setRecentBlocks(joined.toString());
+        WrightsClientConfig.setRecentBlocks(String.join(",", ORDER));
     }
 
     private static void load() {
@@ -53,18 +69,33 @@ public final class RecentBlocks {
             return;
         }
         for (String part : raw.split(",")) {
-            if (part.isBlank()) {
+            if (part.isBlank() || decode(part.trim()) == null || ORDER.contains(part.trim())) {
                 continue;
             }
-            ResourceLocation id = ResourceLocation.tryParse(part.trim());
-            if (id == null) {
-                continue;
-            }
-            BuiltInRegistries.ITEM.getOptional(id).ifPresent(item -> {
-                if (item instanceof BlockItem && !ITEMS.contains(item)) {
-                    ITEMS.add(item);
-                }
-            });
+            ORDER.add(part.trim());
         }
+    }
+
+    private static Pick decode(String token) {
+        if (token.startsWith("~")) {
+            ResourceLocation id = ResourceLocation.tryParse(token.substring(1));
+            if (id == null) {
+                return null;
+            }
+            Block block = BuiltInRegistries.BLOCK.getOptional(id).orElse(null);
+            if (block == null || !BlockFilters.isSourceFluid(block.defaultBlockState())) {
+                return null;
+            }
+            return new Pick(null, block);
+        }
+        ResourceLocation id = ResourceLocation.tryParse(token);
+        if (id == null) {
+            return null;
+        }
+        Item item = BuiltInRegistries.ITEM.getOptional(id).orElse(null);
+        if (!(item instanceof BlockItem)) {
+            return null;
+        }
+        return new Pick(item, null);
     }
 }

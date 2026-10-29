@@ -17,6 +17,7 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.network.BlueprintPayloads;
@@ -32,13 +33,14 @@ public class BlockPickerScreen extends Screen {
     private static final int COLS = 8;
     private static final int CELL = 18;
     private static List<Item> allBlocks;
+    private static List<Block> sourceFluids;
 
     private final Screen parent;
     private final UUID id;
     private final int cellX;
     private final int cellY;
     private final int cellZ;
-    private final List<ItemStack> shown = new ArrayList<>();
+    private final List<Choice> shown = new ArrayList<>();
     private EditBox search;
     private WrightsButton recentButton;
     private WrightsButton inventoryButton;
@@ -123,13 +125,15 @@ public class BlockPickerScreen extends Screen {
             int row = i / COLS;
             int x = listX + column * CELL;
             int y = listY + row * CELL;
-            ItemStack stack = shown.get(start + i);
+            ItemStack stack = shown.get(start + i).icon();
             boolean over = mouseX >= x && mouseX < x + CELL && mouseY >= y && mouseY < y + CELL;
             if (over) {
                 graphics.fill(x, y, x + CELL, y + CELL, 0x66F2D48A);
                 hovered = stack;
             }
-            graphics.renderItem(stack, x + 1, y + 1);
+            if (!stack.isEmpty()) {
+                graphics.renderItem(stack, x + 1, y + 1);
+            }
         }
         if (!hovered.isEmpty()) {
             graphics.renderTooltip(this.font, hovered, (int) mouseX, (int) mouseY);
@@ -144,8 +148,8 @@ public class BlockPickerScreen extends Screen {
             int rows = Math.max(1, (listH - 4) / CELL);
             if (column >= 0 && column < COLS && row >= 0 && row < rows) {
                 int index = (scroll + row) * COLS + column;
-                if (index >= 0 && index < shown.size() && shown.get(index).getItem() instanceof BlockItem blockItem) {
-                    choose(blockItem);
+                if (index >= 0 && index < shown.size()) {
+                    choose(shown.get(index));
                     return true;
                 }
             }
@@ -194,36 +198,71 @@ public class BlockPickerScreen extends Screen {
             scroll = 0;
         }
         shown.clear();
-        for (Item item : source()) {
-            ItemStack stack = new ItemStack(item);
-            if (!query.isEmpty() && !stack.getHoverName().getString().toLowerCase(Locale.ROOT).contains(query)) {
+        for (Choice choice : source()) {
+            if (!query.isEmpty() && !choice.icon().getHoverName().getString().toLowerCase(Locale.ROOT).contains(query)) {
                 continue;
             }
-            shown.add(stack);
+            shown.add(choice);
         }
     }
 
-    private List<Item> source() {
+    private List<Choice> source() {
+        List<Choice> choices = new ArrayList<>();
         if (tab == Tab.RECENT) {
-            return RecentBlocks.items();
+            for (RecentBlocks.Pick pick : RecentBlocks.picks()) {
+                if (pick.fluid() != null) {
+                    addFluid(choices, pick.fluid());
+                } else if (pick.item() instanceof BlockItem blockItem && BlockFilters.canStore(blockItem.getBlock().defaultBlockState())) {
+                    choices.add(Choice.ofBlock(blockItem));
+                }
+            }
+            return choices;
         }
         if (tab == Tab.INVENTORY) {
-            List<Item> items = new ArrayList<>();
             Set<Item> seen = new HashSet<>();
+            Set<Block> seenFluids = new HashSet<>();
             if (this.minecraft != null && this.minecraft.player != null) {
                 var inventory = this.minecraft.player.getInventory();
                 for (int i = 0; i < inventory.getContainerSize(); i++) {
                     ItemStack stack = inventory.getItem(i);
-                    if (stack.getItem() instanceof BlockItem blockItem
+                    Block fluid = fluidForBucket(stack.getItem());
+                    if (fluid != null && seenFluids.add(fluid)) {
+                        addFluid(choices, fluid);
+                    } else if (stack.getItem() instanceof BlockItem blockItem
                             && BlockFilters.canStore(blockItem.getBlock().defaultBlockState())
                             && seen.add(stack.getItem())) {
-                        items.add(stack.getItem());
+                        choices.add(Choice.ofBlock(blockItem));
                     }
                 }
             }
-            return items;
+            return choices;
         }
-        return allBlocks();
+        for (Block block : sourceFluids()) {
+            addFluid(choices, block);
+        }
+        for (Item item : allBlocks()) {
+            if (item instanceof BlockItem blockItem) {
+                choices.add(Choice.ofBlock(blockItem));
+            }
+        }
+        return choices;
+    }
+
+    private static void addFluid(List<Choice> choices, Block block) {
+        BlockState state = block.defaultBlockState();
+        ItemStack icon = BlockFilters.icon(state);
+        if (!icon.isEmpty() && BlockFilters.isSourceFluid(state)) {
+            choices.add(new Choice(icon, Block.getId(state)));
+        }
+    }
+
+    private static Block fluidForBucket(Item item) {
+        for (Block block : sourceFluids()) {
+            if (block.defaultBlockState().getFluidState().getType().getBucket() == item) {
+                return block;
+            }
+        }
+        return null;
     }
 
     private static List<Item> allBlocks() {
@@ -239,10 +278,33 @@ public class BlockPickerScreen extends Screen {
         return allBlocks;
     }
 
-    private void choose(BlockItem item) {
-        RecentBlocks.remember(item);
-        int stateId = Block.getId(item.getBlock().defaultBlockState());
-        PacketDistributor.sendToServer(new BlueprintPayloads.EditCell(id, cellX, cellY, cellZ, stateId, false));
+    private static List<Block> sourceFluids() {
+        if (sourceFluids != null) {
+            return sourceFluids;
+        }
+        sourceFluids = new ArrayList<>();
+        for (Block block : BuiltInRegistries.BLOCK) {
+            if (BlockFilters.isSourceFluid(block.defaultBlockState())) {
+                sourceFluids.add(block);
+            }
+        }
+        return sourceFluids;
+    }
+
+    private void choose(Choice choice) {
+        BlockState state = Block.stateById(choice.stateId());
+        if (BlockFilters.isSourceFluid(state)) {
+            RecentBlocks.rememberFluid(state.getBlock());
+        } else if (state.getBlock().asItem() instanceof BlockItem blockItem) {
+            RecentBlocks.remember(blockItem);
+        }
+        PacketDistributor.sendToServer(new BlueprintPayloads.EditCell(id, cellX, cellY, cellZ, choice.stateId(), false));
         this.minecraft.setScreen(parent);
+    }
+
+    private record Choice(ItemStack icon, int stateId) {
+        private static Choice ofBlock(BlockItem item) {
+            return new Choice(item.getDefaultInstance(), Block.getId(item.getBlock().defaultBlockState()));
+        }
     }
 }

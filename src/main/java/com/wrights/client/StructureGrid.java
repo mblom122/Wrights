@@ -114,7 +114,7 @@ public final class StructureGrid {
                 int cellX = originX + localX * cell;
                 int cellY = originY + localZ * cell;
                 BlockState state = Block.stateById(ghost.stateId());
-                ItemStack stack = new ItemStack(state.getBlock());
+                ItemStack stack = com.wrights.util.BlockFilters.icon(state);
                 if (!stack.isEmpty()) {
                     var pose = graphics.pose();
                     pose.pushPose();

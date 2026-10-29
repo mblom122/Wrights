@@ -1,6 +1,8 @@
 package com.wrights.util;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.DoorBlock;
@@ -14,6 +16,7 @@ import net.minecraft.world.level.block.piston.MovingPistonBlock;
 import net.minecraft.world.level.block.piston.PistonHeadBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
+import net.minecraft.world.level.material.FluidState;
 
 public final class BlockFilters {
     private BlockFilters() {
@@ -51,6 +54,32 @@ public final class BlockFilters {
 
     public static boolean isFluid(BlockState state) {
         return state.getBlock() instanceof LiquidBlock;
+    }
+
+    /** A full source, not a flowing level. Editing can place these; they are not paid for with an item. */
+    public static boolean isSourceFluid(BlockState state) {
+        return isFluid(state) && state.getFluidState().isSource();
+    }
+
+    /** A block the editor can write into a blueprint, including source fluids. */
+    public static boolean canEdit(BlockState state) {
+        return isSourceFluid(state) || canStore(state);
+    }
+
+    /** The stack shown for a stored block. Source fluids use their bucket, since the fluid block has no item. */
+    public static ItemStack icon(BlockState state) {
+        Item item = state.getBlock().asItem();
+        if (item != Items.AIR) {
+            return new ItemStack(item);
+        }
+        FluidState fluid = state.getFluidState();
+        if (!fluid.isEmpty()) {
+            Item bucket = fluid.getType().getBucket();
+            if (bucket != Items.AIR) {
+                return new ItemStack(bucket);
+            }
+        }
+        return ItemStack.EMPTY;
     }
 
     public static boolean canStore(BlockState state) {

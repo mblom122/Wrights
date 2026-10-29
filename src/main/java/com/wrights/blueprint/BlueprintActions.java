@@ -468,7 +468,7 @@ public final class BlueprintActions {
         }
         if (!remove) {
             net.minecraft.world.level.block.state.BlockState state = net.minecraft.world.level.block.Block.stateById(stateId);
-            if (!com.wrights.util.BlockFilters.canStore(state)) {
+            if (!com.wrights.util.BlockFilters.canEdit(state)) {
                 Messages.actionBar(player, "message.wrights.cannot_store");
                 return;
             }

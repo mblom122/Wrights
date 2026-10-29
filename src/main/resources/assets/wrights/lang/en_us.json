@@ -210,7 +210,7 @@
   "screen.wrights.center_short": "Center",
   "screen.wrights.center_hint": "Moves the anchor to the middle block.",
   "screen.wrights.ground_hint": "Moves the anchor to the bottom block.",
-  "screen.wrights.picker": "Change block",
+  "screen.wrights.picker": "Change block or fluid",
   "screen.wrights.picker_recent": "Recent",
   "screen.wrights.picker_inventory": "Inventory",
   "screen.wrights.picker_all": "All",
