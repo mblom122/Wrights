@@ -37,6 +37,11 @@ Hold the Autobot Controller.
 - Use on air while a paste is aimed: cancel the aim.
 - Sneak-use on air: stop the running job and dismiss the drone.
 
+Press **B** to open the Autobots menu. Blueprints are saved copies the drone can build again.
+
+- New: right-click sets corner 1, sneak-right-click sets corner 2. The gold box can be moved and resized, then saved.
+- Pick a blueprint and press Build. A hologram follows the block you look at. Sneak-right-click to type the position and size, then send the drone.
+
 Survival spends matching blocks from your inventory. Creative places them for free. The paste will not overwrite solid blocks. A door or tall plant costs one item. The drone pauses if you walk away or the chunk is not loaded, and it resumes when you come back.
 
 ## Test checklist

@@ -1,0 +1,585 @@
+package com.autobots.blueprint;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.level.block.Block;
+
+import com.autobots.AutobotsConfig;
+import com.autobots.item.ControllerItem;
+import com.autobots.job.JobManager;
+import com.autobots.network.BlueprintNetwork;
+import com.autobots.network.BlueprintPayloads;
+import com.autobots.schematic.Requirements;
+import com.autobots.schematic.Schematic;
+import com.autobots.schematic.SchematicLibrary;
+import com.autobots.util.Messages;
+
+public final class BlueprintActions {
+    private static final int PREVIEW_LIMIT = 3500;
+
+    private BlueprintActions() {
+    }
+
+    public static String cleanName(String raw) {
+        if (raw == null) {
+            return "Blueprint";
+        }
+        String trimmed = raw.trim().replace('\r', ' ').replace('\n', ' ');
+        if (trimmed.isEmpty()) {
+            return "Blueprint";
+        }
+        return trimmed.length() > 48 ? trimmed.substring(0, 48) : trimmed;
+    }
+
+    public static void requestLibrary(ServerPlayer player) {
+        if (!held(player)) {
+            return;
+        }
+        BlueprintNetwork.syncLibrary(player);
+    }
+
+    public static void startCapture(ServerPlayer player) {
+        if (!held(player)) {
+            return;
+        }
+        BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
+        session.startCapture(player.level().dimension());
+        BlueprintNetwork.syncCapture(player);
+        Messages.actionBar(player, "message.autobots.capture_first");
+    }
+
+    public static void pick(ServerPlayer player, BlockPos pos, int action) {
+        if (!held(player) || pos == null) {
+            return;
+        }
+        if (action == BlueprintPayloads.CapturePick.SECOND) {
+            setCorner(player, pos, true);
+        } else if (action == BlueprintPayloads.CapturePick.BOX_BEGIN) {
+            beginBox(player, pos);
+        } else if (action == BlueprintPayloads.CapturePick.BOX_COMMIT) {
+            commitBox(player, pos);
+        } else {
+            setCorner(player, pos, false);
+        }
+    }
+
+    public static void setCorner(ServerPlayer player, BlockPos pos, boolean wantSecond) {
+        if (!held(player)) {
+            return;
+        }
+        BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
+        if (session.mode() != BlueprintSessions.Mode.CAPTURE) {
+            return;
+        }
+        if (session.dimension() != null && !session.dimension().equals(player.level().dimension())) {
+            Messages.actionBar(player, "message.autobots.different_dimension");
+            return;
+        }
+        if (session.dimension() == null) {
+            session.setDimension(player.level().dimension());
+        }
+        boolean second = wantSecond && session.cornerA() != null;
+        BlockPos nextA = second ? session.cornerA() : pos;
+        BlockPos nextB = second ? pos : session.cornerB();
+        if (nextA != null && nextB != null && !acceptBox(player, nextA, nextB)) {
+            return;
+        }
+        session.setCornerA(nextA);
+        session.setCornerB(nextB);
+        session.bump();
+        chime(player, 1.5F);
+        if (nextB == null) {
+            Messages.actionBar(player, "message.autobots.corner1", nextA.getX(), nextA.getY(), nextA.getZ());
+        } else {
+            Messages.actionBar(player, "message.autobots.corner2",
+                    BoxEdits.span(nextA, nextB, 0),
+                    BoxEdits.span(nextA, nextB, 1),
+                    BoxEdits.span(nextA, nextB, 2),
+                    BoxEdits.volume(nextA, nextB),
+                    BoxEdits.solid(player.level(), nextA, nextB));
+        }
+        BlueprintNetwork.syncCapture(player);
+    }
+
+    private static void beginBox(ServerPlayer player, BlockPos pos) {
+        BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
+        if (session.mode() != BlueprintSessions.Mode.CAPTURE) {
+            return;
+        }
+        if (session.dimension() != null && !session.dimension().equals(player.level().dimension())) {
+            Messages.actionBar(player, "message.autobots.different_dimension");
+            return;
+        }
+        if (session.dimension() == null) {
+            session.setDimension(player.level().dimension());
+        }
+        if (!BoxEdits.inWorld(pos)) {
+            Messages.actionBar(player, "message.autobots.too_big", AutobotsConfig.MAX_AXIS.getAsInt(), AutobotsConfig.MAX_BLOCKS.getAsInt());
+            deny(player);
+            return;
+        }
+        session.setCornerA(pos);
+        session.setCornerB(null);
+        session.bump();
+        chime(player, 1.5F);
+        Messages.actionBar(player, "message.autobots.corner1", pos.getX(), pos.getY(), pos.getZ());
+        BlueprintNetwork.syncCapture(player);
+    }
+
+    private static void commitBox(ServerPlayer player, BlockPos pos) {
+        BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
+        if (session.mode() != BlueprintSessions.Mode.CAPTURE) {
+            return;
+        }
+        if (session.cornerA() == null) {
+            beginBox(player, pos);
+            return;
+        }
+        if (session.dimension() != null && !session.dimension().equals(player.level().dimension())) {
+            Messages.actionBar(player, "message.autobots.different_dimension");
+            BlueprintNetwork.syncCapture(player);
+            return;
+        }
+        if (!acceptBox(player, session.cornerA(), pos)) {
+            BlueprintNetwork.syncCapture(player);
+            return;
+        }
+        session.setCornerB(pos);
+        session.bump();
+        chime(player, 1.6F);
+        Messages.actionBar(player, "message.autobots.corner2",
+                BoxEdits.span(session.cornerA(), pos, 0),
+                BoxEdits.span(session.cornerA(), pos, 1),
+                BoxEdits.span(session.cornerA(), pos, 2),
+                BoxEdits.volume(session.cornerA(), pos),
+                BoxEdits.solid(player.level(), session.cornerA(), pos));
+        BlueprintNetwork.syncCapture(player);
+    }
+
+    public static void updateCapture(ServerPlayer player, int generation, int seq, boolean hasA, BlockPos cornerA, boolean hasB, BlockPos cornerB, String name) {
+        if (!held(player)) {
+            return;
+        }
+        BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
+        if (session.mode() != BlueprintSessions.Mode.CAPTURE) {
+            return;
+        }
+        if (generation != session.generation() || seq < session.seq()) {
+            return;
+        }
+        if (session.dimension() != null && !session.dimension().equals(player.level().dimension())) {
+            Messages.actionBar(player, "message.autobots.different_dimension");
+            session.setSeq(seq);
+            BlueprintNetwork.syncCapture(player);
+            return;
+        }
+        session.setSeq(seq);
+        session.setName(cleanName(name));
+        if (!hasA || cornerA == null) {
+            session.setCornerA(null);
+            session.setCornerB(null);
+            BlueprintNetwork.syncCapture(player);
+            return;
+        }
+        if (!BoxEdits.inWorld(cornerA)) {
+            BlueprintNetwork.syncCapture(player);
+            return;
+        }
+        if (!hasB || cornerB == null) {
+            session.setCornerA(cornerA);
+            session.setCornerB(null);
+            BlueprintNetwork.syncCapture(player);
+            return;
+        }
+        if (!acceptBox(player, cornerA, cornerB)) {
+            BlueprintNetwork.syncCapture(player);
+            return;
+        }
+        session.setCornerA(cornerA);
+        session.setCornerB(cornerB);
+        BlueprintNetwork.syncCapture(player);
+    }
+
+    public static void confirm(ServerPlayer player, String name) {
+        if (!held(player)) {
+            return;
+        }
+        BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
+        if (session.mode() != BlueprintSessions.Mode.CAPTURE) {
+            return;
+        }
+        if (session.cornerA() == null || session.cornerB() == null) {
+            Messages.actionBar(player, "message.autobots.need_corners");
+            BlueprintNetwork.syncCapture(player);
+            return;
+        }
+        if (session.dimension() == null || !session.dimension().equals(player.level().dimension())) {
+            Messages.actionBar(player, "message.autobots.different_dimension");
+            BlueprintNetwork.syncCapture(player);
+            return;
+        }
+        if (!acceptBox(player, session.cornerA(), session.cornerB())) {
+            BlueprintNetwork.syncCapture(player);
+            return;
+        }
+        String clean = cleanName(name);
+        session.setName(clean);
+        session.setMode(BlueprintSessions.Mode.SAVING);
+        BlueprintNetwork.syncCapture(player);
+        boolean started = JobManager.startBlueprintSave(
+                player,
+                clean,
+                session.editingId(),
+                session.dimension(),
+                session.cornerA(),
+                session.cornerB());
+        if (!started) {
+            session.setMode(BlueprintSessions.Mode.CAPTURE);
+            BlueprintNetwork.syncCapture(player);
+        }
+    }
+
+    public static void cancel(ServerPlayer player) {
+        if (!held(player)) {
+            return;
+        }
+        BlueprintSessions.get(player).clear();
+        BlueprintNetwork.syncCapture(player);
+    }
+
+    public static void finishSave(ServerPlayer player, java.util.UUID id, boolean saved) {
+        BlueprintSessions.get(player).clear();
+        BlueprintNetwork.syncLibrary(player);
+        BlueprintNetwork.syncCapture(player);
+        BlueprintNetwork.finished(player, saved && id != null ? id : net.minecraft.Util.NIL_UUID, saved);
+    }
+
+    public static void delete(ServerPlayer player, java.util.UUID id) {
+        if (!held(player)) {
+            return;
+        }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        if (library.isInUse(id)) {
+            Messages.actionBar(player, "message.autobots.blueprint_in_use");
+            return;
+        }
+        Schematic schematic = library.schematic(id).orElse(null);
+        if (schematic == null) {
+            Messages.actionBar(player, "message.autobots.blueprint_missing");
+            BlueprintNetwork.syncLibrary(player);
+            return;
+        }
+        library.removeSchematic(id);
+        Messages.actionBar(player, "message.autobots.blueprint_deleted", schematic.name());
+        BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
+        if (id.equals(session.buildId())) {
+            session.clear();
+            BlueprintNetwork.syncCapture(player);
+        }
+        BlueprintNetwork.syncLibrary(player);
+    }
+
+    public static void rename(ServerPlayer player, java.util.UUID id, String name) {
+        if (!held(player)) {
+            return;
+        }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        Schematic schematic = library.schematic(id).orElse(null);
+        if (schematic == null) {
+            Messages.actionBar(player, "message.autobots.blueprint_missing");
+            BlueprintNetwork.syncLibrary(player);
+            return;
+        }
+        String clean = cleanName(name);
+        library.putSchematic(schematic.withName(clean));
+        Messages.actionBar(player, "message.autobots.blueprint_renamed", clean);
+        BlueprintNetwork.syncLibrary(player);
+    }
+
+    public static void beginEdit(ServerPlayer player, java.util.UUID id) {
+        if (!held(player)) {
+            return;
+        }
+        Schematic schematic = editable(player, id, false);
+        if (schematic == null) {
+            return;
+        }
+        BlueprintNetwork.preview(player, schematic, building(player, id), true);
+    }
+
+    public static void recapture(ServerPlayer player, java.util.UUID id) {
+        if (!held(player)) {
+            return;
+        }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        Schematic schematic = library.schematic(id).orElse(null);
+        if (schematic == null) {
+            Messages.actionBar(player, "message.autobots.blueprint_missing");
+            BlueprintNetwork.syncLibrary(player);
+            return;
+        }
+        if (library.isInUse(id)) {
+            Messages.actionBar(player, "message.autobots.blueprint_in_use");
+            return;
+        }
+        BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
+        session.startCapture(player.level().dimension());
+        session.setEditingId(id);
+        session.setName(schematic.name());
+        boolean samePlace = schematic.hasSource()
+                && schematic.sourceDimension().equals(player.level().dimension().location().toString());
+        if (samePlace) {
+            session.setCornerA(schematic.sourceMin());
+            session.setCornerB(schematic.sourceMax());
+            if (!BoxEdits.fits(schematic.sourceMin(), schematic.sourceMax())) {
+                session.setCornerA(null);
+                session.setCornerB(null);
+                Messages.actionBar(player, "message.autobots.too_big", AutobotsConfig.MAX_AXIS.getAsInt(), AutobotsConfig.MAX_BLOCKS.getAsInt());
+            }
+        } else if (schematic.hasSource()) {
+            Messages.actionBar(player, "message.autobots.edit_other_dimension");
+        } else {
+            Messages.actionBar(player, "message.autobots.capture_first");
+        }
+        BlueprintNetwork.syncCapture(player);
+    }
+
+    public static void setAnchor(ServerPlayer player, java.util.UUID id, int x, int y, int z) {
+        if (!held(player)) {
+            return;
+        }
+        Schematic schematic = editable(player, id, true);
+        if (schematic == null) {
+            return;
+        }
+        Schematic updated = schematic.withAnchor(x, y, z);
+        SchematicLibrary.get(player.getServer()).putSchematic(updated);
+        BlueprintNetwork.preview(player, updated, building(player, id), false);
+    }
+
+    public static void transform(ServerPlayer player, java.util.UUID id, int operation) {
+        if (!held(player)) {
+            return;
+        }
+        Schematic schematic = editable(player, id, true);
+        if (schematic == null) {
+            return;
+        }
+        BlueprintTransforms.Op[] ops = BlueprintTransforms.Op.values();
+        if (operation < 0 || operation >= ops.length) {
+            return;
+        }
+        Schematic updated = BlueprintTransforms.apply(schematic, ops[operation]);
+        SchematicLibrary.get(player.getServer()).putSchematic(updated);
+        BlueprintNetwork.syncLibrary(player);
+        BlueprintNetwork.preview(player, updated, building(player, id), false);
+    }
+
+    public static void previewBlueprint(ServerPlayer player, java.util.UUID id) {
+        if (!held(player)) {
+            return;
+        }
+        Schematic schematic = SchematicLibrary.get(player.getServer()).schematic(id).orElse(null);
+        if (schematic == null) {
+            return;
+        }
+        BlueprintNetwork.preview(player, schematic, false, false);
+    }
+
+    public static void sendMaterials(ServerPlayer player, java.util.UUID id, int clipX, int clipY, int clipZ) {
+        if (!held(player)) {
+            return;
+        }
+        Schematic schematic = SchematicLibrary.get(player.getServer()).schematic(id).orElse(null);
+        if (schematic == null) {
+            Messages.actionBar(player, "message.autobots.blueprint_missing");
+            return;
+        }
+        BlueprintNetwork.materials(player, id, false, Requirements.of(schematic, clipX, clipY, clipZ));
+    }
+
+    public static void beginBuild(ServerPlayer player, java.util.UUID id) {
+        if (!held(player)) {
+            return;
+        }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        if (library.jobFor(player.getUUID()).isPresent()) {
+            Messages.actionBar(player, "message.autobots.busy");
+            return;
+        }
+        Schematic schematic = library.schematic(id).orElse(null);
+        if (schematic == null || schematic.blockCount() == 0) {
+            Messages.actionBar(player, "message.autobots.blueprint_missing");
+            BlueprintNetwork.syncLibrary(player);
+            return;
+        }
+        BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
+        session.clear();
+        session.setMode(BlueprintSessions.Mode.BUILD);
+        session.setBuildId(id);
+        session.setName(schematic.name());
+        BlueprintNetwork.preview(player, schematic, true, false);
+    }
+
+    public static void stop(ServerPlayer player) {
+        if (!held(player)) {
+            return;
+        }
+        JobManager.cancel(player, true);
+        BlueprintNetwork.syncLibrary(player);
+    }
+
+    public static void launch(ServerPlayer player, java.util.UUID id, BlockPos anchorPoint, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ) {
+        if (!held(player)) {
+            return;
+        }
+        BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
+        if (session.mode() != BlueprintSessions.Mode.BUILD || !id.equals(session.buildId())) {
+            Messages.actionBar(player, "message.autobots.blueprint_missing");
+            return;
+        }
+        Schematic schematic = SchematicLibrary.get(player.getServer()).schematic(id).orElse(null);
+        if (schematic == null) {
+            Messages.actionBar(player, "message.autobots.blueprint_missing");
+            return;
+        }
+        int sx = clampSize(sizeX);
+        int sy = clampSize(sizeY);
+        int sz = clampSize(sizeZ);
+        int px = clampAnchor(pivotX, schematic.sizeX());
+        int py = clampAnchor(pivotY, schematic.sizeY());
+        int pz = clampAnchor(pivotZ, schematic.sizeZ());
+        BlockPos origin = anchorPoint.offset(-px, -py, -pz);
+        if (!BoxEdits.inWorld(anchorPoint) || !BoxEdits.inWorld(origin)
+                || player.distanceToSqr(anchorPoint.getX() + 0.5D, anchorPoint.getY() + 0.5D, anchorPoint.getZ() + 0.5D) > rangeSqr()) {
+            Messages.actionBar(player, "message.autobots.place_out_of_range");
+            return;
+        }
+        java.util.List<Requirements.Cost> missing = Requirements.missing(player, Requirements.of(schematic, sx, sy, sz));
+        if (!missing.isEmpty()) {
+            BlueprintNetwork.materials(player, id, true, missing);
+        }
+        JobManager.startBlueprintBuild(player, id, origin, sx, sy, sz);
+        BlueprintNetwork.syncLibrary(player);
+    }
+
+    public static List<BlueprintPayloads.Summary> summaries(ServerPlayer player) {
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        List<Schematic> schematics = new ArrayList<>(library.schematics());
+        schematics.sort(Comparator.comparing(Schematic::name, String.CASE_INSENSITIVE_ORDER).thenComparing(Schematic::id));
+        List<BlueprintPayloads.Summary> summaries = new ArrayList<>(schematics.size());
+        for (Schematic schematic : schematics) {
+            String source = "";
+            if (schematic.hasSource()) {
+                BlockPos min = schematic.sourceMin();
+                source = min.getX() + ", " + min.getY() + ", " + min.getZ();
+            }
+            summaries.add(new BlueprintPayloads.Summary(
+                    schematic.id(),
+                    schematic.name(),
+                    schematic.sizeX(),
+                    schematic.sizeY(),
+                    schematic.sizeZ(),
+                    schematic.blockCount(),
+                    source));
+        }
+        return summaries;
+    }
+
+    public static boolean busy(ServerPlayer player) {
+        return SchematicLibrary.get(player.getServer()).jobFor(player.getUUID()).isPresent();
+    }
+
+    public static BlueprintPayloads.Preview previewOf(Schematic schematic, boolean forBuild, boolean openEditor) {
+        List<Schematic.Entry> entries = schematic.entries();
+        int count = entries.size();
+        int stride = Math.max(1, (count + PREVIEW_LIMIT - 1) / PREVIEW_LIMIT);
+        List<BlueprintPayloads.Bit> bits = new ArrayList<>();
+        for (int i = 0; i < count; i += stride) {
+            Schematic.Entry entry = entries.get(i);
+            bits.add(new BlueprintPayloads.Bit(entry.x(), entry.y(), entry.z(), Block.getId(entry.state())));
+        }
+        return new BlueprintPayloads.Preview(
+                schematic.id(),
+                schematic.name(),
+                schematic.sizeX(),
+                schematic.sizeY(),
+                schematic.sizeZ(),
+                schematic.blockCount(),
+                stride > 1,
+                bits,
+                schematic.anchorX(),
+                schematic.anchorY(),
+                schematic.anchorZ(),
+                forBuild,
+                openEditor);
+    }
+
+    private static boolean held(ServerPlayer player) {
+        return ControllerItem.isHeld(player);
+    }
+
+    private static int clampSize(int size) {
+        return Math.max(1, Math.min(256, size));
+    }
+
+    private static int clampAnchor(int value, int size) {
+        if (size <= 1) {
+            return 0;
+        }
+        return Math.max(0, Math.min(size - 1, value));
+    }
+
+    private static boolean building(ServerPlayer player, java.util.UUID id) {
+        BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
+        return session.mode() == BlueprintSessions.Mode.BUILD && id.equals(session.buildId());
+    }
+
+    private static Schematic editable(ServerPlayer player, java.util.UUID id, boolean changing) {
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        Schematic schematic = library.schematic(id).orElse(null);
+        if (schematic == null) {
+            Messages.actionBar(player, "message.autobots.blueprint_missing");
+            BlueprintNetwork.syncLibrary(player);
+            return null;
+        }
+        if (changing && library.isInUse(id)) {
+            Messages.actionBar(player, "message.autobots.blueprint_in_use");
+            return null;
+        }
+        return schematic;
+    }
+
+    private static double rangeSqr() {
+        double range = AutobotsConfig.MAX_RANGE.getAsInt();
+        return range * range;
+    }
+
+    private static boolean acceptBox(ServerPlayer player, BlockPos a, BlockPos b) {
+        if (!BoxEdits.inWorld(a) || !BoxEdits.inWorld(b) || !BoxEdits.fits(a, b)) {
+            Messages.actionBar(player, "message.autobots.too_big", AutobotsConfig.MAX_AXIS.getAsInt(), AutobotsConfig.MAX_BLOCKS.getAsInt());
+            deny(player);
+            return false;
+        }
+        if (player.level().dimension() != null && !BoxEdits.near(player, a, b)) {
+            Messages.actionBar(player, "message.autobots.too_far");
+            deny(player);
+            return false;
+        }
+        return true;
+    }
+
+    private static void chime(ServerPlayer player, float pitch) {
+        player.level().playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 0.45F, pitch);
+    }
+
+    private static void deny(ServerPlayer player) {
+        player.level().playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.NOTE_BLOCK_BASS, SoundSource.PLAYERS, 0.35F, 0.7F);
+    }
+}

@@ -49,6 +49,11 @@ public final class BuildJob {
     private BlockPos lastDronePos;
     private Phase phase = Phase.RUNNING;
     private int messageDelay;
+    private String blueprintName;
+    private UUID replaceSchematicId;
+    private int clipX = Integer.MAX_VALUE;
+    private int clipY = Integer.MAX_VALUE;
+    private int clipZ = Integer.MAX_VALUE;
 
     private BuildJob(UUID id, UUID owner, UUID controllerId, Kind kind, ResourceKey<Level> dimension, BlockPos min, BlockPos max, int total) {
         this.id = id;
@@ -178,6 +183,32 @@ public final class BuildJob {
         return partial;
     }
 
+    public String blueprintName() {
+        return blueprintName;
+    }
+
+    public void setBlueprintName(String blueprintName) {
+        this.blueprintName = blueprintName;
+    }
+
+    public UUID replaceSchematicId() {
+        return replaceSchematicId;
+    }
+
+    public void setReplaceSchematicId(UUID replaceSchematicId) {
+        this.replaceSchematicId = replaceSchematicId;
+    }
+
+    public void setClip(int clipX, int clipY, int clipZ) {
+        this.clipX = Math.max(1, clipX);
+        this.clipY = Math.max(1, clipY);
+        this.clipZ = Math.max(1, clipZ);
+    }
+
+    public boolean outsideClip(Schematic.Entry entry) {
+        return entry.x() >= clipX || entry.y() >= clipY || entry.z() >= clipZ;
+    }
+
     public boolean tickMessage() {
         if (messageDelay > 0) {
             messageDelay--;
@@ -229,6 +260,17 @@ public final class BuildJob {
         if (lastDronePos != null) {
             tag.put("dronePos", NbtUtils.writeBlockPos(lastDronePos));
         }
+        if (blueprintName != null) {
+            tag.putString("blueprintName", blueprintName);
+        }
+        if (replaceSchematicId != null) {
+            tag.putUUID("replace", replaceSchematicId);
+        }
+        if (clipX != Integer.MAX_VALUE) {
+            tag.putInt("clipX", clipX);
+            tag.putInt("clipY", clipY);
+            tag.putInt("clipZ", clipZ);
+        }
         ListTag list = new ListTag();
         for (Schematic.Entry entry : partial) {
             list.add(entry.save());
@@ -265,6 +307,17 @@ public final class BuildJob {
         }
         if (tag.contains("dronePos")) {
             job.lastDronePos = NbtUtils.readBlockPos(tag, "dronePos").orElse(null);
+        }
+        if (tag.contains("blueprintName")) {
+            job.blueprintName = tag.getString("blueprintName");
+        }
+        if (tag.hasUUID("replace")) {
+            job.replaceSchematicId = tag.getUUID("replace");
+        }
+        if (tag.contains("clipX")) {
+            job.clipX = tag.getInt("clipX");
+            job.clipY = tag.getInt("clipY");
+            job.clipZ = tag.getInt("clipZ");
         }
         ListTag list = tag.getList("partial", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) {

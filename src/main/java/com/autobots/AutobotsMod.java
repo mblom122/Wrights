@@ -13,6 +13,7 @@ import com.autobots.item.ModCreativeTabs;
 import com.autobots.item.ModDataComponents;
 import com.autobots.item.ModItems;
 import com.autobots.entity.ModEntities;
+import com.autobots.network.BlueprintNetwork;
 
 @Mod(AutobotsMod.MOD_ID)
 public class AutobotsMod {
@@ -24,7 +25,9 @@ public class AutobotsMod {
         ModItems.ITEMS.register(modBus);
         ModEntities.ENTITIES.register(modBus);
         ModCreativeTabs.TABS.register(modBus);
+        modBus.addListener(BlueprintNetwork::register);
         container.registerConfig(ModConfig.Type.SERVER, AutobotsConfig.SPEC);
+        container.registerConfig(ModConfig.Type.CLIENT, AutobotsClientConfig.SPEC);
         LOGGER.info("Autobots loaded for an isolated NeoForge 1.21.1 test");
     }
 }

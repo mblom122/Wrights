@@ -88,6 +88,14 @@ First tested in an otherwise empty NeoForge 1.21.1 instance.
     ordering="NONE"
     side="BOTH"
 
+# JEI is optional. The dev client has it; a normal instance does not need it.
+[[dependencies.${mod_id}]]
+    modId="jei"
+    type="optional"
+    versionRange="[19.18,)"
+    ordering="AFTER"
+    side="CLIENT"
+
 # Features are specific properties of the game environment, that you may want to declare you require. This example declares
 # that your mod requires GL version 3.2 or higher. Other features will be added. They are side aware so declaring this won't
 # stop your mod loading on the server for example.

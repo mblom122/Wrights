@@ -66,6 +66,10 @@ public final class SchematicLibrary extends SavedData {
         return Optional.ofNullable(schematics.get(id));
     }
 
+    public Collection<Schematic> schematics() {
+        return schematics.values();
+    }
+
     public void putSchematic(Schematic schematic) {
         schematics.put(schematic.id(), schematic);
         setDirty();

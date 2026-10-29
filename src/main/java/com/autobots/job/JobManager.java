@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -16,6 +17,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gameevent.GameEvent;
@@ -28,6 +30,8 @@ import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import com.autobots.AutobotsConfig;
+import com.autobots.blueprint.BlueprintActions;
+import com.autobots.blueprint.BoxEdits;
 import com.autobots.AutobotsMod;
 import com.autobots.entity.DroneEntity;
 import com.autobots.entity.ModEntities;
@@ -143,6 +147,59 @@ public final class JobManager {
         Messages.actionBar(player, "message.autobots.launched");
     }
 
+    public static boolean startBlueprintSave(ServerPlayer player, String name, UUID replaceId, ResourceKey<Level> dimension, BlockPos cornerA, BlockPos cornerB) {
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        if (library.jobFor(player.getUUID()).isPresent()) {
+            Messages.actionBar(player, "message.autobots.busy");
+            return false;
+        }
+        if (replaceId != null && library.isInUse(replaceId)) {
+            Messages.actionBar(player, "message.autobots.blueprint_in_use");
+            return false;
+        }
+        BlockPos min = new BlockPos(
+                Math.min(cornerA.getX(), cornerB.getX()),
+                Math.min(cornerA.getY(), cornerB.getY()),
+                Math.min(cornerA.getZ(), cornerB.getZ()));
+        BlockPos max = new BlockPos(
+                Math.max(cornerA.getX(), cornerB.getX()),
+                Math.max(cornerA.getY(), cornerB.getY()),
+                Math.max(cornerA.getZ(), cornerB.getZ()));
+        BuildJob job = BuildJob.copy(player.getUUID(), player.getUUID(), dimension, min, max);
+        job.setBlueprintName(name);
+        job.setReplaceSchematicId(replaceId);
+        library.addJob(job);
+        Messages.actionBar(player, "message.autobots.saving");
+        return true;
+    }
+
+    public static boolean startBlueprintBuild(ServerPlayer player, UUID schematicId, BlockPos origin, int sizeX, int sizeY, int sizeZ) {
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        if (library.jobFor(player.getUUID()).isPresent()) {
+            Messages.actionBar(player, "message.autobots.busy");
+            return false;
+        }
+        Schematic schematic = library.schematic(schematicId).orElse(null);
+        if (schematic == null || schematic.blockCount() == 0) {
+            Messages.actionBar(player, "message.autobots.blueprint_missing");
+            return false;
+        }
+        BuildJob job = BuildJob.paste(
+                player.getUUID(),
+                player.getUUID(),
+                player.level().dimension(),
+                origin,
+                schematic.id(),
+                schematic.blockCount());
+        job.setClip(sizeX, sizeY, sizeZ);
+        library.addJob(job);
+        if (player.level() instanceof ServerLevel level) {
+            ensureDrone(level, player, job, origin);
+        }
+        Messages.actionBar(player, "message.autobots.launched");
+        return true;
+    }
+
     private static void tickCopy(MinecraftServer server, SchematicLibrary library, BuildJob job) {
         if (job.phase() == BuildJob.Phase.BINDING) {
             tryBindCopy(server, library, job);
@@ -221,7 +278,32 @@ public final class JobManager {
             job.setResultSchematicId(null);
             return;
         }
-        Schematic schematic = new Schematic(UUID.randomUUID(), sizeX, sizeY, sizeZ, entries);
+        UUID id = job.replaceSchematicId() != null ? job.replaceSchematicId() : UUID.randomUUID();
+        String name = job.blueprintName() == null ? "Blueprint" : job.blueprintName();
+        int anchorX = 0;
+        int anchorY = 0;
+        int anchorZ = 0;
+        if (job.replaceSchematicId() != null) {
+            Schematic previous = library.schematic(job.replaceSchematicId()).orElse(null);
+            if (previous != null) {
+                anchorX = previous.anchorX();
+                anchorY = previous.anchorY();
+                anchorZ = previous.anchorZ();
+            }
+        }
+        Schematic schematic = new Schematic(
+                id,
+                name,
+                sizeX,
+                sizeY,
+                sizeZ,
+                entries,
+                job.min(),
+                job.max(),
+                job.dimension().location().toString(),
+                anchorX,
+                anchorY,
+                anchorZ);
         library.putSchematic(schematic);
         job.setResultSchematicId(schematic.id());
         job.setPhase(BuildJob.Phase.BINDING);
@@ -240,6 +322,24 @@ public final class JobManager {
                 Messages.actionBar(player, "message.autobots.copy_empty");
             }
             library.removeJob(job);
+            if (job.blueprintName() != null) {
+                BlueprintActions.finishSave(player, null, false);
+            }
+            return;
+        }
+        if (job.blueprintName() != null) {
+            Schematic saved = library.schematic(job.resultSchematicId()).orElse(null);
+            library.removeJob(job);
+            if (saved == null) {
+                Messages.actionBar(player, "message.autobots.copy_empty");
+                BlueprintActions.finishSave(player, null, false);
+            } else if (job.skippedSpecial() > 0) {
+                Messages.actionBar(player, "message.autobots.copy_done_skipped", saved.blockCount(), BoxEdits.volume(saved.sizeX(), saved.sizeY(), saved.sizeZ()), job.skippedSpecial());
+                BlueprintActions.finishSave(player, saved.id(), true);
+            } else {
+                Messages.actionBar(player, "message.autobots.blueprint_saved", saved.name(), BoxEdits.volume(saved.sizeX(), saved.sizeY(), saved.sizeZ()), saved.blockCount());
+                BlueprintActions.finishSave(player, saved.id(), true);
+            }
             return;
         }
         ItemStack stack = findController(player, job.controllerId());
@@ -262,9 +362,9 @@ public final class JobManager {
         }
         ControllerData.write(stack, data.withSchematic(schematic.id(), schematic.sizeX(), schematic.sizeY(), schematic.sizeZ(), schematic.blockCount()));
         if (job.skippedSpecial() > 0) {
-            Messages.actionBar(player, "message.autobots.copy_done_skipped", schematic.blockCount(), job.skippedSpecial());
+            Messages.actionBar(player, "message.autobots.copy_done_skipped", schematic.blockCount(), BoxEdits.volume(schematic.sizeX(), schematic.sizeY(), schematic.sizeZ()), job.skippedSpecial());
         } else {
-            Messages.actionBar(player, "message.autobots.copy_done", schematic.blockCount());
+            Messages.actionBar(player, "message.autobots.copy_done", schematic.blockCount(), BoxEdits.volume(schematic.sizeX(), schematic.sizeY(), schematic.sizeZ()));
         }
         library.removeJob(job);
     }
@@ -283,6 +383,13 @@ public final class JobManager {
         }
         if (player == null) {
             return;
+        }
+        if (job.cursor() >= job.total()) {
+            finishPaste(server, library, player, job);
+            return;
+        }
+        while (job.cursor() < schematic.blockCount() && job.outsideClip(schematic.entry(job.cursor()))) {
+            job.advance();
         }
         if (job.cursor() >= job.total()) {
             finishPaste(server, library, player, job);
@@ -320,6 +427,10 @@ public final class JobManager {
             }
             if (drone.distanceToSqr(Vec3.atCenterOf(pos)) > 9.0D) {
                 break;
+            }
+            if (job.outsideClip(entry)) {
+                job.advance();
+                continue;
             }
             if (placeOne(level, player, job, pos, entry) == PlaceResult.PAUSE) {
                 if (job.tickMessage()) {
