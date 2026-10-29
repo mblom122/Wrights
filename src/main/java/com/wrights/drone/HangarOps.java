@@ -95,9 +95,9 @@ public final class HangarOps {
     }
 
     private static Swarm insert(ServerPlayer player, Swarm swarm, int mode) {
-        int room = Swarm.MAX - swarm.units().size();
+        int room = Swarm.capacity() - swarm.units().size();
         if (room <= 0) {
-            Messages.actionBar(player, "message.wrights.drone_full", Swarm.MAX);
+            Messages.actionBar(player, "message.wrights.drone_full", Swarm.capacity());
             return swarm;
         }
         List<Integer> tiers = pullWrights(player, wanted(mode, room));
@@ -244,8 +244,8 @@ public final class HangarOps {
     }
 
     private static Swarm build(ServerPlayer player, Swarm swarm) {
-        if (swarm.units().size() >= Swarm.MAX) {
-            Messages.actionBar(player, "message.wrights.drone_full", Swarm.MAX);
+        if (swarm.units().size() >= Swarm.capacity()) {
+            Messages.actionBar(player, "message.wrights.drone_full", Swarm.capacity());
             return swarm;
         }
         if (!pay(player, Items.IRON_INGOT, IRON) || !pay(player, Items.REDSTONE, REDSTONE) || !pay(player, Items.AMETHYST_SHARD, AMETHYST)) {

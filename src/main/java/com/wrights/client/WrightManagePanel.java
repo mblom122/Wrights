@@ -79,7 +79,7 @@ final class WrightManagePanel {
         if (removeButton != null) {
             removeButton.active = expanded >= 0;
         }
-        graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_count", swarm.units().size(), Swarm.MAX, held(screen)),
+        graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_count", swarm.units().size(), Swarm.capacity(), held(screen)),
                 panelX + 12, panelY + 22, WrightsUi.MUTED, false);
         graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_bulk"), panelX + 12, panelY + 36, WrightsUi.MUTED, false);
 

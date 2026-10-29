@@ -869,7 +869,7 @@ public final class WrightsClientState {
             return 0;
         }
         int free = com.wrights.drone.Wrightports.swarm(minecraft.player).units().size();
-        return Math.min(free, Math.max(0, placeableBlocks()));
+        return Math.min(free, Math.min(Math.max(0, placeableBlocks()), WrightsConfig.maxWrightsPerJob()));
     }
 
     /** Keeps this job's wright count inside what the port and the blueprint can use. */

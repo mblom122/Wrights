@@ -32,7 +32,7 @@ public class PersonalWrightportItem extends Item implements ICurioItem {
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         Swarm swarm = Swarm.from(stack);
-        tooltip.add(Component.translatable("item.wrights.personal_wrightport.drones", swarm.units().size(), Swarm.MAX).withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("item.wrights.personal_wrightport.drones", swarm.units().size(), Swarm.capacity()).withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("item.wrights.personal_wrightport.assign", swarm.assignCount()).withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("item.wrights.personal_wrightport.hint").withStyle(ChatFormatting.DARK_GRAY));
     }

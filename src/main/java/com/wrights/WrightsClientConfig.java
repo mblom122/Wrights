@@ -47,11 +47,11 @@ public final class WrightsClientConfig {
             .comment("When true, building and undoing finish in one step. When false, the drone places and removes a few blocks at a time.")
             .define("instantJobs", false);
     public static final ModConfigSpec.BooleanValue DRONE_MAX = BUILDER
-            .comment("When true, a new job uses every free drone. It still never uses more drones than the job has blocks.")
+            .comment("When true, a new job uses every free drone. It still never uses more drones than the job has blocks, or more than maxWrightsPerJob in the server config.")
             .define("droneMax", false);
     public static final ModConfigSpec.IntValue DRONE_COUNT = BUILDER
-            .comment("How many drones a new job uses when droneMax is false. Still limited by free drones and by the number of blocks.")
-            .defineInRange("droneCount", 5, 1, 64);
+            .comment("How many drones a new job uses when droneMax is false. Still limited by free drones, by the number of blocks, and by maxWrightsPerJob in the server config.")
+            .defineInRange("droneCount", 5, 1, 512);
     public static final ModConfigSpec.BooleanValue BUILD_MENU = BUILDER
             .comment("When true, right-click in build mode opens the build menu instead of starting the job.")
             .define("buildMenu", false);
@@ -164,7 +164,7 @@ public final class WrightsClientConfig {
     }
 
     public static void setDroneCount(int count) {
-        DRONE_COUNT.set(clamp(count, 1, 64));
+        DRONE_COUNT.set(clamp(count, 1, Math.min(512, WrightsConfig.maxWrightsPerJob())));
         save();
     }
 
@@ -183,7 +183,7 @@ public final class WrightsClientConfig {
             return 0;
         }
         int wanted = DRONE_MAX.get() ? freeDrones : DRONE_COUNT.get();
-        return Math.max(1, Math.min(wanted, Math.min(freeDrones, blocks)));
+        return Math.max(1, Math.min(wanted, Math.min(freeDrones, Math.min(blocks, WrightsConfig.maxWrightsPerJob()))));
     }
 
     public static void save() {

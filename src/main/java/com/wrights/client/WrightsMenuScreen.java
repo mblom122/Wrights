@@ -15,6 +15,7 @@ import net.minecraft.Util;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.WrightsClientConfig;
+import com.wrights.WrightsConfig;
 import com.wrights.drone.Wrightports;
 import com.wrights.network.BlueprintPayloads;
 
@@ -674,7 +675,7 @@ public class WrightsMenuScreen extends Screen {
             graphics.fill(droneMinusX, droneY, droneMinusX + 16, droneY + 16, 0xFF18222C);
             WrightsUi.border(graphics, droneMinusX, droneY, 16, 16, 0xFF3D4E5E);
             graphics.drawCenteredString(this.font, "-", droneMinusX + 8, droneY + 4, WrightsUi.TEXT);
-            String count = Integer.toString(WrightsClientConfig.DRONE_COUNT.get());
+            String count = Integer.toString(Math.min(WrightsClientConfig.DRONE_COUNT.get(), WrightsConfig.maxWrightsPerJob()));
             graphics.drawCenteredString(this.font, count, droneMinusX + 26, droneY + 4, WrightsUi.TEXT);
             graphics.fill(dronePlusX, droneY, dronePlusX + 16, droneY + 16, 0xFF18222C);
             WrightsUi.border(graphics, dronePlusX, droneY, 16, 16, 0xFF3D4E5E);
@@ -1004,7 +1005,7 @@ public class WrightsMenuScreen extends Screen {
                     }
                     if (step != 0) {
                         WrightsClientState.deployChosen = false;
-                        WrightsClientConfig.setDroneCount(WrightsClientState.stepped(WrightsClientConfig.DRONE_COUNT.get(), step, 1, 64));
+                        WrightsClientConfig.setDroneCount(WrightsClientState.stepped(WrightsClientConfig.DRONE_COUNT.get(), step, 1, WrightsConfig.maxWrightsPerJob()));
                         WrightsClientState.applyDeploy();
                         return true;
                     }

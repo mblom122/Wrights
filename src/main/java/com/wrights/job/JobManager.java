@@ -1169,8 +1169,9 @@ public final class JobManager {
             }
             if (current.isEmpty() && job.crewUnits().isEmpty() && !(job.paused() && job.crewQuota() > 0)) {
                 int need = job.hasCrew() ? job.hands().size() : (instant(player) ? 0 : 1);
+                int jobCap = WrightsConfig.maxWrightsPerJob();
                 for (Swarm.Unit unit : swarm.units()) {
-                    if (current.size() >= need) {
+                    if (current.size() >= need || current.size() >= jobCap) {
                         break;
                     }
                     if (taken.add(unit.id())) {
@@ -1181,6 +1182,10 @@ public final class JobManager {
             if (current.isEmpty() && had > 0) {
                 dirty |= detachCrew(player, job);
                 continue;
+            }
+            int jobCap = WrightsConfig.maxWrightsPerJob();
+            if (current.size() > jobCap) {
+                current.subList(jobCap, current.size()).clear();
             }
             if (job.crewQuota() == 0 && !current.isEmpty()) {
                 job.setCrewQuota(current.size());
@@ -1260,6 +1265,11 @@ public final class JobManager {
             BlueprintNetwork.syncJobs(player);
             return;
         }
+        if (add && !job.crewUnits().contains(unitId) && job.crewUnits().size() >= WrightsConfig.maxWrightsPerJob()) {
+            Messages.actionBar(player, "message.wrights.job_wright_cap", WrightsConfig.maxWrightsPerJob());
+            BlueprintNetwork.syncJobs(player);
+            return;
+        }
         List<UUID> ids = new ArrayList<>(job.crewUnits());
         if (add) {
             if (!ids.contains(unitId)) {
@@ -1315,6 +1325,13 @@ public final class JobManager {
             return;
         }
         if (source != null && target != null && source.id().equals(target.id())) {
+            BlueprintNetwork.syncJobs(player);
+            return;
+        }
+        if (target != null && (source == null || !source.id().equals(target.id()))
+                && !target.crewUnits().contains(unitId)
+                && target.crewUnits().size() >= WrightsConfig.maxWrightsPerJob()) {
+            Messages.actionBar(player, "message.wrights.job_wright_cap", WrightsConfig.maxWrightsPerJob());
             BlueprintNetwork.syncJobs(player);
             return;
         }
@@ -1408,9 +1425,12 @@ public final class JobManager {
         }
         Schematic schematic = job.schematicId() == null ? null : library.schematic(job.schematicId()).orElse(null);
         int room = placeableBlocks(schematic, job);
-        if (kept.size() > room) {
-            Messages.actionBar(player, "message.wrights.drone_block_cap", Math.max(0, room));
-            while (kept.size() > room) {
+        int limit = Math.min(room, WrightsConfig.maxWrightsPerJob());
+        if (kept.size() > limit) {
+            if (kept.size() > room) {
+                Messages.actionBar(player, "message.wrights.drone_block_cap", Math.max(0, room));
+            }
+            while (kept.size() > limit) {
                 kept.remove(kept.size() - 1);
                 speeds.remove(speeds.size() - 1);
             }
@@ -1514,7 +1534,7 @@ public final class JobManager {
         if (room <= 0) {
             return false;
         }
-        int wanted = Math.min(quota, room);
+        int wanted = Math.min(quota, Math.min(room, WrightsConfig.maxWrightsPerJob()));
         Swarm swarm = Wrightports.swarm(player);
         Set<UUID> have = new HashSet<>();
         for (Swarm.Unit unit : swarm.units()) {
@@ -1611,7 +1631,7 @@ public final class JobManager {
             return false;
         }
         int fromPort = Swarm.from(Wrightports.worn(player)).assignCount();
-        int wanted = Math.min(requested > 0 ? requested : fromPort, blocks);
+        int wanted = Math.min(requested > 0 ? requested : fromPort, Math.min(blocks, WrightsConfig.maxWrightsPerJob()));
         List<Swarm.Unit> units = freeUnits(player, library, job.id(), wanted);
         if (units.isEmpty()) {
             Messages.actionBar(player, "message.wrights.drones_busy");

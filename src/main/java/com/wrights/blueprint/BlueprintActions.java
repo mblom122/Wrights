@@ -1063,7 +1063,7 @@ public final class BlueprintActions {
 
     public static BlueprintPayloads.Preview previewOf(Schematic schematic, boolean forBuild, boolean openEditor) {
         List<Schematic.Entry> entries = schematic.entries();
-        boolean concealed = entries.size() > WrightsConfig.MAX_PREVIEW_BLOCKS;
+        boolean concealed = entries.size() > WrightsConfig.maxPreviewBlocks();
         List<BlueprintPayloads.Bit> bits = new ArrayList<>();
         if (!concealed) {
             for (Schematic.Entry entry : entries) {

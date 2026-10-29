@@ -1,6 +1,7 @@
 package com.wrights.client;
 
 import com.wrights.WrightsMod;
+import com.wrights.WrightsConfig;
 import com.wrights.item.ControllerItem;
 import com.wrights.network.BlueprintPayloads;
 
@@ -35,8 +36,14 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
 @EventBusSubscriber(modid = WrightsMod.MOD_ID, value = Dist.CLIENT)
 public final class SelectionRenderer {
-    private static final int PREVIEW_BUDGET = 4096;
-    private static final double RANGE_SQR = 48.0D * 48.0D;
+    private static int previewBudget() {
+        return WrightsConfig.ghostBudget();
+    }
+
+    private static double rangeSqr() {
+        double range = WrightsConfig.ghostRange();
+        return range * range;
+    }
     private static int[] order = new int[0];
     private static double[] distanceSq = new double[0];
 
@@ -235,7 +242,7 @@ public final class SelectionRenderer {
             double dy = y + 0.5D - camera.y;
             double dz = z + 0.5D - camera.z;
             double distance = dx * dx + dy * dy + dz * dz;
-            if (distance > RANGE_SQR) {
+            if (distance > rangeSqr()) {
                 continue;
             }
             BlockState state = Block.stateById(ghost.stateId());
@@ -246,7 +253,7 @@ public final class SelectionRenderer {
             distanceSq[count] = distance;
             count++;
         }
-        int keep = Math.min(count, PREVIEW_BUDGET);
+        int keep = Math.min(count, previewBudget());
         nearest(count, keep);
         BlockRenderDispatcher renderer = minecraft.getBlockRenderer();
         boolean any = false;
@@ -280,7 +287,7 @@ public final class SelectionRenderer {
             double dy = y + 0.5D - camera.y;
             double dz = z + 0.5D - camera.z;
             double distance = dx * dx + dy * dy + dz * dz;
-            if (distance > RANGE_SQR) {
+            if (distance > rangeSqr()) {
                 continue;
             }
             BlockPos world = BlockPos.containing(x, y, z);
@@ -295,7 +302,7 @@ public final class SelectionRenderer {
             distanceSq[count] = distance;
             count++;
         }
-        int keep = Math.min(count, PREVIEW_BUDGET);
+        int keep = Math.min(count, previewBudget());
         nearest(count, keep);
         BlockRenderDispatcher renderer = Minecraft.getInstance().getBlockRenderer();
         boolean any = false;
@@ -349,14 +356,14 @@ public final class SelectionRenderer {
                     double y = world.getY() + 0.5D - camera.y;
                     double z = world.getZ() + 0.5D - camera.z;
                     double distance = x * x + y * y + z * z;
-                    if (distance > RANGE_SQR) {
+                    if (distance > rangeSqr()) {
                         continue;
                     }
                     order[count] = i;
                     distanceSq[count] = distance;
                     count++;
                 }
-                int keep = Math.min(count, PREVIEW_BUDGET);
+                int keep = Math.min(count, previewBudget());
                 nearest(count, keep);
                 for (int n = 0; n < keep; n++) {
                     WrightsClientState.Ghost ghost = ghosts.get(order[n]);

@@ -549,7 +549,7 @@ public final class BlueprintNetwork {
             return;
         }
         java.util.List<BlueprintPayloads.Bit> bits = new java.util.ArrayList<>();
-        if (schematic != null && schematic.blockCount() <= com.wrights.WrightsConfig.MAX_PREVIEW_BLOCKS) {
+        if (schematic != null && schematic.blockCount() <= com.wrights.WrightsConfig.maxPreviewBlocks()) {
             for (Schematic.Entry entry : schematic.entries()) {
                 if (job.outsideClip(entry)) {
                     continue;

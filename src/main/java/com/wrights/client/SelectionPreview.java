@@ -34,7 +34,7 @@ public final class SelectionPreview {
         int sizeZ = high.getZ() - low.getZ() + 1;
         List<WrightsClientState.Ghost> ghosts = new ArrayList<>();
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-        int limit = WrightsConfig.MAX_PREVIEW_BLOCKS;
+        int limit = WrightsConfig.maxPreviewBlocks();
         for (int y = low.getY(); y <= high.getY(); y++) {
             for (int z = low.getZ(); z <= high.getZ(); z++) {
                 for (int x = low.getX(); x <= high.getX(); x++) {

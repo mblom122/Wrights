@@ -14,6 +14,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 
+import com.wrights.WrightsConfig;
 import com.wrights.item.ModDataComponents;
 
 /**
@@ -21,8 +22,12 @@ import com.wrights.item.ModDataComponents;
  * and is not spent yet.
  */
 public record Swarm(List<Unit> units, int assign) {
-    public static final int MAX = 64;
     public static final int MAX_SPEED = 5;
+
+    /** How many wrights one wrightport may hold. Comes from the server config. */
+    public static int capacity() {
+        return WrightsConfig.maxWrightsCarried();
+    }
     public static final Swarm EMPTY = new Swarm(List.of(), 1);
 
     public record Unit(UUID id, int speed, int power) {
@@ -86,7 +91,7 @@ public record Swarm(List<Unit> units, int assign) {
     }
 
     public Swarm addUnit(int speed) {
-        if (units.size() >= MAX) {
+        if (units.size() >= capacity()) {
             return this;
         }
         List<Unit> next = new ArrayList<>(units);

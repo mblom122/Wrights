@@ -20,7 +20,7 @@ public class WrightportBlockItem extends BlockItem {
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         Swarm swarm = Swarm.from(stack);
         if (!swarm.units().isEmpty()) {
-            tooltip.add(Component.translatable("item.wrights.personal_wrightport.drones", swarm.units().size(), Swarm.MAX).withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.translatable("item.wrights.personal_wrightport.drones", swarm.units().size(), Swarm.capacity()).withStyle(ChatFormatting.GRAY));
         }
         tooltip.add(Component.translatable("item.wrights.wrightport.hint").withStyle(ChatFormatting.DARK_GRAY));
     }
