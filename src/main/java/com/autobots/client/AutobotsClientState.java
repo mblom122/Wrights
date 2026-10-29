@@ -66,7 +66,6 @@ public final class AutobotsClientState {
     public static boolean bindSupply;
     public static boolean supplyBound;
     public static BlockPos supplyPos;
-    public static boolean keepSupplyMode;
     public static BlockPos anchor;
     public static int pivotX;
     public static int pivotY;
@@ -608,16 +607,8 @@ public final class AutobotsClientState {
     }
 
     public static void applySupply(BlueprintPayloads.SupplySync payload) {
-        boolean choosing = bindSupply;
-        boolean stay = keepSupplyMode;
-        keepSupplyMode = false;
         supplyBound = payload.chest();
         supplyPos = payload.chest() ? payload.pos() : null;
-        if (choosing && !stay) {
-            bindSupply = false;
-            styleHudTicks = 70;
-            styleAnnounce = true;
-        }
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.screen instanceof PlacementScreen placement) {
             placement.refresh();

@@ -142,7 +142,6 @@ public final class AutobotsInput {
             event.setUseItem(TriState.FALSE);
             if (event.getEntity().isShiftKeyDown()) {
                 if (AutobotsClientState.bindSupply && AutobotsClientState.supplyBound) {
-                    AutobotsClientState.keepSupplyMode = true;
                     AutobotsClientState.supplyBound = false;
                     AutobotsClientState.supplyPos = null;
                     net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.autobots.network.BlueprintPayloads.BindSupply(BlockPos.ZERO, true));
@@ -154,7 +153,7 @@ public final class AutobotsInput {
                 if (Minecraft.getInstance().level != null && SelectionRenderer.isSupplyContainer(Minecraft.getInstance().level, pos)) {
                     net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.autobots.network.BlueprintPayloads.BindSupply(pos, false));
                 } else {
-                    net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.autobots.network.BlueprintPayloads.BindSupply(BlockPos.ZERO, true));
+                    event.getEntity().displayClientMessage(net.minecraft.network.chat.Component.translatable("message.autobots.supply_not_container"), true);
                 }
             } else {
                 AutobotsClientState.tryBuild();
@@ -182,7 +181,6 @@ public final class AutobotsInput {
             event.setCanceled(true);
             if (event.getEntity().isShiftKeyDown()) {
                 if (AutobotsClientState.bindSupply && AutobotsClientState.supplyBound) {
-                    AutobotsClientState.keepSupplyMode = true;
                     AutobotsClientState.supplyBound = false;
                     AutobotsClientState.supplyPos = null;
                     net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.autobots.network.BlueprintPayloads.BindSupply(BlockPos.ZERO, true));
@@ -190,7 +188,7 @@ public final class AutobotsInput {
                     Minecraft.getInstance().setScreen(new PlacementScreen());
                 }
             } else if (AutobotsClientState.bindSupply) {
-                net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.autobots.network.BlueprintPayloads.BindSupply(BlockPos.ZERO, true));
+                event.getEntity().displayClientMessage(net.minecraft.network.chat.Component.translatable("message.autobots.supply_not_container"), true);
             } else {
                 AutobotsClientState.tryBuild();
             }

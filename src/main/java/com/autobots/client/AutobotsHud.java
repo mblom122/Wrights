@@ -56,8 +56,8 @@ public final class AutobotsHud {
             line = Component.translatable("hud.autobots.saving", AutobotsClientState.name);
         } else if (AutobotsClientState.mode == AutobotsClientState.Mode.BUILD) {
             if (AutobotsClientState.bindSupply) {
-                line = supplyChoice(minecraft);
-                sub = Component.translatable("hud.autobots.bind_explain");
+                line = Component.translatable("hud.autobots.bind_explain");
+                sub = supplyChoice(minecraft);
             } else {
                 line = Component.translatable("hud.autobots.build", AutobotsClientState.buildName);
                 sub = Component.translatable(AutobotsClientState.supplyBound ? "hud.autobots.build_chest" : "hud.autobots.build_inventory");
@@ -184,7 +184,11 @@ public final class AutobotsHud {
     private static Component supplyChoice(Minecraft minecraft) {
         BlockPos aim = SelectionRenderer.supplyTarget(minecraft);
         if (aim == null || minecraft.level == null) {
-            return Component.translatable("hud.autobots.supply_yours");
+            if (AutobotsClientState.supplyBound && AutobotsClientState.supplyPos != null) {
+                BlockPos bound = AutobotsClientState.supplyPos;
+                return Component.translatable("screen.autobots.supply_at", bound.getX(), bound.getY(), bound.getZ());
+            }
+            return Component.translatable("screen.autobots.supply_none");
         }
         return minecraft.level.getBlockState(aim).getBlock().getName();
     }
