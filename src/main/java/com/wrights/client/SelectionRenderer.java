@@ -160,6 +160,7 @@ public final class SelectionRenderer {
         }
         String here = minecraft.level.dimension().location().toString();
         float pulse = 0.65F + 0.35F * (float) Math.sin(System.currentTimeMillis() / 180.0D);
+        VertexConsumer fill = buffers.getBuffer(RenderType.debugFilledBox());
         VertexConsumer lines = buffers.getBuffer(RenderType.lines());
         boolean any = false;
         for (BlueprintPayloads.JobLine job : WrightsClientState.jobs) {
@@ -167,14 +168,16 @@ public final class SelectionRenderer {
                 continue;
             }
             BlockPos origin = job.origin();
-            AABB box = new AABB(origin.getX(), origin.getY(), origin.getZ(), origin.getX() + job.sizeX(), origin.getY() + job.sizeY(), origin.getZ() + job.sizeZ());
-            drawBox(pose, lines, box, camera, 0.95F, 0.78F, 0.25F, pulse);
-            BlockPos anchor = job.anchor();
-            AABB marker = new AABB(anchor.getX(), anchor.getY(), anchor.getZ(), anchor.getX() + 1.0D, anchor.getY() + 1.0D, anchor.getZ() + 1.0D);
-            drawBox(pose, lines, marker, camera, 0.35F, 0.75F, 1.0F, 1.0F);
+            AABB box = new AABB(origin.getX(), origin.getY(), origin.getZ(), origin.getX() + Math.max(1, job.sizeX()), origin.getY() + Math.max(1, job.sizeY()), origin.getZ() + Math.max(1, job.sizeZ())).inflate(0.04D);
+            AABB local = box.move(-camera.x, -camera.y, -camera.z);
+            LevelRenderer.addChainedFilledBoxVertices(
+                    pose, fill, local.minX, local.minY, local.minZ, local.maxX, local.maxY, local.maxZ,
+                    0.95F, 0.82F, 0.28F, 0.14F + 0.08F * pulse);
+            drawBox(pose, lines, box, camera, 0.98F, 0.86F, 0.32F, pulse);
             any = true;
         }
         if (any) {
+            buffers.endBatch(RenderType.debugFilledBox());
             buffers.endBatch(RenderType.lines());
         }
     }

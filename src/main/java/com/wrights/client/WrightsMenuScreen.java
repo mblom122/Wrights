@@ -1423,7 +1423,9 @@ public class WrightsMenuScreen extends Screen {
         if (creativeVisit()) {
             right = drawJobButton(graphics, right, buttonY, "menu.wrights.visit", mouseX, mouseY, 52);
         }
-        right = drawJobButton(graphics, right, buttonY, WrightsClientState.markedJobs.contains(job.id()) ? "menu.wrights.mark_on" : "menu.wrights.mark", mouseX, mouseY, 52);
+        boolean highlighted = WrightsClientState.markedJobs.contains(job.id());
+        String markKey = highlighted ? "menu.wrights.mark_on" : "menu.wrights.mark";
+        right = drawJobButton(graphics, right, buttonY, markKey, mouseX, mouseY, jobButtonWidth(markKey), highlighted ? 0xFFF2D48A : 0);
         if (job.finished()) {
             right = drawJobButton(graphics, right, buttonY, "menu.wrights.redo", mouseX, mouseY, 52);
             if (job.canUndo()) {
@@ -1513,9 +1515,16 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private int drawJobButton(GuiGraphics graphics, int right, int y, String key, int mouseX, int mouseY, int width) {
+        return drawJobButton(graphics, right, y, key, mouseX, mouseY, width, 0);
+    }
+
+    private int drawJobButton(GuiGraphics graphics, int right, int y, String key, int mouseX, int mouseY, int width, int border) {
         int left = right - width;
         boolean hover = mouseX >= left && mouseX < right && mouseY >= y && mouseY < y + 16;
         graphics.fill(left, y, right, y + 16, hover ? 0xFF3A5164 : 0xFF24384A);
+        if (border != 0) {
+            WrightsUi.border(graphics, left, y, width, 16, border);
+        }
         Component label = Component.translatable(key);
         String text = this.font.plainSubstrByWidth(label.getString(), width - 4);
         graphics.drawString(this.font, text, left + (width - this.font.width(text)) / 2, y + 4, WrightsUi.TEXT, false);
@@ -1588,11 +1597,13 @@ public class WrightsMenuScreen extends Screen {
             }
             right -= 56;
         }
-        if (hitJobButton(mouseX, right, buttonY)) {
+        String markKey = WrightsClientState.markedJobs.contains(job.id()) ? "menu.wrights.mark_on" : "menu.wrights.mark";
+        int markW = jobButtonWidth(markKey);
+        if (hitWide(mouseX, mouseY, right, buttonY, markW)) {
             WrightsClientState.toggleMark(job.id());
             return true;
         }
-        right -= 56;
+        right -= markW + 4;
         if (job.finished()) {
             if (hitJobButton(mouseX, right, buttonY)) {
                 PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.REDO));
