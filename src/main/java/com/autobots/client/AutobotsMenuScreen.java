@@ -75,6 +75,23 @@ public class AutobotsMenuScreen extends Screen {
     private int instantX;
     private int instantY;
     private int instantW;
+    private int optionScroll;
+    private int optionViewX;
+    private int optionViewY;
+    private int optionViewW;
+    private int optionViewH;
+    private int optionContentH;
+    private int optionThumbY;
+    private int optionThumbH;
+    private boolean optionDragging;
+    private int optionDragGrab;
+    private int optionTitleY;
+    private int optionPreviewX;
+    private int optionPreviewY;
+    private int optionHintY;
+    private int optionPlaceY;
+    private int optionPlaceHintY;
+    private int optionOffsetY;
     private EditBox wallPercent;
     private EditBox edgePercent;
     private EditBox placeX;
@@ -230,6 +247,7 @@ public class AutobotsMenuScreen extends Screen {
             showOffset(placeX, AutobotsClientConfig.PLACE_X.get());
             showOffset(placeY, AutobotsClientConfig.PLACE_Y.get());
             showOffset(placeZ, AutobotsClientConfig.PLACE_Z.get());
+            layoutOptions();
         }
     }
 
@@ -249,6 +267,9 @@ public class AutobotsMenuScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        if (options) {
+            layoutOptions();
+        }
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, Component.translatable("menu.autobots.title"), panelX + 16, panelY + 10, AutobotsUi.COPPER, false);
         graphics.drawString(this.font, Component.translatable("menu.autobots.subtitle"), panelX + 16, panelY + 22, AutobotsUi.MUTED, false);
@@ -287,67 +308,131 @@ public class AutobotsMenuScreen extends Screen {
         }
     }
 
-    private void renderOptions(GuiGraphics graphics) {
-        int x = listX + 8;
-        int y = panelY + 46;
-        graphics.drawString(this.font, Component.translatable("menu.autobots.options_title"), x, panelY + 42, AutobotsUi.TEXT, false);
-        int preview = (Math.round(AutobotsClientConfig.wallAlpha() * 255.0F) << 24) | AutobotsClientConfig.wallRgb();
-        graphics.fill(x + 220, panelY + 42, x + 268, panelY + 70, preview);
-        AutobotsUi.border(graphics, x + 220, panelY + 42, 48, 28, 0xFF000000 | AutobotsClientConfig.edgeRgb());
-        y = panelY + 64;
-        graphics.drawString(this.font, Component.translatable("menu.autobots.wall_color"), x, y, AutobotsUi.MUTED, false);
-        swatchX = x + 110;
-        wallSwatchY = y - 2;
-        drawSwatches(graphics, swatchX, wallSwatchY, AutobotsClientConfig.wallRgb());
-        y += 20;
+    private int optionY(int local) {
+        return optionViewY + local - optionScroll;
+    }
+
+    private void layoutOptions() {
+        optionViewX = listX - 2;
+        optionViewY = panelY + 38;
+        optionViewW = panelX + panelW - 16 - optionViewX;
+        optionViewH = panelH - 76;
+        int x = optionViewX + 10;
+        int local = 6;
+        optionTitleY = optionY(local);
+        optionPreviewX = x + 220;
+        optionPreviewY = optionY(local);
+        local = 30;
+        wallSwatchY = optionY(local - 2);
+        local += 20;
         wallSliderX = x + 108;
-        wallSliderY = y;
+        wallSliderY = optionY(local);
         wallSliderW = 120;
-        drawSlider(graphics, x, y, wallSliderX, wallSliderW, AutobotsClientConfig.WALL_TRANSPARENCY.get(), 100, Component.translatable("menu.autobots.wall_transparency"));
-        placeField(wallPercent, wallSliderX + wallSliderW + 8, y - 4);
-        graphics.drawString(this.font, "%", wallPercent.getX() + 34, y, AutobotsUi.TEXT, false);
-        y += 22;
-        graphics.drawString(this.font, Component.translatable("menu.autobots.edge_color"), x, y, AutobotsUi.MUTED, false);
-        edgeSwatchY = y - 2;
-        drawSwatches(graphics, swatchX, edgeSwatchY, AutobotsClientConfig.edgeRgb());
-        y += 20;
+        placeField(wallPercent, wallSliderX + wallSliderW + 8, wallSliderY - 4);
+        local += 22;
+        edgeSwatchY = optionY(local - 2);
+        local += 20;
         edgeSliderX = x + 108;
-        edgeSliderY = y;
+        edgeSliderY = optionY(local);
         edgeSliderW = 120;
-        drawSlider(graphics, x, y, edgeSliderX, edgeSliderW, AutobotsClientConfig.EDGE_OPACITY.get(), 100, Component.translatable("menu.autobots.edge_opacity"));
-        placeField(edgePercent, edgeSliderX + edgeSliderW + 8, y - 4);
-        graphics.drawString(this.font, "%", edgePercent.getX() + 34, y, AutobotsUi.TEXT, false);
-        y += 22;
-        graphics.drawString(this.font, Component.translatable("menu.autobots.corner_markers"), x, y, AutobotsUi.MUTED, false);
+        placeField(edgePercent, edgeSliderX + edgeSliderW + 8, edgeSliderY - 4);
+        local += 22;
         boolean marks = AutobotsClientConfig.CORNER_MARKERS.get();
         Component state = Component.translatable(marks ? "menu.autobots.on" : "menu.autobots.off");
         markerW = Math.max(36, this.font.width(state) + 16);
         markerX = x + 108;
-        markerY = y - 3;
-        graphics.fill(markerX, markerY, markerX + markerW, markerY + 16, marks ? 0xFF24384A : 0xFF18222C);
-        AutobotsUi.border(graphics, markerX, markerY, markerW, 16, marks ? AutobotsUi.COPPER : 0xFF3D4E5E);
-        graphics.drawCenteredString(this.font, state, markerX + markerW / 2, markerY + 4, AutobotsUi.TEXT);
-        y += 22;
-        boolean creative = this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild;
-        graphics.drawString(this.font, Component.translatable("menu.autobots.build_speed"), x, y, AutobotsUi.MUTED, false);
-        boolean instant = creative || AutobotsClientConfig.INSTANT_JOBS.get();
+        markerY = optionY(local - 3);
+        local += 22;
+        boolean paceChoice = creativeVisit();
+        boolean instant = paceChoice && AutobotsClientConfig.INSTANT_JOBS.get();
         Component pace = Component.translatable(instant ? "menu.autobots.instant" : "menu.autobots.drone_pace");
         instantW = Math.max(52, this.font.width(pace) + 16);
         instantX = x + 108;
-        instantY = y - 3;
-        graphics.fill(instantX, instantY, instantX + instantW, instantY + 16, instant ? 0xFF24384A : 0xFF18222C);
-        AutobotsUi.border(graphics, instantX, instantY, instantW, 16, instant ? AutobotsUi.COPPER : 0xFF3D4E5E);
-        graphics.drawCenteredString(this.font, pace, instantX + instantW / 2, instantY + 4, AutobotsUi.TEXT);
-        y += 14;
-        graphics.drawString(this.font, Component.translatable(creative ? "menu.autobots.build_speed_creative" : "menu.autobots.build_speed_hint"), x, y, AutobotsUi.MUTED, false);
-        y += 18;
-        graphics.drawString(this.font, Component.translatable("menu.autobots.place_offset"), x, y, AutobotsUi.TEXT, false);
-        y += 12;
-        graphics.drawString(this.font, Component.translatable("menu.autobots.place_hint"), x, y, AutobotsUi.MUTED, false);
-        y += 16;
-        drawOffset(graphics, x, y, "X", placeX);
-        drawOffset(graphics, x + 70, y, "Y", placeY);
-        drawOffset(graphics, x + 140, y, "Z", placeZ);
+        instantY = optionY(local - 3);
+        local += 14;
+        optionHintY = optionY(local);
+        local += 18;
+        optionPlaceY = optionY(local);
+        local += 12;
+        optionPlaceHintY = optionY(local);
+        local += 16;
+        optionOffsetY = optionY(local);
+        placeField(placeX, x + 12, optionOffsetY);
+        placeField(placeY, x + 82, optionOffsetY);
+        placeField(placeZ, x + 152, optionOffsetY);
+        swatchX = x + 110;
+        optionContentH = local + 22;
+        int maxScroll = Math.max(0, optionContentH - optionViewH);
+        int clamped = Mth.clamp(optionScroll, 0, maxScroll);
+        if (clamped != optionScroll) {
+            optionScroll = clamped;
+            layoutOptions();
+            return;
+        }
+        showOptionBox(wallPercent);
+        showOptionBox(edgePercent);
+        showOptionBox(placeX);
+        showOptionBox(placeY);
+        showOptionBox(placeZ);
+        if (maxScroll > 0) {
+            optionThumbH = Math.max(16, optionViewH * optionViewH / optionContentH);
+            optionThumbY = optionViewY + (optionViewH - optionThumbH) * optionScroll / maxScroll;
+        } else {
+            optionThumbH = optionViewH;
+            optionThumbY = optionViewY;
+        }
+    }
+
+    private void showOptionBox(EditBox box) {
+        int top = box.getY();
+        int bottom = top + box.getHeight();
+        box.visible = options && top >= optionViewY && bottom <= optionViewY + optionViewH;
+    }
+
+    private void renderOptions(GuiGraphics graphics) {
+        int x = optionViewX + 10;
+        graphics.enableScissor(optionViewX, optionViewY, optionViewX + optionViewW - 6, optionViewY + optionViewH);
+        graphics.drawString(this.font, Component.translatable("menu.autobots.options_title"), x, optionTitleY, AutobotsUi.TEXT, false);
+        int preview = (Math.round(AutobotsClientConfig.wallAlpha() * 255.0F) << 24) | AutobotsClientConfig.wallRgb();
+        graphics.fill(optionPreviewX, optionPreviewY, optionPreviewX + 48, optionPreviewY + 28, preview);
+        AutobotsUi.border(graphics, optionPreviewX, optionPreviewY, 48, 28, 0xFF000000 | AutobotsClientConfig.edgeRgb());
+        graphics.drawString(this.font, Component.translatable("menu.autobots.wall_color"), x, wallSwatchY + 2, AutobotsUi.MUTED, false);
+        drawSwatches(graphics, swatchX, wallSwatchY, AutobotsClientConfig.wallRgb());
+        drawSlider(graphics, x, wallSliderY, wallSliderX, wallSliderW, AutobotsClientConfig.WALL_TRANSPARENCY.get(), 100, Component.translatable("menu.autobots.wall_transparency"));
+        graphics.drawString(this.font, "%", wallPercent.getX() + 34, wallSliderY, AutobotsUi.TEXT, false);
+        graphics.drawString(this.font, Component.translatable("menu.autobots.edge_color"), x, edgeSwatchY + 2, AutobotsUi.MUTED, false);
+        drawSwatches(graphics, swatchX, edgeSwatchY, AutobotsClientConfig.edgeRgb());
+        drawSlider(graphics, x, edgeSliderY, edgeSliderX, edgeSliderW, AutobotsClientConfig.EDGE_OPACITY.get(), 100, Component.translatable("menu.autobots.edge_opacity"));
+        graphics.drawString(this.font, "%", edgePercent.getX() + 34, edgeSliderY, AutobotsUi.TEXT, false);
+        graphics.drawString(this.font, Component.translatable("menu.autobots.corner_markers"), x, markerY + 3, AutobotsUi.MUTED, false);
+        boolean marks = AutobotsClientConfig.CORNER_MARKERS.get();
+        Component state = Component.translatable(marks ? "menu.autobots.on" : "menu.autobots.off");
+        graphics.fill(markerX, markerY, markerX + markerW, markerY + 16, marks ? 0xFF24384A : 0xFF18222C);
+        AutobotsUi.border(graphics, markerX, markerY, markerW, 16, marks ? AutobotsUi.COPPER : 0xFF3D4E5E);
+        graphics.drawCenteredString(this.font, state, markerX + markerW / 2, markerY + 4, AutobotsUi.TEXT);
+        boolean paceChoice = creativeVisit();
+        boolean instant = paceChoice && AutobotsClientConfig.INSTANT_JOBS.get();
+        graphics.drawString(this.font, Component.translatable("menu.autobots.build_speed"), x, instantY + 3, paceChoice ? AutobotsUi.MUTED : 0xFF667480, false);
+        Component pace = Component.translatable(instant ? "menu.autobots.instant" : "menu.autobots.drone_pace");
+        int fill = paceChoice ? (instant ? 0xFF24384A : 0xFF18222C) : 0xFF141C24;
+        int edge = paceChoice ? (instant ? AutobotsUi.COPPER : 0xFF3D4E5E) : 0xFF3A4652;
+        int text = paceChoice ? AutobotsUi.TEXT : 0xFF667480;
+        graphics.fill(instantX, instantY, instantX + instantW, instantY + 16, fill);
+        AutobotsUi.border(graphics, instantX, instantY, instantW, 16, edge);
+        graphics.drawCenteredString(this.font, pace, instantX + instantW / 2, instantY + 4, text);
+        Component hint = Component.translatable(paceChoice ? "menu.autobots.build_speed_hint" : "menu.autobots.build_speed_locked");
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(hint.getString(), optionViewW - 28), x, optionHintY, 0xFF667480, false);
+        graphics.drawString(this.font, Component.translatable("menu.autobots.place_offset"), x, optionPlaceY, AutobotsUi.TEXT, false);
+        graphics.drawString(this.font, Component.translatable("menu.autobots.place_hint"), x, optionPlaceHintY, AutobotsUi.MUTED, false);
+        graphics.drawString(this.font, "X", x, optionOffsetY + 3, AutobotsUi.MUTED, false);
+        graphics.drawString(this.font, "Y", x + 70, optionOffsetY + 3, AutobotsUi.MUTED, false);
+        graphics.drawString(this.font, "Z", x + 140, optionOffsetY + 3, AutobotsUi.MUTED, false);
+        graphics.disableScissor();
+        if (optionContentH > optionViewH) {
+            int barX = optionViewX + optionViewW - 5;
+            graphics.fill(barX, optionViewY, barX + 3, optionViewY + optionViewH, 0xFF24303A);
+            graphics.fill(barX, optionThumbY, barX + 3, optionThumbY + optionThumbH, AutobotsUi.COPPER);
+        }
     }
 
     private void drawSwatches(GuiGraphics graphics, int x, int y, int selected) {
@@ -378,11 +463,6 @@ public class AutobotsMenuScreen extends Screen {
         box.setY(y);
         box.setWidth(28);
         box.setHeight(14);
-    }
-
-    private void drawOffset(GuiGraphics graphics, int x, int y, String label, EditBox box) {
-        graphics.drawString(this.font, label, x, y + 3, AutobotsUi.MUTED, false);
-        placeField(box, x + 12, y);
     }
 
     private void renderList(GuiGraphics graphics, int mouseX, int mouseY) {
@@ -503,6 +583,7 @@ public class AutobotsMenuScreen extends Screen {
         if (button == 0 && hitTask(mouseX, mouseY, panelY + 150)) {
             options = true;
             jobsPage = false;
+            optionScroll = 0;
             setFocused(null);
             refresh();
             return true;
@@ -511,31 +592,38 @@ public class AutobotsMenuScreen extends Screen {
             return true;
         }
         if (options && button == 0) {
-            if (pickSwatch(mouseX, mouseY, wallSwatchY, true) || pickSwatch(mouseX, mouseY, edgeSwatchY, false)) {
+            layoutOptions();
+            if (hitOptionBar(mouseX, mouseY)) {
+                optionDragging = true;
+                optionDragGrab = (int) mouseY - optionThumbY;
                 return true;
             }
-            if (mouseX >= markerX && mouseX < markerX + markerW && mouseY >= markerY && mouseY < markerY + 16) {
-                AutobotsClientConfig.setCornerMarkers(!AutobotsClientConfig.CORNER_MARKERS.get());
-                return true;
-            }
-            if (mouseX >= instantX && mouseX < instantX + instantW && mouseY >= instantY && mouseY < instantY + 16) {
-                if (this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild) {
+            if (insideOptionView(mouseX, mouseY)) {
+                if (pickSwatch(mouseX, mouseY, wallSwatchY, true) || pickSwatch(mouseX, mouseY, edgeSwatchY, false)) {
                     return true;
                 }
-                boolean next = !AutobotsClientConfig.INSTANT_JOBS.get();
-                AutobotsClientConfig.setInstantJobs(next);
-                PacketDistributor.sendToServer(new BlueprintPayloads.SetPace(next));
-                return true;
-            }
-            if (hitSlider(mouseX, mouseY, wallSliderX, wallSliderY, wallSliderW)) {
-                drag = 1;
-                applyDrag(mouseX);
-                return true;
-            }
-            if (hitSlider(mouseX, mouseY, edgeSliderX, edgeSliderY, edgeSliderW)) {
-                drag = 2;
-                applyDrag(mouseX);
-                return true;
+                if (mouseX >= markerX && mouseX < markerX + markerW && mouseY >= markerY && mouseY < markerY + 16) {
+                    AutobotsClientConfig.setCornerMarkers(!AutobotsClientConfig.CORNER_MARKERS.get());
+                    return true;
+                }
+                if (mouseX >= instantX && mouseX < instantX + instantW && mouseY >= instantY && mouseY < instantY + 16) {
+                    if (creativeVisit()) {
+                        boolean next = !AutobotsClientConfig.INSTANT_JOBS.get();
+                        AutobotsClientConfig.setInstantJobs(next);
+                        PacketDistributor.sendToServer(new BlueprintPayloads.SetPace(next));
+                    }
+                    return true;
+                }
+                if (hitSlider(mouseX, mouseY, wallSliderX, wallSliderY, wallSliderW)) {
+                    drag = 1;
+                    applyDrag(mouseX);
+                    return true;
+                }
+                if (hitSlider(mouseX, mouseY, edgeSliderX, edgeSliderY, edgeSliderW)) {
+                    drag = 2;
+                    applyDrag(mouseX);
+                    return true;
+                }
             }
             return super.mouseClicked(mouseX, mouseY, button);
         }
@@ -565,6 +653,12 @@ public class AutobotsMenuScreen extends Screen {
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (optionDragging && button == 0) {
+            int max = Math.max(0, optionContentH - optionViewH);
+            int travel = Math.max(1, optionViewH - optionThumbH);
+            optionScroll = Mth.clamp((int) ((mouseY - optionDragGrab - optionViewY) * max / travel), 0, max);
+            return true;
+        }
         if (drag != 0 && button == 0) {
             applyDrag(mouseX);
             return true;
@@ -581,6 +675,7 @@ public class AutobotsMenuScreen extends Screen {
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
         if (button == 0) {
             spinning = false;
+            optionDragging = false;
         }
         if (drag != 0) {
             applyDrag(mouseX);
@@ -593,6 +688,18 @@ public class AutobotsMenuScreen extends Screen {
 
     private boolean insideModel(double mouseX, double mouseY) {
         return !options && selected() != null && mouseX >= modelX && mouseX < modelX + modelW && mouseY >= modelY && mouseY < modelY + modelH;
+    }
+
+    private boolean insideOptionView(double mouseX, double mouseY) {
+        return mouseX >= optionViewX && mouseX < optionViewX + optionViewW && mouseY >= optionViewY && mouseY < optionViewY + optionViewH;
+    }
+
+    private boolean hitOptionBar(double mouseX, double mouseY) {
+        if (optionContentH <= optionViewH) {
+            return false;
+        }
+        int barX = optionViewX + optionViewW - 8;
+        return mouseX >= barX && mouseX < optionViewX + optionViewW && mouseY >= optionViewY && mouseY < optionViewY + optionViewH;
     }
 
     private boolean hitTask(double mouseX, double mouseY, int y) {
@@ -885,6 +992,11 @@ public class AutobotsMenuScreen extends Screen {
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         if (jobsPage) {
             jobScroll = Mth.clamp(jobScroll - (int) Math.signum(scrollY), 0, Math.max(0, AutobotsClientState.jobs.size() - jobRows()));
+            return true;
+        }
+        if (options && insideOptionView(mouseX, mouseY)) {
+            int max = Math.max(0, optionContentH - optionViewH);
+            optionScroll = Mth.clamp(optionScroll - (int) Math.signum(scrollY) * 16, 0, max);
             return true;
         }
         if (insideList(mouseX, mouseY)) {

@@ -236,7 +236,13 @@ public final class BlueprintNetwork {
 
     private static void pace(BlueprintPayloads.SetPace payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
-        context.enqueueWork(() -> BlueprintSessions.get(player).setInstantJobs(payload.instant()));
+        context.enqueueWork(() -> {
+            if (player.getAbilities().instabuild && !player.isSpectator()) {
+                BlueprintSessions.get(player).setInstantJobs(payload.instant());
+            } else {
+                BlueprintSessions.get(player).setInstantJobs(false);
+            }
+        });
     }
 
     private static void assign(BlueprintPayloads.SetAssign payload, IPayloadContext context) {

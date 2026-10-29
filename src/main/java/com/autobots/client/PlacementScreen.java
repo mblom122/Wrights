@@ -8,6 +8,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.neoforged.neoforge.network.PacketDistributor;
 
+import com.autobots.AutobotsClientConfig;
 import com.autobots.AutobotsConfig;
 import com.autobots.blueprint.BlueprintTransforms;
 import com.autobots.blueprint.BoxEdits;
@@ -113,8 +114,8 @@ public class PlacementScreen extends Screen {
         chestButton = new AutobotsButton(panelX + 16 + aimW, panelY + 188, aimW, 16, Component.translatable("screen.autobots.supply_chest"), button -> bindChest());
         addRenderableWidget(inventoryButton);
         addRenderableWidget(chestButton);
-        boolean creative = this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild;
-        if (!creative) {
+        boolean paceInstant = this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild && !this.minecraft.player.isSpectator() && AutobotsClientConfig.INSTANT_JOBS.get();
+        if (!paceInstant) {
             step(panelX + 12, panelY + 230, "-", () -> changeAssign(-1));
             step(panelX + 186, panelY + 230, "+", () -> changeAssign(1));
         }
@@ -200,8 +201,8 @@ public class PlacementScreen extends Screen {
         axis(graphics, panelY + 140, "Y");
         axis(graphics, panelY + 158, "Z");
         graphics.drawString(this.font, Component.translatable("screen.autobots.items_from"), panelX + 12, panelY + 176, AutobotsUi.BLUE, false);
-        boolean creative = this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild;
-        if (creative) {
+        boolean paceInstant = this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild && !this.minecraft.player.isSpectator() && AutobotsClientConfig.INSTANT_JOBS.get();
+        if (paceInstant) {
             graphics.drawString(this.font, Component.translatable("screen.autobots.drones_instant"), panelX + 12, panelY + 234, AutobotsUi.MUTED, false);
         } else if (this.minecraft.player != null) {
             com.autobots.drone.Swarm swarm = com.autobots.drone.Cradles.swarm(this.minecraft.player);
@@ -538,7 +539,7 @@ public class PlacementScreen extends Screen {
     }
 
     private void changeAssign(int delta) {
-        if (this.minecraft.player == null || this.minecraft.player.getAbilities().instabuild) {
+        if (this.minecraft.player == null) {
             return;
         }
         com.autobots.drone.Swarm swarm = com.autobots.drone.Cradles.swarm(this.minecraft.player);

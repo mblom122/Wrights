@@ -984,8 +984,8 @@ public final class JobManager {
     }
 
     private static boolean instant(ServerPlayer player) {
-        if (player.getAbilities().instabuild && !player.isSpectator()) {
-            return true;
+        if (!player.getAbilities().instabuild || player.isSpectator()) {
+            return false;
         }
         return com.autobots.blueprint.BlueprintSessions.get(player).instantJobs();
     }
