@@ -19,6 +19,11 @@ public final class ModCreativeTabs {
             .icon(() -> ModItems.CONTROLLER.get().getDefaultInstance())
             .displayItems((parameters, output) -> {
                 output.accept(ModItems.CONTROLLER.get());
+                output.accept(ModItems.WRIGHT.get());
+                output.accept(ModItems.UPGRADE_IRON.get());
+                output.accept(ModItems.UPGRADE_GOLD.get());
+                output.accept(ModItems.UPGRADE_DIAMOND.get());
+                output.accept(ModItems.UPGRADE_NETHERITE.get());
                 output.accept(ModItems.PERSONAL_WRIGHTPORT.get());
                 output.accept(ModBlocks.WRIGHTPORT_ITEM.get());
                 output.accept(ModBlocks.HANGAR_ITEM.get());

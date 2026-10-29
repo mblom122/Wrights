@@ -17,6 +17,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
+import com.wrights.drone.Swarm;
 import com.wrights.schematic.Schematic;
 
 public final class BuildJob {
@@ -223,7 +224,7 @@ public final class BuildJob {
             Hand hand = new Hand();
             hand.lane = i;
             hand.lanes = lanes;
-            hand.speed = Math.max(1, Math.min(4, speeds.get(i)));
+            hand.speed = Math.max(1, Math.min(Swarm.MAX_SPEED, speeds.get(i)));
             hands.add(hand);
         }
     }
@@ -252,7 +253,7 @@ public final class BuildJob {
             Hand hand = i < hands.size() ? hands.get(i) : new Hand();
             hand.lane = i;
             hand.lanes = lanes;
-            hand.speed = Math.max(1, Math.min(4, speeds.get(i)));
+            hand.speed = Math.max(1, Math.min(Swarm.MAX_SPEED, speeds.get(i)));
             if (scan) {
                 hand.cursor = 0;
                 hand.rescan = true;

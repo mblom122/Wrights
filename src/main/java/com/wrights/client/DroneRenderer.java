@@ -1,6 +1,7 @@
 package com.wrights.client;
 
 import com.wrights.WrightsMod;
+import com.wrights.drone.WrightTier;
 import com.wrights.entity.DroneEntity;
 
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -34,7 +35,9 @@ public class DroneRenderer extends EntityRenderer<DroneEntity> {
         pose.scale(-0.7F, -0.7F, 0.7F);
         this.model.setupAnim(entity, 0.0F, 0.0F, entity.tickCount + partialTick, 0.0F, 0.0F);
         VertexConsumer consumer = buffers.getBuffer(RenderType.entityCutoutNoCull(TEXTURE));
-        this.model.renderToBuffer(pose, consumer, light, OverlayTexture.NO_OVERLAY, 0xFFFFFFFF);
+        int color = WrightTier.modelColor(entity.tier());
+        this.model.renderToBuffer(pose, consumer, light, OverlayTexture.NO_OVERLAY, color);
+        this.model.renderLens(pose, consumer, light, OverlayTexture.NO_OVERLAY);
         pose.popPose();
         super.render(entity, yaw, partialTick, pose, buffers, light);
     }

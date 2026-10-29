@@ -17,8 +17,8 @@ public final class WrightsConfig {
             .defineInRange("maxBlocks", 100_000, 1, 2_097_152);
 
     public static final ModConfigSpec.IntValue BLOCKS_PER_TICK = BUILDER
-            .comment("How many blocks a drone may place in one server tick. Keep this low.")
-            .defineInRange("blocksPerTick", 4, 1, 64);
+            .comment("How many blocks one wright may place in one server tick. A netherite wright places 5 when this allows it.")
+            .defineInRange("blocksPerTick", 8, 1, 64);
 
     public static final ModConfigSpec.IntValue COPY_POSITIONS_PER_TICK = BUILDER
             .comment("How many positions a copy may read in one tick. Reading is cheap, so this can be higher than placement.")

@@ -1389,7 +1389,7 @@ public final class JobManager {
                 BuildJob.Hand hand = job.hands().get(i);
                 hand.lane = i;
                 hand.lanes = job.hands().size();
-                hand.speed = Math.max(1, Math.min(4, speeds.get(i)));
+                hand.speed = Math.max(1, Math.min(Swarm.MAX_SPEED, speeds.get(i)));
             }
             if (job.hands().size() != before) {
                 evenOut(job, schematic);
@@ -1491,6 +1491,9 @@ public final class JobManager {
             Schematic.Entry next = schematic.entry(index);
             BlockPos nextPos = job.min().offset(next.x(), next.y(), next.z());
             DroneEntity drone = ensureHand(level, player, job, hand, nextPos);
+            if (drone != null) {
+                drone.setTier(hand.speed);
+            }
             if (drone == null) {
                 waitingChunk = true;
                 continue;
@@ -1571,6 +1574,9 @@ public final class JobManager {
             BuildJob.Refund peek = job.refunds().get(index);
             BlockPos nextPos = job.min().offset(peek.x(), peek.y(), peek.z());
             DroneEntity drone = ensureHand(level, player, job, hand, nextPos);
+            if (drone != null) {
+                drone.setTier(hand.speed);
+            }
             if (drone == null) {
                 continue;
             }
@@ -2439,6 +2445,7 @@ public final class JobManager {
         if (job.droneId() != null) {
             Entity existing = level.getEntity(job.droneId());
             if (existing instanceof DroneEntity drone && drone.isAlive()) {
+                paint(drone, job);
                 return drone;
             }
             BlockPos last = job.lastDronePos();
@@ -2449,6 +2456,7 @@ public final class JobManager {
         net.minecraft.world.phys.AABB search = new net.minecraft.world.phys.AABB(workPos).inflate(96.0D);
         for (DroneEntity drone : level.getEntitiesOfClass(DroneEntity.class, search, entity -> entity.jobId().filter(job.id()::equals).isPresent() && entity.isAlive())) {
             job.setDroneId(drone.getUUID());
+            paint(drone, job);
             return drone;
         }
         DroneEntity drone = new DroneEntity(ModEntities.DRONE.get(), level);
@@ -2458,7 +2466,13 @@ public final class JobManager {
         job.setDroneId(drone.getUUID());
         job.setLastDronePos(drone.blockPosition());
         level.addFreshEntity(drone);
+        paint(drone, job);
         return drone;
+    }
+
+    private static void paint(DroneEntity drone, BuildJob job) {
+        int tier = job.hands().isEmpty() ? 1 : job.hands().get(0).speed;
+        drone.setTier(tier);
     }
 
     private static DroneEntity ensureHand(ServerLevel level, ServerPlayer player, BuildJob job, BuildJob.Hand hand, BlockPos workPos) {

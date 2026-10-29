@@ -21,8 +21,8 @@ import com.wrights.item.ModDataComponents;
  * and is not spent yet.
  */
 public record Swarm(List<Unit> units, int assign) {
-    public static final int MAX = 8;
-    public static final int MAX_SPEED = 4;
+    public static final int MAX = 64;
+    public static final int MAX_SPEED = 5;
     public static final Swarm EMPTY = new Swarm(List.of(), 1);
 
     public record Unit(UUID id, int speed, int power) {
@@ -82,11 +82,15 @@ public record Swarm(List<Unit> units, int assign) {
     }
 
     public Swarm addUnit() {
+        return addUnit(1);
+    }
+
+    public Swarm addUnit(int speed) {
         if (units.size() >= MAX) {
             return this;
         }
         List<Unit> next = new ArrayList<>(units);
-        next.add(new Unit(UUID.randomUUID(), 1, 0));
+        next.add(new Unit(UUID.randomUUID(), Mth.clamp(speed, 1, MAX_SPEED), 0));
         int keep = assign <= 0 ? 1 : assign;
         return new Swarm(List.copyOf(next), keep);
     }

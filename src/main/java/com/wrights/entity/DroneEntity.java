@@ -20,6 +20,7 @@ import com.wrights.schematic.SchematicLibrary;
 
 public class DroneEntity extends Entity {
     private static final EntityDataAccessor<String> JOB_ID = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.STRING);
+    private static final EntityDataAccessor<Integer> TIER = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.INT);
 
     public DroneEntity(EntityType<? extends DroneEntity> type, Level level) {
         super(type, level);
@@ -30,6 +31,15 @@ public class DroneEntity extends Entity {
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         builder.define(JOB_ID, "");
+        builder.define(TIER, 1);
+    }
+
+    public int tier() {
+        return com.wrights.drone.WrightTier.clamp(this.entityData.get(TIER));
+    }
+
+    public void setTier(int tier) {
+        this.entityData.set(TIER, com.wrights.drone.WrightTier.clamp(tier));
     }
 
     public Optional<UUID> jobId() {
@@ -105,10 +115,14 @@ public class DroneEntity extends Entity {
         if (tag.hasUUID("JobId")) {
             setJobId(tag.getUUID("JobId"));
         }
+        if (tag.contains("Tier")) {
+            setTier(tag.getInt("Tier"));
+        }
     }
 
     @Override
     protected void addAdditionalSaveData(CompoundTag tag) {
         jobId().ifPresent(id -> tag.putUUID("JobId", id));
+        tag.putInt("Tier", tier());
     }
 }

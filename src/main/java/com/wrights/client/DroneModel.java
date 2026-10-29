@@ -73,4 +73,8 @@ public class DroneModel extends EntityModel<DroneEntity> {
     public void renderToBuffer(com.mojang.blaze3d.vertex.PoseStack pose, com.mojang.blaze3d.vertex.VertexConsumer buffer, int light, int overlay, int color) {
         this.root.render(pose, buffer, light, overlay, color);
     }
+
+    public void renderLens(com.mojang.blaze3d.vertex.PoseStack pose, com.mojang.blaze3d.vertex.VertexConsumer buffer, int light, int overlay) {
+        this.root.getChild("lens").render(pose, buffer, light, overlay, 0xFFFFFFFF);
+    }
 }

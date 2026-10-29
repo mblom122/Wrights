@@ -14,7 +14,9 @@ public class WrightportScreen extends AbstractContainerScreen<com.wrights.menu.W
     private static final int ROW = 12;
     private static final int LIST_X = 8;
     private static final int LIST_Y = 22;
+    private static final int VISIBLE = 8;
     private int selected;
+    private int scroll;
 
     public WrightportScreen(com.wrights.menu.WrightportMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
@@ -71,9 +73,10 @@ public class WrightportScreen extends AbstractContainerScreen<com.wrights.menu.W
         if (selected >= swarm.units().size()) {
             selected = Math.max(0, swarm.units().size() - 1);
         }
-        for (int i = 0; i < swarm.units().size() && i < Swarm.MAX; i++) {
+        scroll = Math.max(0, Math.min(scroll, Math.max(0, swarm.units().size() - VISIBLE)));
+        for (int i = scroll; i < swarm.units().size() && i < scroll + VISIBLE; i++) {
             Swarm.Unit unit = swarm.units().get(i);
-            int y = topPos + LIST_Y + i * ROW;
+            int y = topPos + LIST_Y + (i - scroll) * ROW;
             if (i == selected) {
                 graphics.fill(leftPos + LIST_X - 2, y - 1, leftPos + 168, y + 11, 0x553C2A1A);
             }
@@ -93,10 +96,18 @@ public class WrightportScreen extends AbstractContainerScreen<com.wrights.menu.W
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         Swarm swarm = swarm();
         int row = (int) ((mouseY - topPos - LIST_Y) / ROW);
-        if (mouseX >= leftPos + LIST_X && mouseX <= leftPos + 168 && row >= 0 && row < swarm.units().size()) {
-            selected = row;
+        int index = row + scroll;
+        if (mouseX >= leftPos + LIST_X && mouseX <= leftPos + 168 && row >= 0 && row < VISIBLE && index >= 0 && index < swarm.units().size()) {
+            selected = index;
             return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        int max = Math.max(0, swarm().units().size() - VISIBLE);
+        scroll = Math.max(0, Math.min(max, scroll - (int) Math.signum(scrollY)));
+        return true;
     }
 }

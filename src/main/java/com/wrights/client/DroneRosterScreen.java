@@ -12,6 +12,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.drone.Wrightports;
 import com.wrights.drone.Swarm;
+import com.wrights.drone.WrightTier;
 import com.wrights.network.BlueprintPayloads;
 
 public class DroneRosterScreen extends Screen {
@@ -25,6 +26,7 @@ public class DroneRosterScreen extends Screen {
     private int panelX;
     private int panelY;
     private int panelH;
+    private int scroll;
     private WrightsButton back;
 
     public DroneRosterScreen(Screen parent) {
@@ -72,7 +74,8 @@ public class DroneRosterScreen extends Screen {
                 graphics.fill(panelX + 10, row.y - 3, panelX + PANEL_W - 10, row.y + 12, 0xA0C47A3A);
             }
             graphics.drawString(this.font, this.font.plainSubstrByWidth(row.name, 88), panelX + 16, row.y, WrightsUi.TEXT, false);
-            graphics.drawString(this.font, this.font.plainSubstrByWidth(row.stat, 150), panelX + 108, row.y, WrightsUi.MUTED, false);
+            Component tierName = Component.translatable(WrightTier.nameKey(row.tier));
+            graphics.drawString(this.font, tierName, panelX + 108, row.y, WrightTier.textColor(row.tier), false);
             graphics.drawString(this.font, this.font.plainSubstrByWidth(row.where, 80), panelX + PANEL_W - 96, row.y, WrightsUi.TEXT, false);
         }
         graphics.drawString(this.font, Component.translatable("screen.wrights.move_to"), panelX + 16, moveY() - 14, WrightsUi.TEXT, false);
@@ -118,6 +121,20 @@ public class DroneRosterScreen extends Screen {
         return false;
     }
 
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        int max = Math.max(0, panelH - Math.max(96, this.height - 16));
+        int next = Mth.clamp(scroll - (int) Math.signum(scrollY) * 16, 0, max);
+        if (next != scroll) {
+            scroll = next;
+            rebuild();
+            if (back != null) {
+                back.setY(panelY + panelH - 28);
+            }
+        }
+        return true;
+    }
+
     private void rebuild() {
         Swarm swarm = swarm();
         UUID keep = selected >= 0 && selected < drones.size() ? drones.get(selected).unit : null;
@@ -127,7 +144,7 @@ public class DroneRosterScreen extends Screen {
         for (int i = 0; i < swarm.units().size(); i++) {
             Swarm.Unit unit = swarm.units().get(i);
             String where = assignment(unit.id());
-            drones.add(new DroneRow(unit.id(), y, Component.translatable("screen.wrights.drone_name", i + 1).getString(), stat(unit), where == null ? Component.translatable("screen.wrights.drone_free").getString() : where));
+            drones.add(new DroneRow(unit.id(), y, Component.translatable("screen.wrights.drone_name", i + 1).getString(), WrightTier.clamp(unit.speed()), where == null ? Component.translatable("screen.wrights.drone_free").getString() : where));
             y += 16;
             if (keep != null && unit.id().equals(keep)) {
                 selected = drones.size() - 1;
@@ -165,7 +182,9 @@ public class DroneRosterScreen extends Screen {
             x += w + 4;
         }
         panelH = rowY - panelY + 52;
-        int nextY = Math.max(8, (this.height - panelH) / 2);
+        int view = Math.max(96, this.height - 16);
+        scroll = Mth.clamp(scroll, 0, Math.max(0, panelH - view));
+        int nextY = panelH > view ? 8 - scroll : Math.max(8, (this.height - panelH) / 2);
         int shift = nextY - panelY;
         if (shift != 0) {
             panelY = nextY;
@@ -220,27 +239,18 @@ public class DroneRosterScreen extends Screen {
         return this.minecraft == null || this.minecraft.player == null ? Swarm.EMPTY : Wrightports.swarm(this.minecraft.player);
     }
 
-    private static String stat(Swarm.Unit unit) {
-        int speed = Mth.clamp(unit.speed(), 1, Swarm.MAX_SPEED);
-        String line = Component.translatable("screen.wrights.drone_stat", Component.translatable("drone.wrights.speed." + speed), speed).getString();
-        if (unit.power() > 0) {
-            line = line + "  " + Component.translatable("screen.wrights.drone_power", unit.power()).getString();
-        }
-        return line;
-    }
-
     private static final class DroneRow {
         private final UUID unit;
         private int y;
         private final String name;
-        private final String stat;
+        private final int tier;
         private final String where;
 
-        private DroneRow(UUID unit, int y, String name, String stat, String where) {
+        private DroneRow(UUID unit, int y, String name, int tier, String where) {
             this.unit = unit;
             this.y = y;
             this.name = name;
-            this.stat = stat;
+            this.tier = tier;
             this.where = where;
         }
     }

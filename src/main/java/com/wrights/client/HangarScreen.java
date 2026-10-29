@@ -1,25 +1,24 @@
 package com.wrights.client;
 
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-import com.wrights.drone.HangarOps;
 import com.wrights.drone.Swarm;
 import com.wrights.network.BlueprintPayloads;
 
 public class HangarScreen extends AbstractContainerScreen<com.wrights.menu.HangarMenu> {
-    private static final int ROW = 12;
-    private static final int LIST_X = 80;
-    private static final int LIST_Y = 18;
     /** Tab that holds the worn wrightport, sticking out of the window's left edge. */
     private static final int EAR_W = 40;
     private static final int EAR_H = 42;
     private static final int EAR_Y = 141;
-    private int selected;
+
+    private final WrightManagePanel manage = new WrightManagePanel();
+    private WrightsButton manageButton;
 
     public HangarScreen(com.wrights.menu.HangarMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
@@ -35,38 +34,45 @@ public class HangarScreen extends AbstractContainerScreen<com.wrights.menu.Hanga
         if (this.leftPos < EAR_W + 4) {
             this.leftPos = EAR_W + 4;
         }
-        int y = topPos + 116;
-        addRenderableWidget(new WrightsButton(leftPos + 8, y, 32, 16, Component.translatable("screen.wrights.hangar_build"), button -> edit(HangarOps.BUILD, selected)));
-        addRenderableWidget(new WrightsButton(leftPos + 42, y, 32, 16, Component.translatable("screen.wrights.hangar_remove"), button -> edit(HangarOps.REMOVE, selected)));
-        addRenderableWidget(new WrightsButton(leftPos + 76, y, 32, 16, Component.translatable("screen.wrights.hangar_speed"), button -> edit(HangarOps.SPEED, selected)));
-        addRenderableWidget(new WrightsButton(leftPos + 110, y, 28, 16, Component.translatable("screen.wrights.hangar_up"), button -> shift(-1)));
-        addRenderableWidget(new WrightsButton(leftPos + 140, y, 28, 16, Component.translatable("screen.wrights.hangar_down"), button -> shift(1)));
-        addRenderableWidget(new WrightsButton(leftPos + 8, topPos + 134, 16, 14, Component.literal("-"), button -> assign(-1)));
-        addRenderableWidget(new WrightsButton(leftPos + 152, topPos + 134, 16, 14, Component.literal("+"), button -> assign(1)));
+        layoutHangar();
     }
 
-    private void edit(int action, int index) {
+    void layoutHangar() {
+        clearWidgets();
+        if (manage.isOpen()) {
+            manage.addWidgets(this);
+            return;
+        }
+        manageButton = new WrightsButton(leftPos + 8, topPos + 52, 160, 18, Component.translatable("screen.wrights.manage"), button -> manage.toggle(this));
+        manageButton.setShown(docked());
+        addRenderableWidget(manageButton);
+    }
+
+    void addButton(WrightsButton button) {
+        addRenderableWidget(button);
+    }
+
+    void edit(int action, int index) {
         PacketDistributor.sendToServer(new BlueprintPayloads.HangarEdit(menu.pos(), action, index));
     }
 
-    private void shift(int delta) {
-        Swarm swarm = swarm();
-        if (selected < 0 || selected >= swarm.units().size()) {
-            return;
+    net.minecraft.client.gui.Font font() {
+        return this.font;
+    }
+
+    @Override
+    protected void containerTick() {
+        super.containerTick();
+        if (manage.isOpen() && !docked()) {
+            manage.close(this);
         }
-        edit(delta < 0 ? HangarOps.UP : HangarOps.DOWN, selected);
-        int next = selected + delta;
-        if (next >= 0 && next < swarm.units().size()) {
-            selected = next;
+        if (manageButton != null) {
+            manageButton.setShown(!manage.isOpen() && docked());
         }
     }
 
-    private void assign(int delta) {
-        Swarm swarm = swarm();
-        if (swarm.units().isEmpty()) {
-            return;
-        }
-        edit(HangarOps.ASSIGN, swarm.assignCount() + delta);
+    private boolean docked() {
+        return !menu.getSlot(0).getItem().isEmpty();
     }
 
     private Swarm swarm() {
@@ -100,35 +106,77 @@ public class HangarScreen extends AbstractContainerScreen<com.wrights.menu.Hanga
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
-        Swarm swarm = swarm();
-        if (selected >= swarm.units().size()) {
-            selected = Math.max(0, swarm.units().size() - 1);
-        }
-        for (int i = 0; i < swarm.units().size() && i < Swarm.MAX; i++) {
-            Swarm.Unit unit = swarm.units().get(i);
-            int y = topPos + LIST_Y + i * ROW;
-            if (i == selected) {
-                graphics.fill(leftPos + LIST_X - 2, y - 1, leftPos + 168, y + 11, 0x553C2A1A);
+        if (manage.isOpen()) {
+            manage.render(this, graphics, mouseX, mouseY);
+            for (net.minecraft.client.gui.components.Renderable widget : this.renderables) {
+                widget.render(graphics, mouseX, mouseY, partialTick);
             }
-            int speed = Math.max(1, Math.min(Swarm.MAX_SPEED, unit.speed()));
-            String duty = i < swarm.assignCount()
-                    ? Component.translatable("screen.wrights.hangar_duty").getString()
-                    : Component.translatable("screen.wrights.hangar_standby").getString();
-            String line = (i + 1) + "  " + Component.translatable("drone.wrights.speed." + speed).getString() + "  " + duty;
-            graphics.drawString(this.font, this.font.plainSubstrByWidth(line, 84), leftPos + LIST_X, y + 1, i < swarm.assignCount() ? WrightsUi.COPPER : WrightsUi.MUTED, false);
+            return;
         }
-        if (swarm.units().isEmpty()) {
-            graphics.drawString(this.font, Component.translatable("screen.wrights.hangar_empty"), leftPos + LIST_X, topPos + LIST_Y + 2, WrightsUi.MUTED, false);
+        super.render(graphics, mouseX, mouseY, partialTick);
+        if (!docked()) {
+            graphics.drawString(this.font, Component.translatable("screen.wrights.manage_dock"), leftPos + 8, topPos + 56, WrightsUi.MUTED, false);
+        } else {
+            Swarm swarm = swarm();
+            graphics.drawString(this.font, Component.translatable("screen.wrights.manage_ready", swarm.units().size()), leftPos + 80, topPos + 32, WrightsUi.TEXT, false);
         }
-        String send = swarm.units().isEmpty()
-                ? Component.translatable("screen.wrights.hangar_none").getString()
-                : Component.translatable("screen.wrights.hangar_send", swarm.assignCount(), swarm.units().size()).getString();
-        graphics.drawString(this.font, this.font.plainSubstrByWidth(send, 120), leftPos + 28, topPos + 136, WrightsUi.BLUE, false);
-        graphics.drawString(this.font, Component.translatable("screen.wrights.hangar_power"), leftPos + 8, topPos + 149, WrightsUi.MUTED, false);
         Component worn = Component.translatable("screen.wrights.wrightport_worn");
         graphics.drawString(this.font, worn, leftPos - EAR_W + (EAR_W - this.font.width(worn)) / 2, topPos + EAR_Y + 5, WrightsUi.MUTED, false);
         renderTooltip(graphics, mouseX, mouseY);
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (manage.isOpen()) {
+            if (manage.mouseClicked(this, mouseX, mouseY, button)) {
+                return true;
+            }
+            for (GuiEventListener child : this.children()) {
+                if (child.mouseClicked(mouseX, mouseY, button)) {
+                    return true;
+                }
+            }
+            return true;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (manage.isOpen()) {
+            for (GuiEventListener child : this.children()) {
+                if (child.mouseReleased(mouseX, mouseY, button)) {
+                    return true;
+                }
+            }
+            return true;
+        }
+        return super.mouseReleased(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (manage.isOpen()) {
+            return true;
+        }
+        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (manage.isOpen()) {
+            return manage.mouseScrolled(this, mouseX, mouseY, scrollY);
+        }
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (manage.isOpen() && keyCode == 256) {
+            manage.close(this);
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override
@@ -137,16 +185,5 @@ public class HangarScreen extends AbstractContainerScreen<com.wrights.menu.Hanga
             return false;
         }
         return super.hasClickedOutside(mouseX, mouseY, guiLeft, guiTop, mouseButton);
-    }
-
-    @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        Swarm swarm = swarm();
-        int row = (int) ((mouseY - topPos - LIST_Y) / ROW);
-        if (mouseX >= leftPos + LIST_X && mouseX <= leftPos + 168 && row >= 0 && row < swarm.units().size()) {
-            selected = row;
-            return true;
-        }
-        return super.mouseClicked(mouseX, mouseY, button);
     }
 }

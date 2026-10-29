@@ -12,6 +12,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.drone.Wrightports;
 import com.wrights.drone.Swarm;
+import com.wrights.drone.WrightTier;
 import com.wrights.network.BlueprintPayloads;
 
 public class JobDroneScreen extends Screen {
@@ -24,6 +25,7 @@ public class JobDroneScreen extends Screen {
     private int panelX;
     private int panelY;
     private int panelH;
+    private int scroll;
     private WrightsButton back;
 
     public JobDroneScreen(UUID id, Screen parent) {
@@ -78,7 +80,12 @@ public class JobDroneScreen extends Screen {
                 continue;
             }
             graphics.drawString(this.font, this.font.plainSubstrByWidth(row.label, 150), panelX + 16, row.y, WrightsUi.TEXT, false);
-            graphics.drawString(this.font, this.font.plainSubstrByWidth(row.stat, 90), panelX + 150, row.y, WrightsUi.MUTED, false);
+            if (row.tier > 0) {
+                Component tierName = Component.translatable(WrightTier.nameKey(row.tier));
+                graphics.drawString(this.font, tierName, panelX + 150, row.y, WrightTier.textColor(row.tier), false);
+            } else if (!row.stat.isEmpty()) {
+                graphics.drawString(this.font, this.font.plainSubstrByWidth(row.stat, 90), panelX + 150, row.y, WrightsUi.MUTED, false);
+            }
             if (row.action != null) {
                 int x = panelX + PANEL_W - 68;
                 boolean hover = mouseX >= x && mouseX < x + 52 && mouseY >= row.y - 3 && mouseY < row.y + 13;
@@ -117,6 +124,20 @@ public class JobDroneScreen extends Screen {
         return false;
     }
 
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        int max = Math.max(0, panelH - Math.max(96, this.height - 16));
+        int next = Mth.clamp(scroll - (int) Math.signum(scrollY) * 16, 0, max);
+        if (next != scroll) {
+            scroll = next;
+            rebuild();
+            if (back != null) {
+                back.setY(panelY + panelH - 28);
+            }
+        }
+        return true;
+    }
+
     private void rebuild() {
         rows.clear();
         BlueprintPayloads.JobLine job = live();
@@ -132,8 +153,7 @@ public class JobDroneScreen extends Screen {
                 String label = found == null
                         ? Component.translatable("screen.wrights.drone_missing").getString()
                         : Component.translatable("screen.wrights.drone_name", number).getString();
-                String stat = found == null ? "" : stat(found);
-                rows.add(new Row(unit, y, label, stat, "screen.wrights.drone_remove"));
+                rows.add(new Row(unit, y, label, "", "screen.wrights.drone_remove", found == null ? 0 : WrightTier.clamp(found.speed())));
                 y += ROW;
                 shown++;
             }
@@ -153,8 +173,8 @@ public class JobDroneScreen extends Screen {
             }
             String other = otherJob(unit.id());
             String label = Component.translatable("screen.wrights.drone_name", i + 1).getString();
-            String stat = other == null ? stat(unit) : Component.translatable("screen.wrights.drone_on_other", other).getString();
-            rows.add(new Row(unit.id(), y, label, stat, other == null ? "screen.wrights.drone_add" : null));
+            String stat = other == null ? "" : Component.translatable("screen.wrights.drone_on_other", other).getString();
+            rows.add(new Row(unit.id(), y, label, stat, other == null ? "screen.wrights.drone_add" : null, other == null ? WrightTier.clamp(unit.speed()) : 0));
             y += ROW;
             free++;
         }
@@ -163,7 +183,9 @@ public class JobDroneScreen extends Screen {
             y += ROW;
         }
         panelH = y + 36;
-        panelY = Math.max(8, (this.height - panelH) / 2);
+        int view = Math.max(96, this.height - 16);
+        scroll = Mth.clamp(scroll, 0, Math.max(0, panelH - view));
+        panelY = panelH > view ? 8 - scroll : Math.max(8, (this.height - panelH) / 2);
         for (Row row : rows) {
             row.y += panelY;
         }
@@ -205,19 +227,6 @@ public class JobDroneScreen extends Screen {
         return this.minecraft == null || this.minecraft.player == null ? Swarm.EMPTY : Wrightports.swarm(this.minecraft.player);
     }
 
-    private static String stat(Swarm.Unit unit) {
-        String speed = Component.translatable(speedKey(unit.speed())).getString();
-        String line = Component.translatable("screen.wrights.drone_stat", speed, Mth.clamp(unit.speed(), 1, Swarm.MAX_SPEED)).getString();
-        if (unit.power() > 0) {
-            line = line + "  " + Component.translatable("screen.wrights.drone_power", unit.power()).getString();
-        }
-        return line;
-    }
-
-    private static String speedKey(int speed) {
-        return "drone.wrights.speed." + Mth.clamp(speed, 1, Swarm.MAX_SPEED);
-    }
-
     private static Swarm.Unit find(Swarm swarm, UUID id) {
         for (Swarm.Unit unit : swarm.units()) {
             if (unit.id().equals(id)) {
@@ -242,14 +251,20 @@ public class JobDroneScreen extends Screen {
         private final String label;
         private final String stat;
         private final String action;
+        private final int tier;
         private final boolean header;
 
         private Row(UUID unit, int y, String label, String stat, String action) {
+            this(unit, y, label, stat, action, 0);
+        }
+
+        private Row(UUID unit, int y, String label, String stat, String action, int tier) {
             this.unit = unit;
             this.y = y;
             this.label = label;
             this.stat = stat;
             this.action = action;
+            this.tier = tier;
             this.header = false;
         }
 
@@ -263,6 +278,7 @@ public class JobDroneScreen extends Screen {
             this.label = key;
             this.stat = "";
             this.action = null;
+            this.tier = 0;
             this.header = true;
         }
     }
