@@ -1,7 +1,6 @@
 package com.wrights.blueprint;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 import net.minecraft.world.level.block.Mirror;
@@ -98,7 +97,7 @@ public final class BlueprintTransforms {
     }
 
     private static Schematic finish(Schematic schematic, int sizeX, int sizeY, int sizeZ, List<Schematic.Entry> entries, int anchorX, int anchorY, int anchorZ) {
-        entries.sort(Comparator.comparing(Schematic.Entry::secondary));
+        entries.sort(Schematic.BUILD_ORDER);
         return new Schematic(
                 schematic.id(),
                 schematic.name(),

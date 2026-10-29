@@ -133,6 +133,17 @@ public final class BuildJob {
         return cursor;
     }
 
+    /** Scan point for a single wright that has to step past a falling block and come back. Not saved. */
+    private int pasteProbe;
+
+    public int pasteProbe() {
+        return pasteProbe;
+    }
+
+    public void setPasteProbe(int pasteProbe) {
+        this.pasteProbe = Math.max(0, pasteProbe);
+    }
+
     public void advance() {
         cursor++;
     }
@@ -826,6 +837,8 @@ public final class BuildJob {
         public int y1;
         public int z1;
         public int cursor;
+        /** Next schematic index to inspect. Not saved; a reload starts again at {@link #cursor}. */
+        public int probe;
 
         public boolean contains(int x, int y, int z) {
             return x >= x0 && x <= x1 && y >= y0 && y <= y1 && z >= z0 && z <= z1;
@@ -839,6 +852,8 @@ public final class BuildJob {
         /** Leftover eighths of a block, so a fractional place rate stays exact across ticks. */
         public int placeCredit;
         public int cursor;
+        /** Next schematic index to inspect when this hand has no slices. Not saved. */
+        public int probe;
         public boolean rescan;
         public boolean idle;
         public UUID entityId;

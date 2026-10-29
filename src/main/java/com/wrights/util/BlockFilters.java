@@ -4,6 +4,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.DoorBlock;
+import net.minecraft.world.level.block.FallingBlock;
 import net.minecraft.world.level.block.DoublePlantBlock;
 import net.minecraft.world.level.block.EndGatewayBlock;
 import net.minecraft.world.level.block.EndPortalBlock;
@@ -55,6 +56,11 @@ public final class BlockFilters {
             return false;
         }
         return block.asItem() != Items.AIR;
+    }
+
+    /** Sand, gravel, anvils, and the other blocks that fall when the block under them is missing. */
+    public static boolean falls(BlockState state) {
+        return state.getBlock() instanceof FallingBlock;
     }
 
     public static boolean isSecondary(BlockState state) {

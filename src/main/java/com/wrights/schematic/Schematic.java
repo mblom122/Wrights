@@ -1,7 +1,10 @@
 package com.wrights.schematic;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import net.minecraft.core.BlockPos;
@@ -27,7 +30,11 @@ public final class Schematic {
     private final int anchorX;
     private final int anchorY;
     private final int anchorZ;
+    /** Bottom layer first, then upper halves of doors and tall plants at the same height. */
+    public static final Comparator<Entry> BUILD_ORDER = Comparator.comparingInt((Entry entry) -> entry.y()).thenComparing(Entry::secondary);
+
     private final boolean ephemeral;
+    private transient Map<Long, Integer> positions;
 
     public Schematic(UUID id, int sizeX, int sizeY, int sizeZ, List<Entry> entries) {
         this(id, "Blueprint", sizeX, sizeY, sizeZ, entries, BlockPos.ZERO, BlockPos.ZERO, "");
@@ -139,6 +146,23 @@ public final class Schematic {
 
     public Entry entry(int index) {
         return entries.get(index);
+    }
+
+    /** Index of the saved block at this schematic cell, or -1 when the blueprint has air there. */
+    public int indexAt(int x, int y, int z) {
+        return positions().getOrDefault(BlockPos.asLong(x, y, z), -1);
+    }
+
+    private Map<Long, Integer> positions() {
+        if (positions == null) {
+            Map<Long, Integer> map = new HashMap<>(entries.size() * 2);
+            for (int i = 0; i < entries.size(); i++) {
+                Entry entry = entries.get(i);
+                map.put(BlockPos.asLong(entry.x(), entry.y(), entry.z()), i);
+            }
+            positions = map;
+        }
+        return positions;
     }
 
     public CompoundTag save() {
