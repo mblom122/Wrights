@@ -37,6 +37,8 @@ public class WrightsMenuScreen extends Screen {
     private int listY;
     private int listW;
     private int listH;
+    private int headingY;
+    private int searchY;
     private int detailX;
     private int detailY;
     private int detailW;
@@ -175,7 +177,7 @@ public class WrightsMenuScreen extends Screen {
     @Override
     protected void init() {
         layout();
-        search = new EditBox(this.font, listX, panelY + 36, listW, 16, Component.translatable("menu.wrights.search"));
+        search = new EditBox(this.font, listX, searchY, listW, 16, Component.translatable("menu.wrights.search"));
         search.setHint(Component.translatable("menu.wrights.search"));
         search.setMaxLength(48);
         search.setResponder(value -> {
@@ -248,12 +250,14 @@ public class WrightsMenuScreen extends Screen {
         panelX = (this.width - panelW) / 2;
         panelY = (this.height - panelH) / 2;
         listX = panelX + 126;
-        listY = panelY + 56;
+        headingY = panelY + 36;
+        searchY = panelY + 50;
+        listY = panelY + 72;
         listW = Math.min(168, panelW - 300);
         if (listW < 120) {
             listW = Math.max(100, (panelW - 150) / 2);
         }
-        listH = panelH - 96;
+        listH = Math.max(ROW, panelH - 112);
         detailX = listX + listW + 8;
         detailY = listY;
         detailW = panelX + panelW - 12 - detailX;
@@ -294,6 +298,9 @@ public class WrightsMenuScreen extends Screen {
         }
         boolean capture = WrightsClientState.mode == WrightsClientState.Mode.CAPTURE;
         boolean building = !options && !jobsPage;
+        search.setX(listX);
+        search.setY(searchY);
+        search.setWidth(listW);
         search.visible = building;
         rename.visible = building;
         newButton.visible = building;
@@ -388,9 +395,9 @@ public class WrightsMenuScreen extends Screen {
             return;
         }
 
-        graphics.drawString(this.font, Component.translatable("menu.wrights.blueprints"), listX, panelY + 24, WrightsUi.TEXT, false);
+        graphics.drawString(this.font, Component.translatable("menu.wrights.blueprints"), listX, headingY, WrightsUi.TEXT, false);
         if (WrightsClientState.busy) {
-            graphics.drawString(this.font, Component.translatable("menu.wrights.busy"), detailX, panelY + 24, WrightsUi.COPPER, false);
+            graphics.drawString(this.font, Component.translatable("menu.wrights.busy"), detailX, headingY, WrightsUi.COPPER, false);
         }
         renderList(graphics, mouseX, mouseY);
         renderDetail(graphics);
