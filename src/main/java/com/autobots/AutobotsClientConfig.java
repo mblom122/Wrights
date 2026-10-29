@@ -45,6 +45,18 @@ public final class AutobotsClientConfig {
     public static final ModConfigSpec.IntValue PLACE_Z = BUILDER
             .comment("Blocks in front of you when a paste is not aimed at a block.")
             .defineInRange("placeZ", 1, -32, 32);
+    public static final ModConfigSpec.IntValue LAST_MODE = BUILDER
+            .comment("Last controller task. 0 ready, 1 new blueprint, 2 building.")
+            .defineInRange("lastMode", 0, 0, 2);
+    public static final ModConfigSpec.IntValue LAST_STYLE = BUILDER
+            .comment("Last new-blueprint tool. 0 corners, 1 box, 2 move.")
+            .defineInRange("lastStyle", 1, 0, 2);
+    public static final ModConfigSpec.ConfigValue<String> LAST_BUILD = BUILDER
+            .comment("Last blueprint that was being built.")
+            .define("lastBuild", "");
+    public static final ModConfigSpec.ConfigValue<String> RECENT_BLOCKS = BUILDER
+            .comment("Blocks recently picked while editing a blueprint.")
+            .define("recentBlocks", "");
 
     static final ModConfigSpec SPEC = BUILDER.build();
 
@@ -107,6 +119,18 @@ public final class AutobotsClientConfig {
 
     public static void save() {
         SPEC.save();
+    }
+
+    public static void setRecentBlocks(String ids) {
+        RECENT_BLOCKS.set(ids == null ? "" : ids);
+        save();
+    }
+
+    public static void setLastMode(int mode, int style, String buildId) {
+        LAST_MODE.set(clamp(mode, 0, 2));
+        LAST_STYLE.set(clamp(style, 0, 2));
+        LAST_BUILD.set(buildId == null ? "" : buildId);
+        save();
     }
 
     private static int clamp(int value, int min, int max) {

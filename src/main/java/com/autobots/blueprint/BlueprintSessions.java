@@ -48,6 +48,15 @@ public final class BlueprintSessions {
         }
     }
 
+    @SubscribeEvent
+    public static void onLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            com.autobots.item.ControllerItem.quietLegacy(player);
+            com.autobots.network.BlueprintNetwork.syncCapture(player);
+            com.autobots.network.BlueprintNetwork.syncJobHolograms(player);
+        }
+    }
+
     public static final class BlueprintSession {
         private Mode mode = Mode.NONE;
         private BlockPos cornerA;

@@ -2,7 +2,9 @@ package com.autobots.job;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import net.minecraft.core.BlockPos;
@@ -32,6 +34,7 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import com.autobots.AutobotsConfig;
 import com.autobots.blueprint.BlueprintActions;
 import com.autobots.blueprint.BoxEdits;
+import com.autobots.network.BlueprintNetwork;
 import com.autobots.AutobotsMod;
 import com.autobots.entity.DroneEntity;
 import com.autobots.entity.ModEntities;
@@ -58,6 +61,9 @@ public final class JobManager {
         SchematicLibrary library = SchematicLibrary.get(server);
         List<BuildJob> jobs = new ArrayList<>(library.jobs());
         for (BuildJob job : jobs) {
+            if (job.finished()) {
+                continue;
+            }
             try {
                 if (job.kind() == BuildJob.Kind.COPY) {
                     tickCopy(server, library, job);
@@ -69,8 +75,20 @@ public final class JobManager {
                 discardDrone(server, job);
                 library.removeJob(job);
             }
-            if (library.job(job.id()).isPresent()) {
+            if (!job.finished() && library.job(job.id()).isPresent()) {
                 library.setDirty();
+            }
+        }
+        if (server.getTickCount() % 10 == 0) {
+            java.util.Set<java.util.UUID> owners = new java.util.HashSet<>();
+            for (BuildJob job : library.jobs()) {
+                owners.add(job.owner());
+            }
+            for (java.util.UUID owner : owners) {
+                net.minecraft.server.level.ServerPlayer player = server.getPlayerList().getPlayer(owner);
+                if (player != null) {
+                    com.autobots.network.BlueprintNetwork.syncJobs(player);
+                }
             }
         }
     }
@@ -81,19 +99,93 @@ public final class JobManager {
 
     public static boolean cancel(ServerPlayer player, boolean tellPlayer) {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
-        BuildJob job = library.jobFor(player.getUUID()).orElse(null);
-        if (job == null) {
+        List<BuildJob> jobs = new ArrayList<>(library.jobsFor(player.getUUID()));
+        jobs.removeIf(BuildJob::finished);
+        if (jobs.isEmpty()) {
             return false;
+        }
+        for (BuildJob job : jobs) {
+            stopOne(player, library, job, false);
+        }
+        if (tellPlayer) {
+            Messages.actionBar(player, jobs.size() == 1 ? "message.autobots.stopped" : "message.autobots.stopped_all");
+        }
+        com.autobots.network.BlueprintNetwork.syncJobs(player);
+        return true;
+    }
+
+    public static void control(ServerPlayer player, java.util.UUID id, int action) {
+        if (!com.autobots.item.ControllerItem.isHeld(player)) {
+            return;
+        }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        BuildJob job = library.job(id).orElse(null);
+        if (job == null || !job.owner().equals(player.getUUID())) {
+            com.autobots.network.BlueprintNetwork.syncJobs(player);
+            return;
+        }
+        if (action == com.autobots.network.BlueprintPayloads.JobControl.STOP) {
+            stopOne(player, library, job, true);
+        } else if (action == com.autobots.network.BlueprintPayloads.JobControl.PAUSE && !job.finished()) {
+            job.setPaused(true);
+            library.setDirty();
+        } else if (action == com.autobots.network.BlueprintPayloads.JobControl.RESUME && !job.finished()) {
+            job.setPaused(false);
+            library.setDirty();
+        } else if (action == com.autobots.network.BlueprintPayloads.JobControl.REDO) {
+            redo(player, library, job);
+            return;
+        }
+        com.autobots.network.BlueprintNetwork.syncJobs(player);
+    }
+
+    private static void stopOne(ServerPlayer player, SchematicLibrary library, BuildJob job, boolean tell) {
+        if (job.finished()) {
+            return;
         }
         if (job.kind() == BuildJob.Kind.COPY && job.resultSchematicId() != null) {
             library.removeSchematic(job.resultSchematicId());
         }
-        discardDrone(player.getServer(), job);
-        library.removeJob(job);
-        if (tellPlayer) {
+        if (job.kind() == BuildJob.Kind.PASTE) {
+            com.autobots.network.BlueprintNetwork.clearJobHologram(player, job.id());
+            discardDrone(player.getServer(), job);
+            archive(library, job);
+        } else {
+            discardDrone(player.getServer(), job);
+            library.removeJob(job);
+        }
+        if (tell) {
             Messages.actionBar(player, "message.autobots.stopped");
         }
-        return true;
+    }
+
+    private static void redo(ServerPlayer player, SchematicLibrary library, BuildJob job) {
+        if (!job.finished() || job.kind() != BuildJob.Kind.PASTE || job.schematicId() == null) {
+            return;
+        }
+        Schematic schematic = library.schematic(job.schematicId()).orElse(null);
+        if (schematic == null || schematic.blockCount() == 0) {
+            Messages.actionBar(player, "message.autobots.blueprint_missing");
+            return;
+        }
+        if (overlapsBuild(library, job.dimension(), schematic, job.min(), job.clipX(), job.clipY(), job.clipZ())) {
+            Messages.actionBar(player, "message.autobots.build_overlap");
+            return;
+        }
+        job.restart();
+        library.setDirty();
+        if (player.level() instanceof ServerLevel level && level.dimension().equals(job.dimension())) {
+            ensureDrone(level, player, job, job.min());
+        }
+        BlueprintNetwork.showJobHologram(player, job, schematic);
+        BlueprintNetwork.syncJobs(player);
+        Messages.actionBar(player, "message.autobots.launched");
+    }
+
+    private static void archive(SchematicLibrary library, BuildJob job) {
+        job.markFinished(library.nextHistoryOrder());
+        library.pruneHistory(job.owner());
+        library.setDirty();
     }
 
     public static void startCopy(ServerPlayer player, ItemStack stack, ControllerData data) {
@@ -149,7 +241,7 @@ public final class JobManager {
 
     public static boolean startBlueprintSave(ServerPlayer player, String name, UUID replaceId, ResourceKey<Level> dimension, BlockPos cornerA, BlockPos cornerB) {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
-        if (library.jobFor(player.getUUID()).isPresent()) {
+        if (hasCopy(library, player.getUUID())) {
             Messages.actionBar(player, "message.autobots.busy");
             return false;
         }
@@ -175,13 +267,13 @@ public final class JobManager {
 
     public static boolean startBlueprintBuild(ServerPlayer player, UUID schematicId, BlockPos origin, int sizeX, int sizeY, int sizeZ) {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
-        if (library.jobFor(player.getUUID()).isPresent()) {
-            Messages.actionBar(player, "message.autobots.busy");
-            return false;
-        }
         Schematic schematic = library.schematic(schematicId).orElse(null);
         if (schematic == null || schematic.blockCount() == 0) {
             Messages.actionBar(player, "message.autobots.blueprint_missing");
+            return false;
+        }
+        if (overlapsBuild(library, player.level().dimension(), schematic, origin, sizeX, sizeY, sizeZ)) {
+            Messages.actionBar(player, "message.autobots.build_overlap");
             return false;
         }
         BuildJob job = BuildJob.paste(
@@ -197,10 +289,52 @@ public final class JobManager {
             ensureDrone(level, player, job, origin);
         }
         Messages.actionBar(player, "message.autobots.launched");
+        BlueprintNetwork.showJobHologram(player, job, schematic);
+        BlueprintNetwork.syncJobs(player);
         return true;
     }
 
+    private static boolean hasCopy(SchematicLibrary library, UUID playerId) {
+        for (BuildJob job : library.jobsFor(playerId)) {
+            if (job.kind() == BuildJob.Kind.COPY) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean overlapsBuild(SchematicLibrary library, ResourceKey<Level> dimension, Schematic schematic, BlockPos origin, int sizeX, int sizeY, int sizeZ) {
+        Set<BlockPos> occupied = new HashSet<>();
+        for (BuildJob job : library.jobs()) {
+            if (job.kind() != BuildJob.Kind.PASTE || job.finished() || !job.dimension().equals(dimension) || job.schematicId() == null) {
+                continue;
+            }
+            Schematic existing = library.schematic(job.schematicId()).orElse(null);
+            if (existing == null) {
+                continue;
+            }
+            for (Schematic.Entry entry : existing.entries()) {
+                if (job.outsideClip(entry)) {
+                    continue;
+                }
+                occupied.add(job.min().offset(entry.x(), entry.y(), entry.z()));
+            }
+        }
+        for (Schematic.Entry entry : schematic.entries()) {
+            if (entry.x() >= sizeX || entry.y() >= sizeY || entry.z() >= sizeZ) {
+                continue;
+            }
+            if (occupied.contains(origin.offset(entry.x(), entry.y(), entry.z()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static void tickCopy(MinecraftServer server, SchematicLibrary library, BuildJob job) {
+        if (job.paused()) {
+            return;
+        }
         if (job.phase() == BuildJob.Phase.BINDING) {
             tryBindCopy(server, library, job);
             return;
@@ -388,6 +522,21 @@ public final class JobManager {
             finishPaste(server, library, player, job);
             return;
         }
+        if (job.paused()) {
+            return;
+        }
+        if (!player.level().dimension().equals(job.dimension())) {
+            if (job.tickMessage()) {
+                Messages.actionBar(player, "message.autobots.other_dimension");
+            }
+            return;
+        }
+        if (!nearSite(player, job)) {
+            if (job.tickMessage()) {
+                Messages.actionBar(player, "message.autobots.out_of_range");
+            }
+            return;
+        }
         while (job.cursor() < schematic.blockCount() && job.outsideClip(schematic.entry(job.cursor()))) {
             job.advance();
         }
@@ -397,9 +546,6 @@ public final class JobManager {
         }
         Schematic.Entry next = schematic.entry(job.cursor());
         BlockPos nextPos = job.min().offset(next.x(), next.y(), next.z());
-        if (!ready(player, level, nextPos, job, false)) {
-            return;
-        }
         DroneEntity drone = ensureDrone(level, player, job, nextPos);
         if (drone == null) {
             if (job.tickMessage()) {
@@ -422,9 +568,6 @@ public final class JobManager {
         for (int i = 0; i < budget && job.cursor() < schematic.blockCount(); i++) {
             Schematic.Entry entry = schematic.entry(job.cursor());
             BlockPos pos = job.min().offset(entry.x(), entry.y(), entry.z());
-            if (!ready(player, level, pos, job, false)) {
-                return;
-            }
             if (drone.distanceToSqr(Vec3.atCenterOf(pos)) > 9.0D) {
                 break;
             }
@@ -451,8 +594,26 @@ public final class JobManager {
 
     private static void finishPaste(MinecraftServer server, SchematicLibrary library, ServerPlayer player, BuildJob job) {
         discardDrone(server, job);
-        library.removeJob(job);
-        Messages.actionBar(player, "message.autobots.paste_done", job.placed(), job.skipped());
+        int placed = job.placed();
+        int skipped = job.skipped();
+        archive(library, job);
+        com.autobots.network.BlueprintNetwork.clearJobHologram(player, job.id());
+        com.autobots.network.BlueprintNetwork.syncJobs(player);
+        if (placed == 0 && skipped > 0) {
+            Messages.actionBar(player, "message.autobots.all_skipped");
+        } else if (placed == 0) {
+            Messages.actionBar(player, "message.autobots.already_built");
+        } else {
+            Messages.actionBar(player, "message.autobots.paste_done", placed, skipped);
+        }
+    }
+
+    private static boolean nearSite(ServerPlayer player, BuildJob job) {
+        if (!player.level().dimension().equals(job.dimension())) {
+            return false;
+        }
+        double range = AutobotsConfig.MAX_RANGE.getAsInt();
+        return player.distanceToSqr(Vec3.atCenterOf(job.min())) <= range * range;
     }
 
     private static boolean ready(ServerPlayer player, ServerLevel level, BlockPos pos, BuildJob job, boolean copy) {
@@ -591,10 +752,15 @@ public final class JobManager {
                 return null;
             }
         }
+        net.minecraft.world.phys.AABB search = new net.minecraft.world.phys.AABB(workPos).inflate(96.0D);
+        for (DroneEntity drone : level.getEntitiesOfClass(DroneEntity.class, search, entity -> entity.jobId().filter(job.id()::equals).isPresent() && entity.isAlive())) {
+            job.setDroneId(drone.getUUID());
+            return drone;
+        }
         DroneEntity drone = new DroneEntity(ModEntities.DRONE.get(), level);
         drone.setJobId(job.id());
-        Vec3 eye = player.getEyePosition();
-        drone.moveTo(eye.x, eye.y, eye.z, player.getYRot(), 0.0F);
+        Vec3 site = Vec3.atCenterOf(workPos).add(0.0D, 1.15D, 0.0D);
+        drone.moveTo(site.x, site.y, site.z, player.getYRot(), 0.0F);
         job.setDroneId(drone.getUUID());
         job.setLastDronePos(drone.blockPosition());
         level.addFreshEntity(drone);

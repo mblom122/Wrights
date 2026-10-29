@@ -8,6 +8,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.neoforged.neoforge.network.PacketDistributor;
 
+import com.autobots.AutobotsConfig;
 import com.autobots.blueprint.BlueprintTransforms;
 import com.autobots.blueprint.BoxEdits;
 import com.autobots.network.BlueprintPayloads;
@@ -24,8 +25,15 @@ public class PlacementScreen extends Screen {
     private int modelSize;
     private int layer;
     private int layerY;
+    private int selectionY;
     private int rotateY;
     private int flipY;
+    private int selX = -1;
+    private int selY = -1;
+    private int selZ = -1;
+    private AutobotsButton anchorButton;
+    private AutobotsButton removeButton;
+    private AutobotsButton changeButton;
     private EditBox xBox;
     private EditBox yBox;
     private EditBox zBox;
@@ -45,7 +53,7 @@ public class PlacementScreen extends Screen {
     protected void init() {
         panelW = 214;
         panelH = 248;
-        int extra = 16 + 22 + 14 + 18 + 14 + 18 + 22;
+        int extra = 176;
         modelSize = Math.min(140, Math.max(88, this.height - extra - 24));
         int gap = 12;
         if (modelSize + gap + panelW > this.width - 16) {
@@ -58,9 +66,10 @@ public class PlacementScreen extends Screen {
         panelY = Math.max(6, (this.height - blockH) / 2);
         modelX = groupX;
         modelY = panelY;
-        gridY = modelY + 16;
+        gridY = modelY;
         layerY = gridY + modelSize + 4;
-        rotateY = layerY + 30;
+        selectionY = layerY + 34;
+        rotateY = selectionY + 64;
         flipY = rotateY + 34;
         layer = AutobotsClientState.pivotY;
         if (AutobotsClientState.anchor == null) {
@@ -94,6 +103,12 @@ public class PlacementScreen extends Screen {
         addRenderableWidget(new AutobotsButton(panelX + 134, panelY + 212, 68, 18, Component.translatable("screen.autobots.back"), button -> onClose()));
         addRenderableWidget(new AutobotsButton(modelX, layerY, 22, 16, Component.literal("-"), button -> changeLayer(-1)));
         addRenderableWidget(new AutobotsButton(modelX + modelSize - 22, layerY, 22, 16, Component.literal("+"), button -> changeLayer(1)));
+        anchorButton = new AutobotsButton(modelX, selectionY, modelSize, 16, Component.translatable("screen.autobots.set_anchor"), button -> setSelectedAnchor());
+        removeButton = new AutobotsButton(modelX, selectionY + 18, half, 16, Component.translatable("screen.autobots.remove_block"), button -> removeSelected());
+        changeButton = new AutobotsButton(modelX + half + 4, selectionY + 18, half, 16, Component.translatable("screen.autobots.change_block"), button -> changeSelected());
+        addRenderableWidget(anchorButton);
+        addRenderableWidget(removeButton);
+        addRenderableWidget(changeButton);
         addRenderableWidget(new AutobotsButton(modelX, rotateY, half, 16, Component.translatable("screen.autobots.rotate_left"), button -> transform(BlueprintTransforms.Op.ROTATE_CCW)));
         addRenderableWidget(new AutobotsButton(modelX + half + 4, rotateY, half, 16, Component.translatable("screen.autobots.rotate_right"), button -> transform(BlueprintTransforms.Op.ROTATE)));
         addRenderableWidget(new AutobotsButton(modelX, flipY, half, 16, Component.translatable("screen.autobots.flip_horizontal"), button -> transform(BlueprintTransforms.Op.FLIP_X)));
@@ -143,10 +158,16 @@ public class PlacementScreen extends Screen {
         axis(graphics, panelY + 158, "Z");
         Component note = note();
         graphics.drawString(this.font, this.font.plainSubstrByWidth(note.getString(), panelW - 24), panelX + 12, panelY + 176, AutobotsUi.MUTED, false);
-        graphics.drawCenteredString(this.font, Component.translatable("screen.autobots.set_anchor"), modelX + modelSize / 2, modelY + 2, AutobotsUi.TEXT);
-        grid.layout(modelX + 12, gridY + 12, Math.max(32, modelSize - 24), AutobotsClientState.fullX, AutobotsClientState.fullZ);
-        grid.render(graphics, AutobotsClientState.ghosts, AutobotsClientState.fullX, AutobotsClientState.fullZ, layer, AutobotsClientState.pivotX, AutobotsClientState.pivotY, AutobotsClientState.pivotZ);
+        syncSelection();
+        if (AutobotsClientState.concealed) {
+            graphics.drawCenteredString(this.font, Component.translatable("screen.autobots.preview_hidden"), modelX + modelSize / 2, gridY + modelSize / 2, AutobotsUi.MUTED);
+        } else {
+            grid.layout(modelX + 12, gridY + 14, Math.max(32, modelSize - 28), AutobotsClientState.fullX, AutobotsClientState.fullZ);
+            grid.render(graphics, AutobotsClientState.ghosts, AutobotsClientState.fullX, AutobotsClientState.fullZ, layer, AutobotsClientState.pivotX, AutobotsClientState.pivotY, AutobotsClientState.pivotZ, selX, selY, selZ);
+        }
         graphics.drawCenteredString(this.font, Component.translatable("screen.autobots.layer", layer + 1, AutobotsClientState.fullY), modelX + modelSize / 2, layerY + 4, AutobotsUi.MUTED);
+        graphics.drawString(this.font, Component.translatable("screen.autobots.selection"), modelX, selectionY - 12, AutobotsUi.BLUE, false);
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("screen.autobots.mark_hint").getString(), modelSize), modelX, selectionY + 36, AutobotsUi.MUTED, false);
         graphics.drawString(this.font, Component.translatable("screen.autobots.rotate"), modelX, rotateY - 12, AutobotsUi.BLUE, false);
         graphics.drawString(this.font, Component.translatable("screen.autobots.flip"), modelX, flipY - 12, AutobotsUi.BLUE, false);
     }
@@ -157,12 +178,28 @@ public class PlacementScreen extends Screen {
     }
 
     @Override
+    public void tick() {
+        super.tick();
+        if (!AutobotsClientState.follow || xBox == null || xBox.isFocused() || yBox.isFocused() || zBox.isFocused()) {
+            return;
+        }
+        BlockPos look = AutobotsClientState.lookTarget();
+        if (AutobotsClientState.anchor == null || !AutobotsClientState.anchor.equals(look)) {
+            AutobotsClientState.anchor = look;
+            refresh();
+        }
+    }
+
+    @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 0 && AutobotsClientState.buildId != null) {
-            grid.layout(modelX + 12, gridY + 12, Math.max(32, modelSize - 24), AutobotsClientState.fullX, AutobotsClientState.fullZ);
+        if (button == 0 && AutobotsClientState.buildId != null && !AutobotsClientState.concealed) {
+            grid.layout(modelX + 12, gridY + 14, Math.max(32, modelSize - 28), AutobotsClientState.fullX, AutobotsClientState.fullZ);
             int[] hit = grid.hit(mouseX, mouseY, AutobotsClientState.fullX, AutobotsClientState.fullZ, layer);
             if (hit != null) {
-                PacketDistributor.sendToServer(new BlueprintPayloads.SetAnchor(AutobotsClientState.buildId, hit[0], hit[1], hit[2]));
+                selX = hit[0];
+                selY = hit[1];
+                selZ = hit[2];
+                syncSelection();
                 return true;
             }
         }
@@ -179,6 +216,9 @@ public class PlacementScreen extends Screen {
     }
 
     private Component note() {
+        if (AutobotsClientState.concealed) {
+            return Component.translatable("screen.autobots.preview_hidden");
+        }
         if (AutobotsClientState.sampled) {
             return Component.translatable("screen.autobots.sampled");
         }
@@ -272,15 +312,59 @@ public class PlacementScreen extends Screen {
     }
 
     private void send() {
-        AutobotsClientState.tryBuild();
-        this.minecraft.setScreen(null);
+        if (AutobotsClientState.tryBuild()) {
+            AutobotsClientState.stepAnchor();
+            refresh();
+        }
     }
 
     private void transform(BlueprintTransforms.Op operation) {
         if (AutobotsClientState.buildId == null) {
             return;
         }
+        clearSelection();
         PacketDistributor.sendToServer(new BlueprintPayloads.TransformBlueprint(AutobotsClientState.buildId, operation.ordinal()));
+    }
+
+    private void setSelectedAnchor() {
+        if (AutobotsClientState.buildId == null || !inside(selX, selY, selZ)) {
+            return;
+        }
+        PacketDistributor.sendToServer(new BlueprintPayloads.SetAnchor(AutobotsClientState.buildId, selX, selY, selZ));
+    }
+
+    private void removeSelected() {
+        if (AutobotsClientState.buildId == null || !inside(selX, selY, selZ)) {
+            return;
+        }
+        PacketDistributor.sendToServer(new BlueprintPayloads.EditCell(AutobotsClientState.buildId, selX, selY, selZ, 0, true));
+    }
+
+    private void changeSelected() {
+        if (!inside(selX, selY, selZ)) {
+            return;
+        }
+        BlockPickerScreen.open(this, AutobotsClientState.buildId, selX, selY, selZ);
+    }
+
+    private void clearSelection() {
+        selX = -1;
+        selY = -1;
+        selZ = -1;
+        syncSelection();
+    }
+
+    private boolean inside(int x, int y, int z) {
+        return x >= 0 && y >= 0 && z >= 0 && x < AutobotsClientState.fullX && y < AutobotsClientState.fullY && z < AutobotsClientState.fullZ;
+    }
+
+    private void syncSelection() {
+        boolean selected = inside(selX, selY, selZ);
+        if (anchorButton != null) {
+            anchorButton.active = selected;
+            removeButton.active = selected;
+            changeButton.active = selected;
+        }
     }
 
     private void changeLayer(int delta) {
@@ -288,7 +372,7 @@ public class PlacementScreen extends Screen {
     }
 
     private int clamp(int size) {
-        return Math.max(1, Math.min(256, size));
+        return Math.max(1, Math.min(AutobotsConfig.MAX_AXIS.getAsInt(), size));
     }
 
     private void set(EditBox box, int value) {

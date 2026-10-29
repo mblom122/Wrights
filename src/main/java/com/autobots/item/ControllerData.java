@@ -93,6 +93,13 @@ public record ControllerData(
         return new ControllerData(controllerId, cornerA, cornerB, schematicId, sizeX, sizeY, sizeZ, blockCount, Optional.empty());
     }
 
+    public ControllerData withoutSelection() {
+        if (cornerA.isEmpty() && cornerB.isEmpty() && armedOrigin.isEmpty()) {
+            return this;
+        }
+        return new ControllerData(controllerId, Optional.empty(), Optional.empty(), schematicId, sizeX, sizeY, sizeZ, blockCount, Optional.empty());
+    }
+
     public boolean hasSchematic() {
         return schematicId.isPresent() && sizeX > 0 && sizeY > 0 && sizeZ > 0 && blockCount > 0;
     }

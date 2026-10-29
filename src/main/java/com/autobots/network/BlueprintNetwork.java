@@ -13,6 +13,8 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 import com.autobots.blueprint.BlueprintActions;
 import com.autobots.blueprint.BlueprintSessions;
+import com.autobots.job.BuildJob;
+import com.autobots.job.JobManager;
 import com.autobots.schematic.Requirements;
 import com.autobots.schematic.Schematic;
 
@@ -28,6 +30,7 @@ public final class BlueprintNetwork {
         registrar.playToServer(BlueprintPayloads.CapturePick.TYPE, BlueprintPayloads.CapturePick.STREAM_CODEC, BlueprintNetwork::pick);
         registrar.playToServer(BlueprintPayloads.CaptureConfirm.TYPE, BlueprintPayloads.CaptureConfirm.STREAM_CODEC, BlueprintNetwork::confirm);
         registrar.playToServer(BlueprintPayloads.CaptureCancel.TYPE, BlueprintPayloads.CaptureCancel.STREAM_CODEC, BlueprintNetwork::cancel);
+        registrar.playToServer(BlueprintPayloads.Resume.TYPE, BlueprintPayloads.Resume.STREAM_CODEC, BlueprintNetwork::resume);
         registrar.playToServer(BlueprintPayloads.DeleteBlueprint.TYPE, BlueprintPayloads.DeleteBlueprint.STREAM_CODEC, BlueprintNetwork::delete);
         registrar.playToServer(BlueprintPayloads.RenameBlueprint.TYPE, BlueprintPayloads.RenameBlueprint.STREAM_CODEC, BlueprintNetwork::rename);
         registrar.playToServer(BlueprintPayloads.PreviewBlueprint.TYPE, BlueprintPayloads.PreviewBlueprint.STREAM_CODEC, BlueprintNetwork::previewBlueprint);
@@ -36,7 +39,10 @@ public final class BlueprintNetwork {
         registrar.playToServer(BlueprintPayloads.BeginBuild.TYPE, BlueprintPayloads.BeginBuild.STREAM_CODEC, BlueprintNetwork::build);
         registrar.playToServer(BlueprintPayloads.LaunchBuild.TYPE, BlueprintPayloads.LaunchBuild.STREAM_CODEC, BlueprintNetwork::launch);
         registrar.playToServer(BlueprintPayloads.StopJob.TYPE, BlueprintPayloads.StopJob.STREAM_CODEC, BlueprintNetwork::stop);
+        registrar.playToServer(BlueprintPayloads.JobControl.TYPE, BlueprintPayloads.JobControl.STREAM_CODEC, BlueprintNetwork::control);
         registrar.playToServer(BlueprintPayloads.SetAnchor.TYPE, BlueprintPayloads.SetAnchor.STREAM_CODEC, BlueprintNetwork::anchor);
+        registrar.playToServer(BlueprintPayloads.EditCell.TYPE, BlueprintPayloads.EditCell.STREAM_CODEC, BlueprintNetwork::editCell);
+        registrar.playToServer(BlueprintPayloads.EditLayer.TYPE, BlueprintPayloads.EditLayer.STREAM_CODEC, BlueprintNetwork::editLayer);
         registrar.playToServer(BlueprintPayloads.TransformBlueprint.TYPE, BlueprintPayloads.TransformBlueprint.STREAM_CODEC, BlueprintNetwork::transform);
         registrar.playToServer(BlueprintPayloads.RecaptureBlueprint.TYPE, BlueprintPayloads.RecaptureBlueprint.STREAM_CODEC, BlueprintNetwork::recapture);
 
@@ -45,6 +51,8 @@ public final class BlueprintNetwork {
         registrar.playToClient(BlueprintPayloads.Preview.TYPE, BlueprintPayloads.Preview.STREAM_CODEC, BlueprintNetwork::clientPreview);
         registrar.playToClient(BlueprintPayloads.Materials.TYPE, BlueprintPayloads.Materials.STREAM_CODEC, BlueprintNetwork::clientMaterials);
         registrar.playToClient(BlueprintPayloads.CaptureFinished.TYPE, BlueprintPayloads.CaptureFinished.STREAM_CODEC, BlueprintNetwork::clientFinished);
+        registrar.playToClient(BlueprintPayloads.JobHologram.TYPE, BlueprintPayloads.JobHologram.STREAM_CODEC, BlueprintNetwork::clientJobHologram);
+        registrar.playToClient(BlueprintPayloads.JobSync.TYPE, BlueprintPayloads.JobSync.STREAM_CODEC, BlueprintNetwork::clientJobs);
     }
 
     public static void syncLibrary(ServerPlayer player) {
@@ -87,7 +95,10 @@ public final class BlueprintNetwork {
 
     private static void library(BlueprintPayloads.LibraryRequest payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
-        context.enqueueWork(() -> BlueprintActions.requestLibrary(player));
+        context.enqueueWork(() -> {
+            BlueprintActions.requestLibrary(player);
+            BlueprintNetwork.syncJobs(player);
+        });
     }
 
     private static void startCapture(BlueprintPayloads.StartCapture payload, IPayloadContext context) {
@@ -121,6 +132,11 @@ public final class BlueprintNetwork {
     private static void cancel(BlueprintPayloads.CaptureCancel payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
         context.enqueueWork(() -> BlueprintActions.cancel(player));
+    }
+
+    private static void resume(BlueprintPayloads.Resume payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> BlueprintActions.resume(player, payload.mode(), payload.buildId()));
     }
 
     private static void delete(BlueprintPayloads.DeleteBlueprint payload, IPayloadContext context) {
@@ -167,6 +183,16 @@ public final class BlueprintNetwork {
                 payload.pivotZ()));
     }
 
+    private static void editCell(BlueprintPayloads.EditCell payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> BlueprintActions.editCell(player, payload.id(), payload.x(), payload.y(), payload.z(), payload.stateId(), payload.remove()));
+    }
+
+    private static void editLayer(BlueprintPayloads.EditLayer payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> BlueprintActions.editLayer(player, payload.id(), payload.operation(), payload.from(), payload.to()));
+    }
+
     private static void anchor(BlueprintPayloads.SetAnchor payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
         context.enqueueWork(() -> BlueprintActions.setAnchor(player, payload.id(), payload.x(), payload.y(), payload.z()));
@@ -184,7 +210,15 @@ public final class BlueprintNetwork {
 
     private static void stop(BlueprintPayloads.StopJob payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
-        context.enqueueWork(() -> BlueprintActions.stop(player));
+        context.enqueueWork(() -> {
+            BlueprintActions.stop(player);
+            syncJobs(player);
+        });
+    }
+
+    private static void control(BlueprintPayloads.JobControl payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> JobManager.control(player, payload.id(), payload.action()));
     }
 
     private static void clientLibrary(BlueprintPayloads.LibrarySync payload, IPayloadContext context) {
@@ -220,5 +254,72 @@ public final class BlueprintNetwork {
             return;
         }
         context.enqueueWork(() -> com.autobots.client.AutobotsClientState.applyFinished(payload));
+    }
+
+    private static void clientJobHologram(BlueprintPayloads.JobHologram payload, IPayloadContext context) {
+        if (FMLEnvironment.dist != Dist.CLIENT) {
+            return;
+        }
+        context.enqueueWork(() -> com.autobots.client.AutobotsClientState.applyJobHologram(payload));
+    }
+
+    private static void clientJobs(BlueprintPayloads.JobSync payload, IPayloadContext context) {
+        if (FMLEnvironment.dist != Dist.CLIENT) {
+            return;
+        }
+        context.enqueueWork(() -> com.autobots.client.AutobotsClientState.applyJobs(payload));
+    }
+
+    public static void syncJobs(ServerPlayer player) {
+        com.autobots.schematic.SchematicLibrary library = com.autobots.schematic.SchematicLibrary.get(player.getServer());
+        java.util.List<BuildJob> jobs = new java.util.ArrayList<>(library.jobsFor(player.getUUID()));
+        jobs.sort(java.util.Comparator.comparing(BuildJob::finished).thenComparing(java.util.Comparator.comparingInt(BuildJob::historyOrder).reversed()));
+        java.util.List<BlueprintPayloads.JobLine> lines = new java.util.ArrayList<>();
+        for (BuildJob job : jobs) {
+            String name = job.blueprintName();
+            if (name == null || name.isBlank()) {
+                name = job.kind() == BuildJob.Kind.COPY ? "Saving" : "Build";
+                if (job.schematicId() != null) {
+                    name = library.schematic(job.schematicId()).map(Schematic::name).orElse(name);
+                }
+            }
+            if (name.length() > 48) {
+                name = name.substring(0, 48);
+            }
+            int done = job.finished() ? job.placed() : job.cursor();
+            lines.add(new BlueprintPayloads.JobLine(job.id(), name, done, job.total(), job.skipped(), job.paused(), job.kind() == BuildJob.Kind.COPY, job.finished()));
+        }
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.JobSync(lines));
+    }
+
+    public static void showJobHologram(ServerPlayer player, BuildJob job, Schematic schematic) {
+        java.util.List<BlueprintPayloads.Bit> bits = new java.util.ArrayList<>();
+        if (schematic != null && schematic.blockCount() <= com.autobots.AutobotsConfig.MAX_PREVIEW_BLOCKS) {
+            for (Schematic.Entry entry : schematic.entries()) {
+                if (job.outsideClip(entry)) {
+                    continue;
+                }
+                bits.add(new BlueprintPayloads.Bit(entry.x(), entry.y(), entry.z(), net.minecraft.world.level.block.Block.getId(entry.state())));
+            }
+        }
+        int clipX = job.clipX() == Integer.MAX_VALUE ? schematic.sizeX() : job.clipX();
+        int clipY = job.clipY() == Integer.MAX_VALUE ? schematic.sizeY() : job.clipY();
+        int clipZ = job.clipZ() == Integer.MAX_VALUE ? schematic.sizeZ() : job.clipZ();
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.JobHologram(job.id(), job.min(), clipX, clipY, clipZ, false, bits));
+    }
+
+    public static void clearJobHologram(ServerPlayer player, java.util.UUID jobId) {
+        PacketDistributor.sendToPlayer(player, BlueprintPayloads.JobHologram.clear(jobId));
+    }
+
+    public static void syncJobHolograms(ServerPlayer player) {
+        PacketDistributor.sendToPlayer(player, BlueprintPayloads.JobHologram.clearAll());
+        com.autobots.schematic.SchematicLibrary library = com.autobots.schematic.SchematicLibrary.get(player.getServer());
+        for (com.autobots.job.BuildJob job : library.jobsFor(player.getUUID())) {
+            if (job.kind() != com.autobots.job.BuildJob.Kind.PASTE || job.schematicId() == null) {
+                continue;
+            }
+            library.schematic(job.schematicId()).ifPresent(schematic -> showJobHologram(player, job, schematic));
+        }
     }
 }

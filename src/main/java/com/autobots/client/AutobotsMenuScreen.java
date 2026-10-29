@@ -56,6 +56,8 @@ public class AutobotsMenuScreen extends Screen {
     private int modelH;
     private final List<BlueprintPayloads.Summary> filtered = new ArrayList<>();
     private boolean options;
+    private boolean jobsPage;
+    private int jobScroll;
     private int drag;
     private int wallSliderX;
     private int wallSliderY;
@@ -101,8 +103,8 @@ public class AutobotsMenuScreen extends Screen {
         newButton = add(new AutobotsButton(listX, y, buttonW, 18, Component.translatable("menu.autobots.new"), button -> newBlueprint()));
         editButton = add(new AutobotsButton(listX + 62, y, buttonW, 18, Component.translatable("menu.autobots.edit"), button -> edit()));
         deleteButton = add(new AutobotsButton(listX + 124, y, buttonW, 18, Component.translatable("menu.autobots.delete"), button -> delete(), true));
-        buildButton = add(new AutobotsButton(detailX, y, detailW - 74, 18, Component.translatable("menu.autobots.build"), button -> build()));
-        addRenderableWidget(new AutobotsButton(detailX + detailW - 70, y, 70, 18, Component.translatable("menu.autobots.close"), button -> onClose()));
+        buildButton = add(new AutobotsButton(detailX + detailW - 120, y, buttonW, 18, Component.translatable("menu.autobots.build"), button -> build()));
+        addRenderableWidget(new AutobotsButton(detailX + detailW - buttonW, y, buttonW, 18, Component.translatable("menu.autobots.close"), button -> onClose()));
         renameButton = add(new AutobotsButton(detailX + Math.max(48, detailW - 78), detailSplit + 52, 74, 14, Component.translatable("menu.autobots.rename"), button -> rename()));
         materialsButton = add(new AutobotsButton(detailX + 4, detailSplit + 72, Math.max(40, detailW - 8), 16, Component.translatable("menu.autobots.materials"), button -> openMaterials()));
         stopButton = add(new AutobotsButton(detailX + 4, detailSplit + 92, Math.max(40, detailW - 8), 16, Component.translatable("menu.autobots.stop"), button -> PacketDistributor.sendToServer(new BlueprintPayloads.StopJob())));
@@ -166,14 +168,14 @@ public class AutobotsMenuScreen extends Screen {
         boolean has = selected != null;
         editButton.active = has;
         deleteButton.active = has;
-        buildButton.active = has && !AutobotsClientState.busy;
+        buildButton.active = has;
         renameButton.active = has;
         deleteButton.setMessage(Component.translatable(has && selected.id().equals(confirmDelete) ? "menu.autobots.delete_confirm" : "menu.autobots.delete"));
         if (has && !rename.isFocused()) {
             rename.setValue(selected.name());
         }
         boolean capture = AutobotsClientState.mode == AutobotsClientState.Mode.CAPTURE;
-        boolean building = !options;
+        boolean building = !options && !jobsPage;
         search.visible = building;
         rename.visible = building;
         newButton.visible = building;
@@ -231,7 +233,7 @@ public class AutobotsMenuScreen extends Screen {
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         graphics.fill(0, 0, this.width, this.height, 0xC0060C14);
         AutobotsUi.panel(graphics, panelX, panelY, panelW, panelH);
-        if (options) {
+        if (options || jobsPage) {
             int x = listX - 2;
             int width = panelX + panelW - 12 - x;
             AutobotsUi.inset(graphics, x, panelY + 34, width, panelH - 68);
@@ -246,12 +248,17 @@ public class AutobotsMenuScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, Component.translatable("menu.autobots.title"), panelX + 16, panelY + 10, AutobotsUi.COPPER, false);
         graphics.drawString(this.font, Component.translatable("menu.autobots.subtitle"), panelX + 16, panelY + 22, AutobotsUi.MUTED, false);
-        drawTask(graphics, Component.translatable("menu.autobots.building"), !options, false, panelY + 46);
-        drawTask(graphics, Component.translatable("menu.autobots.mining"), false, true, panelY + 72);
-        drawTask(graphics, Component.translatable("menu.autobots.hauling"), false, true, panelY + 98);
-        drawTask(graphics, Component.translatable("menu.autobots.options"), options, false, panelY + 124);
+        drawTask(graphics, Component.translatable("menu.autobots.building"), !options && !jobsPage, false, panelY + 46);
+        drawTask(graphics, Component.translatable("menu.autobots.jobs"), jobsPage, false, panelY + 72);
+        drawTask(graphics, Component.translatable("menu.autobots.mining"), false, true, panelY + 98);
+        drawTask(graphics, Component.translatable("menu.autobots.hauling"), false, true, panelY + 124);
+        drawTask(graphics, Component.translatable("menu.autobots.options"), options, false, panelY + 150);
         if (options) {
             renderOptions(graphics);
+            return;
+        }
+        if (jobsPage) {
+            renderJobs(graphics, mouseX, mouseY);
             return;
         }
 
@@ -425,6 +432,8 @@ public class AutobotsMenuScreen extends Screen {
             BlueprintModelView.render(graphics, modelX, modelY, modelW, modelH, AutobotsClientState.editGhosts, AutobotsClientState.editX, AutobotsClientState.editY, AutobotsClientState.editZ, yaw, pitch);
         } else if (!ready) {
             graphics.drawCenteredString(this.font, Component.translatable("menu.autobots.model_loading"), modelX + modelW / 2, modelY + modelH / 2, AutobotsUi.MUTED);
+        } else if (AutobotsClientState.previewConcealed) {
+            graphics.drawCenteredString(this.font, Component.translatable("screen.autobots.preview_hidden"), modelX + modelW / 2, modelY + modelH / 2, AutobotsUi.MUTED);
         } else {
             graphics.drawCenteredString(this.font, Component.translatable("menu.autobots.materials_empty"), modelX + modelW / 2, modelY + modelH / 2, AutobotsUi.MUTED);
         }
@@ -463,12 +472,25 @@ public class AutobotsMenuScreen extends Screen {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0 && hitTask(mouseX, mouseY, panelY + 46)) {
             options = false;
+            jobsPage = false;
             refresh();
             return true;
         }
-        if (button == 0 && hitTask(mouseX, mouseY, panelY + 124)) {
-            options = true;
+        if (button == 0 && hitTask(mouseX, mouseY, panelY + 72)) {
+            options = false;
+            jobsPage = true;
+            setFocused(null);
             refresh();
+            return true;
+        }
+        if (button == 0 && hitTask(mouseX, mouseY, panelY + 150)) {
+            options = true;
+            jobsPage = false;
+            setFocused(null);
+            refresh();
+            return true;
+        }
+        if (jobsPage && button == 0 && clickJob(mouseX, mouseY)) {
             return true;
         }
         if (options && button == 0) {
@@ -650,8 +672,106 @@ public class AutobotsMenuScreen extends Screen {
         return min + (int) Math.round(t * (max - min));
     }
 
+    private int activeJobs() {
+        int count = 0;
+        for (BlueprintPayloads.JobLine job : AutobotsClientState.jobs) {
+            if (!job.finished()) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private int jobRows() {
+        return Math.max(1, (panelH - 110) / 44);
+    }
+
+    private void renderJobs(GuiGraphics graphics, int mouseX, int mouseY) {
+        List<BlueprintPayloads.JobLine> jobs = AutobotsClientState.jobs;
+        int x = listX;
+        int width = panelX + panelW - 24 - x;
+        graphics.drawString(this.font, Component.translatable("menu.autobots.jobs"), x, panelY + 24, AutobotsUi.TEXT, false);
+        if (jobs.isEmpty()) {
+            graphics.drawString(this.font, Component.translatable("menu.autobots.jobs_empty"), x, panelY + 52, AutobotsUi.MUTED, false);
+            return;
+        }
+        jobScroll = Mth.clamp(jobScroll, 0, Math.max(0, jobs.size() - jobRows()));
+        for (int row = 0; row < jobRows() && jobScroll + row < jobs.size(); row++) {
+            BlueprintPayloads.JobLine job = jobs.get(jobScroll + row);
+            int y = panelY + 44 + row * 44;
+            boolean hover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 40;
+            graphics.fill(x, y, x + width, y + 40, hover ? 0xFF24303C : 0xFF18222C);
+            graphics.drawString(this.font, Component.literal(job.name()), x + 6, y + 5, AutobotsUi.TEXT, false);
+            String status = job.finished() ? "menu.autobots.done" : job.saving() ? "menu.autobots.saving" : job.paused() ? "menu.autobots.paused" : "menu.autobots.running";
+            Component statusText = Component.translatable(status);
+            int statusColor = job.finished() ? AutobotsUi.MUTED : job.paused() ? 0xFFE0B060 : AutobotsUi.COPPER;
+            graphics.drawString(this.font, statusText, x + width - 130 - this.font.width(statusText), y + 5, statusColor, false);
+            int total = Math.max(1, job.total());
+            graphics.drawString(this.font, Component.translatable("menu.autobots.job_progress", job.done(), job.total(), job.skipped()), x + 6, y + 17, AutobotsUi.MUTED, false);
+            int barW = Math.max(20, width - 148);
+            graphics.fill(x + 6, y + 30, x + 6 + barW, y + 34, 0xFF0C141C);
+            int filled = Mth.clamp(job.done() * barW / total, 0, barW);
+            graphics.fill(x + 6, y + 30, x + 6 + filled, y + 34, job.finished() ? 0xFF6E8494 : AutobotsUi.COPPER);
+            if (job.finished()) {
+                drawJobButton(graphics, x + width - 60, y + 12, "menu.autobots.redo", mouseX, mouseY);
+            } else {
+                drawJobButton(graphics, x + width - 124, y + 12, job.paused() ? "menu.autobots.resume" : "menu.autobots.pause", mouseX, mouseY);
+                drawJobButton(graphics, x + width - 60, y + 12, "menu.autobots.stop", mouseX, mouseY);
+            }
+        }
+        if (activeJobs() > 1) {
+            drawJobButton(graphics, x, panelY + panelH - 58, "menu.autobots.stop_all", mouseX, mouseY);
+        }
+    }
+
+    private void drawJobButton(GuiGraphics graphics, int x, int y, String key, int mouseX, int mouseY) {
+        boolean hover = mouseX >= x && mouseX < x + 56 && mouseY >= y && mouseY < y + 16;
+        graphics.fill(x, y, x + 56, y + 16, hover ? 0xFF3A5164 : 0xFF24384A);
+        Component label = Component.translatable(key);
+        graphics.drawString(this.font, label, x + (56 - this.font.width(label)) / 2, y + 4, AutobotsUi.TEXT, false);
+    }
+
+    private boolean clickJob(double mouseX, double mouseY) {
+        List<BlueprintPayloads.JobLine> jobs = AutobotsClientState.jobs;
+        int x = listX;
+        int width = panelX + panelW - 24 - x;
+        if (activeJobs() > 1 && mouseX >= x && mouseX < x + 56 && mouseY >= panelY + panelH - 58 && mouseY < panelY + panelH - 42) {
+            PacketDistributor.sendToServer(new BlueprintPayloads.StopJob());
+            return true;
+        }
+        int row = (int) ((mouseY - (panelY + 44)) / 44.0D);
+        if (row < 0 || row >= jobRows() || jobScroll + row >= jobs.size()) {
+            return false;
+        }
+        int y = panelY + 44 + row * 44;
+        if (mouseY < y || mouseY >= y + 40) {
+            return false;
+        }
+        BlueprintPayloads.JobLine job = jobs.get(jobScroll + row);
+        if (job.finished()) {
+            if (mouseX >= x + width - 60 && mouseX < x + width - 4 && mouseY >= y + 12 && mouseY < y + 28) {
+                PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.REDO));
+                return true;
+            }
+            return false;
+        }
+        if (mouseX >= x + width - 124 && mouseX < x + width - 68 && mouseY >= y + 12 && mouseY < y + 28) {
+            PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), job.paused() ? BlueprintPayloads.JobControl.RESUME : BlueprintPayloads.JobControl.PAUSE));
+            return true;
+        }
+        if (mouseX >= x + width - 60 && mouseX < x + width - 4 && mouseY >= y + 12 && mouseY < y + 28) {
+            PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.STOP));
+            return true;
+        }
+        return false;
+    }
+
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (jobsPage) {
+            jobScroll = Mth.clamp(jobScroll - (int) Math.signum(scrollY), 0, Math.max(0, AutobotsClientState.jobs.size() - jobRows()));
+            return true;
+        }
         if (insideList(mouseX, mouseY)) {
             scroll = Mth.clamp(scroll - (int) Math.signum(scrollY), 0, Math.max(0, filtered.size() - visibleRows()));
             return true;
@@ -680,7 +800,7 @@ public class AutobotsMenuScreen extends Screen {
 
     private void build() {
         BlueprintPayloads.Summary summary = selected();
-        if (summary == null || AutobotsClientState.busy) {
+        if (summary == null) {
             return;
         }
         AutobotsClientState.armBuild(summary);
@@ -716,12 +836,14 @@ public class AutobotsMenuScreen extends Screen {
     private void discard() {
         PacketDistributor.sendToServer(new BlueprintPayloads.CaptureCancel());
         AutobotsClientState.clearLocal();
+        AutobotsClientState.forgetMode();
         refresh();
     }
 
     private void cancelPreview() {
         PacketDistributor.sendToServer(new BlueprintPayloads.CaptureCancel());
         AutobotsClientState.clearLocal();
+        AutobotsClientState.forgetMode();
         refresh();
     }
 

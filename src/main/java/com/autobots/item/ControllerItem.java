@@ -3,8 +3,6 @@ package com.autobots.item;
 import java.util.List;
 
 import net.minecraft.ChatFormatting;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.GlobalPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
@@ -21,11 +19,9 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.common.util.TriState;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 
-import com.autobots.AutobotsConfig;
 import com.autobots.AutobotsMod;
 import com.autobots.blueprint.BlueprintClientFlags;
 import com.autobots.blueprint.BlueprintSessions;
-import com.autobots.blueprint.BoxEdits;
 import com.autobots.job.JobManager;
 import com.autobots.util.Messages;
 
@@ -49,12 +45,9 @@ public class ControllerItem extends Item {
         if (BlueprintSessions.suppressController(player)) {
             return InteractionResult.SUCCESS;
         }
-        ItemStack stack = context.getItemInHand();
-        ControllerData data = ControllerData.from(stack).ensureId();
-        if (player.isShiftKeyDown()) {
-            return aimOrLaunch(player, stack, data, context);
-        }
-        return setCorner(player, stack, data, GlobalPos.of(level.dimension(), context.getClickedPos()));
+        quietLegacy(player);
+        Messages.actionBar(player, "hud.autobots.task_ready_sub");
+        return InteractionResult.SUCCESS;
     }
 
     @Override
@@ -66,37 +59,15 @@ public class ControllerItem extends Item {
         if (BlueprintSessions.suppressController(serverPlayer)) {
             return InteractionResultHolder.success(stack);
         }
-        ControllerData data = ControllerData.from(stack).ensureId();
-        ControllerData.write(stack, data);
-
+        quietLegacy(serverPlayer);
         if (serverPlayer.isShiftKeyDown()) {
             boolean stopped = JobManager.cancel(serverPlayer, true);
-            ControllerData current = ControllerData.from(stack);
-            if (current.armedOrigin().isPresent()) {
-                ControllerData.write(stack, current.withoutAim());
-                if (!stopped) {
-                    Messages.actionBar(serverPlayer, "message.autobots.aim_cancelled");
-                }
-            } else if (!stopped) {
+            if (!stopped) {
                 Messages.actionBar(serverPlayer, "message.autobots.nothing_to_stop");
             }
             return InteractionResultHolder.success(stack);
         }
-
-        if (data.armedOrigin().isPresent()) {
-            ControllerData.write(stack, data.withoutAim());
-            Messages.actionBar(serverPlayer, "message.autobots.aim_cancelled");
-            return InteractionResultHolder.success(stack);
-        }
-        if (JobManager.jobFor(serverPlayer).isPresent()) {
-            Messages.actionBar(serverPlayer, "message.autobots.busy");
-            return InteractionResultHolder.success(stack);
-        }
-        if (data.cornerA().isEmpty() || data.cornerB().isEmpty()) {
-            Messages.actionBar(serverPlayer, "message.autobots.need_corners");
-            return InteractionResultHolder.success(stack);
-        }
-        JobManager.startCopy(serverPlayer, stack, ControllerData.from(stack));
+        Messages.actionBar(serverPlayer, "hud.autobots.task_ready_sub");
         return InteractionResultHolder.success(stack);
     }
 
@@ -138,53 +109,17 @@ public class ControllerItem extends Item {
         event.setUseItem(TriState.TRUE);
     }
 
-    private static InteractionResult setCorner(ServerPlayer player, ItemStack stack, ControllerData data, GlobalPos pos) {
-        if (data.cornerA().isEmpty() || data.cornerB().isPresent()) {
-            ControllerData.write(stack, data.withCornerA(pos));
-            BlockPos blockPos = pos.pos();
-            Messages.actionBar(player, "message.autobots.corner1", blockPos.getX(), blockPos.getY(), blockPos.getZ());
-            return InteractionResult.SUCCESS;
+    public static void quietLegacy(ServerPlayer player) {
+        for (InteractionHand hand : InteractionHand.values()) {
+            ItemStack stack = player.getItemInHand(hand);
+            if (!(stack.getItem() instanceof ControllerItem)) {
+                continue;
+            }
+            ControllerData data = ControllerData.from(stack);
+            ControllerData cleared = data.withoutSelection();
+            if (cleared != data) {
+                ControllerData.write(stack, cleared);
+            }
         }
-        GlobalPos cornerA = data.cornerA().get();
-        if (!cornerA.dimension().equals(pos.dimension())) {
-            Messages.actionBar(player, "message.autobots.different_dimension");
-            return InteractionResult.SUCCESS;
-        }
-        BlockPos first = cornerA.pos();
-        BlockPos second = pos.pos();
-        int sizeX = Math.abs(first.getX() - second.getX()) + 1;
-        int sizeY = Math.abs(first.getY() - second.getY()) + 1;
-        int sizeZ = Math.abs(first.getZ() - second.getZ()) + 1;
-        long volume = (long) sizeX * sizeY * sizeZ;
-        if (sizeX > AutobotsConfig.MAX_AXIS.getAsInt()
-                || sizeY > AutobotsConfig.MAX_AXIS.getAsInt()
-                || sizeZ > AutobotsConfig.MAX_AXIS.getAsInt()
-                || volume > AutobotsConfig.MAX_BLOCKS.getAsInt()) {
-            Messages.actionBar(player, "message.autobots.too_big", AutobotsConfig.MAX_AXIS.getAsInt(), AutobotsConfig.MAX_BLOCKS.getAsInt());
-            return InteractionResult.SUCCESS;
-        }
-        ControllerData.write(stack, data.withCornerB(pos));
-        Messages.actionBar(player, "message.autobots.corner2", sizeX, sizeY, sizeZ, volume, BoxEdits.solid(player.level(), first, second));
-        return InteractionResult.SUCCESS;
-    }
-
-    private static InteractionResult aimOrLaunch(ServerPlayer player, ItemStack stack, ControllerData data, UseOnContext context) {
-        if (JobManager.jobFor(player).isPresent()) {
-            Messages.actionBar(player, "message.autobots.busy");
-            return InteractionResult.SUCCESS;
-        }
-        if (!data.hasSchematic()) {
-            Messages.actionBar(player, "message.autobots.need_copy");
-            return InteractionResult.SUCCESS;
-        }
-        BlockPos originPos = context.getClickedPos().relative(context.getClickedFace());
-        GlobalPos origin = GlobalPos.of(context.getLevel().dimension(), originPos);
-        if (data.armedOrigin().isPresent() && data.armedOrigin().get().equals(origin)) {
-            JobManager.startPaste(player, stack, data, origin);
-            return InteractionResult.SUCCESS;
-        }
-        ControllerData.write(stack, data.withAim(origin));
-        Messages.actionBar(player, "message.autobots.armed");
-        return InteractionResult.SUCCESS;
     }
 }

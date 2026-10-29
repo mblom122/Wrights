@@ -9,6 +9,7 @@ import net.minecraft.client.gui.components.EditBox;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
@@ -26,6 +27,8 @@ public final class AutobotsInput {
             "key.categories.autobots");
 
     private static boolean windowRaised;
+    private static boolean wasHeld;
+    private static int resumeDelay;
 
     private AutobotsInput() {
     }
@@ -50,18 +53,42 @@ public final class AutobotsInput {
     }
 
     @SubscribeEvent
+    public static void onLogin(ClientPlayerNetworkEvent.LoggingIn event) {
+        AutobotsClientState.prepareJoin();
+        resumeDelay = 20;
+        wasHeld = false;
+    }
+
+    @SubscribeEvent
     public static void onTick(ClientTickEvent.Post event) {
         Minecraft minecraft = Minecraft.getInstance();
         raiseWindow(minecraft);
         if (minecraft.player == null) {
+            wasHeld = false;
             return;
+        }
+        boolean held = com.autobots.item.ControllerItem.isHeld(minecraft.player);
+        if (held) {
+            if (resumeDelay > 0) {
+                resumeDelay--;
+                if (resumeDelay == 0) {
+                    AutobotsClientState.tryResume();
+                }
+            } else if (!wasHeld) {
+                AutobotsClientState.tryResume();
+            }
+        }
+        wasHeld = held;
+        if (!held) {
+            AutobotsClientState.noteUnequipped();
         }
         AutobotsClientState.tickCapture();
         if (!com.autobots.item.ControllerItem.isHeld(minecraft.player)) {
             if (minecraft.screen instanceof AutobotsMenuScreen
                     || minecraft.screen instanceof BlueprintAdjustScreen
                     || minecraft.screen instanceof PlacementScreen
-                    || minecraft.screen instanceof BlueprintEditScreen) {
+                    || minecraft.screen instanceof BlueprintEditScreen
+                    || minecraft.screen instanceof BlockPickerScreen) {
                 minecraft.setScreen(null);
             }
             while (MENU.consumeClick()) {
@@ -79,7 +106,8 @@ public final class AutobotsInput {
             } else             if (minecraft.screen instanceof AutobotsMenuScreen
                     || minecraft.screen instanceof BlueprintAdjustScreen
                     || minecraft.screen instanceof PlacementScreen
-                    || minecraft.screen instanceof BlueprintEditScreen) {
+                    || minecraft.screen instanceof BlueprintEditScreen
+                    || minecraft.screen instanceof BlockPickerScreen) {
                 minecraft.setScreen(null);
             }
         }

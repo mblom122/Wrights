@@ -25,6 +25,7 @@ public final class AutobotsHud {
         }
         Component line = null;
         Component sub = null;
+        Component task = taskLine();
         if (AutobotsClientState.mode == AutobotsClientState.Mode.CAPTURE) {
             boolean box = AutobotsClientState.captureStyle == AutobotsClientState.CaptureStyle.BOX;
             boolean move = AutobotsClientState.captureStyle == AutobotsClientState.CaptureStyle.MOVE;
@@ -54,12 +55,19 @@ public final class AutobotsHud {
             line = Component.translatable("hud.autobots.saving", AutobotsClientState.name);
         } else if (AutobotsClientState.mode == AutobotsClientState.Mode.BUILD) {
             line = Component.translatable("hud.autobots.build", AutobotsClientState.buildName);
-            sub = Component.translatable("hud.autobots.build_sub");
+            sub = Component.translatable(AutobotsClientState.concealed ? "screen.autobots.preview_hidden" : "hud.autobots.build_sub");
+        } else if (AutobotsClientState.mode == AutobotsClientState.Mode.NONE) {
+            line = Component.translatable("hud.autobots.task_ready_sub");
         }
+        GuiGraphics graphics = event.getGuiGraphics();
+        int taskWidth = minecraft.font.width(task);
+        int taskX = (graphics.guiWidth() - taskWidth) / 2;
+        graphics.fill(taskX - 8, 4, taskX + taskWidth + 8, 18, 0xC0101822);
+        graphics.fill(taskX - 8, 4, taskX - 6, 18, AutobotsUi.COPPER);
+        graphics.drawString(minecraft.font, task, taskX, 7, AutobotsUi.COPPER, false);
         if (line == null && !showModes(minecraft)) {
             return;
         }
-        GuiGraphics graphics = event.getGuiGraphics();
         if (line != null) {
             int width = minecraft.font.width(line);
             if (sub != null) {
@@ -67,16 +75,30 @@ public final class AutobotsHud {
             }
             int x = (graphics.guiWidth() - width) / 2;
             int height = sub == null ? 18 : 30;
-            graphics.fill(x - 8, 6, x + width + 8, 8 + height, 0xC0101822);
-            graphics.fill(x - 8, 6, x - 6, 8 + height, AutobotsUi.COPPER);
-            graphics.drawString(minecraft.font, line, x, 10, AutobotsUi.TEXT, false);
+            int top = 22;
+            graphics.fill(x - 8, top, x + width + 8, top + height, 0xC0101822);
+            graphics.fill(x - 8, top, x - 6, top + height, AutobotsUi.COPPER);
+            graphics.drawString(minecraft.font, line, x, top + 4, AutobotsUi.TEXT, false);
             if (sub != null) {
-                graphics.drawString(minecraft.font, sub, x, 22, AutobotsUi.MUTED, false);
+                graphics.drawString(minecraft.font, sub, x, top + 16, AutobotsUi.MUTED, false);
             }
         }
         if (showModes(minecraft)) {
             drawModes(graphics, minecraft);
         }
+    }
+
+    private static Component taskLine() {
+        if (AutobotsClientState.mode == AutobotsClientState.Mode.CAPTURE) {
+            return Component.translatable("hud.autobots.task_new", Component.translatable(styleKey(AutobotsClientState.captureStyle)));
+        }
+        if (AutobotsClientState.mode == AutobotsClientState.Mode.BUILD) {
+            return Component.translatable("hud.autobots.task_build");
+        }
+        if (AutobotsClientState.mode == AutobotsClientState.Mode.SAVING) {
+            return Component.translatable("hud.autobots.task_saving");
+        }
+        return Component.translatable("hud.autobots.task_ready");
     }
 
     private static boolean showModes(Minecraft minecraft) {

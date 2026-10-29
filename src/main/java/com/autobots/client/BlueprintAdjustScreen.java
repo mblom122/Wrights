@@ -204,8 +204,8 @@ public class BlueprintAdjustScreen extends Screen {
     }
 
     private void cancel() {
-        PacketDistributor.sendToServer(new BlueprintPayloads.CaptureCancel());
-        AutobotsClientState.clearLocal();
+        AutobotsClientState.releaseSelection();
+        AutobotsClientState.sendUpdate();
         this.minecraft.setScreen(null);
     }
 

@@ -21,8 +21,6 @@ import com.autobots.schematic.SchematicLibrary;
 import com.autobots.util.Messages;
 
 public final class BlueprintActions {
-    private static final int PREVIEW_LIMIT = 3500;
-
     private BlueprintActions() {
     }
 
@@ -42,6 +40,26 @@ public final class BlueprintActions {
             return;
         }
         BlueprintNetwork.syncLibrary(player);
+    }
+
+    public static void resume(ServerPlayer player, int mode, java.util.UUID buildId) {
+        if (!held(player)) {
+            return;
+        }
+        BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
+        com.autobots.item.ControllerItem.quietLegacy(player);
+        if (session.mode() != BlueprintSessions.Mode.NONE) {
+            BlueprintNetwork.syncCapture(player);
+            return;
+        }
+        if (mode == 2 && buildId != null && !buildId.equals(net.minecraft.Util.NIL_UUID)) {
+            beginBuild(player, buildId);
+            return;
+        }
+        if (mode == 1) {
+            session.startCapture(player.level().dimension());
+            BlueprintNetwork.syncCapture(player);
+        }
     }
 
     public static void startCapture(ServerPlayer player) {
@@ -363,6 +381,161 @@ public final class BlueprintActions {
         BlueprintNetwork.preview(player, updated, building(player, id), false);
     }
 
+    public static void editCell(ServerPlayer player, java.util.UUID id, int x, int y, int z, int stateId, boolean remove) {
+        if (!held(player)) {
+            return;
+        }
+        Schematic schematic = editable(player, id, true);
+        if (schematic == null) {
+            return;
+        }
+        if (x < 0 || y < 0 || z < 0 || x >= schematic.sizeX() || y >= schematic.sizeY() || z >= schematic.sizeZ()) {
+            return;
+        }
+        java.util.ArrayList<Schematic.Entry> next = new java.util.ArrayList<>();
+        for (Schematic.Entry entry : schematic.entries()) {
+            if (entry.x() == x && entry.y() == y && entry.z() == z) {
+                continue;
+            }
+            next.add(entry);
+        }
+        if (!remove) {
+            net.minecraft.world.level.block.state.BlockState state = net.minecraft.world.level.block.Block.stateById(stateId);
+            if (!com.autobots.util.BlockFilters.canStore(state)) {
+                Messages.actionBar(player, "message.autobots.cannot_store");
+                return;
+            }
+            if (next.size() >= AutobotsConfig.MAX_BLOCKS.getAsInt()) {
+                Messages.actionBar(player, "message.autobots.too_big", AutobotsConfig.MAX_AXIS.getAsInt(), AutobotsConfig.MAX_BLOCKS.getAsInt());
+                return;
+            }
+            next.add(new Schematic.Entry((short) x, (short) y, (short) z, state, com.autobots.util.BlockFilters.isSecondary(state)));
+            next.sort(java.util.Comparator.comparing(Schematic.Entry::secondary));
+        }
+        Schematic updated = schematic.withEntries(next);
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        library.putSchematic(updated);
+        BlueprintNetwork.syncLibrary(player);
+        BlueprintNetwork.preview(player, updated, building(player, id), false);
+    }
+
+    public static void editLayer(ServerPlayer player, java.util.UUID id, int operation, int from, int to) {
+        if (!held(player)) {
+            return;
+        }
+        Schematic schematic = editable(player, id, true);
+        if (schematic == null) {
+            return;
+        }
+        int height = Math.max(1, schematic.sizeY());
+        int source = Math.max(0, Math.min(height - 1, from));
+        java.util.ArrayList<Schematic.Entry> entries = new java.util.ArrayList<>();
+        int anchorY = schematic.anchorY();
+        if (operation == BlueprintPayloads.EditLayer.REMOVE) {
+            if (height == 1) {
+                for (Schematic.Entry entry : schematic.entries()) {
+                    if (entry.y() != source) {
+                        entries.add(entry);
+                    }
+                }
+                storeLayout(player, id, schematic, 1, entries, 0);
+                return;
+            }
+            for (Schematic.Entry entry : schematic.entries()) {
+                if (entry.y() == source) {
+                    continue;
+                }
+                int y = entry.y() > source ? entry.y() - 1 : entry.y();
+                entries.add(new Schematic.Entry(entry.x(), (short) y, entry.z(), entry.state(), entry.secondary()));
+            }
+            if (anchorY == source) {
+                anchorY = Math.max(0, source - 1);
+            } else if (anchorY > source) {
+                anchorY--;
+            }
+            storeLayout(player, id, schematic, height - 1, entries, anchorY);
+            return;
+        }
+        if (operation == BlueprintPayloads.EditLayer.INSERT) {
+            if (height >= AutobotsConfig.MAX_AXIS.getAsInt()) {
+                Messages.actionBar(player, "message.autobots.too_big", AutobotsConfig.MAX_AXIS.getAsInt(), AutobotsConfig.MAX_BLOCKS.getAsInt());
+                return;
+            }
+            int at = Math.max(0, Math.min(height, to));
+            shiftUp(schematic, entries, at);
+            if (anchorY >= at) {
+                anchorY++;
+            }
+            storeLayout(player, id, schematic, height + 1, entries, anchorY);
+            return;
+        }
+        if (operation == BlueprintPayloads.EditLayer.MOVE) {
+            int dest = Math.max(0, Math.min(height - 1, to));
+            if (dest == source) {
+                return;
+            }
+            for (Schematic.Entry entry : schematic.entries()) {
+                int y = movedY(entry.y(), source, dest);
+                entries.add(new Schematic.Entry(entry.x(), (short) y, entry.z(), entry.state(), entry.secondary()));
+            }
+            storeLayout(player, id, schematic, height, entries, movedY(anchorY, source, dest));
+            return;
+        }
+        if (operation == BlueprintPayloads.EditLayer.COPY) {
+            int dest = Math.max(0, Math.min(height, to));
+            int added = 0;
+            for (Schematic.Entry entry : schematic.entries()) {
+                if (entry.y() == source) {
+                    added++;
+                }
+            }
+            if (height >= AutobotsConfig.MAX_AXIS.getAsInt() || schematic.blockCount() + added > AutobotsConfig.MAX_BLOCKS.getAsInt()) {
+                Messages.actionBar(player, "message.autobots.too_big", AutobotsConfig.MAX_AXIS.getAsInt(), AutobotsConfig.MAX_BLOCKS.getAsInt());
+                return;
+            }
+            shiftUp(schematic, entries, dest);
+            for (Schematic.Entry entry : schematic.entries()) {
+                if (entry.y() != source) {
+                    continue;
+                }
+                entries.add(new Schematic.Entry(entry.x(), (short) dest, entry.z(), entry.state(), entry.secondary()));
+            }
+            entries.sort(java.util.Comparator.comparing(Schematic.Entry::secondary));
+            if (anchorY >= dest) {
+                anchorY++;
+            }
+            storeLayout(player, id, schematic, height + 1, entries, anchorY);
+        }
+    }
+
+    private static void shiftUp(Schematic schematic, java.util.List<Schematic.Entry> into, int at) {
+        for (Schematic.Entry entry : schematic.entries()) {
+            int y = entry.y() >= at ? entry.y() + 1 : entry.y();
+            into.add(new Schematic.Entry(entry.x(), (short) y, entry.z(), entry.state(), entry.secondary()));
+        }
+    }
+
+    private static int movedY(int y, int from, int dest) {
+        if (y == from) {
+            return dest;
+        }
+        if (from < dest && y > from && y <= dest) {
+            return y - 1;
+        }
+        if (dest < from && y >= dest && y < from) {
+            return y + 1;
+        }
+        return y;
+    }
+
+    private static void storeLayout(ServerPlayer player, java.util.UUID id, Schematic schematic, int sizeY, java.util.List<Schematic.Entry> entries, int anchorY) {
+        Schematic updated = schematic.withLayout(sizeY, entries, anchorY);
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        library.putSchematic(updated);
+        BlueprintNetwork.syncLibrary(player);
+        BlueprintNetwork.preview(player, updated, building(player, id), false);
+    }
+
     public static void transform(ServerPlayer player, java.util.UUID id, int operation) {
         if (!held(player)) {
             return;
@@ -409,10 +582,6 @@ public final class BlueprintActions {
             return;
         }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
-        if (library.jobFor(player.getUUID()).isPresent()) {
-            Messages.actionBar(player, "message.autobots.busy");
-            return;
-        }
         Schematic schematic = library.schematic(id).orElse(null);
         if (schematic == null || schematic.blockCount() == 0) {
             Messages.actionBar(player, "message.autobots.blueprint_missing");
@@ -498,12 +667,12 @@ public final class BlueprintActions {
 
     public static BlueprintPayloads.Preview previewOf(Schematic schematic, boolean forBuild, boolean openEditor) {
         List<Schematic.Entry> entries = schematic.entries();
-        int count = entries.size();
-        int stride = Math.max(1, (count + PREVIEW_LIMIT - 1) / PREVIEW_LIMIT);
+        boolean concealed = entries.size() > AutobotsConfig.MAX_PREVIEW_BLOCKS;
         List<BlueprintPayloads.Bit> bits = new ArrayList<>();
-        for (int i = 0; i < count; i += stride) {
-            Schematic.Entry entry = entries.get(i);
-            bits.add(new BlueprintPayloads.Bit(entry.x(), entry.y(), entry.z(), Block.getId(entry.state())));
+        if (!concealed) {
+            for (Schematic.Entry entry : entries) {
+                bits.add(new BlueprintPayloads.Bit(entry.x(), entry.y(), entry.z(), Block.getId(entry.state())));
+            }
         }
         return new BlueprintPayloads.Preview(
                 schematic.id(),
@@ -512,7 +681,8 @@ public final class BlueprintActions {
                 schematic.sizeY(),
                 schematic.sizeZ(),
                 schematic.blockCount(),
-                stride > 1,
+                false,
+                concealed,
                 bits,
                 schematic.anchorX(),
                 schematic.anchorY(),
@@ -526,7 +696,7 @@ public final class BlueprintActions {
     }
 
     private static int clampSize(int size) {
-        return Math.max(1, Math.min(256, size));
+        return Math.max(1, Math.min(AutobotsConfig.MAX_AXIS.getAsInt(), size));
     }
 
     private static int clampAnchor(int value, int size) {

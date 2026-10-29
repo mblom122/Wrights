@@ -5,13 +5,16 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 public final class AutobotsConfig {
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
+    /** Solid blocks sent in one preview packet. Larger blueprints still copy and build. */
+    public static final int MAX_PREVIEW_BLOCKS = 48_000;
+
     public static final ModConfigSpec.IntValue MAX_AXIS = BUILDER
-            .comment("Largest selection length on one axis, in blocks.")
-            .defineInRange("maxAxis", 32, 1, 256);
+            .comment("Largest selection length on one axis, in blocks. 512 matches Building Gadgets and RFTools.")
+            .defineInRange("maxAxis", 512, 1, 512);
 
     public static final ModConfigSpec.IntValue MAX_BLOCKS = BUILDER
-            .comment("Largest selection volume, in blocks. Air counts toward this cap.")
-            .defineInRange("maxBlocks", 32768, 1, 262144);
+            .comment("Largest selection volume, in blocks. Air counts toward this cap. 100000 matches Building Gadgets.")
+            .defineInRange("maxBlocks", 100_000, 1, 2_097_152);
 
     public static final ModConfigSpec.IntValue BLOCKS_PER_TICK = BUILDER
             .comment("How many blocks a drone may place in one server tick. Keep this low.")

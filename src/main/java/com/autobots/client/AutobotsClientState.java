@@ -1,7 +1,11 @@
 package com.autobots.client;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import net.minecraft.client.Minecraft;
@@ -43,6 +47,7 @@ public final class AutobotsClientState {
     public static int seq;
     public static List<BlueprintPayloads.Summary> library = List.of();
     public static boolean busy;
+    public static List<BlueprintPayloads.JobLine> jobs = List.of();
     public static boolean libraryKnown;
     public static UUID selected;
     public static UUID buildId;
@@ -55,6 +60,7 @@ public final class AutobotsClientState {
     public static int viewZ = 1;
     public static int blockCount;
     public static boolean sampled;
+    public static boolean concealed;
     public static boolean follow;
     public static BlockPos anchor;
     public static int pivotX;
@@ -69,6 +75,7 @@ public final class AutobotsClientState {
     public static int editZ = 1;
     public static int editBlocks;
     public static boolean previewSampled;
+    public static boolean previewConcealed;
     public static int editPivotX;
     public static int editPivotY;
     public static int editPivotZ;
@@ -102,10 +109,136 @@ public final class AutobotsClientState {
     public record Ghost(int x, int y, int z, float r, float g, float b, int stateId) {
     }
 
+    public record ActiveBuild(BlockPos origin, int clipX, int clipY, int clipZ, List<Ghost> ghosts) {
+    }
+
+    public static final Map<UUID, ActiveBuild> activeBuilds = new LinkedHashMap<>();
+    public static final Set<Long> activeCells = new HashSet<>();
+
+    public static void applyJobHologram(BlueprintPayloads.JobHologram payload) {
+        if (payload.clear()) {
+            if (payload.jobId().equals(Util.NIL_UUID)) {
+                activeBuilds.clear();
+            } else {
+                activeBuilds.remove(payload.jobId());
+            }
+        } else {
+            List<Ghost> ghosts = new ArrayList<>();
+            for (BlueprintPayloads.Bit bit : payload.bits()) {
+                BlockState state = Block.stateById(bit.stateId());
+                if (state.isAir()) {
+                    continue;
+                }
+                ghosts.add(new Ghost(Short.toUnsignedInt(bit.x()), Short.toUnsignedInt(bit.y()), Short.toUnsignedInt(bit.z()), 1.0F, 1.0F, 1.0F, bit.stateId()));
+            }
+            activeBuilds.put(payload.jobId(), new ActiveBuild(payload.origin(), payload.clipX(), payload.clipY(), payload.clipZ(), ghosts));
+        }
+        activeCells.clear();
+        for (ActiveBuild build : activeBuilds.values()) {
+            for (Ghost ghost : build.ghosts()) {
+                if (ghost.x() >= build.clipX() || ghost.y() >= build.clipY() || ghost.z() >= build.clipZ()) {
+                    continue;
+                }
+                activeCells.add(BlockPos.asLong(build.origin().getX() + ghost.x(), build.origin().getY() + ghost.y(), build.origin().getZ() + ghost.z()));
+            }
+        }
+    }
+
+    public static void applyJobs(BlueprintPayloads.JobSync payload) {
+        jobs = List.copyOf(payload.jobs());
+        busy = false;
+        for (BlueprintPayloads.JobLine job : jobs) {
+            if (!job.finished()) {
+                busy = true;
+                break;
+            }
+        }
+    }
+
     public static void updateFlags() {
         BlueprintClientFlags.capture = mode == Mode.CAPTURE || mode == Mode.SAVING;
         BlueprintClientFlags.build = mode == Mode.BUILD;
         BlueprintClientFlags.suppressController = BlueprintClientFlags.capture || BlueprintClientFlags.build;
+        rememberMode();
+    }
+
+    private static int rememberedMode = -1;
+    private static int rememberedStyle = -1;
+    private static String rememberedBuild = "";
+
+    private static void rememberMode() {
+        int modeId = mode == Mode.CAPTURE ? 1 : mode == Mode.BUILD ? 2 : 0;
+        if (modeId == 0) {
+            return;
+        }
+        String id = mode == Mode.BUILD && buildId != null ? buildId.toString() : "";
+        int style = captureStyle.ordinal();
+        if (modeId == rememberedMode && style == rememberedStyle && id.equals(rememberedBuild)) {
+            return;
+        }
+        rememberedMode = modeId;
+        rememberedStyle = style;
+        rememberedBuild = id;
+        com.autobots.AutobotsClientConfig.setLastMode(modeId, style, id);
+    }
+
+    public static void prepareJoin() {
+        mode = Mode.NONE;
+        cornerA = null;
+        cornerB = null;
+        editingId = null;
+        buildId = null;
+        ghosts = List.of();
+        follow = false;
+        boxDragging = false;
+        moveGrabbed = false;
+        generation = -1;
+        seq = -1;
+        int style = com.autobots.AutobotsClientConfig.LAST_STYLE.get();
+        CaptureStyle[] styles = CaptureStyle.values();
+        captureStyle = styles[Math.max(0, Math.min(styles.length - 1, style))];
+        resumeSent = false;
+        updateFlags();
+    }
+
+    public static void releaseSelection() {
+        cornerA = null;
+        cornerB = null;
+        boxDragging = false;
+        moveGrabbed = false;
+    }
+
+    private static boolean resumeSent;
+
+    public static void forgetMode() {
+        AutobotsClientConfig.setLastMode(0, captureStyle.ordinal(), "");
+        rememberedMode = 0;
+        rememberedBuild = "";
+    }
+
+    public static void noteUnequipped() {
+        resumeSent = false;
+    }
+
+    public static void tryResume() {
+        if (mode != Mode.NONE || resumeSent) {
+            return;
+        }
+        int last = com.autobots.AutobotsClientConfig.LAST_MODE.get();
+        if (last != 1 && last != 2) {
+            return;
+        }
+        resumeSent = true;
+        java.util.UUID id = net.minecraft.Util.NIL_UUID;
+        String raw = com.autobots.AutobotsClientConfig.LAST_BUILD.get();
+        if (raw != null && !raw.isBlank()) {
+            try {
+                id = java.util.UUID.fromString(raw);
+            } catch (IllegalArgumentException ignored) {
+                id = net.minecraft.Util.NIL_UUID;
+            }
+        }
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.autobots.network.BlueprintPayloads.Resume(last, id));
     }
 
     public static void beginCaptureLocal() {
@@ -152,6 +285,7 @@ public final class AutobotsClientState {
         viewZ = fullZ;
         blockCount = summary.blocks();
         sampled = false;
+        concealed = false;
         ghosts = List.of();
         follow = true;
         anchor = lookTarget();
@@ -203,6 +337,7 @@ public final class AutobotsClientState {
             if (incoming != Mode.BUILD) {
                 buildId = null;
                 ghosts = List.of();
+                concealed = false;
                 follow = false;
             }
         }
@@ -257,6 +392,7 @@ public final class AutobotsClientState {
         editZ = Math.max(1, payload.sizeZ());
         editBlocks = payload.blocks();
         previewSampled = payload.sampled();
+        previewConcealed = payload.concealed();
         editPivotX = clamp(payload.anchorX(), editX);
         editPivotY = clamp(payload.anchorY(), editY);
         editPivotZ = clamp(payload.anchorZ(), editZ);
@@ -271,6 +407,7 @@ public final class AutobotsClientState {
             fullZ = editZ;
             blockCount = payload.blocks();
             sampled = payload.sampled();
+            concealed = payload.concealed();
             ghosts = parsed;
             pivotX = editPivotX;
             pivotY = editPivotY;
@@ -306,15 +443,15 @@ public final class AutobotsClientState {
         }
     }
 
-    public static void tryBuild() {
+    public static boolean tryBuild() {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player == null || !ControllerItem.isHeld(minecraft.player)) {
-            return;
+            return false;
         }
         if (mode != Mode.BUILD || buildId == null || anchor == null || buildCooldown > 0) {
-            return;
+            return false;
         }
-        buildCooldown = 8;
+        buildCooldown = 2;
         follow = true;
         PacketDistributor.sendToServer(new BlueprintPayloads.LaunchBuild(
                 buildId,
@@ -325,6 +462,17 @@ public final class AutobotsClientState {
                 pivotX,
                 pivotY,
                 pivotZ));
+        return true;
+    }
+
+    public static void stepAnchor() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (anchor == null || minecraft.player == null) {
+            return;
+        }
+        follow = false;
+        net.minecraft.core.Direction facing = minecraft.player.getDirection();
+        anchor = anchor.offset(facing.getStepX() * Math.max(1, viewX), 0, facing.getStepZ() * Math.max(1, viewZ));
     }
 
     public static void tickFollow() {
@@ -332,8 +480,8 @@ public final class AutobotsClientState {
             buildCooldown--;
         }
         Minecraft minecraft = Minecraft.getInstance();
-        if (mode == Mode.BUILD && follow && minecraft.screen == null && minecraft.player != null
-                && ControllerItem.isHeld(minecraft.player)) {
+        if (mode == Mode.BUILD && follow && minecraft.player != null && ControllerItem.isHeld(minecraft.player)
+                && (minecraft.screen == null || minecraft.screen instanceof PlacementScreen)) {
             anchor = lookTarget();
         }
     }
@@ -384,6 +532,7 @@ public final class AutobotsClientState {
         captureStyle = values[next];
         styleHudTicks = 70;
         styleAnnounce = true;
+        rememberMode();
     }
 
     public static void onCaptureClick(BlockPos clicked, boolean shift) {

@@ -164,6 +164,21 @@ public final class BlueprintPayloads {
         }
     }
 
+    public record Resume(int mode, UUID buildId) implements CustomPacketPayload {
+        public static final Type<Resume> TYPE = payloadType("resume");
+        public static final StreamCodec<RegistryFriendlyByteBuf, Resume> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeByte(value.mode);
+                    buf.writeUUID(value.buildId);
+                },
+                buf -> new Resume(buf.readByte(), buf.readUUID()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public record CaptureCancel() implements CustomPacketPayload {
         public static final Type<CaptureCancel> TYPE = payloadType("capture_cancel");
         public static final StreamCodec<RegistryFriendlyByteBuf, CaptureCancel> STREAM_CODEC = empty(new CaptureCancel());
@@ -305,7 +320,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record Preview(UUID id, String name, int sizeX, int sizeY, int sizeZ, int blocks, boolean sampled, List<Bit> bits, int anchorX, int anchorY, int anchorZ, boolean forBuild, boolean openEditor) implements CustomPacketPayload {
+    public record Preview(UUID id, String name, int sizeX, int sizeY, int sizeZ, int blocks, boolean sampled, boolean concealed, List<Bit> bits, int anchorX, int anchorY, int anchorZ, boolean forBuild, boolean openEditor) implements CustomPacketPayload {
         public static final Type<Preview> TYPE = payloadType("preview");
         public static final StreamCodec<RegistryFriendlyByteBuf, Preview> STREAM_CODEC = StreamCodec.of((buf, value) -> value.write(buf), Preview::read);
 
@@ -317,6 +332,7 @@ public final class BlueprintPayloads {
             buf.writeVarInt(sizeZ);
             buf.writeVarInt(blocks);
             buf.writeBoolean(sampled);
+            buf.writeBoolean(concealed);
             buf.writeVarInt(anchorX);
             buf.writeVarInt(anchorY);
             buf.writeVarInt(anchorZ);
@@ -336,6 +352,7 @@ public final class BlueprintPayloads {
             int sizeZ = buf.readVarInt();
             int blocks = buf.readVarInt();
             boolean sampled = buf.readBoolean();
+            boolean concealed = buf.readBoolean();
             int anchorX = buf.readVarInt();
             int anchorY = buf.readVarInt();
             int anchorZ = buf.readVarInt();
@@ -346,7 +363,7 @@ public final class BlueprintPayloads {
             for (int i = 0; i < count; i++) {
                 bits.add(Bit.read(buf));
             }
-            return new Preview(id, name, sizeX, sizeY, sizeZ, blocks, sampled, bits, anchorX, anchorY, anchorZ, forBuild, openEditor);
+            return new Preview(id, name, sizeX, sizeY, sizeZ, blocks, sampled, concealed, bits, anchorX, anchorY, anchorZ, forBuild, openEditor);
         }
 
         @Override
@@ -388,6 +405,154 @@ public final class BlueprintPayloads {
                     buf.writeBoolean(value.saved);
                 },
                 buf -> new CaptureFinished(buf.readUUID(), buf.readBoolean()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record EditCell(UUID id, int x, int y, int z, int stateId, boolean remove) implements CustomPacketPayload {
+        public static final Type<EditCell> TYPE = payloadType("edit_cell");
+        public static final StreamCodec<RegistryFriendlyByteBuf, EditCell> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeUUID(value.id);
+                    buf.writeVarInt(value.x);
+                    buf.writeVarInt(value.y);
+                    buf.writeVarInt(value.z);
+                    buf.writeVarInt(value.stateId);
+                    buf.writeBoolean(value.remove);
+                },
+                buf -> new EditCell(buf.readUUID(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readBoolean()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record EditLayer(UUID id, int operation, int from, int to) implements CustomPacketPayload {
+        public static final int REMOVE = 0;
+        public static final int INSERT = 1;
+        public static final int MOVE = 2;
+        public static final int COPY = 3;
+        public static final Type<EditLayer> TYPE = payloadType("edit_layer");
+        public static final StreamCodec<RegistryFriendlyByteBuf, EditLayer> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeUUID(value.id);
+                    buf.writeByte(value.operation);
+                    buf.writeVarInt(value.from);
+                    buf.writeVarInt(value.to);
+                },
+                buf -> new EditLayer(buf.readUUID(), buf.readByte(), buf.readVarInt(), buf.readVarInt()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record JobHologram(UUID jobId, BlockPos origin, int clipX, int clipY, int clipZ, boolean clear, List<Bit> bits) implements CustomPacketPayload {
+        public static final Type<JobHologram> TYPE = payloadType("job_hologram");
+        public static final StreamCodec<RegistryFriendlyByteBuf, JobHologram> STREAM_CODEC = StreamCodec.of((buf, value) -> value.write(buf), JobHologram::read);
+
+        public static JobHologram clearAll() {
+            return new JobHologram(net.minecraft.Util.NIL_UUID, BlockPos.ZERO, 0, 0, 0, true, List.of());
+        }
+
+        public static JobHologram clear(UUID jobId) {
+            return new JobHologram(jobId, BlockPos.ZERO, 0, 0, 0, true, List.of());
+        }
+
+        public void write(RegistryFriendlyByteBuf buf) {
+            buf.writeUUID(jobId);
+            buf.writeBlockPos(origin);
+            buf.writeVarInt(clipX);
+            buf.writeVarInt(clipY);
+            buf.writeVarInt(clipZ);
+            buf.writeBoolean(clear);
+            buf.writeVarInt(bits.size());
+            for (Bit bit : bits) {
+                bit.write(buf);
+            }
+        }
+
+        public static JobHologram read(RegistryFriendlyByteBuf buf) {
+            UUID jobId = buf.readUUID();
+            BlockPos origin = buf.readBlockPos();
+            int clipX = buf.readVarInt();
+            int clipY = buf.readVarInt();
+            int clipZ = buf.readVarInt();
+            boolean clear = buf.readBoolean();
+            int count = buf.readVarInt();
+            List<Bit> bits = new ArrayList<>(count);
+            for (int i = 0; i < count; i++) {
+                bits.add(Bit.read(buf));
+            }
+            return new JobHologram(jobId, origin, clipX, clipY, clipZ, clear, bits);
+        }
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record JobLine(UUID id, String name, int done, int total, int skipped, boolean paused, boolean saving, boolean finished) {
+        public void write(RegistryFriendlyByteBuf buf) {
+            buf.writeUUID(id);
+            buf.writeUtf(name, 48);
+            buf.writeVarInt(done);
+            buf.writeVarInt(total);
+            buf.writeVarInt(skipped);
+            buf.writeBoolean(paused);
+            buf.writeBoolean(saving);
+            buf.writeBoolean(finished);
+        }
+
+        public static JobLine read(RegistryFriendlyByteBuf buf) {
+            return new JobLine(buf.readUUID(), buf.readUtf(48), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean());
+        }
+    }
+
+    public record JobSync(List<JobLine> jobs) implements CustomPacketPayload {
+        public static final Type<JobSync> TYPE = payloadType("job_sync");
+        public static final StreamCodec<RegistryFriendlyByteBuf, JobSync> STREAM_CODEC = StreamCodec.of((buf, value) -> value.write(buf), JobSync::read);
+
+        public void write(RegistryFriendlyByteBuf buf) {
+            buf.writeVarInt(jobs.size());
+            for (JobLine job : jobs) {
+                job.write(buf);
+            }
+        }
+
+        public static JobSync read(RegistryFriendlyByteBuf buf) {
+            int count = buf.readVarInt();
+            List<JobLine> jobs = new ArrayList<>(count);
+            for (int i = 0; i < count; i++) {
+                jobs.add(JobLine.read(buf));
+            }
+            return new JobSync(jobs);
+        }
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record JobControl(UUID id, int action) implements CustomPacketPayload {
+        public static final int PAUSE = 0;
+        public static final int RESUME = 1;
+        public static final int STOP = 2;
+        public static final int REDO = 3;
+        public static final Type<JobControl> TYPE = payloadType("job_control");
+        public static final StreamCodec<RegistryFriendlyByteBuf, JobControl> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeUUID(value.id);
+                    buf.writeByte(value.action);
+                },
+                buf -> new JobControl(buf.readUUID(), buf.readByte()));
 
         @Override
         public Type<? extends CustomPacketPayload> type() {

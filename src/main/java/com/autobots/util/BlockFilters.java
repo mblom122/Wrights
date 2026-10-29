@@ -41,6 +41,22 @@ public final class BlockFilters {
         return block.asItem() != Items.AIR;
     }
 
+    public static boolean canStore(BlockState state) {
+        if (state.isAir() || state.hasBlockEntity()) {
+            return false;
+        }
+        var block = state.getBlock();
+        if (block instanceof LiquidBlock
+                || block instanceof NetherPortalBlock
+                || block instanceof EndPortalBlock
+                || block instanceof EndGatewayBlock
+                || block instanceof PistonHeadBlock
+                || block instanceof MovingPistonBlock) {
+            return false;
+        }
+        return block.asItem() != Items.AIR;
+    }
+
     public static boolean isSecondary(BlockState state) {
         if (state.getBlock() instanceof DoorBlock && state.getValue(DoorBlock.HALF) == DoubleBlockHalf.UPPER) {
             return true;

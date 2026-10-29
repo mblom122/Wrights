@@ -99,6 +99,14 @@ public final class Schematic {
         return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ);
     }
 
+    public Schematic withEntries(List<Entry> entries) {
+        return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ);
+    }
+
+    public Schematic withLayout(int sizeY, List<Entry> entries, int anchorY) {
+        return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ);
+    }
+
     public int sizeX() {
         return sizeX;
     }

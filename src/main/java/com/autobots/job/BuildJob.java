@@ -205,8 +205,58 @@ public final class BuildJob {
         this.clipZ = Math.max(1, clipZ);
     }
 
+    public int clipX() {
+        return clipX;
+    }
+
+    public int clipY() {
+        return clipY;
+    }
+
+    public int clipZ() {
+        return clipZ;
+    }
+
     public boolean outsideClip(Schematic.Entry entry) {
         return entry.x() >= clipX || entry.y() >= clipY || entry.z() >= clipZ;
+    }
+
+    private boolean paused;
+    private boolean finished;
+    private int historyOrder;
+
+    public boolean paused() {
+        return paused;
+    }
+
+    public void setPaused(boolean paused) {
+        this.paused = paused;
+    }
+
+    public boolean finished() {
+        return finished;
+    }
+
+    public int historyOrder() {
+        return historyOrder;
+    }
+
+    public void markFinished(int order) {
+        finished = true;
+        historyOrder = order;
+        paused = false;
+        droneId = null;
+    }
+
+    public void restart() {
+        finished = false;
+        paused = false;
+        cursor = 0;
+        placed = 0;
+        skipped = 0;
+        skippedSpecial = 0;
+        droneId = null;
+        lastDronePos = null;
     }
 
     public boolean tickMessage() {
@@ -266,6 +316,9 @@ public final class BuildJob {
         if (replaceSchematicId != null) {
             tag.putUUID("replace", replaceSchematicId);
         }
+        tag.putBoolean("paused", paused);
+        tag.putBoolean("finished", finished);
+        tag.putInt("historyOrder", historyOrder);
         if (clipX != Integer.MAX_VALUE) {
             tag.putInt("clipX", clipX);
             tag.putInt("clipY", clipY);
@@ -319,6 +372,9 @@ public final class BuildJob {
             job.clipY = tag.getInt("clipY");
             job.clipZ = tag.getInt("clipZ");
         }
+        job.paused = tag.getBoolean("paused");
+        job.finished = tag.getBoolean("finished");
+        job.historyOrder = tag.getInt("historyOrder");
         ListTag list = tag.getList("partial", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) {
             job.partial.add(Schematic.Entry.load(list.getCompound(i), blocks));
