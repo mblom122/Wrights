@@ -75,9 +75,15 @@ public class WrightsMenuScreen extends Screen {
     private int workHeaderY;
     private int workListY;
     private int workRows;
+    private int workGroupY;
+    private int workGroupH;
     private int doneHeaderY;
     private int doneListY;
     private int doneRows;
+    private int doneGroupY;
+    private int doneGroupH;
+    private int jobX;
+    private int jobW;
     private int workPauseRight;
     private int workRemoveRight;
     private int doneRemoveRight;
@@ -347,7 +353,9 @@ public class WrightsMenuScreen extends Screen {
         if (options || jobsPage) {
             int x = listX - 2;
             int width = panelX + panelW - 12 - x;
-            WrightsUi.inset(graphics, x, panelY + 34, width, panelH - 68);
+            int top = jobsPage ? jobsInsetY() : panelY + 34;
+            int height = jobsPage ? jobsInsetH() : panelH - 68;
+            WrightsUi.inset(graphics, x, top, width, height);
             return;
         }
         WrightsUi.inset(graphics, listX - 2, listY - 2, listW + 4, listH + 4);
@@ -963,6 +971,16 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private static final int JOB_ROW = 58;
+    private static final int JOB_HEADER = 20;
+    private static final int JOB_GROUP_MIN = 46;
+
+    private int jobsInsetY() {
+        return panelY + 38;
+    }
+
+    private int jobsInsetH() {
+        return panelH - 78;
+    }
 
     private void prepareJobs() {
         workingJobs.clear();
@@ -978,40 +996,49 @@ public class WrightsMenuScreen extends Screen {
                 }
             }
         }
-        int top = panelY + 40;
+        int insetX = listX - 2;
+        int insetW = panelX + panelW - 12 - insetX;
+        jobX = insetX + 6;
+        jobW = insetW - 12;
         manageAllWidth = jobButtonWidth("menu.wrights.manage_all");
-        manageAllRight = listX + (panelX + panelW - 24 - listX);
-        manageAllY = panelY + 18;
-        int bottom = panelY + panelH - 12;
+        manageAllRight = jobX + jobW;
+        manageAllY = jobsInsetY() + 6;
+        int groupsTop = jobsInsetY() + 28;
+        int groupsBottom = jobsInsetY() + jobsInsetH() - 6;
         int gap = 8;
-        int header = 18;
-        int inner = Math.max(header * 2 + 28, bottom - top - gap);
+        int room = Math.max(JOB_GROUP_MIN * 2 + gap, groupsBottom - groupsTop);
         boolean workOpen = !workingJobs.isEmpty();
         boolean doneOpen = !finishedJobs.isEmpty();
+        int workWant = jobGroupHeight(workOpen ? workingJobs.size() : 0);
+        int doneWant = jobGroupHeight(doneOpen ? finishedJobs.size() : 0);
         int workBlock;
         int doneBlock;
-        if (!workOpen && !doneOpen) {
-            workBlock = header + 16;
-            doneBlock = header + 16;
-        } else if (!workOpen) {
-            workBlock = header + 16;
-            doneBlock = Math.max(header + JOB_ROW, inner - workBlock);
-        } else if (!doneOpen) {
-            doneBlock = header + 16;
-            workBlock = Math.max(header + JOB_ROW, inner - doneBlock);
+        if (workWant + doneWant + gap <= room) {
+            workBlock = workWant;
+            doneBlock = doneWant;
         } else {
-            workBlock = Math.max(header + JOB_ROW, inner / 2);
-            doneBlock = Math.max(header + JOB_ROW, inner - workBlock);
+            int workMin = jobGroupHeight(workOpen ? 1 : 0);
+            int doneMin = jobGroupHeight(doneOpen ? 1 : 0);
+            int extra = Math.max(0, room - gap - workMin - doneMin);
+            int workDemand = Math.max(0, workWant - workMin);
+            int doneDemand = Math.max(0, doneWant - doneMin);
+            int demand = Math.max(1, workDemand + doneDemand);
+            workBlock = workMin + extra * workDemand / demand;
+            doneBlock = room - gap - workBlock;
         }
-        workHeaderY = top;
-        workListY = top + header;
-        workRows = workOpen ? Math.max(1, (workBlock - header) / JOB_ROW) : 0;
-        doneHeaderY = top + workBlock + gap;
-        doneListY = doneHeaderY + header;
-        doneRows = doneOpen ? Math.max(1, (doneBlock - header) / JOB_ROW) : 0;
+        workGroupY = groupsTop;
+        workGroupH = workBlock;
+        workHeaderY = workGroupY + 2;
+        workListY = workGroupY + JOB_HEADER + 4;
+        workRows = workOpen ? Math.max(1, (workBlock - JOB_HEADER - 8) / JOB_ROW) : 0;
+        doneGroupY = workGroupY + workBlock + gap;
+        doneGroupH = doneBlock;
+        doneHeaderY = doneGroupY + 2;
+        doneListY = doneGroupY + JOB_HEADER + 4;
+        doneRows = doneOpen ? Math.max(1, (doneBlock - JOB_HEADER - 8) / JOB_ROW) : 0;
         jobScroll = Mth.clamp(jobScroll, 0, Math.max(0, workingJobs.size() - workRows));
         historyScroll = Mth.clamp(historyScroll, 0, Math.max(0, finishedJobs.size() - doneRows));
-        int right = listX + (panelX + panelW - 24 - listX);
+        int right = jobX + jobW - 6;
         workRemoveWidth = jobButtonWidth("menu.wrights.remove_all");
         workPauseWidth = jobButtonWidth(workAllPaused ? "menu.wrights.resume_all" : "menu.wrights.pause_all");
         workRemoveRight = right;
@@ -1020,40 +1047,52 @@ public class WrightsMenuScreen extends Screen {
         doneRemoveRight = right;
     }
 
+    private static int jobGroupHeight(int rows) {
+        if (rows <= 0) {
+            return JOB_GROUP_MIN;
+        }
+        return JOB_HEADER + 8 + rows * JOB_ROW;
+    }
+
     private int jobButtonWidth(String key) {
         return Math.max(52, this.font.width(Component.translatable(key)) + 10);
     }
 
     private void renderJobs(GuiGraphics graphics, int mouseX, int mouseY) {
         prepareJobs();
-        int x = listX;
-        int width = panelX + panelW - 24 - x;
         int[] pool = dronePool();
-        String drones = this.font.plainSubstrByWidth(Component.translatable("menu.wrights.drones_pool", pool[0], pool[1]).getString(), Math.max(40, width - manageAllWidth - 8));
-        graphics.drawString(this.font, drones, x, panelY + 22, WrightsUi.TEXT, false);
+        String drones = this.font.plainSubstrByWidth(Component.translatable("menu.wrights.drones_pool", pool[0], pool[1]).getString(), Math.max(40, jobW - manageAllWidth - 8));
+        graphics.drawString(this.font, drones, jobX, manageAllY + 4, WrightsUi.TEXT, false);
         drawJobButton(graphics, manageAllRight, manageAllY, "menu.wrights.manage_all", mouseX, mouseY, manageAllWidth);
-        drawJobSection(graphics, x, workHeaderY, width, "menu.wrights.jobs_working", workingJobs.isEmpty() ? "menu.wrights.jobs_working_empty" : null, workingJobs.isEmpty() ? 0 : workPauseWidth + workRemoveWidth + 12);
+        int rowX = jobX + 4;
+        int rowW = jobW - 8;
+        drawJobGroup(graphics, jobX, workGroupY, jobW, workGroupH, "menu.wrights.jobs_working", workingJobs.isEmpty() ? "menu.wrights.jobs_working_empty" : null, workingJobs.isEmpty() ? 0 : workPauseWidth + workRemoveWidth + 18);
         if (!workingJobs.isEmpty()) {
             drawJobButton(graphics, workRemoveRight, workHeaderY, "menu.wrights.remove_all", mouseX, mouseY, workRemoveWidth);
             drawJobButton(graphics, workPauseRight, workHeaderY, workAllPaused ? "menu.wrights.resume_all" : "menu.wrights.pause_all", mouseX, mouseY, workPauseWidth);
             for (int row = 0; row < workRows && jobScroll + row < workingJobs.size(); row++) {
-                drawJobRow(graphics, mouseX, mouseY, x, width, workListY + row * JOB_ROW, workingJobs.get(jobScroll + row));
+                drawJobRow(graphics, mouseX, mouseY, rowX, rowW, workListY + row * JOB_ROW, workingJobs.get(jobScroll + row));
             }
         }
-        drawJobSection(graphics, x, doneHeaderY, width, "menu.wrights.jobs_finished", finishedJobs.isEmpty() ? "menu.wrights.jobs_finished_empty" : null, finishedJobs.isEmpty() ? 0 : doneRemoveWidth + 8);
+        drawJobGroup(graphics, jobX, doneGroupY, jobW, doneGroupH, "menu.wrights.jobs_finished", finishedJobs.isEmpty() ? "menu.wrights.jobs_finished_empty" : null, finishedJobs.isEmpty() ? 0 : doneRemoveWidth + 14);
         if (!finishedJobs.isEmpty()) {
             drawJobButton(graphics, doneRemoveRight, doneHeaderY, "menu.wrights.remove_all", mouseX, mouseY, doneRemoveWidth);
             for (int row = 0; row < doneRows && historyScroll + row < finishedJobs.size(); row++) {
-                drawJobRow(graphics, mouseX, mouseY, x, width, doneListY + row * JOB_ROW, finishedJobs.get(historyScroll + row));
+                drawJobRow(graphics, mouseX, mouseY, rowX, rowW, doneListY + row * JOB_ROW, finishedJobs.get(historyScroll + row));
             }
         }
     }
 
-    private void drawJobSection(GuiGraphics graphics, int x, int y, int width, String title, String empty, int reserved) {
-        String heading = this.font.plainSubstrByWidth(Component.translatable(title).getString(), Math.max(40, width - reserved));
-        graphics.drawString(this.font, heading, x, y + 4, WrightsUi.TEXT, false);
+    private void drawJobGroup(GuiGraphics graphics, int x, int y, int width, int height, String title, String empty, int reserved) {
+        graphics.fill(x, y, x + width, y + height, 0xFF101820);
+        WrightsUi.border(graphics, x, y, width, height, 0xFF3A4C5C);
+        graphics.fill(x + 1, y + 1, x + width - 1, y + JOB_HEADER, 0xFF1C2A36);
+        graphics.fill(x + 1, y + 1, x + 3, y + JOB_HEADER, WrightsUi.COPPER);
+        graphics.fill(x + 1, y + JOB_HEADER - 1, x + width - 1, y + JOB_HEADER, 0xFF31404E);
+        String heading = this.font.plainSubstrByWidth(Component.translatable(title).getString(), Math.max(40, width - reserved - 12));
+        graphics.drawString(this.font, heading, x + 10, y + 6, WrightsUi.TEXT, false);
         if (empty != null) {
-            graphics.drawString(this.font, Component.translatable(empty), x, y + 20, WrightsUi.MUTED, false);
+            graphics.drawString(this.font, Component.translatable(empty), x + 10, y + JOB_HEADER + 6, WrightsUi.MUTED, false);
         }
     }
 
@@ -1221,16 +1260,18 @@ public class WrightsMenuScreen extends Screen {
         if (mouseY < buttonY || mouseY >= buttonY + 16) {
             return false;
         }
+        int rowX = jobX + 4;
+        int rowW = jobW - 8;
         if (working) {
             String count = Component.translatable("menu.wrights.job_drone_count", job.crew().size()).getString();
             int manageW = jobButtonWidth("menu.wrights.manage_drones");
-            int manageRight = listX + 6 + this.font.width(count) + 6 + manageW;
+            int manageRight = rowX + 6 + this.font.width(count) + 6 + manageW;
             if (mouseX >= manageRight - manageW && mouseX < manageRight) {
                 this.minecraft.setScreen(new JobDroneScreen(job.id(), null));
                 return true;
             }
         }
-        int right = listX + (panelX + panelW - 24 - listX) - 4;
+        int right = rowX + rowW - 4;
         if (hitJobButton(mouseX, right, buttonY)) {
             PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.REMOVE));
             return true;
@@ -1296,7 +1337,7 @@ public class WrightsMenuScreen extends Screen {
         if (jobsPage) {
             prepareJobs();
             int delta = (int) Math.signum(scrollY);
-            if (mouseY >= doneHeaderY) {
+            if (mouseY >= doneGroupY) {
                 historyScroll = Mth.clamp(historyScroll - delta, 0, Math.max(0, finishedJobs.size() - doneRows));
             } else {
                 jobScroll = Mth.clamp(jobScroll - delta, 0, Math.max(0, workingJobs.size() - workRows));
