@@ -195,7 +195,7 @@ public final class JobManager {
         }
         if (job.kind() == BuildJob.Kind.PASTE) {
             com.wrights.network.BlueprintNetwork.clearJobHologram(player, job.id());
-            discardDrone(player.getServer(), job);
+            sendHome(player.getServer(), player, job);
             archive(library, job, true);
         } else {
             discardDrone(player.getServer(), job);
@@ -1022,7 +1022,7 @@ public final class JobManager {
     }
 
     private static void finishUndo(MinecraftServer server, SchematicLibrary library, ServerPlayer player, BuildJob job) {
-        discardDrone(server, job);
+        sendHome(server, player, job);
         int removed = Math.max(0, job.undoTotal() - job.skipped() - job.refundCount());
         int returned = job.returned();
         job.markUndone();
@@ -1047,7 +1047,7 @@ public final class JobManager {
     }
 
     private static void finishPaste(MinecraftServer server, SchematicLibrary library, ServerPlayer player, BuildJob job) {
-        discardDrone(server, job);
+        sendHome(server, player, job);
         int placed = job.placed();
         int skipped = job.skipped();
         archive(library, job, false);
@@ -1325,7 +1325,7 @@ public final class JobManager {
 
     private static void placeCrew(ServerPlayer player, SchematicLibrary library, BuildJob job, List<UUID> ids) {
         if (ids.isEmpty()) {
-            discardDrone(player.getServer(), job);
+            sendHome(player.getServer(), player, job);
             job.setCrewQuota(0);
             job.clearAssigned();
             job.setPaused(true);
@@ -1469,8 +1469,9 @@ public final class JobManager {
             }
         }
         ServerLevel level = player.getServer().getLevel(job.dimension());
+        int slot = 0;
         for (UUID droppedId : dropped) {
-            discardId(level, droppedId);
+            recall(level, player, droppedId, slot++, dropped.size());
         }
         job.setCrewUnits(kept);
     }
@@ -2850,7 +2851,7 @@ public final class JobManager {
         DroneEntity drone = new DroneEntity(ModEntities.DRONE.get(), level);
         drone.setJobId(job.id());
         Vec3 site = Vec3.atCenterOf(workPos).add(0.0D, 1.15D, 0.0D);
-        drone.moveTo(site.x, site.y, site.z, player.getYRot(), 0.0F);
+        depart(drone, player, site, 0, 1);
         job.setDroneId(drone.getUUID());
         job.setLastDronePos(drone.blockPosition());
         level.addFreshEntity(drone);
@@ -2887,15 +2888,58 @@ public final class JobManager {
         DroneEntity drone = new DroneEntity(ModEntities.DRONE.get(), level);
         drone.setJobId(job.id());
         Vec3 site = Vec3.atCenterOf(workPos).add(0.0D, 1.15D, 0.0D);
-        double spread = (hand.lane - (hand.lanes - 1) * 0.5D) * 1.6D;
-        boolean alongZ = CrewSplit.splitOnX(hand.lanes, job.spanX(), job.spanZ());
-        double x = site.x + (alongZ ? 0.0D : spread);
-        double z = site.z + (alongZ ? spread : 0.0D);
-        drone.moveTo(x, site.y, z, player.getYRot(), 0.0F);
+        depart(drone, player, site, hand.lane, hand.lanes);
         hand.entityId = drone.getUUID();
         hand.lastPos = drone.blockPosition();
         level.addFreshEntity(drone);
         return drone;
+    }
+
+    private static void depart(DroneEntity drone, ServerPlayer player, Vec3 work, int lane, int lanes) {
+        if (player != null && player.level() == drone.level() && !Wrightports.worn(player).isEmpty()) {
+            drone.departFrom(player, work, lane, lanes);
+            return;
+        }
+        drone.moveTo(work.x, work.y, work.z, player == null ? 0.0F : player.getYRot(), 0.0F);
+    }
+
+    private static void sendHome(MinecraftServer server, ServerPlayer player, BuildJob job) {
+        ServerLevel level = server.getLevel(job.dimension());
+        if (player == null || level == null || player.level() != level) {
+            discardDrone(server, job);
+            return;
+        }
+        List<UUID> ids = new ArrayList<>();
+        if (job.droneId() != null) {
+            ids.add(job.droneId());
+        }
+        for (BuildJob.Hand hand : job.hands()) {
+            if (hand.entityId != null && !ids.contains(hand.entityId)) {
+                ids.add(hand.entityId);
+            }
+        }
+        int slot = 0;
+        for (UUID id : ids) {
+            recall(level, player, id, slot++, ids.size());
+        }
+        job.setDroneId(null);
+        for (BuildJob.Hand hand : job.hands()) {
+            hand.entityId = null;
+        }
+    }
+
+    private static void recall(ServerLevel level, ServerPlayer player, UUID id, int slot, int count) {
+        if (level == null || id == null) {
+            return;
+        }
+        if (player == null || player.level() != level) {
+            discardId(level, id);
+            return;
+        }
+        Entity entity = level.getEntity(id);
+        if (entity instanceof DroneEntity drone && drone.isAlive()) {
+            drone.flyHome(player, slot, count);
+        }
     }
 
     private static void discardDrone(MinecraftServer server, BuildJob job) {

@@ -22,10 +22,49 @@ public class DroneEntity extends Entity {
     private static final EntityDataAccessor<String> JOB_ID = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Integer> TIER = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.INT);
 
+    private boolean returning;
+    private int returnTicks;
+    private UUID ownerId;
+
     public DroneEntity(EntityType<? extends DroneEntity> type, Level level) {
         super(type, level);
         this.noPhysics = true;
         this.setNoGravity(true);
+    }
+
+    /** Leaves the player's eyes, aimed at the block this wright is going to work on. */
+    public void departFrom(net.minecraft.server.level.ServerPlayer player, Vec3 work, int lane, int lanes) {
+        Vec3 from = player.getEyePosition();
+        Vec3 toward = work.subtract(from);
+        if (toward.lengthSqr() < 1.0E-4D) {
+            toward = player.getLookAngle();
+        }
+        toward = toward.normalize();
+        Vec3 side = new Vec3(-toward.z, 0.0D, toward.x);
+        if (side.lengthSqr() < 1.0E-4D) {
+            side = new Vec3(1.0D, 0.0D, 0.0D);
+        } else {
+            side = side.normalize();
+        }
+        double spread = lanes <= 1 ? 0.0D : (lane - (lanes - 1) * 0.5D) * 0.45D;
+        Vec3 start = from.add(toward.scale(0.75D)).add(side.scale(spread));
+        float yaw = (float) (Mth.atan2(toward.z, toward.x) * Mth.RAD_TO_DEG) - 90.0F;
+        this.moveTo(start.x, start.y, start.z, yaw, 0.0F);
+        this.setYRot(yaw);
+    }
+
+    /** Appears above the player, then flies down into them. */
+    public void flyHome(net.minecraft.server.level.ServerPlayer player, int slot, int count) {
+        this.returning = true;
+        this.returnTicks = 0;
+        this.ownerId = player.getUUID();
+        this.setJobId(null);
+        int n = Math.max(1, count);
+        double angle = (Math.PI * 2.0D * slot) / n;
+        double radius = n <= 1 ? 0.0D : 0.55D;
+        Vec3 above = player.position().add(Math.cos(angle) * radius, 5.0D, Math.sin(angle) * radius);
+        this.moveTo(above.x, above.y, above.z, player.getYRot(), 0.0F);
+        this.setYRot(player.getYRot());
     }
 
     @Override
@@ -82,6 +121,20 @@ public class DroneEntity extends Entity {
         if (this.level().isClientSide || !(this.level() instanceof ServerLevel serverLevel)) {
             return;
         }
+        if (this.returning) {
+            net.minecraft.server.level.ServerPlayer player = this.ownerId == null ? null : serverLevel.getServer().getPlayerList().getPlayer(this.ownerId);
+            if (player == null || player.level() != this.level() || ++this.returnTicks > 200) {
+                this.discard();
+                return;
+            }
+            Vec3 dock = player.position().add(0.0D, 0.9D, 0.0D);
+            if (this.distanceToSqr(dock) <= 1.0D) {
+                this.discard();
+                return;
+            }
+            this.moveToward(dock, 0.5D);
+            return;
+        }
         Optional<UUID> id = jobId();
         SchematicLibrary library = SchematicLibrary.get(serverLevel.getServer());
         BuildJob job = id.flatMap(library::job).orElse(null);
@@ -118,11 +171,19 @@ public class DroneEntity extends Entity {
         if (tag.contains("Tier")) {
             setTier(tag.getInt("Tier"));
         }
+        this.returning = tag.getBoolean("Returning");
+        if (tag.hasUUID("Owner")) {
+            this.ownerId = tag.getUUID("Owner");
+        }
     }
 
     @Override
     protected void addAdditionalSaveData(CompoundTag tag) {
         jobId().ifPresent(id -> tag.putUUID("JobId", id));
         tag.putInt("Tier", tier());
+        tag.putBoolean("Returning", this.returning);
+        if (this.ownerId != null) {
+            tag.putUUID("Owner", this.ownerId);
+        }
     }
 }
