@@ -162,7 +162,7 @@ public final class BlueprintActions {
             BlueprintNetwork.syncCapture(player);
             return;
         }
-        if (mode == 2 && buildId != null && !buildId.equals(net.minecraft.Util.NIL_UUID)) {
+        if (mode == 2) {
             beginBuild(player, buildId);
             return;
         }
@@ -863,6 +863,13 @@ public final class BlueprintActions {
 
     public static void beginBuild(ServerPlayer player, java.util.UUID id) {
         if (!held(player)) {
+            return;
+        }
+        if (id == null || id.equals(Util.NIL_UUID)) {
+            BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
+            session.clear();
+            session.setMode(BlueprintSessions.Mode.BUILD);
+            BlueprintNetwork.syncCapture(player);
             return;
         }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());

@@ -195,6 +195,11 @@ public final class WrightsInput {
         if (pos != null) {
             boundThisClick = true;
         }
+        if (WrightsClientState.buildId == null) {
+            Minecraft.getInstance().setScreen(new WrightsMenuScreen());
+            net.neoforged.neoforge.network.PacketDistributor.sendToServer(new BlueprintPayloads.LibraryRequest());
+            return;
+        }
         if (player.isShiftKeyDown()) {
             if (WrightsClientState.bindSupply && WrightsClientState.supplyBound) {
                 WrightsClientState.supplyBound = false;

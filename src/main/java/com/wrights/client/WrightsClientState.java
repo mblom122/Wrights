@@ -344,7 +344,13 @@ public final class WrightsClientState {
         if (modeId == 0) {
             return;
         }
-        String id = mode == Mode.BUILD && buildId != null ? buildId.toString() : "";
+        String id = rememberedBuild;
+        if (mode == Mode.BUILD && buildId != null) {
+            id = buildId.toString();
+        } else if (id.isEmpty()) {
+            String stored = com.wrights.WrightsClientConfig.LAST_BUILD.get();
+            id = stored == null ? "" : stored;
+        }
         int style = captureStyle.ordinal();
         if (modeId == rememberedMode && style == rememberedStyle && id.equals(rememberedBuild)) {
             return;
@@ -459,23 +465,102 @@ public final class WrightsClientState {
         updateFlags();
     }
 
-    public static void enterBuildMode() {
-        leaveCapture();
+    public static void enterNewMode() {
+        if (mode == Mode.CAPTURE || mode == Mode.SAVING) {
+            return;
+        }
+        beginCaptureLocal();
+        PacketDistributor.sendToServer(new BlueprintPayloads.StartCapture());
+    }
+
+    public static void enterBuildFromLast() {
+        if (mode == Mode.BUILD && buildId != null) {
+            return;
+        }
+        UUID id = lastBlueprintId();
+        BlueprintPayloads.Summary known = summary(id);
+        if (known != null) {
+            armBuild(known);
+            PacketDistributor.sendToServer(new BlueprintPayloads.BeginBuild(known.id()));
+            return;
+        }
         mode = Mode.BUILD;
+        buildId = null;
+        buildName = "";
+        ghosts = List.of();
+        follow = false;
+        bindSupply = false;
+        cornerA = null;
+        cornerB = null;
+        boxDragging = false;
+        moveGrabbed = false;
+        clearCapturePreview();
         updateFlags();
+        UUID send = id != null && !libraryKnown ? id : Util.NIL_UUID;
+        PacketDistributor.sendToServer(new BlueprintPayloads.BeginBuild(send));
     }
 
     public static void cycleMainMode(int delta) {
-        int index = mode == Mode.JOBS ? 1 : mode == Mode.BUILD ? 0 : delta > 0 ? -1 : 2;
-        int next = Math.floorMod(index + delta, 2);
-        if (next == 1) {
-            enterJobs();
+        int index = switch (mode) {
+            case CAPTURE, SAVING -> 0;
+            case BUILD -> 1;
+            case JOBS -> 2;
+            default -> delta > 0 ? -1 : 3;
+        };
+        int next = Math.floorMod(index + delta, 3);
+        if (next == 0) {
+            enterNewMode();
+        } else if (next == 1) {
+            enterBuildFromLast();
         } else {
-            enterBuildMode();
+            enterJobs();
         }
         mainPicker = true;
         styleHudTicks = 70;
         styleAnnounce = true;
+    }
+
+    private static UUID lastBlueprintId() {
+        UUID saved = parseId(rememberedBuild);
+        if (saved == null) {
+            saved = parseId(com.wrights.WrightsClientConfig.LAST_BUILD.get());
+        }
+        if (saved != null && (!libraryKnown || summary(saved) != null)) {
+            return saved;
+        }
+        UUID best = null;
+        long bestTime = 0L;
+        for (BlueprintPayloads.Summary entry : library) {
+            if (entry.lastUsed() > bestTime) {
+                bestTime = entry.lastUsed();
+                best = entry.id();
+            }
+        }
+        return best;
+    }
+
+    private static BlueprintPayloads.Summary summary(UUID id) {
+        if (id == null) {
+            return null;
+        }
+        for (BlueprintPayloads.Summary entry : library) {
+            if (entry.id().equals(id)) {
+                return entry;
+            }
+        }
+        return null;
+    }
+
+    private static UUID parseId(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            UUID id = UUID.fromString(raw);
+            return id.equals(Util.NIL_UUID) ? null : id;
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     public static BlueprintPayloads.JobLine jobAimed() {
@@ -928,6 +1013,11 @@ public final class WrightsClientState {
 
     public static void cycleBuildTool() {
         mainPicker = false;
+        if (buildId == null) {
+            styleHudTicks = 70;
+            styleAnnounce = true;
+            return;
+        }
         bindSupply = !bindSupply;
         if (bindSupply) {
             bindFromMenu = false;

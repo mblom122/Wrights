@@ -290,8 +290,11 @@ public class WrightsMenuScreen extends Screen {
         if (!preserveMode) {
             if (jobsPage) {
                 WrightsClientState.enterJobs();
-            } else if (!options) {
-                WrightsClientState.enterBuildMode();
+            } else if (!options
+                    && WrightsClientState.mode != WrightsClientState.Mode.CAPTURE
+                    && WrightsClientState.mode != WrightsClientState.Mode.SAVING
+                    && WrightsClientState.mode != WrightsClientState.Mode.BUILD) {
+                WrightsClientState.enterBuildFromLast();
             }
         }
         super.removed();

@@ -62,7 +62,9 @@ public final class WrightsHud {
         } else if (WrightsClientState.mode == WrightsClientState.Mode.SAVING) {
             line = Component.translatable("hud.wrights.saving", WrightsClientState.name);
         } else if (WrightsClientState.mode == WrightsClientState.Mode.BUILD) {
-            if (WrightsClientState.bindSupply) {
+            if (WrightsClientState.buildId == null) {
+                line = Component.translatable("hud.wrights.pick_blueprint");
+            } else if (WrightsClientState.bindSupply) {
                 line = Component.translatable("hud.wrights.bind_explain");
                 sub = supplyChoice(minecraft);
             } else {
@@ -125,6 +127,9 @@ public final class WrightsHud {
             return Component.translatable("hud.wrights.task_new", Component.translatable(styleKey(WrightsClientState.captureStyle)));
         }
         if (WrightsClientState.mode == WrightsClientState.Mode.BUILD) {
+            if (WrightsClientState.buildId == null) {
+                return Component.translatable("hud.wrights.main_build");
+            }
             return Component.translatable("hud.wrights.task_build_tool", Component.translatable(WrightsClientState.bindSupply ? "hud.wrights.tool_bind" : "hud.wrights.tool_build"));
         }
         if (WrightsClientState.mode == WrightsClientState.Mode.JOBS) {
@@ -146,22 +151,26 @@ public final class WrightsHud {
     private static void drawMainModes(GuiGraphics graphics, Minecraft minecraft) {
         Component title = Component.translatable("hud.wrights.main_modes");
         Component how = Component.translatable("hud.wrights.main_how");
+        Component fresh = Component.translatable("hud.wrights.main_new");
         Component build = Component.translatable("hud.wrights.main_build");
         Component jobs = Component.translatable("hud.wrights.main_jobs");
         Component selected = Component.translatable("hud.wrights.mode_selected");
         int width = 188;
         width = Math.max(width, minecraft.font.width(title) + 28);
         width = Math.max(width, minecraft.font.width(how) + 28);
+        width = Math.max(width, minecraft.font.width(fresh) + minecraft.font.width(selected) + 36);
         width = Math.max(width, minecraft.font.width(build) + minecraft.font.width(selected) + 36);
         width = Math.max(width, minecraft.font.width(jobs) + minecraft.font.width(selected) + 36);
         int row = 18;
-        int height = 28 + row * 2 + 18;
+        int height = 28 + row * 3 + 18;
         int x = (graphics.guiWidth() - width) / 2;
         int y = graphics.guiHeight() / 2 + 8;
         WrightsUi.panel(graphics, x, y, width, height);
         graphics.drawString(minecraft.font, title, x + 12, y + 8, WrightsUi.TEXT, false);
-        drawMainRow(graphics, minecraft, x, y + 24, width, WrightsClientState.mode == WrightsClientState.Mode.BUILD, build, selected);
-        drawMainRow(graphics, minecraft, x, y + 24 + row, width, WrightsClientState.mode == WrightsClientState.Mode.JOBS, jobs, selected);
+        boolean making = WrightsClientState.mode == WrightsClientState.Mode.CAPTURE || WrightsClientState.mode == WrightsClientState.Mode.SAVING;
+        drawMainRow(graphics, minecraft, x, y + 24, width, making, fresh, selected);
+        drawMainRow(graphics, minecraft, x, y + 24 + row, width, WrightsClientState.mode == WrightsClientState.Mode.BUILD, build, selected);
+        drawMainRow(graphics, minecraft, x, y + 24 + row * 2, width, WrightsClientState.mode == WrightsClientState.Mode.JOBS, jobs, selected);
         graphics.drawString(minecraft.font, how, x + 12, y + height - 14, WrightsUi.MUTED, false);
     }
 
@@ -185,7 +194,9 @@ public final class WrightsHud {
 
     private static void drawBuildModes(GuiGraphics graphics, Minecraft minecraft) {
         Component title = Component.translatable("hud.wrights.build_modes");
-        Component how = Component.translatable(WrightsClientState.bindSupply ? "hud.wrights.bind_explain" : "hud.wrights.build_explain");
+        Component how = WrightsClientState.buildId == null
+                ? Component.translatable("hud.wrights.pick_blueprint")
+                : Component.translatable(WrightsClientState.bindSupply ? "hud.wrights.bind_explain" : "hud.wrights.build_explain");
         Component build = Component.translatable("hud.wrights.tool_build");
         Component bind = Component.translatable("hud.wrights.tool_bind");
         Component selected = Component.translatable("hud.wrights.mode_selected");
