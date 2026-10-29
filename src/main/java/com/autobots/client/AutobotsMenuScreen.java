@@ -407,7 +407,7 @@ public class AutobotsMenuScreen extends Screen {
         optionPlaceY = optionY(local);
         local += 12;
         optionPlaceHintY = optionY(local);
-        local += 16;
+        local += 22;
         optionOffsetY = optionY(local);
         placeField(placeX, x + 12, optionOffsetY);
         placeField(placeY, x + 82, optionOffsetY);
@@ -475,7 +475,9 @@ public class AutobotsMenuScreen extends Screen {
         Component hint = Component.translatable(paceChoice ? "menu.autobots.build_speed_hint" : "menu.autobots.build_speed_locked");
         graphics.drawString(this.font, this.font.plainSubstrByWidth(hint.getString(), optionViewW - 28), x, optionHintY, 0xFF667480, false);
         graphics.drawString(this.font, Component.translatable("menu.autobots.place_offset"), x, optionPlaceY, AutobotsUi.TEXT, false);
-        graphics.drawString(this.font, Component.translatable("menu.autobots.place_hint"), x, optionPlaceHintY, AutobotsUi.MUTED, false);
+        int hintW = Math.max(40, optionViewW - 16);
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("menu.autobots.place_hint").getString(), hintW), x, optionPlaceHintY, AutobotsUi.MUTED, false);
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("menu.autobots.place_axes").getString(), hintW), x, optionPlaceHintY + 10, AutobotsUi.MUTED, false);
         graphics.drawString(this.font, "X", x, optionOffsetY + 3, AutobotsUi.MUTED, false);
         graphics.drawString(this.font, "Y", x + 70, optionOffsetY + 3, AutobotsUi.MUTED, false);
         graphics.drawString(this.font, "Z", x + 140, optionOffsetY + 3, AutobotsUi.MUTED, false);
