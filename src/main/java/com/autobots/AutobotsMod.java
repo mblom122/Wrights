@@ -40,7 +40,7 @@ public class AutobotsMod {
         modBus.addListener(AutobotsMod::commonSetup);
         container.registerConfig(ModConfig.Type.SERVER, AutobotsConfig.SPEC);
         container.registerConfig(ModConfig.Type.CLIENT, AutobotsClientConfig.SPEC);
-        LOGGER.info("Autobots loaded for an isolated NeoForge 1.21.1 test");
+        LOGGER.info("Wrights loaded for an isolated NeoForge 1.21.1 test");
     }
 
     private static void commonSetup(FMLCommonSetupEvent event) {

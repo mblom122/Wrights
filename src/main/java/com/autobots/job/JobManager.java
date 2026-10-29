@@ -84,7 +84,7 @@ public final class JobManager {
                     tickPaste(server, library, job);
                 }
             } catch (RuntimeException ex) {
-                AutobotsMod.LOGGER.error("Autobots job {} failed and was stopped", job.id(), ex);
+                AutobotsMod.LOGGER.error("Wrights job {} failed and was stopped", job.id(), ex);
                 discardDrone(server, job);
                 library.removeJob(job);
             }
