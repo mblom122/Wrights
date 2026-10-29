@@ -138,12 +138,7 @@ public final class BlueprintShelf {
         if (parent != null && !folders.containsKey(parent)) {
             parent = null;
         }
-        String base = clean(requested, "Folder");
-        String name = base;
-        int suffix = 2;
-        while (nameTaken(name) && suffix < 100) {
-            name = base + " " + suffix++;
-        }
+        String name = clean(requested, "Folder");
         folders.put(id, new Folder(id, name, parent));
         order.put(id, Integer.MAX_VALUE);
         writeOrder(children(parent, schematicNames));
@@ -401,15 +396,6 @@ public final class BlueprintShelf {
         for (int i = 0; i < ids.size(); i++) {
             order.put(ids.get(i), i);
         }
-    }
-
-    private boolean nameTaken(String name) {
-        for (Folder folder : folders.values()) {
-            if (folder.name.equalsIgnoreCase(name)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static String clean(String raw, String fallback) {

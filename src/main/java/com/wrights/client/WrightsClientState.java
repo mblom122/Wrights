@@ -434,7 +434,7 @@ public final class WrightsClientState {
         mode = Mode.CAPTURE;
         cornerA = null;
         cornerB = null;
-        name = "Blueprint";
+        name = com.wrights.blueprint.BlueprintActions.suggestName(libraryNames());
         editingId = null;
         ghosts = List.of();
         follow = false;
@@ -442,6 +442,14 @@ public final class WrightsClientState {
         moveGrabbed = false;
         styleHudTicks = 70;
         updateFlags();
+    }
+
+    private static List<String> libraryNames() {
+        List<String> names = new ArrayList<>();
+        for (com.wrights.network.BlueprintPayloads.Summary summary : library) {
+            names.add(summary.name());
+        }
+        return names;
     }
 
     public static void enterJobs() {
@@ -1167,7 +1175,7 @@ public final class WrightsClientState {
                 hasA ? cornerA : BlockPos.ZERO,
                 hasB,
                 hasB ? cornerB : BlockPos.ZERO,
-                name == null ? "Blueprint" : name));
+                name == null ? com.wrights.blueprint.BlueprintActions.suggestName(libraryNames()) : name));
     }
 
     private static BlockPos solidA;

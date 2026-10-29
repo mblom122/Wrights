@@ -3,8 +3,11 @@ package com.wrights.blueprint;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import net.minecraft.Util;
@@ -40,6 +43,89 @@ public final class BlueprintActions {
         return trimmed.length() > 48 ? trimmed.substring(0, 48) : trimmed;
     }
 
+    /** Next free "Blueprint 1", "Blueprint 2", and so on. Folders are not part of this. */
+    public static String suggestName(Iterable<String> existing) {
+        Set<String> taken = keys(existing);
+        for (int n = 1; n < 10000; n++) {
+            String candidate = "Blueprint " + n;
+            if (!taken.contains(key(candidate))) {
+                return candidate;
+            }
+        }
+        return "Blueprint";
+    }
+
+    /** Keeps {@code requested} when it is free. Otherwise appends the next free number. */
+    public static String uniqueName(String requested, Iterable<String> existing) {
+        if (requested == null || requested.isBlank()) {
+            return suggestName(existing);
+        }
+        String base = cleanName(requested);
+        Set<String> taken = keys(existing);
+        if (!taken.contains(key(base))) {
+            return base;
+        }
+        String stem = base;
+        int start = 2;
+        int space = base.lastIndexOf(' ');
+        if (space > 0 && space < base.length() - 1) {
+            String tail = base.substring(space + 1);
+            if (tail.chars().allMatch(Character::isDigit)) {
+                stem = base.substring(0, space);
+                try {
+                    start = Integer.parseInt(tail) + 1;
+                } catch (NumberFormatException ignored) {
+                    start = 2;
+                }
+            }
+        }
+        for (int n = start; n < start + 10000; n++) {
+            String suffix = " " + n;
+            String head = stem.length() + suffix.length() > 48 ? stem.substring(0, 48 - suffix.length()) : stem;
+            String candidate = head + suffix;
+            if (!taken.contains(key(candidate))) {
+                return candidate;
+            }
+        }
+        return base;
+    }
+
+    private static Set<String> keys(Iterable<String> names) {
+        Set<String> taken = new HashSet<>();
+        if (names == null) {
+            return taken;
+        }
+        for (String name : names) {
+            if (name != null && !name.isBlank()) {
+                taken.add(key(name));
+            }
+        }
+        return taken;
+    }
+
+    private static String key(String name) {
+        return name.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static List<String> blueprintNames(SchematicLibrary library, UUID except) {
+        List<String> names = new ArrayList<>();
+        for (Schematic schematic : library.schematics()) {
+            if (except == null || !except.equals(schematic.id())) {
+                names.add(schematic.name());
+            }
+        }
+        for (com.wrights.job.BuildJob job : library.jobs()) {
+            if (job.kind() != com.wrights.job.BuildJob.Kind.COPY || job.blueprintName() == null) {
+                continue;
+            }
+            if (except != null && except.equals(job.replaceSchematicId())) {
+                continue;
+            }
+            names.add(job.blueprintName());
+        }
+        return names;
+    }
+
     public static void requestLibrary(ServerPlayer player) {
         if (!held(player)) {
             return;
@@ -62,7 +148,7 @@ public final class BlueprintActions {
             return;
         }
         if (mode == 1) {
-            session.startCapture(player.level().dimension());
+            session.startCapture(player.level().dimension(), suggestName(blueprintNames(SchematicLibrary.get(player.getServer()), null)));
             BlueprintNetwork.syncCapture(player);
         }
     }
@@ -72,7 +158,7 @@ public final class BlueprintActions {
             return;
         }
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
-        session.startCapture(player.level().dimension());
+        session.startCapture(player.level().dimension(), suggestName(blueprintNames(SchematicLibrary.get(player.getServer()), null)));
         BlueprintNetwork.syncCapture(player);
         Messages.actionBar(player, "message.wrights.capture_first");
     }
@@ -251,7 +337,7 @@ public final class BlueprintActions {
             BlueprintNetwork.syncCapture(player);
             return;
         }
-        String clean = cleanName(name);
+        String clean = uniqueName(name, blueprintNames(SchematicLibrary.get(player.getServer()), session.editingId()));
         session.setName(clean);
         session.setBuildAfterSave(buildAfter);
         session.setMode(BlueprintSessions.Mode.SAVING);
@@ -335,6 +421,12 @@ public final class BlueprintActions {
             return;
         }
         String clean = cleanName(name);
+        String unique = uniqueName(clean, blueprintNames(library, id));
+        if (!unique.equals(clean)) {
+            Messages.actionBar(player, "message.wrights.name_taken");
+            BlueprintNetwork.syncLibrary(player);
+            return;
+        }
         library.putSchematic(schematic.withName(clean));
         Messages.actionBar(player, "message.wrights.blueprint_renamed", clean);
         BlueprintNetwork.syncLibrary(player);
@@ -416,7 +508,7 @@ public final class BlueprintActions {
             return;
         }
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
-        session.startCapture(player.level().dimension());
+        session.startCapture(player.level().dimension(), schematic.name());
         session.setEditingId(id);
         session.setName(schematic.name());
         boolean samePlace = schematic.hasSource()

@@ -250,7 +250,7 @@ public class BlueprintAdjustScreen extends Screen {
     private void pushFields() {
         suppress = true;
         if (!nameBox.isFocused()) {
-            nameBox.setValue(WrightsClientState.name == null ? "Blueprint" : WrightsClientState.name);
+            nameBox.setValue(WrightsClientState.name == null ? "Blueprint 1" : WrightsClientState.name);
         }
         BlockPos first = WrightsClientState.cornerA;
         BlockPos second = WrightsClientState.cornerB;

@@ -208,7 +208,7 @@ public final class BlueprintSessions {
             seq = 0;
         }
 
-        public void startCapture(ResourceKey<Level> dimension) {
+        public void startCapture(ResourceKey<Level> dimension, String suggestedName) {
             mode = Mode.CAPTURE;
             cornerA = null;
             cornerB = null;
@@ -217,7 +217,7 @@ public final class BlueprintSessions {
             draft = null;
             draftDirty = false;
             clearEdit();
-            name = "Blueprint";
+            name = suggestedName == null || suggestedName.isBlank() ? "Blueprint 1" : suggestedName;
             buildAfterSave = false;
             this.dimension = dimension;
             bump();

@@ -334,6 +334,7 @@
   "message.wrights.edit_discarded": "Changes discarded",
   "message.wrights.blueprint_deleted": "Deleted %s",
   "message.wrights.blueprint_renamed": "Renamed to %s",
+  "message.wrights.name_taken": "A blueprint already uses that name",
   "message.wrights.folder_created": "Created %s",
   "message.wrights.blueprint_in_use": "The wright is using that blueprint",
   "message.wrights.cannot_store": "That block cannot be stored",
