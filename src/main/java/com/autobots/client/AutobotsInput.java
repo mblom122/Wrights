@@ -151,6 +151,9 @@ public final class AutobotsInput {
             } else if (AutobotsClientState.bindSupply) {
                 BlockPos pos = event.getPos();
                 if (Minecraft.getInstance().level != null && SelectionRenderer.isSupplyContainer(Minecraft.getInstance().level, pos)) {
+                    AutobotsClientState.supplyBound = true;
+                    AutobotsClientState.supplyPos = pos.immutable();
+                    AutobotsClientState.bindSupply = false;
                     net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.autobots.network.BlueprintPayloads.BindSupply(pos, false));
                 } else {
                     event.getEntity().displayClientMessage(net.minecraft.network.chat.Component.translatable("message.autobots.supply_not_container"), true);

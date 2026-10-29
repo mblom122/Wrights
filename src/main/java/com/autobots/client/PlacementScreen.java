@@ -57,6 +57,7 @@ public class PlacementScreen extends Screen {
     private AutobotsButton inventoryButton;
     private AutobotsButton chestButton;
     private AutobotsButton clearSupplyButton;
+    private AutobotsButton highlightSupplyButton;
     private boolean suppress;
     private boolean edited;
     private boolean frameSelection;
@@ -78,7 +79,7 @@ public class PlacementScreen extends Screen {
             modelSize = Math.max(map ? openW : 88, this.width - 8 - pad * 2 - gap - controlsW);
         }
         panelW = pad + modelSize + gap + controlsW + pad;
-        panelH = 392;
+        panelH = 420;
         panelX = Math.max(4, (this.width - panelW) / 2);
         panelY = Math.max(4, (this.height - panelH) / 2);
         modelX = panelX + pad;
@@ -88,9 +89,9 @@ public class PlacementScreen extends Screen {
         layerY = modelY + modelSize + 16;
         int mapShift = map ? 18 : 0;
         selectionY = layerY + 36 + mapShift;
-        rotateY = panelY + 258;
-        flipY = rotateY + 30;
-        layersY = panelY + 190;
+        layersY = selectionY + 80;
+        rotateY = panelY + 154;
+        flipY = rotateY + 36;
         layer = AutobotsClientState.pivotY;
         if (AutobotsClientState.anchor == null) {
             AutobotsClientState.anchor = AutobotsClientState.lookTarget();
@@ -117,32 +118,39 @@ public class PlacementScreen extends Screen {
         step(right + 76, panelY + 72, "+", () -> resize(2, 1));
         int half = Math.max(40, (modelSize - 4) / 2);
         int row = (controlsW - 28) / 2;
-        clearSupplyButton = new AutobotsButton(controlsX + controlsW - 64, panelY + 120, 52, 16, Component.translatable("screen.autobots.supply_clear"), button -> useInventory());
-        addRenderableWidget(clearSupplyButton);
-        lockButton = new AutobotsButton(controlsX + 12, panelY + 140, row, 16, Component.translatable("screen.autobots.lock"), button -> setAim(false));
-        followButton = new AutobotsButton(controlsX + 16 + row, panelY + 140, row, 16, Component.translatable("screen.autobots.follow"), button -> setAim(true));
+        int foot = panelY + panelH;
+        lockButton = new AutobotsButton(controlsX + 12, panelY + 96, row, 16, Component.translatable("screen.autobots.lock"), button -> setAim(false));
+        followButton = new AutobotsButton(controlsX + 16 + row, panelY + 96, row, 16, Component.translatable("screen.autobots.follow"), button -> setAim(true));
         addRenderableWidget(lockButton);
         addRenderableWidget(followButton);
-        inventoryButton = new AutobotsButton(controlsX + 12, panelY + 100, row, 16, Component.translatable("screen.autobots.supply_inventory"), button -> useInventory());
-        chestButton = new AutobotsButton(controlsX + 16 + row, panelY + 100, row, 16, Component.translatable("screen.autobots.supply_chest"), button -> bindChest());
+        inventoryButton = new AutobotsButton(controlsX + 12, foot - 118, row, 16, Component.translatable("screen.autobots.supply_player"), button -> useInventory());
+        chestButton = new AutobotsButton(controlsX + 16 + row, foot - 118, row, 16, Component.translatable("screen.autobots.supply_bind"), button -> bindChest());
         addRenderableWidget(inventoryButton);
         addRenderableWidget(chestButton);
+        int clearW = 52;
+        int highlightW = 68;
+        highlightSupplyButton = new AutobotsButton(controlsX + controlsW - 16 - clearW - highlightW, foot - 96, highlightW, 16, Component.translatable("screen.autobots.supply_highlight"), button -> highlightSupply());
+        clearSupplyButton = new AutobotsButton(controlsX + controlsW - 12 - clearW, foot - 96, clearW, 16, Component.translatable("screen.autobots.supply_clear"), button -> useInventory());
+        addRenderableWidget(highlightSupplyButton);
+        addRenderableWidget(clearSupplyButton);
         boolean paceInstant = this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild && !this.minecraft.player.isSpectator() && AutobotsClientConfig.INSTANT_JOBS.get();
         if (!paceInstant) {
-            step(controlsX + 12, panelY + 160, "-", () -> changeAssign(-1));
-            step(controlsX + controlsW - 28, panelY + 160, "+", () -> changeAssign(1));
+            step(controlsX + 12, panelY + 118, "-", () -> changeAssign(-1));
+            step(controlsX + controlsW - 28, panelY + 118, "+", () -> changeAssign(1));
         }
-        addRenderableWidget(new AutobotsButton(controlsX + 12, layersY, row, 16, Component.translatable("screen.autobots.move_layer"), button -> showPrompt(true)));
-        addRenderableWidget(new AutobotsButton(controlsX + 16 + row, layersY, row, 16, Component.translatable("screen.autobots.duplicate_layer"), button -> editLayer(BlueprintPayloads.EditLayer.COPY, layer + 1)));
-        addRenderableWidget(new AutobotsButton(controlsX + 12, layersY + 18, row, 16, Component.translatable("screen.autobots.remove_layer"), button -> editLayer(BlueprintPayloads.EditLayer.REMOVE, layer)));
-        addRenderableWidget(new AutobotsButton(controlsX + 16 + row, layersY + 18, row, 16, Component.translatable("screen.autobots.add_layer"), button -> showPrompt(false)));
-        promptY = layersY + 38;
-        promptBox = new EditBox(this.font, controlsX + 72, promptY, 36, 16, Component.translatable("screen.autobots.layer_at"));
+        addRenderableWidget(new AutobotsButton(modelX, layersY, half, 16, Component.translatable("screen.autobots.move_layer"), button -> showPrompt(true)));
+        addRenderableWidget(new AutobotsButton(modelX + half + 4, layersY, half, 16, Component.translatable("screen.autobots.duplicate_layer"), button -> editLayer(BlueprintPayloads.EditLayer.COPY, layer + 1)));
+        addRenderableWidget(new AutobotsButton(modelX, layersY + 18, half, 16, Component.translatable("screen.autobots.remove_layer"), button -> editLayer(BlueprintPayloads.EditLayer.REMOVE, layer)));
+        addRenderableWidget(new AutobotsButton(modelX + half + 4, layersY + 18, half, 16, Component.translatable("screen.autobots.add_layer"), button -> showPrompt(false)));
+        promptY = layersY + 40;
+        int boxW = Math.min(42, Math.max(28, modelSize / 3));
+        int actionW = Math.max(24, (modelSize - boxW - 8) / 2);
+        promptBox = new EditBox(this.font, modelX, promptY + 14, boxW, 16, Component.translatable("screen.autobots.layer_at"));
         promptBox.setFilter(text -> text.matches("\\d{0,3}"));
         promptBox.setMaxLength(3);
         addRenderableWidget(promptBox);
-        promptOk = new AutobotsButton(controlsX + 112, promptY, 40, 16, Component.translatable("screen.autobots.layer_ok"), button -> confirmPrompt());
-        promptCancel = new AutobotsButton(controlsX + 156, promptY, 52, 16, Component.translatable("screen.autobots.layer_cancel"), button -> hidePrompt());
+        promptOk = new AutobotsButton(modelX + boxW + 4, promptY + 14, actionW, 16, Component.translatable("screen.autobots.layer_ok"), button -> confirmPrompt());
+        promptCancel = new AutobotsButton(modelX + boxW + 8 + actionW, promptY + 14, actionW, 16, Component.translatable("screen.autobots.layer_cancel"), button -> hidePrompt());
         addRenderableWidget(promptOk);
         addRenderableWidget(promptCancel);
         hidePrompt();
@@ -152,12 +160,12 @@ public class PlacementScreen extends Screen {
         addRenderableWidget(new AutobotsButton(controlsX + 16 + row, flipY, row, 16, Component.translatable("screen.autobots.flip_vertical"), button -> transform(BlueprintTransforms.Op.FLIP_Y)));
         addRenderableWidget(new AutobotsButton(controlsX + 12, flipY + 18, row, 16, Component.translatable("screen.autobots.center_short"), button -> transform(BlueprintTransforms.Op.CENTER)));
         addRenderableWidget(new AutobotsButton(controlsX + 16 + row, flipY + 18, row, 16, Component.translatable("screen.autobots.ground"), button -> transform(BlueprintTransforms.Op.GROUND)));
-        addRenderableWidget(new AutobotsButton(controlsX + 12, flipY + 38, controlsW - 24, 16, Component.translatable("menu.autobots.materials"), button -> MaterialsScreen.request(AutobotsClientState.buildId, AutobotsClientState.viewX, AutobotsClientState.viewY, AutobotsClientState.viewZ, this)));
+        addRenderableWidget(new AutobotsButton(controlsX + 12, foot - 74, controlsW - 24, 16, Component.translatable("menu.autobots.materials"), button -> MaterialsScreen.request(AutobotsClientState.buildId, AutobotsClientState.viewX, AutobotsClientState.viewY, AutobotsClientState.viewZ, this)));
         int backW = 68;
         int backX = controlsW - 12 - backW;
-        addRenderableWidget(new AutobotsButton(controlsX + 12, panelY + 348, backX - 16, 18, Component.translatable("menu.autobots.build"), button -> send()));
-        addRenderableWidget(new AutobotsButton(controlsX + backX, panelY + 348, backW, 18, Component.translatable("screen.autobots.back"), button -> onClose()));
-        addRenderableWidget(new AutobotsButton(controlsX + 12, panelY + 370, controlsW - 24, 18, Component.translatable("screen.autobots.save_blueprint"), button -> saveBlueprint()));
+        addRenderableWidget(new AutobotsButton(controlsX + 12, foot - 48, backX - 16, 18, Component.translatable("menu.autobots.build"), button -> send()));
+        addRenderableWidget(new AutobotsButton(controlsX + backX, foot - 48, backW, 18, Component.translatable("screen.autobots.back"), button -> onClose()));
+        addRenderableWidget(new AutobotsButton(controlsX + 12, foot - 26, controlsW - 24, 18, Component.translatable("screen.autobots.save_blueprint"), button -> saveBlueprint()));
         addRenderableWidget(new AutobotsButton(modelX, layerY, 22, 16, Component.literal("-"), button -> changeLayer(-1)));
         addRenderableWidget(new AutobotsButton(modelX + modelSize - 22, layerY, 22, 16, Component.literal("+"), button -> changeLayer(1)));
         if (map) {
@@ -201,11 +209,11 @@ public class PlacementScreen extends Screen {
             followButton.setPicked(AutobotsClientState.follow);
         }
         if (inventoryButton != null) {
-            inventoryButton.setPicked(!AutobotsClientState.supplyBound && !AutobotsClientState.bindSupply);
-            chestButton.setPicked(AutobotsClientState.supplyBound || AutobotsClientState.bindSupply);
-        }
-        if (clearSupplyButton != null) {
-            clearSupplyButton.active = AutobotsClientState.supplyBound;
+            boolean bound = AutobotsClientState.supplyBound && AutobotsClientState.supplyPos != null;
+            inventoryButton.setPicked(!bound && !AutobotsClientState.bindSupply);
+            chestButton.setPicked(bound || AutobotsClientState.bindSupply);
+            clearSupplyButton.visible = bound;
+            highlightSupplyButton.visible = bound;
         }
         suppress = false;
     }
@@ -222,30 +230,34 @@ public class PlacementScreen extends Screen {
                 ? Component.translatable("screen.autobots.place").getString()
                 : AutobotsClientState.buildName;
         graphics.drawString(this.font, this.font.plainSubstrByWidth(title, panelW - 24), panelX + 14, panelY + 8, AutobotsUi.COPPER, false);
-        graphics.drawString(this.font, Component.translatable("screen.autobots.location"), controlsX + 12, panelY + 28, AutobotsUi.BLUE, false);
-        graphics.drawString(this.font, Component.translatable("screen.autobots.size_label"), controlsX + 126, panelY + 28, AutobotsUi.BLUE, false);
+        graphics.drawString(this.font, Component.translatable("screen.autobots.location"), controlsX + 12, panelY + 28, AutobotsUi.TEXT, false);
+        graphics.drawString(this.font, Component.translatable("screen.autobots.size_label"), controlsX + 126, panelY + 28, AutobotsUi.TEXT, false);
         axis(graphics, controlsX + 108, panelY + 40, "X");
         axis(graphics, controlsX + 108, panelY + 56, "Y");
         axis(graphics, controlsX + 108, panelY + 72, "Z");
         axis(graphics, controlsX + 222, panelY + 40, "X");
         axis(graphics, controlsX + 222, panelY + 56, "Y");
         axis(graphics, controlsX + 222, panelY + 72, "Z");
-        graphics.drawString(this.font, Component.translatable("screen.autobots.items_from"), controlsX + 12, panelY + 90, AutobotsUi.BLUE, false);
-        BlockPos supply = AutobotsClientState.supplyBound ? AutobotsClientState.supplyPos : null;
-        Component supplyLine = supply == null
-                ? Component.translatable("screen.autobots.supply_none")
-                : Component.translatable("screen.autobots.supply_at", supply.getX(), supply.getY(), supply.getZ());
-        graphics.drawString(this.font, this.font.plainSubstrByWidth(supplyLine.getString(), 150), controlsX + 12, panelY + 124, supply == null ? AutobotsUi.MUTED : AutobotsUi.BLUE, false);
+        int foot = panelY + panelH;
+        graphics.drawString(this.font, Component.translatable("screen.autobots.use_items_from"), controlsX + 12, foot - 132, AutobotsUi.MUTED, false);
+        boolean bound = AutobotsClientState.supplyBound && AutobotsClientState.supplyPos != null;
+        if (bound) {
+            Component supplyLine = Component.translatable("screen.autobots.supply_at", AutobotsClientState.supplyPos.getX(), AutobotsClientState.supplyPos.getY(), AutobotsClientState.supplyPos.getZ());
+            int room = Math.max(40, highlightSupplyButton.getX() - (controlsX + 12) - 6);
+            graphics.drawString(this.font, this.font.plainSubstrByWidth(supplyLine.getString(), room), controlsX + 12, foot - 92, AutobotsUi.TEXT, false);
+        } else if (AutobotsClientState.bindSupply) {
+            graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("screen.autobots.supply_aim").getString(), panelX + panelW - 24 - controlsX), controlsX + 12, foot - 92, AutobotsUi.MUTED, false);
+        }
         boolean paceInstant = this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild && !this.minecraft.player.isSpectator() && AutobotsClientConfig.INSTANT_JOBS.get();
         if (paceInstant) {
-            graphics.drawString(this.font, Component.translatable("screen.autobots.drones_instant"), controlsX + 12, panelY + 164, AutobotsUi.MUTED, false);
+            graphics.drawString(this.font, Component.translatable("screen.autobots.drones_instant"), controlsX + 12, panelY + 122, AutobotsUi.MUTED, false);
         } else if (this.minecraft.player != null) {
             com.autobots.drone.Swarm swarm = com.autobots.drone.Cradles.swarm(this.minecraft.player);
             Component line = swarm.units().isEmpty()
                     ? Component.translatable(com.autobots.drone.Cradles.worn(this.minecraft.player).isEmpty() ? "screen.autobots.need_cradle" : "screen.autobots.need_drone")
                     : Component.translatable("screen.autobots.drones_send", swarm.assignCount(), swarm.units().size());
             int color = swarm.units().isEmpty() ? 0xFFE07A7A : AutobotsUi.BLUE;
-            graphics.drawString(this.font, this.font.plainSubstrByWidth(line.getString(), 168), controlsX + 32, panelY + 164, color, false);
+            graphics.drawString(this.font, this.font.plainSubstrByWidth(line.getString(), 168), controlsX + 32, panelY + 122, color, false);
         }
         syncSelection();
         if (AutobotsClientState.concealed) {
@@ -255,14 +267,15 @@ public class PlacementScreen extends Screen {
             grid.render(graphics, AutobotsClientState.ghosts, AutobotsClientState.fullX, AutobotsClientState.fullZ, layer, AutobotsClientState.pivotX, AutobotsClientState.pivotY, AutobotsClientState.pivotZ, selX, selY, selZ);
         }
         graphics.drawCenteredString(this.font, Component.translatable("screen.autobots.layer", layer + 1, AutobotsClientState.fullY), modelX + modelSize / 2, layerY - 12, AutobotsUi.MUTED);
-        graphics.drawString(this.font, Component.translatable("screen.autobots.selection"), modelX, selectionY - 12, AutobotsUi.BLUE, false);
-        graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("screen.autobots.mark_hint").getString(), modelSize), modelX, selectionY + 36, AutobotsUi.MUTED, false);
-        graphics.drawString(this.font, Component.translatable("screen.autobots.layers"), controlsX + 12, layersY - 12, AutobotsUi.BLUE, false);
+        graphics.drawString(this.font, Component.translatable("screen.autobots.selection"), modelX, selectionY - 12, AutobotsUi.TEXT, false);
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("screen.autobots.hint_selected").getString(), modelSize), modelX, selectionY + 40, 0xFFF2D48A, false);
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("screen.autobots.hint_anchor").getString(), modelSize), modelX, selectionY + 52, AutobotsUi.BLUE, false);
+        graphics.drawString(this.font, Component.translatable("screen.autobots.layers"), modelX, layersY - 12, AutobotsUi.TEXT, false);
         if (promptOpen) {
-            graphics.drawString(this.font, Component.translatable(movePrompt ? "screen.autobots.move_prompt" : "screen.autobots.add_prompt"), controlsX + 12, promptY + 4, AutobotsUi.MUTED, false);
+            graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable(movePrompt ? "screen.autobots.move_prompt" : "screen.autobots.add_prompt").getString(), modelSize), modelX, promptY + 2, AutobotsUi.MUTED, false);
         }
-        graphics.drawString(this.font, Component.translatable("screen.autobots.rotate"), controlsX + 12, rotateY - 12, AutobotsUi.BLUE, false);
-        graphics.drawString(this.font, Component.translatable("screen.autobots.flip"), controlsX + 12, flipY - 12, AutobotsUi.BLUE, false);
+        graphics.drawString(this.font, Component.translatable("screen.autobots.rotate"), controlsX + 12, rotateY - 12, AutobotsUi.TEXT, false);
+        graphics.drawString(this.font, Component.translatable("screen.autobots.flip"), controlsX + 12, flipY - 12, AutobotsUi.TEXT, false);
     }
 
     @Override
@@ -421,8 +434,17 @@ public class PlacementScreen extends Screen {
         AutobotsClientState.bindSupply = false;
         AutobotsClientState.supplyBound = false;
         AutobotsClientState.supplyPos = null;
+        AutobotsClientState.supplyHighlightUntil = 0L;
         PacketDistributor.sendToServer(new BlueprintPayloads.BindSupply(BlockPos.ZERO, true));
         refresh();
+    }
+
+    private void highlightSupply() {
+        if (AutobotsClientState.supplyPos == null) {
+            return;
+        }
+        AutobotsClientState.supplyHighlightUntil = System.currentTimeMillis() + 5000L;
+        this.minecraft.setScreen(null);
     }
 
     private void bindChest() {

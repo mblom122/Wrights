@@ -66,6 +66,7 @@ public final class AutobotsClientState {
     public static boolean bindSupply;
     public static boolean supplyBound;
     public static BlockPos supplyPos;
+    public static long supplyHighlightUntil;
     public static BlockPos anchor;
     public static int pivotX;
     public static int pivotY;
@@ -624,9 +625,16 @@ public final class AutobotsClientState {
         styleAnnounce = true;
     }
 
+    public static boolean supplyHighlighting() {
+        return supplyPos != null && System.currentTimeMillis() < supplyHighlightUntil;
+    }
+
     public static void applySupply(BlueprintPayloads.SupplySync payload) {
         supplyBound = payload.chest();
         supplyPos = payload.chest() ? payload.pos() : null;
+        if (!supplyBound) {
+            supplyHighlightUntil = 0L;
+        }
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.screen instanceof PlacementScreen placement) {
             placement.refresh();

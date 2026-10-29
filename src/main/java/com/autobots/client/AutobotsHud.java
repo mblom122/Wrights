@@ -190,7 +190,7 @@ public final class AutobotsHud {
                 BlockPos bound = AutobotsClientState.supplyPos;
                 return Component.translatable("screen.autobots.supply_at", bound.getX(), bound.getY(), bound.getZ());
             }
-            return Component.translatable("screen.autobots.supply_none");
+            return Component.translatable("screen.autobots.supply_aim");
         }
         return minecraft.level.getBlockState(aim).getBlock().getName();
     }
