@@ -275,6 +275,10 @@ public final class BuildJob {
             hand.entityId = null;
             hand.lastPos = null;
             hand.rescan = false;
+            hand.idle = false;
+            for (Slice slice : hand.slices) {
+                slice.cursor = 0;
+            }
         }
     }
 
@@ -585,6 +589,22 @@ public final class BuildJob {
                 handTag.putInt("speed", hand.speed);
                 handTag.putInt("cursor", hand.cursor);
                 handTag.putBoolean("rescan", hand.rescan);
+                handTag.putBoolean("idle", hand.idle);
+                if (!hand.slices.isEmpty()) {
+                    ListTag slices = new ListTag();
+                    for (Slice slice : hand.slices) {
+                        CompoundTag sliceTag = new CompoundTag();
+                        sliceTag.putInt("x0", slice.x0);
+                        sliceTag.putInt("y0", slice.y0);
+                        sliceTag.putInt("z0", slice.z0);
+                        sliceTag.putInt("x1", slice.x1);
+                        sliceTag.putInt("y1", slice.y1);
+                        sliceTag.putInt("z1", slice.z1);
+                        sliceTag.putInt("cursor", slice.cursor);
+                        slices.add(sliceTag);
+                    }
+                    handTag.put("slices", slices);
+                }
                 if (hand.entityId != null) {
                     handTag.putUUID("entity", hand.entityId);
                 }
@@ -688,6 +708,20 @@ public final class BuildJob {
                 hand.speed = handTag.getInt("speed");
                 hand.cursor = handTag.getInt("cursor");
                 hand.rescan = handTag.getBoolean("rescan");
+                hand.idle = handTag.getBoolean("idle");
+                ListTag slices = handTag.getList("slices", Tag.TAG_COMPOUND);
+                for (int sliceIndex = 0; sliceIndex < slices.size(); sliceIndex++) {
+                    CompoundTag sliceTag = slices.getCompound(sliceIndex);
+                    Slice slice = new Slice();
+                    slice.x0 = sliceTag.getInt("x0");
+                    slice.y0 = sliceTag.getInt("y0");
+                    slice.z0 = sliceTag.getInt("z0");
+                    slice.x1 = sliceTag.getInt("x1");
+                    slice.y1 = sliceTag.getInt("y1");
+                    slice.z1 = sliceTag.getInt("z1");
+                    slice.cursor = sliceTag.getInt("cursor");
+                    hand.slices.add(slice);
+                }
                 if (handTag.hasUUID("entity")) {
                     hand.entityId = handTag.getUUID("entity");
                 }
@@ -743,14 +777,30 @@ public final class BuildJob {
         return job;
     }
 
+    public static final class Slice {
+        public int x0;
+        public int y0;
+        public int z0;
+        public int x1;
+        public int y1;
+        public int z1;
+        public int cursor;
+
+        public boolean contains(int x, int y, int z) {
+            return x >= x0 && x <= x1 && y >= y0 && y <= y1 && z >= z0 && z <= z1;
+        }
+    }
+
     public static final class Hand {
         public int lane;
         public int lanes;
         public int speed = 1;
         public int cursor;
         public boolean rescan;
+        public boolean idle;
         public UUID entityId;
         public BlockPos lastPos;
+        public final List<Slice> slices = new ArrayList<>();
     }
 
     public record Refund(short x, short y, short z, BlockState state, boolean paid) {

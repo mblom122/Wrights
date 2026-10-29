@@ -1336,7 +1336,7 @@ public final class JobManager {
             }
         } else {
             int before = job.hands().size();
-            ensureSlices(job, schematic);
+            ensureSlices(job, true);
             while (job.hands().size() > speeds.size()) {
                 BuildJob.Hand removed = job.hands().remove(job.hands().size() - 1);
                 if (removed.entityId != null) {
@@ -1744,10 +1744,10 @@ public final class JobManager {
 
     private static void evenOut(BuildJob job, Schematic schematic) {
         if (schematic == null || job.hands().size() < 2) {
-            ensureSlices(job, schematic);
+            ensureSlices(job, false);
             return;
         }
-        ensureSlices(job, schematic);
+        ensureSlices(job, false);
         int passes = job.hands().size() * 8;
         for (int pass = 0; pass < passes; pass++) {
             BuildJob.Hand poor = null;
@@ -1803,7 +1803,7 @@ public final class JobManager {
         if (!pending) {
             return;
         }
-        ensureSlices(job, schematic);
+        migrateSlices(job);
         for (int n = 0; n < job.hands().size(); n++) {
             BuildJob.Hand receiver = null;
             for (BuildJob.Hand hand : job.hands()) {
@@ -1817,13 +1817,13 @@ public final class JobManager {
                 return;
             }
             BuildJob.Slice donor = fullestPaste(job, schematic, receiver);
-            if (donor == null) {
-                receiver.idle = false;
-                return;
-            }
-            BuildJob.Slice half = splitPaste(schematic, donor);
+            BuildJob.Slice half = donor == null ? null : splitPaste(schematic, donor);
             if (half == null) {
-                receiver.idle = false;
+                for (BuildJob.Hand hand : job.hands()) {
+                    if (countPaste(schematic, hand) == 0) {
+                        hand.idle = false;
+                    }
+                }
                 return;
             }
             receiver.slices.add(half);
@@ -1845,6 +1845,7 @@ public final class JobManager {
         if (!pending) {
             return;
         }
+        migrateSlices(job);
         for (int n = 0; n < job.hands().size(); n++) {
             BuildJob.Hand receiver = null;
             for (BuildJob.Hand hand : job.hands()) {
@@ -1858,13 +1859,13 @@ public final class JobManager {
                 return;
             }
             BuildJob.Slice donor = fullestRefund(job, receiver);
-            if (donor == null) {
-                receiver.idle = false;
-                return;
-            }
-            BuildJob.Slice half = splitRefunds(job, donor);
+            BuildJob.Slice half = donor == null ? null : splitRefunds(job, donor);
             if (half == null) {
-                receiver.idle = false;
+                for (BuildJob.Hand hand : job.hands()) {
+                    if (countRefunds(job, hand) == 0) {
+                        hand.idle = false;
+                    }
+                }
                 return;
             }
             receiver.slices.add(half);
