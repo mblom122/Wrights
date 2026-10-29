@@ -397,7 +397,8 @@ public final class BlueprintNetwork {
                     job.boxSizeY(),
                     job.boxSizeZ(),
                     job.crewUnits().size(),
-                    job.crewUnits()));
+                    job.crewUnits(),
+                    job.workedTicks()));
         }
         PacketDistributor.sendToPlayer(player, new BlueprintPayloads.JobSync(lines));
     }

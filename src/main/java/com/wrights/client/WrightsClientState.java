@@ -1,5 +1,6 @@
 package com.wrights.client;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -201,46 +202,124 @@ public final class WrightsClientState {
     }
 
     public static String timeLeft(BlueprintPayloads.JobLine job) {
-        if (job.finished() || job.paused() || job.undoing()) {
+        if (job.finished() || job.paused()) {
             return "";
         }
         Pace pace = paces.get(job.id());
-        if (pace == null || pace.perSecond < 0.05D) {
+        if (pace == null || pace.shownSeconds < 0) {
             return "";
         }
-        int left = Math.max(0, job.total() - job.done());
-        long seconds = (long) Math.ceil(left / pace.perSecond);
+        double seconds = pace.shownSeconds - (System.currentTimeMillis() - pace.shownAt) / 1000.0D;
         if (seconds < 1) {
             return "1s";
         }
+        return formatSeconds((long) Math.ceil(seconds));
+    }
+
+    private static String formatSeconds(long seconds) {
         if (seconds < 60) {
             return seconds + "s";
         }
         long minutes = seconds / 60;
         long rest = seconds % 60;
-        if (minutes < 60) {
-            return minutes + "m " + rest + "s";
+        if (minutes < 10) {
+            return rest == 0 ? minutes + "m" : minutes + "m " + rest + "s";
         }
-        return (minutes / 60) + "h " + (minutes % 60) + "m";
+        if (minutes < 60) {
+            return minutes + "m";
+        }
+        long hours = minutes / 60;
+        long min = minutes % 60;
+        return min == 0 ? hours + "h" : hours + "h " + min + "m";
     }
 
     private static void notePace(BlueprintPayloads.JobLine job, long now) {
         Pace pace = paces.computeIfAbsent(job.id(), id -> new Pace());
-        if (pace.at > 0 && now > pace.at && job.done() > pace.done) {
-            double rate = (job.done() - pace.done) * 1000.0D / (now - pace.at);
-            pace.perSecond = pace.perSecond <= 0 ? rate : pace.perSecond * 0.6D + rate * 0.4D;
-        }
         if (job.finished() || job.done() < pace.done) {
-            pace.perSecond = 0;
+            pace.samples.clear();
+            pace.shownSeconds = -1;
+            pace.done = job.done();
+            pace.shownAt = now;
+            return;
+        }
+        if (job.paused()) {
+            pace.samples.clear();
+            pace.shownAt = now;
+            pace.done = job.done();
+            return;
+        }
+        pace.samples.addLast(new Sample(now, job.done()));
+        long keep = now - 15_000L;
+        while (pace.samples.size() > 2 && pace.samples.peekFirst().at < keep) {
+            pace.samples.removeFirst();
         }
         pace.done = job.done();
-        pace.at = now;
+        double rate = paceRate(pace, job);
+        if (rate <= 0.02D) {
+            return;
+        }
+        int left = Math.max(0, job.total() - job.done());
+        double raw = left / rate;
+        if (pace.shownSeconds < 0) {
+            pace.shownSeconds = raw;
+            pace.shownAt = now;
+            return;
+        }
+        double aged = Math.max(0, pace.shownSeconds - (now - pace.shownAt) / 1000.0D);
+        pace.shownAt = now;
+        double error = raw - aged;
+        double deadband = Math.max(3.0D, aged * 0.1D);
+        if (Math.abs(error) <= deadband) {
+            pace.shownSeconds = aged;
+            return;
+        }
+        double delta = error * 0.4D;
+        double cap = Math.max(3.0D, raw * 0.1D);
+        if (delta > cap) {
+            delta = cap;
+        } else if (delta < -cap) {
+            delta = -cap;
+        }
+        pace.shownSeconds = Math.max(0, aged + delta);
+    }
+
+    private static double paceRate(Pace pace, BlueprintPayloads.JobLine job) {
+        double lifetime = 0;
+        double worked = job.workedTicks() / 20.0D;
+        if (worked >= 8.0D && job.done() > 0) {
+            lifetime = job.done() / worked;
+        }
+        double window = 0;
+        if (pace.samples.size() >= 2) {
+            Sample first = pace.samples.peekFirst();
+            Sample last = pace.samples.peekLast();
+            double span = (last.at - first.at) / 1000.0D;
+            int gained = last.done - first.done;
+            if (span >= 8.0D && gained > 0) {
+                window = gained / span;
+            }
+        }
+        if (window > 0 && lifetime > 0) {
+            return lifetime * 0.75D + window * 0.25D;
+        }
+        return window > 0 ? window : lifetime;
+    }
+
+    private static final class Sample {
+        private final long at;
+        private final int done;
+
+        private Sample(long at, int done) {
+            this.at = at;
+            this.done = done;
+        }
     }
 
     private static final class Pace {
         private int done;
-        private long at;
-        private double perSecond;
+        private long shownAt;
+        private double shownSeconds = -1;
+        private final ArrayDeque<Sample> samples = new ArrayDeque<>();
     }
 
     public static void updateFlags() {

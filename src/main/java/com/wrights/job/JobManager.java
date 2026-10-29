@@ -615,6 +615,7 @@ public final class JobManager {
             return;
         }
         int budget = WrightsConfig.COPY_POSITIONS_PER_TICK.getAsInt();
+        boolean counted = false;
         for (int i = 0; i < budget && job.cursor() < job.total(); i++) {
             BlockPos pos = job.scanPos();
             if (level.isOutsideBuildHeight(pos)) {
@@ -623,6 +624,10 @@ public final class JobManager {
             }
             if (!ready(player, level, pos, job, true)) {
                 return;
+            }
+            if (!counted) {
+                job.workedTick();
+                counted = true;
             }
             if (!level.isLoaded(pos)) {
                 if (WrightsConfig.REQUIRE_CHUNKS_LOADED.getAsBoolean()) {
@@ -788,9 +793,6 @@ public final class JobManager {
         if (player == null) {
             return;
         }
-        if (!job.paused()) {
-            job.workedTick();
-        }
         if (job.cursor() >= job.total()) {
             finishPaste(server, library, player, job);
             return;
@@ -818,6 +820,7 @@ public final class JobManager {
                 }
                 return;
             }
+            job.workedTick();
             tickCrew(level, player, library, job, schematic);
             return;
         }
@@ -833,6 +836,7 @@ public final class JobManager {
             }
             return;
         }
+        job.workedTick();
         int skipBudget = 8192;
         while (skipBudget > 0 && job.cursor() < schematic.blockCount() && satisfied(level, job, schematic.entry(job.cursor()))) {
             job.advance();
@@ -920,6 +924,7 @@ public final class JobManager {
                 }
                 return;
             }
+            job.workedTick();
             tickUndoCrew(level, player, library, job);
             return;
         }
@@ -935,6 +940,7 @@ public final class JobManager {
             }
             return;
         }
+        job.workedTick();
         if (!job.hasRefunds()) {
             finishUndo(server, library, player, job);
             return;

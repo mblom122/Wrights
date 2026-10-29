@@ -420,6 +420,10 @@ public final class BuildJob {
         }
     }
 
+    public int workedTicks() {
+        return workedTicks;
+    }
+
     public int elapsedSeconds() {
         return workedTicks / 20;
     }
