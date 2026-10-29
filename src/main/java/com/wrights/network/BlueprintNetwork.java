@@ -197,7 +197,8 @@ public final class BlueprintNetwork {
                 payload.sizeZ(),
                 payload.pivotX(),
                 payload.pivotY(),
-                payload.pivotZ()));
+                payload.pivotZ(),
+                payload.drones()));
     }
 
     private static void editCell(BlueprintPayloads.EditCell payload, IPayloadContext context) {

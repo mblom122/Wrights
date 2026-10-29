@@ -384,7 +384,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record LaunchBuild(UUID id, BlockPos origin, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ) implements CustomPacketPayload {
+    public record LaunchBuild(UUID id, BlockPos origin, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones) implements CustomPacketPayload {
         public static final Type<LaunchBuild> TYPE = payloadType("launch_build");
         public static final StreamCodec<RegistryFriendlyByteBuf, LaunchBuild> STREAM_CODEC = StreamCodec.of((buf, value) -> value.write(buf), LaunchBuild::read);
 
@@ -397,10 +397,11 @@ public final class BlueprintPayloads {
             buf.writeVarInt(pivotX);
             buf.writeVarInt(pivotY);
             buf.writeVarInt(pivotZ);
+            buf.writeVarInt(drones);
         }
 
         public static LaunchBuild read(RegistryFriendlyByteBuf buf) {
-            return new LaunchBuild(buf.readUUID(), buf.readBlockPos(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt());
+            return new LaunchBuild(buf.readUUID(), buf.readBlockPos(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt());
         }
 
         @Override

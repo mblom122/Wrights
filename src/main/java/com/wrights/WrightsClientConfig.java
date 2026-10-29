@@ -47,7 +47,10 @@ public final class WrightsClientConfig {
             .define("droneMax", false);
     public static final ModConfigSpec.IntValue DRONE_COUNT = BUILDER
             .comment("How many drones a new job uses when droneMax is false. Still limited by free drones and by the number of blocks.")
-            .defineInRange("droneCount", 5, 1, 8);
+            .defineInRange("droneCount", 5, 1, 64);
+    public static final ModConfigSpec.BooleanValue BUILD_MENU = BUILDER
+            .comment("When true, right-click in build mode opens the build menu instead of starting the job.")
+            .define("buildMenu", false);
     public static final ModConfigSpec.IntValue PLACE_X = BUILDER
             .comment("Blocks to your right when a paste is not aimed at a block.")
             .defineInRange("placeX", 0, -32, 32);
@@ -148,7 +151,12 @@ public final class WrightsClientConfig {
     }
 
     public static void setDroneCount(int count) {
-        DRONE_COUNT.set(clamp(count, 1, 8));
+        DRONE_COUNT.set(clamp(count, 1, 64));
+        save();
+    }
+
+    public static void setBuildMenu(boolean enabled) {
+        BUILD_MENU.set(enabled);
         save();
     }
 

@@ -457,7 +457,7 @@ public final class BlueprintActions {
                 return;
             }
             next.add(new Schematic.Entry((short) x, (short) y, (short) z, state, com.wrights.util.BlockFilters.isSecondary(state)));
-            next.sort(java.util.Comparator.comparing(Schematic.Entry::secondary));
+            next.sort(Schematic.BUILD_ORDER);
         }
         remember(player, id, schematic.withEntries(next));
     }
@@ -543,7 +543,7 @@ public final class BlueprintActions {
                 }
                 entries.add(new Schematic.Entry(entry.x(), (short) dest, entry.z(), entry.state(), entry.secondary()));
             }
-            entries.sort(java.util.Comparator.comparing(Schematic.Entry::secondary));
+            entries.sort(Schematic.BUILD_ORDER);
             if (anchorY >= dest) {
                 anchorY++;
             }
@@ -671,7 +671,7 @@ public final class BlueprintActions {
         BlueprintNetwork.syncLibrary(player);
     }
 
-    public static void launch(ServerPlayer player, java.util.UUID id, BlockPos anchorPoint, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ) {
+    public static void launch(ServerPlayer player, java.util.UUID id, BlockPos anchorPoint, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones) {
         if (!held(player)) {
             return;
         }
@@ -709,7 +709,7 @@ public final class BlueprintActions {
             library.putSchematic(snapshot);
             buildSchematicId = snapshot.id();
         }
-        if (!JobManager.startBlueprintBuild(player, buildSchematicId, origin, sx, sy, sz) && snapshot != null) {
+        if (!JobManager.startBlueprintBuild(player, buildSchematicId, origin, sx, sy, sz, drones) && snapshot != null) {
             library.removeSchematic(snapshot.id());
         }
         BlueprintNetwork.syncLibrary(player);

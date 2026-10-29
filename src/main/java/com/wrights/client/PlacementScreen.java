@@ -45,7 +45,6 @@ public class PlacementScreen extends Screen {
     private WrightsButton promptCancel;
     private boolean promptOpen;
     private boolean movePrompt;
-    private boolean deployApplied;
     private boolean awaitTaller;
     private EditBox xBox;
     private EditBox yBox;
@@ -136,10 +135,7 @@ public class PlacementScreen extends Screen {
         addRenderableWidget(clearSupplyButton);
         boolean paceInstant = this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild && !this.minecraft.player.isSpectator() && WrightsClientConfig.INSTANT_JOBS.get();
         if (!paceInstant) {
-            if (!deployApplied && !WrightsClientState.deployChosen) {
-                WrightsClientState.applyDeploy();
-            }
-            deployApplied = true;
+            WrightsClientState.clampDeploy();
             step(controlsX + 12, panelY + 118, "-", () -> changeAssign(-1));
             step(controlsX + controlsW - 28, panelY + 118, "+", () -> changeAssign(1));
         }
@@ -168,9 +164,9 @@ public class PlacementScreen extends Screen {
         addRenderableWidget(new WrightsButton(controlsX + 12, foot - 74, controlsW - 24, 16, Component.translatable("menu.wrights.materials"), button -> MaterialsScreen.request(WrightsClientState.buildId, WrightsClientState.viewX, WrightsClientState.viewY, WrightsClientState.viewZ, this)));
         int backW = 68;
         int backX = controlsW - 12 - backW;
-        addRenderableWidget(new WrightsButton(controlsX + 12, foot - 48, backX - 16, 18, Component.translatable("menu.wrights.build"), button -> send()));
+        addRenderableWidget(new WrightsButton(controlsX + 12, foot - 48, backX - 16, 18, Component.translatable("screen.wrights.save_blueprint"), button -> saveBlueprint()));
         addRenderableWidget(new WrightsButton(controlsX + backX, foot - 48, backW, 18, Component.translatable("screen.wrights.back"), button -> onClose()));
-        addRenderableWidget(new WrightsButton(controlsX + 12, foot - 26, controlsW - 24, 18, Component.translatable("screen.wrights.save_blueprint"), button -> saveBlueprint()));
+        addRenderableWidget(new WrightsButton(controlsX + 12, foot - 26, controlsW - 24, 18, Component.translatable("menu.wrights.build"), button -> send()));
         addRenderableWidget(new WrightsButton(modelX, layerY, 22, 16, Component.literal("-"), button -> changeLayer(-1)));
         addRenderableWidget(new WrightsButton(modelX + modelSize - 22, layerY, 22, 16, Component.literal("+"), button -> changeLayer(1)));
         if (map) {
@@ -213,6 +209,7 @@ public class PlacementScreen extends Screen {
             lockButton.setPicked(!WrightsClientState.follow);
             followButton.setPicked(WrightsClientState.follow);
         }
+        WrightsClientState.clampDeploy();
         if (inventoryButton != null) {
             boolean bound = WrightsClientState.supplyBound && WrightsClientState.supplyPos != null;
             inventoryButton.setPicked(!bound && !WrightsClientState.bindSupply);
@@ -258,10 +255,10 @@ public class PlacementScreen extends Screen {
             graphics.drawString(this.font, Component.translatable("screen.wrights.drones_instant"), controlsX + 12, panelY + 122, WrightsUi.MUTED, false);
         } else if (this.minecraft.player != null) {
             com.wrights.drone.Swarm swarm = com.wrights.drone.Wrightports.swarm(this.minecraft.player);
-            int cap = Math.min(swarm.units().size(), Math.max(0, WrightsClientState.placeableBlocks()));
+            int cap = WrightsClientState.deployCap();
             Component line = swarm.units().isEmpty()
                     ? Component.translatable(com.wrights.drone.Wrightports.worn(this.minecraft.player).isEmpty() ? "screen.wrights.need_wrightport" : "screen.wrights.need_drone")
-                    : Component.translatable("screen.wrights.drones_send", Math.min(swarm.assignCount(), Math.max(1, cap)), Math.max(1, cap));
+                    : Component.translatable("screen.wrights.drones_send", Math.min(WrightsClientState.deployCount, Math.max(1, cap)), Math.max(1, cap));
             int color = swarm.units().isEmpty() ? 0xFFE07A7A : WrightsUi.BLUE;
             graphics.drawString(this.font, this.font.plainSubstrByWidth(line.getString(), 168), controlsX + 32, panelY + 122, color, false);
         }
@@ -407,7 +404,7 @@ public class PlacementScreen extends Screen {
         WrightsClientState.viewX = clamp(sx);
         WrightsClientState.viewY = clamp(sy);
         WrightsClientState.viewZ = clamp(sz);
-        clampDeploy();
+        WrightsClientState.clampDeploy();
     }
 
     private void setAnchor(BlockPos anchor) {
@@ -423,7 +420,7 @@ public class PlacementScreen extends Screen {
         WrightsClientState.viewX = clamp(x);
         WrightsClientState.viewY = clamp(y);
         WrightsClientState.viewZ = clamp(z);
-        clampDeploy();
+        WrightsClientState.clampDeploy();
         refresh();
     }
 
@@ -456,6 +453,7 @@ public class PlacementScreen extends Screen {
     }
 
     private void bindChest() {
+        WrightsClientState.bindFromMenu = true;
         WrightsClientState.bindSupply = true;
         WrightsClientState.styleHudTicks = 70;
         WrightsClientState.styleAnnounce = true;
@@ -665,37 +663,17 @@ public class PlacementScreen extends Screen {
     }
 
     private void changeAssign(int delta) {
-        if (this.minecraft.player == null) {
-            return;
-        }
-        com.wrights.drone.Swarm swarm = com.wrights.drone.Wrightports.swarm(this.minecraft.player);
-        if (swarm.units().isEmpty()) {
-            return;
-        }
-        int cap = Math.min(swarm.units().size(), WrightsClientState.placeableBlocks());
+        int cap = WrightsClientState.deployCap();
         if (cap <= 0) {
             return;
         }
-        int next = Mth.clamp(swarm.assignCount() + delta, 1, cap);
-        if (next == swarm.assignCount()) {
+        WrightsClientState.clampDeploy();
+        int next = WrightsClientState.stepped(WrightsClientState.deployCount, delta, 1, cap);
+        if (next == WrightsClientState.deployCount) {
             return;
         }
         WrightsClientState.deployChosen = true;
-        com.wrights.drone.Wrightports.replaceWorn(this.minecraft.player, swarm.withAssign(next));
-        PacketDistributor.sendToServer(new BlueprintPayloads.SetAssign(next));
-    }
-
-    private void clampDeploy() {
-        if (this.minecraft.player == null) {
-            return;
-        }
-        com.wrights.drone.Swarm swarm = com.wrights.drone.Wrightports.swarm(this.minecraft.player);
-        int cap = Math.min(swarm.units().size(), WrightsClientState.placeableBlocks());
-        if (cap <= 0 || swarm.assignCount() <= cap) {
-            return;
-        }
-        com.wrights.drone.Wrightports.replaceWorn(this.minecraft.player, swarm.withAssign(cap));
-        PacketDistributor.sendToServer(new BlueprintPayloads.SetAssign(cap));
+        WrightsClientState.deployCount = next;
     }
 
     private void axis(GuiGraphics graphics, int x, int y, String label) {

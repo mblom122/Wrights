@@ -134,6 +134,10 @@ public class WrightsMenuScreen extends Screen {
     private int droneMinusX;
     private int dronePlusX;
     private int droneHintY;
+    private int buildMenuX;
+    private int buildMenuY;
+    private int buildMenuW;
+    private int buildMenuHintY;
     private int optionPlaceY;
     private int optionPlaceHintY;
     private int optionOffsetY;
@@ -466,6 +470,13 @@ public class WrightsMenuScreen extends Screen {
         local += 16;
         droneHintY = optionY(local);
         local += 16;
+        Component menuState = Component.translatable(WrightsClientConfig.BUILD_MENU.get() ? "menu.wrights.on" : "menu.wrights.off");
+        buildMenuW = Math.max(36, this.font.width(menuState) + 16);
+        buildMenuX = x + 108;
+        buildMenuY = optionY(local - 3);
+        local += 14;
+        buildMenuHintY = optionY(local);
+        local += 16;
         optionPlaceY = optionY(local);
         local += 12;
         optionPlaceHintY = optionY(local);
@@ -558,6 +569,13 @@ public class WrightsMenuScreen extends Screen {
         }
         Component droneHint = Component.translatable(droneMax ? "menu.wrights.drone_max_hint" : "menu.wrights.drone_fixed_hint");
         graphics.drawString(this.font, this.font.plainSubstrByWidth(droneHint.getString(), optionViewW - 28), x, droneHintY, 0xFF667480, false);
+        boolean openMenu = WrightsClientConfig.BUILD_MENU.get();
+        graphics.drawString(this.font, Component.translatable("menu.wrights.open_build_menu"), x, buildMenuY + 3, WrightsUi.MUTED, false);
+        Component menuState = Component.translatable(openMenu ? "menu.wrights.on" : "menu.wrights.off");
+        graphics.fill(buildMenuX, buildMenuY, buildMenuX + buildMenuW, buildMenuY + 16, openMenu ? 0xFF24384A : 0xFF18222C);
+        WrightsUi.border(graphics, buildMenuX, buildMenuY, buildMenuW, 16, openMenu ? WrightsUi.COPPER : 0xFF3D4E5E);
+        graphics.drawCenteredString(this.font, menuState, buildMenuX + buildMenuW / 2, buildMenuY + 4, WrightsUi.TEXT);
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("menu.wrights.open_build_menu_hint").getString(), optionViewW - 28), x, buildMenuHintY, 0xFF667480, false);
         graphics.drawString(this.font, Component.translatable("menu.wrights.place_offset"), x, optionPlaceY, WrightsUi.TEXT, false);
         int hintW = Math.max(40, optionViewW - 16);
         graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("menu.wrights.place_hint").getString(), hintW), x, optionPlaceHintY, WrightsUi.MUTED, false);
@@ -766,10 +784,14 @@ public class WrightsMenuScreen extends Screen {
                     }
                     if (step != 0) {
                         WrightsClientState.deployChosen = false;
-                        WrightsClientConfig.setDroneCount(WrightsClientConfig.DRONE_COUNT.get() + step);
+                        WrightsClientConfig.setDroneCount(WrightsClientState.stepped(WrightsClientConfig.DRONE_COUNT.get(), step, 1, 64));
                         WrightsClientState.applyDeploy();
                         return true;
                     }
+                }
+                if (mouseX >= buildMenuX && mouseX < buildMenuX + buildMenuW && mouseY >= buildMenuY && mouseY < buildMenuY + 16) {
+                    WrightsClientConfig.setBuildMenu(!WrightsClientConfig.BUILD_MENU.get());
+                    return true;
                 }
                 if (hitSlider(mouseX, mouseY, wallSliderX, wallSliderY, wallSliderW)) {
                     drag = 1;

@@ -33,6 +33,7 @@ public final class WrightsInput {
     private static boolean wasHeld;
     private static int resumeDelay;
     private static boolean paceSent;
+    private static boolean boundThisClick;
 
     private WrightsInput() {
     }
@@ -91,6 +92,7 @@ public final class WrightsInput {
         if (!held) {
             WrightsClientState.noteUnequipped();
         }
+        boundThisClick = false;
         WrightsClientState.tickCapture();
         if (!com.wrights.item.ControllerItem.isHeld(minecraft.player)) {
             if (minecraft.screen instanceof WrightsMenuScreen
@@ -143,27 +145,7 @@ public final class WrightsInput {
             event.setCanceled(true);
             event.setUseBlock(TriState.FALSE);
             event.setUseItem(TriState.FALSE);
-            if (event.getEntity().isShiftKeyDown()) {
-                if (WrightsClientState.bindSupply && WrightsClientState.supplyBound) {
-                    WrightsClientState.supplyBound = false;
-                    WrightsClientState.supplyPos = null;
-                    net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.wrights.network.BlueprintPayloads.BindSupply(BlockPos.ZERO, true));
-                } else {
-                    Minecraft.getInstance().setScreen(new PlacementScreen());
-                }
-            } else if (WrightsClientState.bindSupply) {
-                BlockPos pos = event.getPos();
-                if (Minecraft.getInstance().level != null && SelectionRenderer.isSupplyContainer(Minecraft.getInstance().level, pos)) {
-                    WrightsClientState.supplyBound = true;
-                    WrightsClientState.supplyPos = pos.immutable();
-                    WrightsClientState.bindSupply = false;
-                    net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.wrights.network.BlueprintPayloads.BindSupply(pos, false));
-                } else {
-                    event.getEntity().displayClientMessage(net.minecraft.network.chat.Component.translatable("message.wrights.supply_not_container"), true);
-                }
-            } else {
-                WrightsClientState.tryBuild();
-            }
+            useBuildClick(event.getEntity(), event.getPos());
             return;
         }
         if (WrightsClientState.mode == WrightsClientState.Mode.JOBS && Minecraft.getInstance().screen == null) {
@@ -192,19 +174,10 @@ public final class WrightsInput {
         }
         if (com.wrights.blueprint.BlueprintClientFlags.build && Minecraft.getInstance().screen == null) {
             event.setCanceled(true);
-            if (event.getEntity().isShiftKeyDown()) {
-                if (WrightsClientState.bindSupply && WrightsClientState.supplyBound) {
-                    WrightsClientState.supplyBound = false;
-                    WrightsClientState.supplyPos = null;
-                    net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.wrights.network.BlueprintPayloads.BindSupply(BlockPos.ZERO, true));
-                } else {
-                    Minecraft.getInstance().setScreen(new PlacementScreen());
-                }
-            } else if (WrightsClientState.bindSupply) {
-                event.getEntity().displayClientMessage(net.minecraft.network.chat.Component.translatable("message.wrights.supply_not_container"), true);
-            } else {
-                WrightsClientState.tryBuild();
+            if (boundThisClick) {
+                return;
             }
+            useBuildClick(event.getEntity(), null);
             return;
         }
         if (WrightsClientState.mode == WrightsClientState.Mode.JOBS && Minecraft.getInstance().screen == null) {
@@ -216,6 +189,36 @@ public final class WrightsInput {
                 net.neoforged.neoforge.network.PacketDistributor.sendToServer(new BlueprintPayloads.LibraryRequest());
             }
         }
+    }
+
+    private static void useBuildClick(net.minecraft.world.entity.player.Player player, BlockPos pos) {
+        if (pos != null) {
+            boundThisClick = true;
+        }
+        if (player.isShiftKeyDown()) {
+            if (WrightsClientState.bindSupply && WrightsClientState.supplyBound) {
+                WrightsClientState.supplyBound = false;
+                WrightsClientState.supplyPos = null;
+                WrightsClientState.bindFromMenu = false;
+                net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.wrights.network.BlueprintPayloads.BindSupply(BlockPos.ZERO, true));
+            } else {
+                Minecraft.getInstance().setScreen(new PlacementScreen());
+            }
+            return;
+        }
+        if (WrightsClientState.bindSupply) {
+            if (pos != null && Minecraft.getInstance().level != null && SelectionRenderer.isSupplyContainer(Minecraft.getInstance().level, pos)) {
+                WrightsClientState.finishSupplyBind(pos);
+            } else {
+                player.displayClientMessage(net.minecraft.network.chat.Component.translatable("message.wrights.supply_not_container"), true);
+            }
+            return;
+        }
+        if (com.wrights.WrightsClientConfig.BUILD_MENU.get()) {
+            Minecraft.getInstance().setScreen(new PlacementScreen());
+            return;
+        }
+        WrightsClientState.tryBuild();
     }
 
     private static void openAimedJob() {

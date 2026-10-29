@@ -1,7 +1,6 @@
 package com.wrights.job;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -23,6 +22,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.FallingBlock;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -531,7 +531,7 @@ public final class JobManager {
         return true;
     }
 
-    public static boolean startBlueprintBuild(ServerPlayer player, UUID schematicId, BlockPos origin, int sizeX, int sizeY, int sizeZ) {
+    public static boolean startBlueprintBuild(ServerPlayer player, UUID schematicId, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones) {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         Schematic schematic = library.schematic(schematicId).orElse(null);
         if (schematic == null || schematic.blockCount() == 0) {
@@ -552,7 +552,7 @@ public final class JobManager {
         job.setClip(sizeX, sizeY, sizeZ);
         job.setAnchor(origin.offset(schematic.anchorX(), schematic.anchorY(), schematic.anchorZ()));
         job.setSupply(com.wrights.blueprint.BlueprintSessions.get(player).supplyPos());
-        if (!instant(player) && !assignCrew(player, job, schematic)) {
+        if (!instant(player) && !assignCrew(player, job, schematic, drones)) {
             return false;
         }
         library.addJob(job);
@@ -682,7 +682,7 @@ public final class JobManager {
         int sizeY = job.max().getY() - job.min().getY() + 1;
         int sizeZ = job.max().getZ() - job.min().getZ() + 1;
         List<Schematic.Entry> entries = new ArrayList<>(job.partial());
-        entries.sort(Comparator.comparing(Schematic.Entry::secondary));
+        entries.sort(Schematic.BUILD_ORDER);
         if (entries.isEmpty()) {
             job.setPhase(BuildJob.Phase.BINDING);
             job.setResultSchematicId(null);
@@ -838,20 +838,16 @@ public final class JobManager {
             return;
         }
         job.workedTick();
-        int skipBudget = 8192;
-        while (skipBudget > 0 && job.cursor() < schematic.blockCount() && satisfied(level, job, schematic.entry(job.cursor()))) {
-            job.advance();
-            skipBudget--;
-        }
-        if (job.cursor() >= job.total() || job.cursor() >= schematic.blockCount()) {
-            finishPaste(server, library, player, job);
-            return;
-        }
-        if (skipBudget == 0) {
+        int at = nextSolo(level, schematic, job);
+        if (at == SUPPORT_WAIT) {
             library.setDirty();
             return;
         }
-        Schematic.Entry next = schematic.entry(job.cursor());
+        if (at < 0 || job.cursor() >= job.total() || job.cursor() >= schematic.blockCount()) {
+            finishPaste(server, library, player, job);
+            return;
+        }
+        Schematic.Entry next = schematic.entry(at);
         BlockPos nextPos = job.min().offset(next.x(), next.y(), next.z());
         DroneEntity drone = ensureDrone(level, player, job, nextPos);
         if (drone == null) {
@@ -869,24 +865,37 @@ public final class JobManager {
             return;
         }
         int budget = WrightsConfig.BLOCKS_PER_TICK.getAsInt();
-        for (int i = 0; i < budget && job.cursor() < schematic.blockCount(); i++) {
-            Schematic.Entry entry = schematic.entry(job.cursor());
+        for (int i = 0; i < budget; i++) {
+            int index = i == 0 ? at : nextSolo(level, schematic, job);
+            if (index == SUPPORT_WAIT || index < 0) {
+                break;
+            }
+            Schematic.Entry entry = schematic.entry(index);
             BlockPos pos = job.min().offset(entry.x(), entry.y(), entry.z());
             if (drone.distanceToSqr(Vec3.atCenterOf(pos)) > 9.0D) {
                 break;
             }
-            if (job.outsideClip(entry)) {
-                job.advance();
+            if (job.outsideClip(entry) || satisfied(level, job, entry)) {
+                markSolo(job, index);
                 continue;
             }
-            if (placeOne(level, player, job, pos, entry, false) == PlaceResult.PAUSE) {
+            if (falling(level, schematic, job, entry) == Falling.SKIP) {
+                job.skippedOne();
+                markSolo(job, index);
+                continue;
+            }
+            PlaceResult placed = placeOne(level, player, job, pos, entry, false);
+            if (placed == PlaceResult.PAUSE) {
                 if (job.tickMessage()) {
                     Messages.actionBar(player, "message.wrights.paused_chunk");
                 }
                 library.setDirty();
                 return;
             }
-            job.advance();
+            if (placed == PlaceResult.WAIT) {
+                break;
+            }
+            markSolo(job, index);
         }
         library.setDirty();
         if (job.cursor() >= job.total()) {
@@ -1076,8 +1085,12 @@ public final class JobManager {
 
     private enum PlaceResult {
         DONE,
-        PAUSE
+        PAUSE,
+        WAIT
     }
+
+    /** A falling block is not ready yet, so the wright should keep working and come back. */
+    private static final int SUPPORT_WAIT = -3;
 
     private static boolean instant(ServerPlayer player) {
         if (!player.getAbilities().instabuild || player.isSpectator()) {
@@ -1558,6 +1571,10 @@ public final class JobManager {
     }
 
     private static boolean assignCrew(ServerPlayer player, BuildJob job, Schematic schematic) {
+        return assignCrew(player, job, schematic, 0);
+    }
+
+    private static boolean assignCrew(ServerPlayer player, BuildJob job, Schematic schematic, int requested) {
         if (!crewReady(player)) {
             return false;
         }
@@ -1576,7 +1593,8 @@ public final class JobManager {
             Messages.actionBar(player, "message.wrights.drone_block_cap", 0);
             return false;
         }
-        int wanted = Math.min(Swarm.from(Wrightports.worn(player)).assignCount(), blocks);
+        int fromPort = Swarm.from(Wrightports.worn(player)).assignCount();
+        int wanted = Math.min(requested > 0 ? requested : fromPort, blocks);
         List<Swarm.Unit> units = freeUnits(player, library, job.id(), wanted);
         if (units.isEmpty()) {
             Messages.actionBar(player, "message.wrights.drones_busy");
@@ -1598,12 +1616,18 @@ public final class JobManager {
     private static void tickCrew(ServerLevel level, ServerPlayer player, SchematicLibrary library, BuildJob job, Schematic schematic) {
         boolean working = false;
         boolean scanning = false;
+        boolean waiting = false;
         boolean waitingChunk = false;
         int[] skipBudget = {8192};
         for (BuildJob.Hand hand : job.hands()) {
             int index = nextWork(level, schematic, job, hand, skipBudget);
             if (index == -2) {
                 scanning = true;
+                continue;
+            }
+            if (index == SUPPORT_WAIT) {
+                waiting = true;
+                hand.idle = false;
                 continue;
             }
             if (index < 0) {
@@ -1635,6 +1659,10 @@ public final class JobManager {
                     scanning = true;
                     break;
                 }
+                if (at == SUPPORT_WAIT) {
+                    waiting = true;
+                    break;
+                }
                 if (at < 0) {
                     hand.idle = true;
                     break;
@@ -1648,11 +1676,12 @@ public final class JobManager {
                     break;
                 }
                 if (job.outsideClip(entry)) {
-                    noteProgress(hand, entry, at);
+                    noteProgress(schematic, job, hand, entry, at);
                     job.advance();
                     continue;
                 }
-                if (placeOne(level, player, job, pos, entry, false) == PlaceResult.PAUSE) {
+                PlaceResult placed = placeOne(level, player, job, pos, entry, false);
+                if (placed == PlaceResult.PAUSE) {
                     waitingChunk = true;
                     library.setDirty();
                     if (job.tickMessage()) {
@@ -1660,21 +1689,28 @@ public final class JobManager {
                     }
                     return;
                 }
-                noteProgress(hand, entry, at);
+                if (placed == PlaceResult.WAIT) {
+                    waiting = true;
+                    break;
+                }
+                noteProgress(schematic, job, hand, entry, at);
                 job.advance();
             }
         }
         shareWithIdle(job, schematic);
         if (!working && !scanning) {
             for (BuildJob.Hand hand : job.hands()) {
-                if (nextInLane(schematic, job, hand) >= 0) {
+                int peek = nextInLane(level, schematic, job, hand);
+                if (peek == SUPPORT_WAIT) {
+                    waiting = true;
+                } else if (peek >= 0) {
                     working = true;
                     break;
                 }
             }
         }
         library.setDirty();
-        if (!working && !scanning) {
+        if (!working && !scanning && !waiting) {
             finishPaste(level.getServer(), library, player, job);
         } else if (waitingChunk && job.tickMessage()) {
             Messages.actionBar(player, "message.wrights.paused_chunk");
@@ -1793,52 +1829,206 @@ public final class JobManager {
 
     private static int nextWork(ServerLevel level, Schematic schematic, BuildJob job, BuildJob.Hand hand, int[] budget) {
         while (budget[0] > 0) {
-            int index = nextInLane(schematic, job, hand);
+            int index = nextInLane(level, schematic, job, hand);
+            if (index == SUPPORT_WAIT) {
+                return SUPPORT_WAIT;
+            }
             if (index < 0) {
                 hand.rescan = false;
                 return -1;
             }
-            if (!satisfied(level, job, schematic.entry(index))) {
+            Schematic.Entry entry = schematic.entry(index);
+            if (!satisfied(level, job, entry)) {
+                Falling hold = falling(level, schematic, job, entry);
+                if (hold == Falling.SKIP) {
+                    job.skippedOne();
+                    noteProgress(schematic, job, hand, entry, index);
+                    if (!hand.rescan) {
+                        job.advance();
+                    }
+                    continue;
+                }
+                if (hold == Falling.WAIT) {
+                    return SUPPORT_WAIT;
+                }
                 return index;
             }
             budget[0]--;
-            noteProgress(hand, schematic.entry(index), index);
+            noteProgress(schematic, job, hand, entry, index);
             if (!hand.rescan) {
                 job.advance();
             }
         }
-        return nextInLane(schematic, job, hand) < 0 ? -1 : -2;
+        int rest = nextInLane(level, schematic, job, hand);
+        if (rest == SUPPORT_WAIT) {
+            return SUPPORT_WAIT;
+        }
+        return rest < 0 ? -1 : -2;
     }
 
-    private static int nextInLane(Schematic schematic, BuildJob job, BuildJob.Hand hand) {
+    private static int nextInLane(ServerLevel level, Schematic schematic, BuildJob job, BuildJob.Hand hand) {
         if (hand.slices.isEmpty()) {
             for (BuildJob.Hand other : job.hands()) {
                 if (!other.slices.isEmpty()) {
                     return -1;
                 }
             }
-            for (int i = Math.max(0, hand.cursor); i < schematic.blockCount(); i++) {
-                Schematic.Entry entry = schematic.entry(i);
-                if (CrewSplit.lane(entry.x(), entry.y(), entry.z(), hand.lanes, job.spanX(), job.spanY(), job.spanZ()) == hand.lane) {
-                    return i;
-                }
+            java.util.function.Predicate<Schematic.Entry> lane = entry -> CrewSplit.lane(entry.x(), entry.y(), entry.z(), hand.lanes, job.spanX(), job.spanY(), job.spanZ()) == hand.lane;
+            int found = scan(level, schematic, job, hand.cursor, hand.probe, lane);
+            if (found < 0 && Math.max(hand.cursor, hand.probe) > hand.cursor) {
+                hand.probe = hand.cursor;
+                found = scan(level, schematic, job, hand.cursor, hand.cursor, lane);
             }
-            return -1;
+            if (found >= 0) {
+                hand.probe = found;
+            }
+            return found;
         }
         int best = -1;
+        boolean waiting = false;
         for (BuildJob.Slice slice : hand.slices) {
-            for (int i = Math.max(0, slice.cursor); i < schematic.blockCount(); i++) {
-                if (best >= 0 && i >= best) {
-                    break;
+            int found = scanSlice(level, schematic, job, slice);
+            if (found == SUPPORT_WAIT) {
+                waiting = true;
+                continue;
+            }
+            if (found >= 0 && (best < 0 || found < best)) {
+                best = found;
+            }
+        }
+        if (best >= 0) {
+            return best;
+        }
+        return waiting ? SUPPORT_WAIT : -1;
+    }
+
+    private static int scanSlice(ServerLevel level, Schematic schematic, BuildJob job, BuildJob.Slice slice) {
+        int start = Math.max(slice.cursor, slice.probe);
+        java.util.function.Predicate<Schematic.Entry> include = entry -> slice.contains(entry.x(), entry.y(), entry.z());
+        int found = scan(level, schematic, job, slice.cursor, start, include);
+        if (found < 0 && start > slice.cursor) {
+            slice.probe = slice.cursor;
+            found = scan(level, schematic, job, slice.cursor, slice.cursor, include);
+        }
+        if (found >= 0) {
+            slice.probe = found;
+        }
+        return found;
+    }
+
+    /**
+     * Next block this range can act on. A falling block whose floor is not down yet is left in place,
+     * so the wright can build that floor and wrap back to the sand or gravel.
+     */
+    private static int scan(ServerLevel level, Schematic schematic, BuildJob job, int cursor, int start, java.util.function.Predicate<Schematic.Entry> include) {
+        boolean waiting = false;
+        for (int i = Math.max(0, start); i < schematic.blockCount(); i++) {
+            Schematic.Entry entry = schematic.entry(i);
+            if (!include.test(entry)) {
+                continue;
+            }
+            if (job.outsideClip(entry) || satisfied(level, job, entry)) {
+                if (i == cursor) {
+                    return i;
                 }
-                Schematic.Entry entry = schematic.entry(i);
-                if (slice.contains(entry.x(), entry.y(), entry.z())) {
-                    best = i;
-                    break;
+                continue;
+            }
+            if (falling(level, schematic, job, entry) == Falling.WAIT) {
+                waiting = true;
+                continue;
+            }
+            return i;
+        }
+        return waiting ? SUPPORT_WAIT : -1;
+    }
+
+    private enum Falling {
+        READY,
+        WAIT,
+        SKIP
+    }
+
+    private static Falling falling(ServerLevel level, Schematic schematic, BuildJob job, Schematic.Entry entry) {
+        if (!BlockFilters.falls(entry.state())) {
+            return Falling.READY;
+        }
+        return fallingAt(level, schematic, job, entry, new HashSet<>());
+    }
+
+    private static Falling fallingAt(ServerLevel level, Schematic schematic, BuildJob job, Schematic.Entry entry, Set<Long> seen) {
+        if (!seen.add(BlockPos.asLong(entry.x(), entry.y(), entry.z()))) {
+            return Falling.SKIP;
+        }
+        BlockPos below = job.min().offset(entry.x(), entry.y(), entry.z()).below();
+        if (level.isOutsideBuildHeight(below) || !level.isLoaded(below)) {
+            return Falling.WAIT;
+        }
+        int support = schematic.indexAt(entry.x(), entry.y() - 1, entry.z());
+        BlockState under = level.getBlockState(below);
+        if (support >= 0 && !under.equals(schematic.entry(support).state())) {
+            return floorComing(level, schematic, job, support, seen) ? Falling.WAIT : Falling.SKIP;
+        }
+        if (FallingBlock.isFree(under)) {
+            return Falling.SKIP;
+        }
+        return Falling.READY;
+    }
+
+    private static boolean floorComing(ServerLevel level, Schematic schematic, BuildJob job, int support, Set<Long> seen) {
+        Schematic.Entry floor = schematic.entry(support);
+        if (!stillQueued(job, floor.x(), floor.y(), floor.z(), support)) {
+            return false;
+        }
+        if (!BlockFilters.falls(floor.state())) {
+            return true;
+        }
+        return fallingAt(level, schematic, job, floor, seen) != Falling.SKIP;
+    }
+
+    private static boolean stillQueued(BuildJob job, int x, int y, int z, int index) {
+        if (job.hands().isEmpty()) {
+            return job.cursor() <= index;
+        }
+        for (BuildJob.Hand hand : job.hands()) {
+            if (hand.slices.isEmpty()) {
+                if (hand.cursor <= index) {
+                    return true;
+                }
+                continue;
+            }
+            for (BuildJob.Slice slice : hand.slices) {
+                if (slice.contains(x, y, z) && slice.cursor <= index) {
+                    return true;
                 }
             }
         }
-        return best;
+        return false;
+    }
+
+    private static int nextSolo(ServerLevel level, Schematic schematic, BuildJob job) {
+        int start = Math.max(job.cursor(), job.pasteProbe());
+        int found = scan(level, schematic, job, job.cursor(), start, entry -> true);
+        if (found < 0 && start > job.cursor()) {
+            job.setPasteProbe(job.cursor());
+            found = scan(level, schematic, job, job.cursor(), job.cursor(), entry -> true);
+        }
+        if (found >= 0) {
+            job.setPasteProbe(found);
+        }
+        return found;
+    }
+
+    private static void markSolo(BuildJob job, int index) {
+        if (index <= job.cursor()) {
+            while (job.cursor() <= index && job.cursor() < job.total()) {
+                job.advance();
+            }
+            if (job.pasteProbe() < job.cursor()) {
+                job.setPasteProbe(job.cursor());
+            }
+            return;
+        }
+        job.setPasteProbe(index + 1);
     }
 
     private static int refundIndex(BuildJob job, BuildJob.Hand hand) {
@@ -1864,15 +2054,26 @@ public final class JobManager {
         return false;
     }
 
-    private static void noteProgress(BuildJob.Hand hand, Schematic.Entry entry, int index) {
+    private static void noteProgress(Schematic schematic, BuildJob job, BuildJob.Hand hand, Schematic.Entry entry, int index) {
         int next = index + 1;
         if (hand.slices.isEmpty()) {
-            hand.cursor = next;
+            if (firstForHand(schematic, job, hand, hand.cursor) == index) {
+                hand.cursor = next;
+                hand.probe = hand.cursor;
+            } else if (hand.probe <= index) {
+                hand.probe = next;
+            }
             return;
         }
         for (BuildJob.Slice slice : hand.slices) {
-            if (slice.cursor <= index && slice.contains(entry.x(), entry.y(), entry.z())) {
+            if (!slice.contains(entry.x(), entry.y(), entry.z()) || slice.cursor > index) {
+                continue;
+            }
+            if (firstInSlice(schematic, slice, slice.cursor) == index) {
                 slice.cursor = next;
+                slice.probe = slice.cursor;
+            } else if (slice.probe <= index) {
+                slice.probe = next;
             }
         }
         int earliest = Integer.MAX_VALUE;
@@ -1880,6 +2081,26 @@ public final class JobManager {
             earliest = Math.min(earliest, slice.cursor);
         }
         hand.cursor = earliest == Integer.MAX_VALUE ? next : earliest;
+    }
+
+    private static int firstForHand(Schematic schematic, BuildJob job, BuildJob.Hand hand, int from) {
+        for (int i = Math.max(0, from); i < schematic.blockCount(); i++) {
+            Schematic.Entry entry = schematic.entry(i);
+            if (CrewSplit.lane(entry.x(), entry.y(), entry.z(), hand.lanes, job.spanX(), job.spanY(), job.spanZ()) == hand.lane) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static int firstInSlice(Schematic schematic, BuildJob.Slice slice, int from) {
+        for (int i = Math.max(0, from); i < schematic.blockCount(); i++) {
+            Schematic.Entry entry = schematic.entry(i);
+            if (slice.contains(entry.x(), entry.y(), entry.z())) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private static void migrateSlices(BuildJob job) {
@@ -2167,24 +2388,23 @@ public final class JobManager {
         }
         int minX = xs[0];
         int maxX = xs[0];
-        int minY = ys[0];
-        int maxY = ys[0];
         int minZ = zs[0];
         int maxZ = zs[0];
         for (int i = 1; i < count; i++) {
             minX = Math.min(minX, xs[i]);
             maxX = Math.max(maxX, xs[i]);
-            minY = Math.min(minY, ys[i]);
-            maxY = Math.max(maxY, ys[i]);
             minZ = Math.min(minZ, zs[i]);
             maxZ = Math.max(maxZ, zs[i]);
         }
         int spanX = maxX - minX;
-        int spanY = maxY - minY;
         int spanZ = maxZ - minZ;
-        int axis = spanX >= spanZ && spanX >= spanY ? 0 : spanZ >= spanY ? 2 : 1;
-        int minC = axis == 0 ? minX : axis == 1 ? minY : minZ;
-        int span = axis == 0 ? spanX : axis == 1 ? spanY : spanZ;
+        // Never cut a column in half. The wright who owns the sand also owns the block under it.
+        int axis = spanX >= spanZ && spanX > 0 ? 0 : spanZ > 0 ? 2 : -1;
+        if (axis < 0) {
+            return null;
+        }
+        int minC = axis == 0 ? minX : minZ;
+        int span = axis == 0 ? spanX : spanZ;
         if (span <= 0) {
             return null;
         }
@@ -2251,21 +2471,44 @@ public final class JobManager {
     }
 
     private static void placeAll(ServerLevel level, ServerPlayer player, SchematicLibrary library, BuildJob job, Schematic schematic) {
+        int count = Math.min(job.total(), schematic.blockCount());
+        boolean[] done = new boolean[count];
+        int guard = count + 1;
+        boolean progress = true;
+        while (progress && guard-- > 0) {
+            progress = false;
+            for (int i = 0; i < count; i++) {
+                if (done[i]) {
+                    continue;
+                }
+                Schematic.Entry entry = schematic.entry(i);
+                if (job.outsideClip(entry)) {
+                    done[i] = true;
+                    progress = true;
+                    continue;
+                }
+                BlockPos pos = job.min().offset(entry.x(), entry.y(), entry.z());
+                if (!level.isLoaded(pos)) {
+                    level.getChunkAt(pos);
+                }
+                PlaceResult placed = placeOne(level, player, job, pos, entry, true);
+                if (placed == PlaceResult.PAUSE) {
+                    library.setDirty();
+                    return;
+                }
+                if (placed == PlaceResult.WAIT) {
+                    continue;
+                }
+                done[i] = true;
+                progress = true;
+            }
+        }
+        for (int i = 0; i < count; i++) {
+            if (!done[i]) {
+                job.skippedOne();
+            }
+        }
         while (job.cursor() < job.total()) {
-            while (job.cursor() < schematic.blockCount() && job.outsideClip(schematic.entry(job.cursor()))) {
-                job.advance();
-            }
-            if (job.cursor() >= job.total()) {
-                break;
-            }
-            Schematic.Entry entry = schematic.entry(job.cursor());
-            BlockPos pos = job.min().offset(entry.x(), entry.y(), entry.z());
-            if (!level.isLoaded(pos)) {
-                level.getChunkAt(pos);
-            }
-            if (placeOne(level, player, job, pos, entry, true) == PlaceResult.PAUSE) {
-                break;
-            }
             job.advance();
         }
         library.setDirty();
@@ -2332,6 +2575,12 @@ public final class JobManager {
             if (item == Items.AIR || !hasItem(player, level, job, item)) {
                 job.skippedOne();
                 return PlaceResult.DONE;
+            }
+        }
+        if (BlockFilters.falls(state)) {
+            BlockPos below = pos.below();
+            if (level.isOutsideBuildHeight(below) || !level.isLoaded(below) || FallingBlock.isFree(level.getBlockState(below))) {
+                return PlaceResult.WAIT;
             }
         }
 

@@ -63,6 +63,8 @@ public final class WrightsClientState {
     public static int viewZ = 1;
     public static int blockCount;
     public static boolean deployChosen;
+    public static int deployCount = 1;
+    public static boolean bindFromMenu;
     public static final List<JobNotice> jobNotices = new ArrayList<>();
     public static boolean sampled;
     public static boolean concealed;
@@ -665,6 +667,7 @@ public final class WrightsClientState {
             if (!same) {
                 follow = true;
                 anchor = lookTarget();
+                deployChosen = false;
             }
             cornerA = null;
             cornerB = null;
@@ -727,6 +730,56 @@ public final class WrightsClientState {
         PacketDistributor.sendToServer(new BlueprintPayloads.SetAssign(next));
     }
 
+    public static int deployCap() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null) {
+            return 0;
+        }
+        int free = com.wrights.drone.Wrightports.swarm(minecraft.player).units().size();
+        return Math.min(free, Math.max(0, placeableBlocks()));
+    }
+
+    /** Keeps this job's wright count inside what the port and the blueprint can use. */
+    public static void clampDeploy() {
+        int cap = deployCap();
+        if (cap <= 0) {
+            deployCount = 0;
+            return;
+        }
+        if (!deployChosen) {
+            Minecraft minecraft = Minecraft.getInstance();
+            int free = minecraft.player == null ? 0 : com.wrights.drone.Wrightports.swarm(minecraft.player).units().size();
+            deployCount = WrightsClientConfig.deployTarget(free, placeableBlocks());
+        }
+        deployCount = Mth.clamp(Math.max(1, deployCount), 1, cap);
+    }
+
+    public static int stepped(int current, int direction, int min, int max) {
+        if (max < min) {
+            return min;
+        }
+        boolean shift = net.minecraft.client.gui.screens.Screen.hasShiftDown();
+        boolean alt = net.minecraft.client.gui.screens.Screen.hasAltDown();
+        boolean control = net.minecraft.client.gui.screens.Screen.hasControlDown();
+        if (control || (shift && alt)) {
+            return direction > 0 ? max : min;
+        }
+        int step = alt ? 64 : shift ? 16 : 1;
+        return Mth.clamp(current + Integer.signum(direction) * step, min, max);
+    }
+
+    public static void finishSupplyBind(BlockPos pos) {
+        supplyBound = true;
+        supplyPos = pos.immutable();
+        PacketDistributor.sendToServer(new BlueprintPayloads.BindSupply(pos, false));
+        if (!bindFromMenu) {
+            return;
+        }
+        bindSupply = false;
+        bindFromMenu = false;
+        Minecraft.getInstance().setScreen(new PlacementScreen());
+    }
+
     public static boolean tryBuild() {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player == null || !ControllerItem.isHeld(minecraft.player)) {
@@ -735,9 +788,7 @@ public final class WrightsClientState {
         if (mode != Mode.BUILD || buildId == null || anchor == null || buildCooldown > 0) {
             return false;
         }
-        if (!(minecraft.screen instanceof PlacementScreen) && !deployChosen) {
-            applyDeploy();
-        }
+        clampDeploy();
         buildCooldown = 2;
         follow = true;
         PacketDistributor.sendToServer(new BlueprintPayloads.LaunchBuild(
@@ -748,7 +799,8 @@ public final class WrightsClientState {
                 viewZ,
                 pivotX,
                 pivotY,
-                pivotZ));
+                pivotZ,
+                Math.max(0, deployCount)));
         return true;
     }
 
@@ -829,6 +881,9 @@ public final class WrightsClientState {
     public static void cycleBuildTool() {
         mainPicker = false;
         bindSupply = !bindSupply;
+        if (bindSupply) {
+            bindFromMenu = false;
+        }
         styleHudTicks = 70;
         styleAnnounce = true;
     }
