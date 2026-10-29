@@ -254,7 +254,7 @@ public final class BlueprintNetwork {
 
     private static void jobDrones(BlueprintPayloads.SetJobDrones payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
-        context.enqueueWork(() -> com.autobots.job.JobManager.setJobDrones(player, payload.id(), payload.count()));
+        context.enqueueWork(() -> com.autobots.job.JobManager.setJobDrones(player, payload.id(), payload.unit(), payload.add()));
     }
 
     private static void assign(BlueprintPayloads.SetAssign payload, IPayloadContext context) {
@@ -344,6 +344,7 @@ public final class BlueprintNetwork {
 
     public static void syncJobs(ServerPlayer player) {
         com.autobots.schematic.SchematicLibrary library = com.autobots.schematic.SchematicLibrary.get(player.getServer());
+        com.autobots.job.JobManager.bindCrewIds(player, library);
         java.util.List<BuildJob> jobs = new java.util.ArrayList<>(library.jobsFor(player.getUUID()));
         jobs.sort(java.util.Comparator.comparing(BuildJob::finished).thenComparing(java.util.Comparator.comparingInt(BuildJob::historyOrder).reversed()));
         java.util.List<BlueprintPayloads.JobLine> lines = new java.util.ArrayList<>();
@@ -379,7 +380,8 @@ public final class BlueprintNetwork {
                     job.boxSizeX(),
                     job.boxSizeY(),
                     job.boxSizeZ(),
-                    com.autobots.job.JobManager.droneSlots(player, job)));
+                    job.crewUnits().size(),
+                    job.crewUnits()));
         }
         PacketDistributor.sendToPlayer(player, new BlueprintPayloads.JobSync(lines));
     }

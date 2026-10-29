@@ -510,7 +510,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record JobLine(UUID id, String name, int done, int total, int skipped, boolean paused, boolean saving, boolean finished, boolean canUndo, boolean undoing, boolean stopped, boolean undone, String dimension, BlockPos anchor, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones) {
+    public record JobLine(UUID id, String name, int done, int total, int skipped, boolean paused, boolean saving, boolean finished, boolean canUndo, boolean undoing, boolean stopped, boolean undone, String dimension, BlockPos anchor, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, List<UUID> crew) {
         public void write(RegistryFriendlyByteBuf buf) {
             buf.writeUUID(id);
             buf.writeUtf(name, 48);
@@ -531,6 +531,10 @@ public final class BlueprintPayloads {
             buf.writeVarInt(sizeY);
             buf.writeVarInt(sizeZ);
             buf.writeVarInt(drones);
+            buf.writeVarInt(crew.size());
+            for (UUID unit : crew) {
+                buf.writeUUID(unit);
+            }
         }
 
         public static JobLine read(RegistryFriendlyByteBuf buf) {
@@ -553,7 +557,17 @@ public final class BlueprintPayloads {
                     buf.readVarInt(),
                     buf.readVarInt(),
                     buf.readVarInt(),
-                    buf.readVarInt());
+                    buf.readVarInt(),
+                    readCrew(buf));
+        }
+
+        private static List<UUID> readCrew(RegistryFriendlyByteBuf buf) {
+            int count = buf.readVarInt();
+            List<UUID> crew = new ArrayList<>(count);
+            for (int i = 0; i < count; i++) {
+                crew.add(buf.readUUID());
+            }
+            return List.copyOf(crew);
         }
     }
 
@@ -622,14 +636,15 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record SetJobDrones(UUID id, int count) implements CustomPacketPayload {
+    public record SetJobDrones(UUID id, UUID unit, boolean add) implements CustomPacketPayload {
         public static final Type<SetJobDrones> TYPE = payloadType("set_job_drones");
         public static final StreamCodec<RegistryFriendlyByteBuf, SetJobDrones> STREAM_CODEC = StreamCodec.of(
                 (buf, value) -> {
                     buf.writeUUID(value.id);
-                    buf.writeVarInt(value.count);
+                    buf.writeUUID(value.unit);
+                    buf.writeBoolean(value.add);
                 },
-                buf -> new SetJobDrones(buf.readUUID(), buf.readVarInt()));
+                buf -> new SetJobDrones(buf.readUUID(), buf.readUUID(), buf.readBoolean()));
 
         @Override
         public Type<? extends CustomPacketPayload> type() {

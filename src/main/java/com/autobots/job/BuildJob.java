@@ -49,6 +49,7 @@ public final class BuildJob {
     private int skippedSpecial;
     private UUID droneId;
     private final List<Hand> hands = new ArrayList<>();
+    private final List<UUID> crewUnits = new ArrayList<>();
     private int spanX = 1;
     private int spanY = 1;
     private int spanZ = 1;
@@ -198,8 +199,20 @@ public final class BuildJob {
         return spanZ;
     }
 
+    public List<UUID> crewUnits() {
+        return List.copyOf(crewUnits);
+    }
+
+    public void setCrewUnits(List<UUID> ids) {
+        crewUnits.clear();
+        if (ids != null) {
+            crewUnits.addAll(ids);
+        }
+    }
+
     public void setCrew(List<Integer> speeds, int sizeX, int sizeY, int sizeZ) {
         hands.clear();
+        crewUnits.clear();
         awaitDrones = false;
         spanX = Math.max(1, sizeX);
         spanY = Math.max(1, sizeY);
@@ -220,6 +233,7 @@ public final class BuildJob {
 
     public void clearAssigned() {
         hands.clear();
+        crewUnits.clear();
         awaitDrones = true;
     }
 
@@ -584,6 +598,15 @@ public final class BuildJob {
             tag.putInt("spanY", spanY);
             tag.putInt("spanZ", spanZ);
         }
+        if (!crewUnits.isEmpty()) {
+            ListTag units = new ListTag();
+            for (UUID unit : crewUnits) {
+                CompoundTag unitTag = new CompoundTag();
+                unitTag.putUUID("id", unit);
+                units.add(unitTag);
+            }
+            tag.put("crewUnits", units);
+        }
         if (blueprintName != null) {
             tag.putString("blueprintName", blueprintName);
         }
@@ -672,6 +695,15 @@ public final class BuildJob {
                     hand.lastPos = NbtUtils.readBlockPos(handTag, "pos").orElse(null);
                 }
                 job.hands.add(hand);
+            }
+        }
+        if (tag.contains("crewUnits")) {
+            ListTag units = tag.getList("crewUnits", Tag.TAG_COMPOUND);
+            for (int i = 0; i < units.size(); i++) {
+                CompoundTag unitTag = units.getCompound(i);
+                if (unitTag.hasUUID("id")) {
+                    job.crewUnits.add(unitTag.getUUID("id"));
+                }
             }
         }
         if (tag.contains("blueprintName")) {

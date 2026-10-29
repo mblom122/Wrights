@@ -23,15 +23,16 @@ public class JobActionScreen extends Screen {
     @Override
     protected void init() {
         int panelW = 240;
-        int panelH = 148;
+        int panelH = 188;
         panelX = (this.width - panelW) / 2;
         panelY = (this.height - panelH) / 2;
         BlueprintPayloads.JobLine job = live();
         boolean paused = job != null && job.paused();
-        paceButton = new AutobotsButton(panelX + 16, panelY + 78, 208, 18, Component.translatable(paused ? "menu.autobots.resume" : "menu.autobots.pause"), button -> togglePace());
+        addRenderableWidget(new AutobotsButton(panelX + 16, panelY + 78, 208, 18, Component.translatable("screen.autobots.manage_drones"), button -> manage()));
+        paceButton = new AutobotsButton(panelX + 16, panelY + 100, 208, 18, Component.translatable(paused ? "menu.autobots.resume" : "menu.autobots.pause"), button -> togglePace());
         addRenderableWidget(paceButton);
-        addRenderableWidget(new AutobotsButton(panelX + 16, panelY + 100, 100, 18, Component.translatable("menu.autobots.stop"), button -> stop(), true));
-        addRenderableWidget(new AutobotsButton(panelX + 124, panelY + 100, 100, 18, Component.translatable("menu.autobots.close"), button -> onClose()));
+        addRenderableWidget(new AutobotsButton(panelX + 16, panelY + 122, 100, 18, Component.translatable("menu.autobots.stop"), button -> stop(), true));
+        addRenderableWidget(new AutobotsButton(panelX + 124, panelY + 122, 100, 18, Component.translatable("menu.autobots.close"), button -> onClose()));
     }
 
     @Override
@@ -50,7 +51,7 @@ public class JobActionScreen extends Screen {
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         graphics.fill(0, 0, this.width, this.height, 0xC0060C14);
-        AutobotsUi.panel(graphics, panelX, panelY, 240, 148);
+        AutobotsUi.panel(graphics, panelX, panelY, 240, 188);
     }
 
     @Override
@@ -68,15 +69,19 @@ public class JobActionScreen extends Screen {
         graphics.drawString(this.font, Component.translatable(status), panelX + 16, panelY + 28, job.paused() ? 0xFFE0B060 : AutobotsUi.TEXT, false);
         int percent = job.finished() ? 100 : AutobotsClientState.percent(job);
         graphics.drawString(this.font, Component.translatable("menu.autobots.job_percent", percent, job.done(), job.total()), panelX + 16, panelY + 44, AutobotsUi.MUTED, false);
-        if (job.skipped() > 0) {
-            int skipped = job.skipped() * 100 / Math.max(1, job.total());
-            graphics.drawString(this.font, Component.translatable("menu.autobots.job_skipped", job.skipped(), skipped), panelX + 16, panelY + 58, 0xFFF0C14A, false);
-        }
+        String crew = this.font.plainSubstrByWidth(JobDroneScreen.jobSpeeds(this.minecraft.player, job), 208);
+        graphics.drawString(this.font, crew, panelX + 16, panelY + 60, AutobotsUi.TEXT, false);
     }
 
     @Override
     public boolean isPauseScreen() {
         return false;
+    }
+
+    private void manage() {
+        if (this.minecraft != null) {
+            this.minecraft.setScreen(new JobDroneScreen(id, this));
+        }
     }
 
     private void togglePace() {

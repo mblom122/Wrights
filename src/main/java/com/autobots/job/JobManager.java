@@ -1074,8 +1074,11 @@ public final class JobManager {
     }
 
     public static int droneSlots(ServerPlayer player, BuildJob job) {
-        if (job.kind() != BuildJob.Kind.PASTE || job.finished() || job.awaitingDrones()) {
+        if (!usesDrones(job)) {
             return 0;
+        }
+        if (!job.crewUnits().isEmpty()) {
+            return job.crewUnits().size();
         }
         if (job.hasCrew()) {
             return job.hands().size();
@@ -1083,63 +1086,188 @@ public final class JobManager {
         return instant(player) ? 0 : 1;
     }
 
-    public static void setJobDrones(ServerPlayer player, UUID id, int count) {
+    public static void bindCrewIds(ServerPlayer player, SchematicLibrary library) {
+        Swarm swarm = Cradles.swarm(player);
+        Set<UUID> known = new HashSet<>();
+        for (Swarm.Unit unit : swarm.units()) {
+            known.add(unit.id());
+        }
+        Set<UUID> taken = new HashSet<>();
+        boolean dirty = false;
+        for (BuildJob job : library.jobsFor(player.getUUID())) {
+            if (!usesDrones(job) || job.awaitingDrones()) {
+                if (!job.crewUnits().isEmpty()) {
+                    job.setCrewUnits(List.of());
+                    dirty = true;
+                }
+                continue;
+            }
+            List<UUID> current = new ArrayList<>();
+            for (UUID unit : job.crewUnits()) {
+                if (known.contains(unit) && taken.add(unit)) {
+                    current.add(unit);
+                }
+            }
+            if (current.isEmpty() && job.crewUnits().isEmpty()) {
+                int need = job.hasCrew() ? job.hands().size() : (instant(player) ? 0 : 1);
+                for (Swarm.Unit unit : swarm.units()) {
+                    if (current.size() >= need) {
+                        break;
+                    }
+                    if (taken.add(unit.id())) {
+                        current.add(unit.id());
+                    }
+                }
+            }
+            if (!current.equals(job.crewUnits())) {
+                job.setCrewUnits(current);
+                dirty = true;
+            }
+            taken.addAll(current);
+            if (job.hasCrew() && current.size() != job.hands().size()) {
+                if (current.isEmpty()) {
+                    discardDrone(player.getServer(), job);
+                    job.clearAssigned();
+                    job.setPaused(true);
+                } else {
+                    fitCrew(player, library, job, current);
+                }
+                dirty = true;
+            }
+        }
+        if (dirty) {
+            library.setDirty();
+        }
+    }
+
+    public static void setJobDrones(ServerPlayer player, UUID id, UUID unitId, boolean add) {
         if (!com.autobots.item.ControllerItem.isHeld(player)) {
             return;
         }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        bindCrewIds(player, library);
         BuildJob job = library.job(id).orElse(null);
-        if (job == null || !job.owner().equals(player.getUUID()) || job.finished() || job.kind() != BuildJob.Kind.PASTE) {
+        if (job == null || !job.owner().equals(player.getUUID()) || !usesDrones(job)) {
             BlueprintNetwork.syncJobs(player);
             return;
         }
-        int total = Cradles.swarm(player).units().size();
-        int others = 0;
-        for (BuildJob other : library.jobsFor(player.getUUID())) {
-            if (other.id().equals(job.id()) || other.finished() || other.kind() != BuildJob.Kind.PASTE) {
-                continue;
+        Swarm swarm = Cradles.swarm(player);
+        Swarm.Unit unit = null;
+        for (Swarm.Unit candidate : swarm.units()) {
+            if (candidate.id().equals(unitId)) {
+                unit = candidate;
+                break;
             }
-            others += droneSlots(player, other);
         }
-        int next = Math.max(0, Math.min(count, Math.max(0, total - others)));
-        if (next == droneSlots(player, job)) {
+        if (add && unit == null) {
             BlueprintNetwork.syncJobs(player);
             return;
         }
-        if (next == 0) {
+        if (add && claimedByOther(library, player.getUUID(), job.id(), unitId)) {
+            Messages.actionBar(player, "message.autobots.drones_busy");
+            BlueprintNetwork.syncJobs(player);
+            return;
+        }
+        List<UUID> ids = new ArrayList<>(job.crewUnits());
+        if (add) {
+            if (!ids.contains(unitId)) {
+                ids.add(unitId);
+            }
+        } else {
+            ids.remove(unitId);
+        }
+        if (ids.equals(job.crewUnits()) && (ids.isEmpty() || job.hands().size() == ids.size())) {
+            BlueprintNetwork.syncJobs(player);
+            return;
+        }
+        if (ids.isEmpty()) {
             discardDrone(player.getServer(), job);
             job.clearAssigned();
             job.setPaused(true);
         } else {
-            if (!job.hasCrew() && job.droneId() != null) {
-                discardId(player.getServer().getLevel(job.dimension()), job.droneId());
-                job.setDroneId(null);
-            }
-            int sizeX = Math.max(1, job.spanX());
-            int sizeY = Math.max(1, job.spanY());
-            int sizeZ = Math.max(1, job.spanZ());
-            if (!job.hasCrew() && job.schematicId() != null) {
-                Schematic schematic = library.schematic(job.schematicId()).orElse(null);
-                if (schematic != null) {
-                    sizeX = schematic.sizeX();
-                    sizeY = schematic.sizeY();
-                    sizeZ = schematic.sizeZ();
-                    if (job.clipX() != Integer.MAX_VALUE) {
-                        sizeX = Math.min(sizeX, job.clipX());
-                        sizeY = Math.min(sizeY, job.clipY());
-                        sizeZ = Math.min(sizeZ, job.clipZ());
-                    }
-                }
-            }
-            boolean rescan = job.hasCrew() || job.cursor() > 0;
-            List<UUID> dropped = job.resizeCrew(Cradles.swarm(player).speeds(next), sizeX, sizeY, sizeZ, rescan);
-            ServerLevel level = player.getServer().getLevel(job.dimension());
-            for (UUID droppedId : dropped) {
-                discardId(level, droppedId);
-            }
+            fitCrew(player, library, job, ids);
         }
         library.setDirty();
         BlueprintNetwork.syncJobs(player);
+    }
+
+    private static boolean usesDrones(BuildJob job) {
+        return job.kind() == BuildJob.Kind.PASTE && !job.finished();
+    }
+
+    private static boolean claimedByOther(SchematicLibrary library, UUID owner, UUID jobId, UUID unitId) {
+        for (BuildJob other : library.jobsFor(owner)) {
+            if (other.id().equals(jobId) || !usesDrones(other) || other.awaitingDrones()) {
+                continue;
+            }
+            if (other.crewUnits().contains(unitId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<Swarm.Unit> freeUnits(ServerPlayer player, SchematicLibrary library, UUID exceptJob, int limit) {
+        Swarm swarm = Cradles.swarm(player);
+        List<Swarm.Unit> free = new ArrayList<>();
+        for (Swarm.Unit unit : swarm.units()) {
+            if (claimedByOther(library, player.getUUID(), exceptJob, unit.id())) {
+                continue;
+            }
+            free.add(unit);
+            if (free.size() >= limit) {
+                break;
+            }
+        }
+        return free;
+    }
+
+    private static void fitCrew(ServerPlayer player, SchematicLibrary library, BuildJob job, List<UUID> ids) {
+        Swarm swarm = Cradles.swarm(player);
+        List<Integer> speeds = new ArrayList<>();
+        List<UUID> kept = new ArrayList<>();
+        for (UUID unitId : ids) {
+            for (Swarm.Unit unit : swarm.units()) {
+                if (unit.id().equals(unitId)) {
+                    speeds.add(Math.max(1, Math.min(Swarm.MAX_SPEED, unit.speed())));
+                    kept.add(unitId);
+                    break;
+                }
+            }
+        }
+        if (kept.isEmpty()) {
+            discardDrone(player.getServer(), job);
+            job.clearAssigned();
+            job.setPaused(true);
+            return;
+        }
+        if (!job.hasCrew() && job.droneId() != null) {
+            discardId(player.getServer().getLevel(job.dimension()), job.droneId());
+            job.setDroneId(null);
+        }
+        int sizeX = Math.max(1, job.spanX());
+        int sizeY = Math.max(1, job.spanY());
+        int sizeZ = Math.max(1, job.spanZ());
+        if (!job.hasCrew() && job.schematicId() != null) {
+            Schematic schematic = library.schematic(job.schematicId()).orElse(null);
+            if (schematic != null) {
+                sizeX = schematic.sizeX();
+                sizeY = schematic.sizeY();
+                sizeZ = schematic.sizeZ();
+                if (job.clipX() != Integer.MAX_VALUE) {
+                    sizeX = Math.min(sizeX, job.clipX());
+                    sizeY = Math.min(sizeY, job.clipY());
+                    sizeZ = Math.min(sizeZ, job.clipZ());
+                }
+            }
+        }
+        boolean rescan = job.hasCrew() || job.cursor() > 0;
+        List<UUID> dropped = job.resizeCrew(speeds, sizeX, sizeY, sizeZ, rescan);
+        ServerLevel level = player.getServer().getLevel(job.dimension());
+        for (UUID droppedId : dropped) {
+            discardId(level, droppedId);
+        }
+        job.setCrewUnits(kept);
     }
 
     private static boolean missingDrones(ServerPlayer player, BuildJob job) {
@@ -1186,7 +1314,21 @@ public final class JobManager {
             sizeY = Math.min(sizeY, job.clipY());
             sizeZ = Math.min(sizeZ, job.clipZ());
         }
-        job.setCrew(Swarm.from(Cradles.worn(player)).assignedSpeeds(), sizeX, sizeY, sizeZ);
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        bindCrewIds(player, library);
+        List<Swarm.Unit> units = freeUnits(player, library, job.id(), Swarm.from(Cradles.worn(player)).assignCount());
+        if (units.isEmpty()) {
+            Messages.actionBar(player, "message.autobots.drones_busy");
+            return false;
+        }
+        List<Integer> speeds = new ArrayList<>();
+        List<UUID> ids = new ArrayList<>();
+        for (Swarm.Unit unit : units) {
+            speeds.add(Math.max(1, Math.min(Swarm.MAX_SPEED, unit.speed())));
+            ids.add(unit.id());
+        }
+        job.setCrew(speeds, sizeX, sizeY, sizeZ);
+        job.setCrewUnits(ids);
         return job.hasCrew();
     }
 

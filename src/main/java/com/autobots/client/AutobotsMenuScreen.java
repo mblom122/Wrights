@@ -878,7 +878,7 @@ public class AutobotsMenuScreen extends Screen {
         return min + (int) Math.round(t * (max - min));
     }
 
-    private static final int JOB_ROW = 58;
+    private static final int JOB_ROW = 70;
 
     private void prepareJobs() {
         workingJobs.clear();
@@ -894,7 +894,7 @@ public class AutobotsMenuScreen extends Screen {
                 }
             }
         }
-        int top = panelY + 36;
+        int top = panelY + 48;
         int bottom = panelY + panelH - 12;
         int gap = 8;
         int header = 18;
@@ -944,6 +944,8 @@ public class AutobotsMenuScreen extends Screen {
         int[] pool = dronePool();
         String drones = this.font.plainSubstrByWidth(Component.translatable("menu.autobots.drones_pool", pool[0], pool[1]).getString(), Math.max(40, width));
         graphics.drawString(this.font, drones, x, panelY + 22, AutobotsUi.TEXT, false);
+        String roster = this.font.plainSubstrByWidth(JobDroneScreen.cradleLine(this.minecraft.player, AutobotsClientState.jobs), Math.max(40, width));
+        graphics.drawString(this.font, roster, x, panelY + 34, AutobotsUi.MUTED, false);
         drawJobSection(graphics, x, workHeaderY, width, "menu.autobots.jobs_working", workingJobs.isEmpty() ? "menu.autobots.jobs_working_empty" : null, workingJobs.isEmpty() ? 0 : workPauseWidth + workRemoveWidth + 12);
         if (!workingJobs.isEmpty()) {
             drawJobButton(graphics, workRemoveRight, workHeaderY, "menu.autobots.remove_all", mouseX, mouseY, workRemoveWidth);
@@ -970,8 +972,10 @@ public class AutobotsMenuScreen extends Screen {
     }
 
     private void drawJobRow(GuiGraphics graphics, int mouseX, int mouseY, int x, int width, int y, BlueprintPayloads.JobLine job) {
-        boolean hover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 54;
-        graphics.fill(x, y, x + width, y + 54, hover ? 0xFF24303C : 0xFF18222C);
+        boolean working = !job.finished() && !job.saving();
+        int buttonY = working ? y + 48 : y + 36;
+        boolean hover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + (working ? 66 : 54);
+        graphics.fill(x, y, x + width, y + (working ? 66 : 54), hover ? 0xFF24303C : 0xFF18222C);
         String name = this.font.plainSubstrByWidth(job.name(), Math.max(40, width / 2));
         graphics.drawString(this.font, name, x + 6, y + 4, AutobotsUi.TEXT, false);
         Component statusText = Component.translatable(jobStatus(job));
@@ -979,23 +983,28 @@ public class AutobotsMenuScreen extends Screen {
         BlockPos anchor = job.anchor();
         graphics.drawString(this.font, Component.translatable("menu.autobots.job_anchor", anchor.getX(), anchor.getY(), anchor.getZ()), x + 6, y + 15, AutobotsUi.MUTED, false);
         drawProgress(graphics, x + 6, y + 26, Math.max(40, width - 12), job);
-        if (!job.finished() && !job.saving()) {
-            drawDroneControls(graphics, mouseX, mouseY, x, y + 36, job);
+        if (working) {
+            String crew = this.font.plainSubstrByWidth(JobDroneScreen.jobSpeeds(this.minecraft.player, job), Math.max(40, width - 12));
+            graphics.drawString(this.font, crew, x + 6, y + 36, AutobotsUi.MUTED, false);
         }
         int right = x + width - 4;
-        right = drawJobButton(graphics, right, y + 36, "menu.autobots.remove", mouseX, mouseY, 52);
-        if (creativeVisit()) {
-            right = drawJobButton(graphics, right, y + 36, "menu.autobots.visit", mouseX, mouseY, 52);
+        if (working) {
+            int manageW = jobButtonWidth("menu.autobots.manage_drones");
+            drawJobButton(graphics, x + 6 + manageW, buttonY, "menu.autobots.manage_drones", mouseX, mouseY, manageW);
         }
-        right = drawJobButton(graphics, right, y + 36, AutobotsClientState.markedJobs.contains(job.id()) ? "menu.autobots.mark_on" : "menu.autobots.mark", mouseX, mouseY, 52);
+        right = drawJobButton(graphics, right, buttonY, "menu.autobots.remove", mouseX, mouseY, 52);
+        if (creativeVisit()) {
+            right = drawJobButton(graphics, right, buttonY, "menu.autobots.visit", mouseX, mouseY, 52);
+        }
+        right = drawJobButton(graphics, right, buttonY, AutobotsClientState.markedJobs.contains(job.id()) ? "menu.autobots.mark_on" : "menu.autobots.mark", mouseX, mouseY, 52);
         if (job.finished()) {
-            right = drawJobButton(graphics, right, y + 36, "menu.autobots.redo", mouseX, mouseY, 52);
+            right = drawJobButton(graphics, right, buttonY, "menu.autobots.redo", mouseX, mouseY, 52);
             if (job.canUndo()) {
-                drawJobButton(graphics, right, y + 36, "menu.autobots.undo", mouseX, mouseY, 52);
+                drawJobButton(graphics, right, buttonY, "menu.autobots.undo", mouseX, mouseY, 52);
             }
         } else {
-            right = drawJobButton(graphics, right, y + 36, "menu.autobots.stop", mouseX, mouseY, 52);
-            drawJobButton(graphics, right, y + 36, job.paused() ? "menu.autobots.resume" : "menu.autobots.pause", mouseX, mouseY, 52);
+            right = drawJobButton(graphics, right, buttonY, "menu.autobots.stop", mouseX, mouseY, 52);
+            drawJobButton(graphics, right, buttonY, job.paused() ? "menu.autobots.resume" : "menu.autobots.pause", mouseX, mouseY, 52);
         }
     }
 
@@ -1119,48 +1128,54 @@ public class AutobotsMenuScreen extends Screen {
     }
 
     private boolean clickJobRow(double mouseX, double mouseY, int y, BlueprintPayloads.JobLine job) {
-        if (mouseY < y + 36 || mouseY >= y + 52) {
+        boolean working = !job.finished() && !job.saving();
+        int buttonY = working ? y + 48 : y + 36;
+        if (mouseY < buttonY || mouseY >= buttonY + 16) {
             return false;
         }
-        if (!job.finished() && !job.saving() && clickDroneControls(mouseX, mouseY, listX, y + 36, job)) {
-            return true;
+        if (working) {
+            int manageW = jobButtonWidth("menu.autobots.manage_drones");
+            if (mouseX >= listX + 6 && mouseX < listX + 6 + manageW) {
+                this.minecraft.setScreen(new JobDroneScreen(job.id(), null));
+                return true;
+            }
         }
         int right = listX + (panelX + panelW - 24 - listX) - 4;
-        if (hitJobButton(mouseX, right, y + 36)) {
+        if (hitJobButton(mouseX, right, buttonY)) {
             PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.REMOVE));
             return true;
         }
         right -= 56;
         if (creativeVisit()) {
-            if (hitJobButton(mouseX, right, y + 36)) {
+            if (hitJobButton(mouseX, right, buttonY)) {
                 PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.VISIT));
                 return true;
             }
             right -= 56;
         }
-        if (hitJobButton(mouseX, right, y + 36)) {
+        if (hitJobButton(mouseX, right, buttonY)) {
             AutobotsClientState.toggleMark(job.id());
             return true;
         }
         right -= 56;
         if (job.finished()) {
-            if (hitJobButton(mouseX, right, y + 36)) {
+            if (hitJobButton(mouseX, right, buttonY)) {
                 PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.REDO));
                 return true;
             }
             right -= 56;
-            if (job.canUndo() && hitJobButton(mouseX, right, y + 36)) {
+            if (job.canUndo() && hitJobButton(mouseX, right, buttonY)) {
                 PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.UNDO));
                 return true;
             }
             return false;
         }
-        if (hitJobButton(mouseX, right, y + 36)) {
+        if (hitJobButton(mouseX, right, buttonY)) {
             PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.STOP));
             return true;
         }
         right -= 56;
-        if (hitJobButton(mouseX, right, y + 36)) {
+        if (hitJobButton(mouseX, right, buttonY)) {
             PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), job.paused() ? BlueprintPayloads.JobControl.RESUME : BlueprintPayloads.JobControl.PAUSE));
             return true;
         }
@@ -1172,45 +1187,10 @@ public class AutobotsMenuScreen extends Screen {
         int used = 0;
         for (BlueprintPayloads.JobLine job : AutobotsClientState.jobs) {
             if (!job.finished() && !job.saving()) {
-                used += job.drones();
+                used += job.crew().size();
             }
         }
         return new int[] {Math.max(0, total - used), total};
-    }
-
-    private int droneMinusX(int x) {
-        return x + 6 + this.font.width(Component.translatable("menu.autobots.job_drones")) + 4;
-    }
-
-    private void drawDroneControls(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, BlueprintPayloads.JobLine job) {
-        graphics.drawString(this.font, Component.translatable("menu.autobots.job_drones"), x + 6, y + 4, AutobotsUi.MUTED, false);
-        int minus = droneMinusX(x);
-        int plus = minus + 30;
-        drawStep(graphics, mouseX, mouseY, minus, y, "-", job.drones() > 0);
-        String count = Integer.toString(job.drones());
-        graphics.drawString(this.font, count, minus + 14 + (16 - this.font.width(count)) / 2, y + 4, AutobotsUi.TEXT, false);
-        drawStep(graphics, mouseX, mouseY, plus, y, "+", dronePool()[0] > 0);
-    }
-
-    private void drawStep(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, String label, boolean enabled) {
-        boolean hover = enabled && mouseX >= x && mouseX < x + 14 && mouseY >= y && mouseY < y + 16;
-        graphics.fill(x, y, x + 14, y + 16, hover ? 0xFF3A5164 : (enabled ? 0xFF24384A : 0xFF1A242E));
-        int color = enabled ? AutobotsUi.TEXT : 0xFF5C6A74;
-        graphics.drawString(this.font, label, x + (14 - this.font.width(label)) / 2, y + 4, color, false);
-    }
-
-    private boolean clickDroneControls(double mouseX, double mouseY, int x, int y, BlueprintPayloads.JobLine job) {
-        int minus = droneMinusX(x);
-        int plus = minus + 30;
-        if (job.drones() > 0 && mouseX >= minus && mouseX < minus + 14 && mouseY >= y && mouseY < y + 16) {
-            PacketDistributor.sendToServer(new BlueprintPayloads.SetJobDrones(job.id(), job.drones() - 1));
-            return true;
-        }
-        if (dronePool()[0] > 0 && mouseX >= plus && mouseX < plus + 14 && mouseY >= y && mouseY < y + 16) {
-            PacketDistributor.sendToServer(new BlueprintPayloads.SetJobDrones(job.id(), job.drones() + 1));
-            return true;
-        }
-        return false;
     }
 
     private boolean hitJobButton(double mouseX, int right, int y) {
