@@ -303,12 +303,14 @@ public final class BuildJob {
     public void resetCrew() {
         for (Hand hand : hands) {
             hand.cursor = 0;
+            hand.probe = 0;
             hand.entityId = null;
             hand.lastPos = null;
             hand.rescan = false;
             hand.idle = false;
             for (Slice slice : hand.slices) {
                 slice.cursor = 0;
+                slice.probe = 0;
             }
         }
     }
@@ -575,6 +577,7 @@ public final class BuildJob {
         paused = false;
         awaitDrones = false;
         cursor = 0;
+        pasteProbe = 0;
         placed = 0;
         skipped = 0;
         skippedSpecial = 0;
