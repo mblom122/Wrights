@@ -531,6 +531,10 @@ public final class JobManager {
         return true;
     }
 
+    public static boolean startBlueprintBuild(ServerPlayer player, UUID schematicId, BlockPos origin, int sizeX, int sizeY, int sizeZ) {
+        return startBlueprintBuild(player, schematicId, origin, sizeX, sizeY, sizeZ, 0);
+    }
+
     public static boolean startBlueprintBuild(ServerPlayer player, UUID schematicId, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones) {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         Schematic schematic = library.schematic(schematicId).orElse(null);
