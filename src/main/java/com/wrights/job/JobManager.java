@@ -19,7 +19,6 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.FallingBlock;
@@ -1025,8 +1024,8 @@ public final class JobManager {
             level.playSound(null, pos, current.getSoundType(level, pos, player).getBreakSound(), SoundSource.BLOCKS, 1.0F, 1.0F);
         }
         level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_SUPPRESS_DROPS);
-        Item item = refund.state().getBlock().asItem();
-        if (refund.paid() && item != Items.AIR) {
+        Item item = BlockFilters.payment(refund.state());
+        if (refund.paid() && item != null) {
             giveBack(level, player, job, item);
             job.returnedOne();
         }
@@ -2632,6 +2631,7 @@ public final class JobManager {
             return PlaceResult.DONE;
         }
         BlockState state = entry.state();
+        Item payment = BlockFilters.payment(state);
         BlockState existing = level.getBlockState(pos);
         if (existing.equals(state)) {
             return PlaceResult.DONE;
@@ -2649,7 +2649,7 @@ public final class JobManager {
                 job.skippedOne();
                 return PlaceResult.DONE;
             }
-        } else if (!freePlace(player) && !BlockFilters.isFluid(state)) {
+        } else if (!freePlace(player) && payment != null) {
             if (job.supplyPos() != null && supply(level, player, job) == null) {
                 if (job.tickMessage()) {
                     Messages.actionBar(player, "message.wrights.supply_missing");
@@ -2657,8 +2657,7 @@ public final class JobManager {
                 job.skippedOne();
                 return PlaceResult.DONE;
             }
-            Item item = state.getBlock().asItem();
-            if (item == Items.AIR || !hasItem(player, level, job, item)) {
+            if (!hasItem(player, level, job, payment)) {
                 job.skippedOne();
                 return PlaceResult.DONE;
             }
@@ -2687,9 +2686,9 @@ public final class JobManager {
             job.skippedOne();
             return PlaceResult.DONE;
         }
-        boolean paid = !entry.secondary() && !freePlace(player) && !BlockFilters.isFluid(state);
+        boolean paid = !entry.secondary() && !freePlace(player) && payment != null;
         if (paid) {
-            consumeItem(player, level, job, state.getBlock().asItem());
+            consumeItem(player, level, job, payment);
         }
         job.recordPlaced(entry.x(), entry.y(), entry.z(), after, paid);
         if (!quiet) {
@@ -2844,8 +2843,8 @@ public final class JobManager {
             if (!refund.paid()) {
                 continue;
             }
-            Item item = refund.state().getBlock().asItem();
-            if (item != Items.AIR) {
+            Item item = BlockFilters.payment(refund.state());
+            if (item != null) {
                 paid.add(item);
             }
         }

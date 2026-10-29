@@ -8,7 +8,8 @@ import java.util.Map;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.Items;
+
+import com.wrights.util.BlockFilters;
 
 public final class Requirements {
     public record Cost(int itemId, int count) {
@@ -26,8 +27,8 @@ public final class Requirements {
             if (entry.secondary() || entry.x() >= limitX || entry.y() >= limitY || entry.z() >= limitZ) {
                 continue;
             }
-            Item item = entry.state().getBlock().asItem();
-            if (item == Items.AIR) {
+            Item item = BlockFilters.payment(entry.state());
+            if (item == null) {
                 continue;
             }
             counts.merge(item, 1, Integer::sum);

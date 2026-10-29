@@ -40,7 +40,7 @@ public final class BlockFilters {
         return canCopy(level, pos, state, false);
     }
 
-    /** {@code fluids} also keeps water and lava. Those blocks have no item to pay with. */
+    /** {@code fluids} also keeps water and lava. A source is paid for with one bucket. */
     public static boolean canCopy(BlockGetter level, BlockPos pos, BlockState state, boolean fluids) {
         if (state.isAir() || state.hasBlockEntity()) {
             return false;
@@ -66,7 +66,7 @@ public final class BlockFilters {
         return state.getBlock() instanceof LiquidBlock;
     }
 
-    /** A full source, not a flowing level. Editing can place these; they are not paid for with an item. */
+    /** A full source, not a flowing level. One source costs one bucket. */
     public static boolean isSourceFluid(BlockState state) {
         return isFluid(state) && state.getFluidState().isSource();
     }
@@ -120,6 +120,22 @@ public final class BlockFilters {
         }
         bucketSources = found;
         return found;
+    }
+
+    /**
+     * The item a build spends for this block. A source fluid spends its bucket.
+     * Flowing fluid is free, and a block with no item is free.
+     */
+    public static Item payment(BlockState state) {
+        if (state == null) {
+            return null;
+        }
+        if (isSourceFluid(state)) {
+            Item bucket = state.getFluidState().getType().getBucket();
+            return bucket == Items.AIR ? null : bucket;
+        }
+        Item item = state.getBlock().asItem();
+        return item == Items.AIR ? null : item;
     }
 
     /** The stack shown for a stored block. Source fluids use their bucket, since the fluid block has no item. */
