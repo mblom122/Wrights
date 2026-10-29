@@ -35,6 +35,7 @@ public class BlueprintEditScreen extends Screen {
     private AutobotsButton removeButton;
     private AutobotsButton changeButton;
     private EditBox layerTo;
+    private boolean frameSelection;
 
     public BlueprintEditScreen() {
         super(Component.translatable("screen.autobots.adjust_edit"));
@@ -185,6 +186,7 @@ public class BlueprintEditScreen extends Screen {
         selY = y;
         selZ = z;
         layer = Mth.clamp(y, 0, Math.max(0, AutobotsClientState.editY - 1));
+        frameSelection = true;
         syncSelection();
     }
 
@@ -211,7 +213,12 @@ public class BlueprintEditScreen extends Screen {
     private void layoutGrid() {
         grid.layout(gridX + 12, modelY + 14, Math.max(32, modelSize - 28), AutobotsClientState.editX, AutobotsClientState.editZ, AutobotsClientState.editPivotX, AutobotsClientState.editPivotZ, StructureGrid.INLINE);
         if (selY == layer && selX >= 0 && selZ >= 0) {
-            grid.ensureVisible(selX, selZ, AutobotsClientState.editX, AutobotsClientState.editZ);
+            if (frameSelection) {
+                grid.centerOn(selX, selZ, AutobotsClientState.editX, AutobotsClientState.editZ);
+                frameSelection = false;
+            } else {
+                grid.ensureVisible(selX, selZ, AutobotsClientState.editX, AutobotsClientState.editZ);
+            }
         }
     }
 

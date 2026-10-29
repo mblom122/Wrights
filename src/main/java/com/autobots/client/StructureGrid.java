@@ -41,6 +41,11 @@ public final class StructureGrid {
         originY = y + Math.max(0, (pixelSize - gridH) / 2);
     }
 
+    public void centerOn(int x, int z, int sizeX, int sizeZ) {
+        fromX = origin(x, sizeX, spanX);
+        fromZ = origin(z, sizeZ, spanZ);
+    }
+
     public void ensureVisible(int x, int z, int sizeX, int sizeZ) {
         if (x < 0 || z < 0) {
             return;
