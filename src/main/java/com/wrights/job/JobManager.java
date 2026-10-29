@@ -44,6 +44,7 @@ import com.wrights.blueprint.BoxEdits;
 import com.wrights.network.BlueprintNetwork;
 import com.wrights.network.BlueprintPayloads;
 import com.wrights.WrightsMod;
+import com.wrights.drone.WrightTier;
 import com.wrights.drone.Wrightports;
 import com.wrights.drone.CrewSplit;
 import com.wrights.drone.Swarm;
@@ -1627,7 +1628,7 @@ public final class JobManager {
                 hand.lastPos = drone.blockPosition();
                 continue;
             }
-            int budget = Math.min(Math.max(1, hand.speed), WrightsConfig.BLOCKS_PER_TICK.getAsInt());
+            int budget = placeBudget(hand);
             for (int n = 0; n < budget; n++) {
                 int at = nextWork(level, schematic, job, hand, skipBudget);
                 if (at == -2) {
@@ -1709,7 +1710,7 @@ public final class JobManager {
                 hand.lastPos = drone.blockPosition();
                 continue;
             }
-            int budget = Math.min(Math.max(1, hand.speed), WrightsConfig.BLOCKS_PER_TICK.getAsInt());
+            int budget = placeBudget(hand);
             for (int n = 0; n < budget; n++) {
                 int at = refundIndex(job, hand);
                 if (at < 0) {
@@ -2232,8 +2233,17 @@ public final class JobManager {
         return given;
     }
 
+    private static int placeBudget(BuildJob.Hand hand) {
+        int cap = WrightsConfig.BLOCKS_PER_TICK.getAsInt();
+        int eighths = hand.placeCredit + WrightTier.placeEighths(hand.speed);
+        int budget = Math.min(cap, eighths / 8);
+        int leftover = eighths - budget * 8;
+        hand.placeCredit = leftover >= 8 ? leftover % 8 : leftover;
+        return budget;
+    }
+
     private static double flyStep(int speed, double distanceSqr) {
-        double step = 0.28D + Math.max(1, speed) * 0.18D;
+        double step = WrightTier.flyClose(speed);
         if (distanceSqr > 64.0D) {
             step *= 2.1D;
         }

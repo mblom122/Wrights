@@ -622,6 +622,7 @@ public final class BuildJob {
                 handTag.putInt("lane", hand.lane);
                 handTag.putInt("lanes", hand.lanes);
                 handTag.putInt("speed", hand.speed);
+                handTag.putInt("placeCredit", hand.placeCredit);
                 handTag.putInt("cursor", hand.cursor);
                 handTag.putBoolean("rescan", hand.rescan);
                 handTag.putBoolean("idle", hand.idle);
@@ -743,6 +744,7 @@ public final class BuildJob {
                 hand.lane = handTag.getInt("lane");
                 hand.lanes = handTag.getInt("lanes");
                 hand.speed = handTag.getInt("speed");
+                hand.placeCredit = handTag.getInt("placeCredit");
                 hand.cursor = handTag.getInt("cursor");
                 hand.rescan = handTag.getBoolean("rescan");
                 hand.idle = handTag.getBoolean("idle");
@@ -834,6 +836,8 @@ public final class BuildJob {
         public int lane;
         public int lanes;
         public int speed = 1;
+        /** Leftover eighths of a block, so a fractional place rate stays exact across ticks. */
+        public int placeCredit;
         public int cursor;
         public boolean rescan;
         public boolean idle;

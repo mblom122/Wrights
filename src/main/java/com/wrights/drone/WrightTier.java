@@ -7,7 +7,8 @@ import com.wrights.item.ModItems;
 
 /**
  * Copper through netherite. The tier is the wright's speed: a higher tier places more
- * blocks and flies faster.
+ * blocks and flies faster. Copper is half the old copper rate and netherite is double
+ * the old netherite rate, with iron, gold, and diamond on the straight line between them.
  */
 public final class WrightTier {
     public static final int COPPER = 1;
@@ -45,6 +46,25 @@ public final class WrightTier {
 
     public static String nameKey(int tier) {
         return "drone.wrights.speed." + clamp(tier);
+    }
+
+    /**
+     * Eighths of a block this tier adds each tick. Eight eighths is one block, so copper
+     * places one block every other tick and netherite places ten.
+     */
+    public static int placeEighths(int tier) {
+        return switch (clamp(tier)) {
+            case IRON -> 23;
+            case GOLD -> 42;
+            case DIAMOND -> 61;
+            case NETHERITE -> 80;
+            default -> 4;
+        };
+    }
+
+    /** Flight step in blocks per tick while the wright is within eight blocks of its work. */
+    public static double flyClose(int tier) {
+        return 0.23D + 0.5325D * (clamp(tier) - COPPER);
     }
 
     /** The crafted item that raises a wright of {@code tier - 1} to this tier. Copper has none. */
