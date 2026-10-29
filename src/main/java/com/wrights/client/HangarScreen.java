@@ -15,6 +15,10 @@ public class HangarScreen extends AbstractContainerScreen<com.wrights.menu.Hanga
     private static final int ROW = 12;
     private static final int LIST_X = 80;
     private static final int LIST_Y = 18;
+    /** Tab that holds the worn wrightport, sticking out of the window's left edge. */
+    private static final int EAR_W = 40;
+    private static final int EAR_H = 42;
+    private static final int EAR_Y = 141;
     private int selected;
 
     public HangarScreen(com.wrights.menu.HangarMenu menu, Inventory inventory, Component title) {
@@ -28,6 +32,9 @@ public class HangarScreen extends AbstractContainerScreen<com.wrights.menu.Hanga
     @Override
     protected void init() {
         super.init();
+        if (this.leftPos < EAR_W + 4) {
+            this.leftPos = EAR_W + 4;
+        }
         int y = topPos + 116;
         addRenderableWidget(new WrightsButton(leftPos + 8, y, 32, 16, Component.translatable("screen.wrights.hangar_build"), button -> edit(HangarOps.BUILD, selected)));
         addRenderableWidget(new WrightsButton(leftPos + 42, y, 32, 16, Component.translatable("screen.wrights.hangar_remove"), button -> edit(HangarOps.REMOVE, selected)));
@@ -71,12 +78,20 @@ public class HangarScreen extends AbstractContainerScreen<com.wrights.menu.Hanga
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
         graphics.drawString(this.font, this.title, this.titleLabelX, this.titleLabelY, WrightsUi.COPPER, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.wrightport_dock"), 8, 18, WrightsUi.MUTED, false);
-        graphics.drawString(this.font, Component.translatable("screen.wrights.wrightport_worn"), 46, 18, WrightsUi.MUTED, false);
     }
 
     @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
+        int earX = leftPos - EAR_W;
+        int earY = topPos + EAR_Y;
+        graphics.fill(earX + 4, earY + 5, leftPos, earY + EAR_H + 5, 0x66000000);
         WrightsUi.panel(graphics, leftPos, topPos, imageWidth, imageHeight);
+        graphics.fill(earX, earY, leftPos + 4, earY + EAR_H, WrightsUi.PANEL);
+        graphics.fill(earX, earY, leftPos, earY + 1, 0xFF31404E);
+        graphics.fill(earX, earY + EAR_H - 1, leftPos, earY + EAR_H, 0xFF31404E);
+        graphics.fill(earX, earY, earX + 1, earY + EAR_H, 0xFF31404E);
+        graphics.fill(earX, earY, earX + 3, earY + EAR_H, WrightsUi.COPPER);
+        graphics.fill(earX + 3, earY, leftPos, earY + 2, WrightsUi.COPPER_DIM);
         for (net.minecraft.world.inventory.Slot slot : this.menu.slots) {
             int edge = slot.index <= 1 ? WrightsUi.COPPER : 0xFFC5D2DE;
             WrightsUi.slot(graphics, leftPos + slot.x - 1, topPos + slot.y - 1, edge);
@@ -111,7 +126,17 @@ public class HangarScreen extends AbstractContainerScreen<com.wrights.menu.Hanga
                 : Component.translatable("screen.wrights.hangar_send", swarm.assignCount(), swarm.units().size()).getString();
         graphics.drawString(this.font, this.font.plainSubstrByWidth(send, 120), leftPos + 28, topPos + 136, WrightsUi.BLUE, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.hangar_power"), leftPos + 8, topPos + 149, WrightsUi.MUTED, false);
+        Component worn = Component.translatable("screen.wrights.wrightport_worn");
+        graphics.drawString(this.font, worn, leftPos - EAR_W + (EAR_W - this.font.width(worn)) / 2, topPos + EAR_Y + 5, WrightsUi.MUTED, false);
         renderTooltip(graphics, mouseX, mouseY);
+    }
+
+    @Override
+    protected boolean hasClickedOutside(double mouseX, double mouseY, int guiLeft, int guiTop, int mouseButton) {
+        if (mouseX >= guiLeft - EAR_W && mouseX < guiLeft && mouseY >= guiTop + EAR_Y && mouseY < guiTop + EAR_Y + EAR_H) {
+            return false;
+        }
+        return super.hasClickedOutside(mouseX, mouseY, guiLeft, guiTop, mouseButton);
     }
 
     @Override

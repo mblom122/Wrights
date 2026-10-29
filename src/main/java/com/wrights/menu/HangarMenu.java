@@ -22,6 +22,10 @@ import top.theillusivec4.curios.api.type.inventory.ICurioStacksHandler;
 import top.theillusivec4.curios.common.inventory.CurioSlot;
 
 public class HangarMenu extends AbstractContainerMenu {
+    /** Worn wrightport, sitting in the left tab of {@code HangarScreen}. */
+    public static final int WORN_X = -28;
+    public static final int WORN_Y = 158;
+
     private final BlockPos pos;
     private final ContainerLevelAccess access;
 
@@ -64,10 +68,11 @@ public class HangarMenu extends AbstractContainerMenu {
         ICuriosItemHandler curios = CuriosApi.getCuriosInventory(player).orElse(null);
         ICurioStacksHandler stacks = curios == null ? null : curios.getStacksHandler(Wrightports.SLOT).orElse(null);
         if (stacks != null) {
-            addSlot(new CurioSlot(player, stacks.getStacks(), 0, Wrightports.SLOT, 46, 28, stacks.getRenders(), false));
+            addSlot(new CurioSlot(player, stacks.getStacks(), 0, Wrightports.SLOT, WORN_X, WORN_Y, stacks.getRenders(),
+                    stacks.getActiveStates(), stacks.canToggleRendering(), false, false));
             return;
         }
-        addSlot(new Slot(new SimpleContainer(1), 0, 46, 28) {
+        addSlot(new Slot(new SimpleContainer(1), 0, WORN_X, WORN_Y) {
             @Override
             public boolean mayPlace(ItemStack stack) {
                 return false;
