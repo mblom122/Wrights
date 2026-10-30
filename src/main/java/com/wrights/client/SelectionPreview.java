@@ -2,6 +2,7 @@ package com.wrights.client;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
@@ -9,7 +10,9 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
 import com.wrights.WrightsConfig;
+import com.wrights.blueprint.BlueprintTransforms;
 import com.wrights.blueprint.BoxEdits;
+import com.wrights.schematic.Schematic;
 import com.wrights.util.BlockFilters;
 
 /** Blocks inside a new-blueprint box, in the same shape the blueprint model uses. */
@@ -61,5 +64,25 @@ public final class SelectionPreview {
             }
         }
         return new Shot(List.copyOf(ghosts), sizeX, sizeY, sizeZ, false);
+    }
+
+    /** Same turns the save applies, so the new-blueprint preview matches the template. */
+    public static Shot orient(Shot shot, List<BlueprintTransforms.Op> turns) {
+        if (shot.concealed() || turns == null || turns.isEmpty() || shot.ghosts().isEmpty()) {
+            return shot;
+        }
+        List<Schematic.Entry> entries = new ArrayList<>(shot.ghosts().size());
+        for (WrightsClientState.Ghost ghost : shot.ghosts()) {
+            entries.add(new Schematic.Entry((short) ghost.x(), (short) ghost.y(), (short) ghost.z(), Block.stateById(ghost.stateId()), false));
+        }
+        Schematic schematic = new Schematic(UUID.randomUUID(), shot.sizeX(), shot.sizeY(), shot.sizeZ(), entries);
+        for (BlueprintTransforms.Op turn : turns) {
+            schematic = BlueprintTransforms.apply(schematic, turn);
+        }
+        List<WrightsClientState.Ghost> ghosts = new ArrayList<>(schematic.blockCount());
+        for (Schematic.Entry entry : schematic.entries()) {
+            ghosts.add(new WrightsClientState.Ghost(entry.x(), entry.y(), entry.z(), 1.0F, 1.0F, 1.0F, Block.getId(entry.state())));
+        }
+        return new Shot(List.copyOf(ghosts), schematic.sizeX(), schematic.sizeY(), schematic.sizeZ(), false);
     }
 }

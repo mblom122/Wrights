@@ -1,5 +1,8 @@
 package com.wrights.client;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -10,6 +13,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.WrightsClientConfig;
 import com.wrights.WrightsConfig;
+import com.wrights.blueprint.BlueprintTransforms;
 import com.wrights.blueprint.BoxEdits;
 import com.wrights.network.BlueprintPayloads;
 
@@ -28,6 +32,11 @@ public class BlueprintAdjustScreen extends Screen {
     private WrightsButton saveButton;
     private WrightsButton buildButton;
     private WrightsButton resetButton;
+    private WrightsButton rotateLeftButton;
+    private WrightsButton rotateRightButton;
+    private WrightsButton flipHorizontalButton;
+    private WrightsButton flipVerticalButton;
+    private final List<BlueprintTransforms.Op> turns = new ArrayList<>();
     private boolean suppress;
     private String savedKey;
     private int modelX;
@@ -50,6 +59,7 @@ public class BlueprintAdjustScreen extends Screen {
     private boolean previewFluids;
     private boolean previewNbt;
     private boolean previewReady;
+    private String previewTurns = "";
     private SelectionPreview.Shot preview = SelectionPreview.Shot.empty();
     private Component helpTip;
 
@@ -60,7 +70,7 @@ public class BlueprintAdjustScreen extends Screen {
     @Override
     protected void init() {
         panelW = 392;
-        panelH = 364;
+        panelH = 340;
         panelX = Math.max(8, (this.width - panelW) / 2);
         panelY = Math.max(4, (this.height - panelH) / 2);
         nameBox = box(panelX + 12, panelY + 28, 190, 16, 48, false);
@@ -82,13 +92,25 @@ public class BlueprintAdjustScreen extends Screen {
         step(panelX + 114, panelY + 154, "+", () -> grow(1, 1));
         step(panelX + 12, panelY + 172, "-", () -> grow(2, -1));
         step(panelX + 114, panelY + 172, "+", () -> grow(2, 1));
-        resetButton = new WrightsButton(panelX + 12, panelY + 248, 190, 16, Component.translatable(resetKey()), button -> reset());
+        int turnRow = 93;
+        int turnLeft = panelX + 12;
+        int rotateY = panelY + 220;
+        int flipY = panelY + 256;
+        rotateLeftButton = new WrightsButton(turnLeft, rotateY, turnRow, 16, Component.translatable("screen.wrights.rotate_left"), button -> turn(BlueprintTransforms.Op.ROTATE_CCW));
+        rotateRightButton = new WrightsButton(turnLeft + turnRow + 4, rotateY, turnRow, 16, Component.translatable("screen.wrights.rotate_right"), button -> turn(BlueprintTransforms.Op.ROTATE));
+        flipHorizontalButton = new WrightsButton(turnLeft, flipY, turnRow, 16, Component.translatable("screen.wrights.flip_horizontal"), button -> turn(BlueprintTransforms.Op.FLIP_X));
+        flipVerticalButton = new WrightsButton(turnLeft + turnRow + 4, flipY, turnRow, 16, Component.translatable("screen.wrights.flip_vertical"), button -> turn(BlueprintTransforms.Op.FLIP_Y));
+        addRenderableWidget(rotateLeftButton);
+        addRenderableWidget(rotateRightButton);
+        addRenderableWidget(flipHorizontalButton);
+        addRenderableWidget(flipVerticalButton);
+        resetButton = new WrightsButton(panelX + 12, panelY + 280, 190, 16, Component.translatable(resetKey()), button -> reset());
         addRenderableWidget(resetButton);
-        saveButton = new WrightsButton(panelX + 12, panelY + 274, 60, 18, Component.translatable("screen.wrights.save"), button -> save(false));
+        saveButton = new WrightsButton(panelX + 12, panelY + 306, 60, 18, Component.translatable("screen.wrights.save"), button -> save(false));
         addRenderableWidget(saveButton);
-        buildButton = new WrightsButton(panelX + 76, panelY + 274, 60, 18, Component.translatable("screen.wrights.send"), button -> build());
+        buildButton = new WrightsButton(panelX + 76, panelY + 306, 60, 18, Component.translatable("screen.wrights.send"), button -> build());
         addRenderableWidget(buildButton);
-        addRenderableWidget(new WrightsButton(panelX + 140, panelY + 274, 66, 18, Component.translatable("screen.wrights.cancel"), button -> cancel(), true));
+        addRenderableWidget(new WrightsButton(panelX + 140, panelY + 306, 66, 18, Component.translatable("screen.wrights.cancel"), button -> cancel(), true));
         refresh();
     }
 
@@ -126,6 +148,8 @@ public class BlueprintAdjustScreen extends Screen {
         graphics.drawString(this.font, title, panelX + 14, panelY + 8, WrightsUi.COPPER, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.location"), panelX + 12, panelY + 52, WrightsUi.BLUE, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.size_label"), panelX + 12, panelY + 124, WrightsUi.BLUE, false);
+        graphics.drawString(this.font, Component.translatable("screen.wrights.rotate"), panelX + 12, panelY + 208, WrightsUi.BLUE, false);
+        graphics.drawString(this.font, Component.translatable("screen.wrights.flip"), panelX + 12, panelY + 244, WrightsUi.BLUE, false);
         axis(graphics, panelY + 66, "X");
         axis(graphics, panelY + 84, "Y");
         axis(graphics, panelY + 102, "Z");
@@ -294,7 +318,43 @@ public class BlueprintAdjustScreen extends Screen {
                 WrightsClientConfig.COPY_NBT_BLOCKS.get(),
                 settingsChosen(),
                 allChosen(),
-                buildAfter));
+                buildAfter,
+                turnBytes()));
+    }
+
+    private void turn(BlueprintTransforms.Op op) {
+        if (saving() || WrightsClientState.cornerA == null || WrightsClientState.cornerB == null) {
+            return;
+        }
+        BlueprintTransforms.Op undo = switch (op) {
+            case ROTATE -> BlueprintTransforms.Op.ROTATE_CCW;
+            case ROTATE_CCW -> BlueprintTransforms.Op.ROTATE;
+            case FLIP_X, FLIP_Y, FLIP_Z -> op;
+            default -> null;
+        };
+        if (undo != null && !turns.isEmpty() && turns.get(turns.size() - 1) == undo) {
+            turns.remove(turns.size() - 1);
+        } else if (turns.size() < 24) {
+            turns.add(op);
+        }
+        ensurePreview();
+        updateSaveButton();
+    }
+
+    private byte[] turnBytes() {
+        byte[] bytes = new byte[turns.size()];
+        for (int i = 0; i < turns.size(); i++) {
+            bytes[i] = (byte) turns.get(i).ordinal();
+        }
+        return bytes;
+    }
+
+    private String turnKey() {
+        StringBuilder key = new StringBuilder();
+        for (BlueprintTransforms.Op op : turns) {
+            key.append(op.ordinal()).append(',');
+        }
+        return key.toString();
     }
 
     private void build() {
@@ -318,7 +378,8 @@ public class BlueprintAdjustScreen extends Screen {
                 + "\n" + WrightsClientConfig.COPY_NBT_BLOCKS.get()
                 + "\n" + settingsChosen()
                 + "\n" + allChosen()
-                + "\n" + WrightsClientState.cornerA + "\n" + WrightsClientState.cornerB;
+                + "\n" + WrightsClientState.cornerA + "\n" + WrightsClientState.cornerB
+                + "\n" + turnKey();
     }
 
     private void updateSaveButton() {
@@ -343,6 +404,13 @@ public class BlueprintAdjustScreen extends Screen {
         if (buildButton != null) {
             buildButton.active = corners && !saving();
         }
+        boolean canTurn = corners && !saving();
+        if (rotateLeftButton != null) {
+            rotateLeftButton.active = canTurn;
+            rotateRightButton.active = canTurn;
+            flipHorizontalButton.active = canTurn;
+            flipVerticalButton.active = canTurn;
+        }
     }
 
     private void cancel() {
@@ -358,6 +426,7 @@ public class BlueprintAdjustScreen extends Screen {
         }
         WrightsClientState.cornerA = null;
         WrightsClientState.cornerB = null;
+        turns.clear();
         WrightsClientState.sendUpdate();
         this.minecraft.setScreen(null);
     }
@@ -471,17 +540,19 @@ public class BlueprintAdjustScreen extends Screen {
         BlockPos second = WrightsClientState.cornerB;
         boolean fluids = WrightsClientConfig.COPY_FLUIDS.get();
         boolean nbt = WrightsClientConfig.COPY_NBT_BLOCKS.get();
-        if (previewReady && same(previewA, first) && same(previewB, second) && previewFluids == fluids && previewNbt == nbt) {
+        String turnsNow = turnKey();
+        if (previewReady && same(previewA, first) && same(previewB, second) && previewFluids == fluids && previewNbt == nbt && previewTurns.equals(turnsNow)) {
             return;
         }
         previewA = first;
         previewB = second;
         previewFluids = fluids;
         previewNbt = nbt;
+        previewTurns = turnsNow;
         previewReady = true;
         preview = this.minecraft == null
                 ? SelectionPreview.Shot.empty()
-                : SelectionPreview.capture(this.minecraft.level, first, second, fluids, nbt);
+                : SelectionPreview.orient(SelectionPreview.capture(this.minecraft.level, first, second, fluids, nbt), turns);
         WrightsClientState.showCapturePreview(preview.ghosts(), preview.concealed());
     }
 

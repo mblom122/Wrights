@@ -223,7 +223,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record CaptureConfirm(String name, boolean fluids, boolean nbtBlocks, boolean nbtSettings, boolean nbtAll, boolean buildAfter) implements CustomPacketPayload {
+    public record CaptureConfirm(String name, boolean fluids, boolean nbtBlocks, boolean nbtSettings, boolean nbtAll, boolean buildAfter, byte[] turns) implements CustomPacketPayload {
         public static final Type<CaptureConfirm> TYPE = payloadType("capture_confirm");
         public static final StreamCodec<RegistryFriendlyByteBuf, CaptureConfirm> STREAM_CODEC = StreamCodec.of(
                 (buf, value) -> {
@@ -233,8 +233,30 @@ public final class BlueprintPayloads {
                     buf.writeBoolean(value.nbtSettings);
                     buf.writeBoolean(value.nbtAll);
                     buf.writeBoolean(value.buildAfter);
+                    int count = Math.min(value.turns.length, 24);
+                    buf.writeByte(count);
+                    for (int i = 0; i < count; i++) {
+                        buf.writeByte(value.turns[i]);
+                    }
                 },
-                buf -> new CaptureConfirm(buf.readUtf(48), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean()));
+                buf -> {
+                    String name = buf.readUtf(48);
+                    boolean fluids = buf.readBoolean();
+                    boolean nbtBlocks = buf.readBoolean();
+                    boolean nbtSettings = buf.readBoolean();
+                    boolean nbtAll = buf.readBoolean();
+                    boolean buildAfter = buf.readBoolean();
+                    int count = buf.readUnsignedByte();
+                    byte[] turns = new byte[Math.min(count, 24)];
+                    for (int i = 0; i < turns.length; i++) {
+                        turns[i] = buf.readByte();
+                    }
+                    int skip = count - turns.length;
+                    for (int i = 0; i < skip; i++) {
+                        buf.readByte();
+                    }
+                    return new CaptureConfirm(name, fluids, nbtBlocks, nbtSettings, nbtAll, buildAfter, turns);
+                });
 
         @Override
         public Type<? extends CustomPacketPayload> type() {

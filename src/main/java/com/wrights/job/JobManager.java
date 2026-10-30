@@ -527,7 +527,7 @@ public final class JobManager {
         launched(player, job);
     }
 
-    public static boolean startBlueprintSave(ServerPlayer player, String name, UUID replaceId, ResourceKey<Level> dimension, BlockPos cornerA, BlockPos cornerB, boolean copyFluids, boolean copyNbtBlocks, boolean copyNbtSettings, boolean copyNbtAll) {
+    public static boolean startBlueprintSave(ServerPlayer player, String name, UUID replaceId, ResourceKey<Level> dimension, BlockPos cornerA, BlockPos cornerB, boolean copyFluids, boolean copyNbtBlocks, boolean copyNbtSettings, boolean copyNbtAll, byte[] turns) {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         if (hasCopy(library, player.getUUID())) {
             Messages.actionBar(player, "message.wrights.busy");
@@ -549,6 +549,7 @@ public final class JobManager {
         job.setBlueprintName(name);
         job.setCopyFluids(copyFluids);
         job.setCopyNbt(copyNbtBlocks, copyNbtSettings, copyNbtAll);
+        job.setCopyTurns(turns);
         job.setReplaceSchematicId(replaceId);
         library.addJob(job);
         Messages.actionBar(player, "message.wrights.saving");
@@ -732,6 +733,20 @@ public final class JobManager {
         return job.contains(below) && BlockFilters.canCopy(level, below, level.getBlockState(below), job.copyFluids(), job.copyNbtBlocks());
     }
 
+    private static Schematic applyCopyTurns(Schematic schematic, byte[] turns) {
+        if (schematic == null || turns == null || turns.length == 0) {
+            return schematic;
+        }
+        com.wrights.blueprint.BlueprintTransforms.Op[] ops = com.wrights.blueprint.BlueprintTransforms.Op.values();
+        for (byte turn : turns) {
+            int ordinal = turn & 0xFF;
+            if (ordinal < ops.length) {
+                schematic = com.wrights.blueprint.BlueprintTransforms.apply(schematic, ops[ordinal]);
+            }
+        }
+        return schematic;
+    }
+
     private static void finishCopy(SchematicLibrary library, BuildJob job) {
         int sizeX = job.max().getX() - job.min().getX() + 1;
         int sizeY = job.max().getY() - job.min().getY() + 1;
@@ -776,6 +791,7 @@ public final class JobManager {
         if (previous != null) {
             schematic = schematic.withPaste(previous.placeFluids(), previous.voidBlocks(), previous.voidFluids(), previous.voidNbt());
         }
+        schematic = applyCopyTurns(schematic, job.copyTurns());
         library.putSchematic(schematic);
         job.setResultSchematicId(schematic.id());
         job.setPhase(BuildJob.Phase.BINDING);

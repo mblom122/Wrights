@@ -62,6 +62,7 @@ public final class BuildJob {
     private boolean copyNbtBlocks;
     private boolean copyNbtSettings;
     private boolean copyNbtAll;
+    private byte[] copyTurns = new byte[0];
     private boolean placeFluids = true;
     private boolean voidBlocks;
     private boolean voidFluids;
@@ -381,6 +382,20 @@ public final class BuildJob {
         this.copyNbtBlocks = copyNbtBlocks;
         this.copyNbtSettings = copyNbtBlocks && copyNbtSettings && !copyNbtAll;
         this.copyNbtAll = copyNbtBlocks && copyNbtAll;
+    }
+
+    public byte[] copyTurns() {
+        return copyTurns;
+    }
+
+    public void setCopyTurns(byte[] copyTurns) {
+        if (copyTurns == null || copyTurns.length == 0) {
+            this.copyTurns = new byte[0];
+            return;
+        }
+        int count = Math.min(copyTurns.length, 24);
+        this.copyTurns = new byte[count];
+        System.arraycopy(copyTurns, 0, this.copyTurns, 0, count);
     }
 
     public boolean placeFluids() {
@@ -761,6 +776,9 @@ public final class BuildJob {
         tag.putBoolean("copyNbtBlocks", copyNbtBlocks);
         tag.putBoolean("copyNbtSettings", copyNbtSettings);
         tag.putBoolean("copyNbtAll", copyNbtAll);
+        if (copyTurns.length > 0) {
+            tag.putByteArray("copyTurns", copyTurns);
+        }
         tag.putBoolean("placeFluids", placeFluids);
         tag.putBoolean("voidBlocks", voidBlocks);
         tag.putBoolean("voidFluids", voidFluids);
@@ -891,6 +909,9 @@ public final class BuildJob {
         job.copyFluids = tag.getBoolean("copyFluids");
         job.copyNbtBlocks = tag.getBoolean("copyNbtBlocks");
         job.copyNbtAll = job.copyNbtBlocks && tag.getBoolean("copyNbtAll");
+        if (tag.contains("copyTurns")) {
+            job.setCopyTurns(tag.getByteArray("copyTurns"));
+        }
         job.copyNbtSettings = job.copyNbtBlocks && !job.copyNbtAll && tag.getBoolean("copyNbtSettings");
         job.placeFluids = !tag.contains("placeFluids") || tag.getBoolean("placeFluids");
         job.voidBlocks = tag.getBoolean("voidBlocks");

@@ -186,7 +186,8 @@ public final class BlueprintNetwork {
                 payload.nbtBlocks(),
                 payload.nbtSettings(),
                 payload.nbtAll(),
-                payload.buildAfter()));
+                payload.buildAfter(),
+                payload.turns()));
     }
 
     private static void cancel(BlueprintPayloads.CaptureCancel payload, IPayloadContext context) {

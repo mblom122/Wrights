@@ -355,7 +355,7 @@ public final class BlueprintActions {
         BlueprintNetwork.syncCapture(player);
     }
 
-    public static void confirm(ServerPlayer player, String name, boolean copyFluids, boolean copyNbtBlocks, boolean copyNbtSettings, boolean copyNbtAll, boolean buildAfter) {
+    public static void confirm(ServerPlayer player, String name, boolean copyFluids, boolean copyNbtBlocks, boolean copyNbtSettings, boolean copyNbtAll, boolean buildAfter, byte[] turns) {
         if (!requireTool(player)) {
             return;
         }
@@ -397,7 +397,8 @@ public final class BlueprintActions {
                 copyFluids,
                 copyNbtBlocks,
                 settings,
-                all);
+                all,
+                turns);
         if (!started) {
             session.setBuildAfterSave(false);
             session.setMode(BlueprintSessions.Mode.CAPTURE);
