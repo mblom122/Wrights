@@ -174,6 +174,10 @@ public class WrightsMenuScreen extends Screen {
     private int buildMenuY;
     private int buildMenuW;
     private int buildMenuHintY;
+    private int supplyOrderX;
+    private int supplyOrderY;
+    private int supplyOrderW;
+    private int supplyOrderHintY;
     private int optionPlaceY;
     private int optionPlaceHintY;
     private int optionOffsetY;
@@ -591,6 +595,14 @@ public class WrightsMenuScreen extends Screen {
         local += 14;
         buildMenuHintY = optionY(local);
         local += 16;
+        Component playerFirst = Component.translatable("menu.wrights.supply_player_first");
+        Component chestFirst = Component.translatable("menu.wrights.supply_chest_first");
+        supplyOrderW = Math.max(this.font.width(playerFirst), this.font.width(chestFirst)) + 16;
+        supplyOrderX = x + 108;
+        supplyOrderY = optionY(local - 3);
+        local += 14;
+        supplyOrderHintY = optionY(local);
+        local += 16;
         optionPlaceY = optionY(local);
         local += 12;
         optionPlaceHintY = optionY(local);
@@ -690,6 +702,14 @@ public class WrightsMenuScreen extends Screen {
         WrightsUi.border(graphics, buildMenuX, buildMenuY, buildMenuW, 16, openMenu ? WrightsUi.COPPER : 0xFF3D4E5E);
         graphics.drawCenteredString(this.font, menuState, buildMenuX + buildMenuW / 2, buildMenuY + 4, WrightsUi.TEXT);
         graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("menu.wrights.open_build_menu_hint").getString(), optionViewW - 28), x, buildMenuHintY, 0xFF667480, false);
+        boolean playerFirst = WrightsClientConfig.SUPPLY_PLAYER_FIRST.get();
+        graphics.drawString(this.font, Component.translatable("menu.wrights.supply_order"), x, supplyOrderY + 3, WrightsUi.MUTED, false);
+        Component order = Component.translatable(playerFirst ? "menu.wrights.supply_player_first" : "menu.wrights.supply_chest_first");
+        graphics.fill(supplyOrderX, supplyOrderY, supplyOrderX + supplyOrderW, supplyOrderY + 16, playerFirst ? 0xFF24384A : 0xFF18222C);
+        WrightsUi.border(graphics, supplyOrderX, supplyOrderY, supplyOrderW, 16, playerFirst ? WrightsUi.COPPER : 0xFF3D4E5E);
+        graphics.drawCenteredString(this.font, order, supplyOrderX + supplyOrderW / 2, supplyOrderY + 4, WrightsUi.TEXT);
+        Component orderHint = Component.translatable(playerFirst ? "menu.wrights.supply_order_player_hint" : "menu.wrights.supply_order_chest_hint");
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(orderHint.getString(), optionViewW - 28), x, supplyOrderHintY, 0xFF667480, false);
         graphics.drawString(this.font, Component.translatable("menu.wrights.place_offset"), x, optionPlaceY, WrightsUi.TEXT, false);
         int hintW = Math.max(40, optionViewW - 16);
         graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("menu.wrights.place_hint").getString(), hintW), x, optionPlaceHintY, WrightsUi.MUTED, false);
@@ -1012,6 +1032,10 @@ public class WrightsMenuScreen extends Screen {
                 }
                 if (mouseX >= buildMenuX && mouseX < buildMenuX + buildMenuW && mouseY >= buildMenuY && mouseY < buildMenuY + 16) {
                     WrightsClientConfig.setBuildMenu(!WrightsClientConfig.BUILD_MENU.get());
+                    return true;
+                }
+                if (mouseX >= supplyOrderX && mouseX < supplyOrderX + supplyOrderW && mouseY >= supplyOrderY && mouseY < supplyOrderY + 16) {
+                    WrightsClientConfig.setSupplyPlayerFirst(!WrightsClientConfig.SUPPLY_PLAYER_FIRST.get());
                     return true;
                 }
                 if (hitSlider(mouseX, mouseY, wallSliderX, wallSliderY, wallSliderW)) {
