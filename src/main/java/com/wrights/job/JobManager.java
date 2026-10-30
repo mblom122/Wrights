@@ -135,6 +135,7 @@ public final class JobManager {
 
     public static void control(ServerPlayer player, java.util.UUID id, int action) {
         if (!com.wrights.item.ControllerItem.isHeld(player)) {
+            Messages.actionBar(player, "message.wrights.need_controller");
             return;
         }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
@@ -269,6 +270,7 @@ public final class JobManager {
 
     public static void bindSupply(ServerPlayer player, BlockPos pos, boolean clear) {
         if (!ControllerItem.isHeld(player)) {
+            Messages.actionBar(player, "message.wrights.need_controller");
             return;
         }
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
@@ -1395,6 +1397,7 @@ public final class JobManager {
 
     public static void setJobDrones(ServerPlayer player, UUID id, UUID unitId, boolean add) {
         if (!com.wrights.item.ControllerItem.isHeld(player)) {
+            Messages.actionBar(player, "message.wrights.need_controller");
             return;
         }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
@@ -1438,6 +1441,7 @@ public final class JobManager {
 
     public static void moveDrone(ServerPlayer player, UUID unitId, UUID targetId) {
         if (!com.wrights.item.ControllerItem.isHeld(player)) {
+            Messages.actionBar(player, "message.wrights.need_controller");
             return;
         }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());

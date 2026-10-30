@@ -91,23 +91,18 @@ public final class WrightsInput {
         wasHeld = held;
         if (!held) {
             WrightsClientState.noteUnequipped();
+            // World placement/capture UIs need the tool; the main menu and library do not.
+            if (minecraft.screen instanceof BlueprintAdjustScreen
+                    || minecraft.screen instanceof PlacementScreen
+                    || minecraft.screen instanceof BlockPickerScreen) {
+                minecraft.setScreen(null);
+            }
         }
         boundThisClick = false;
         WrightsClientState.tickCapture();
-        if (!com.wrights.item.ControllerItem.isHeld(minecraft.player)) {
-            if (minecraft.screen instanceof WrightsMenuScreen
-                    || minecraft.screen instanceof BlueprintAdjustScreen
-                    || minecraft.screen instanceof PlacementScreen
-                    || minecraft.screen instanceof BlueprintEditScreen
-                    || minecraft.screen instanceof BlockPickerScreen
-                    || minecraft.screen instanceof JobActionScreen) {
-                minecraft.setScreen(null);
-            }
-            while (MENU.consumeClick()) {
-            }
-            return;
+        if (held) {
+            WrightsClientState.tickFollow();
         }
-        WrightsClientState.tickFollow();
         while (MENU.consumeClick()) {
             if (minecraft.screen != null && minecraft.screen.getFocused() instanceof EditBox) {
                 continue;
@@ -115,12 +110,14 @@ public final class WrightsInput {
             if (minecraft.screen == null) {
                 minecraft.setScreen(new WrightsMenuScreen());
                 net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.wrights.network.BlueprintPayloads.LibraryRequest());
-            } else             if (minecraft.screen instanceof WrightsMenuScreen
+            } else if (minecraft.screen instanceof WrightsMenuScreen
                     || minecraft.screen instanceof BlueprintAdjustScreen
                     || minecraft.screen instanceof PlacementScreen
                     || minecraft.screen instanceof BlueprintEditScreen
                     || minecraft.screen instanceof BlockPickerScreen
-                    || minecraft.screen instanceof JobActionScreen) {
+                    || minecraft.screen instanceof JobActionScreen
+                    || minecraft.screen instanceof JobDroneScreen
+                    || minecraft.screen instanceof DroneRosterScreen) {
                 minecraft.setScreen(null);
             }
         }

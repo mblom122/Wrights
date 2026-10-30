@@ -146,14 +146,11 @@ public final class BlueprintActions {
     }
 
     public static void requestLibrary(ServerPlayer player) {
-        if (!held(player)) {
-            return;
-        }
         BlueprintNetwork.syncLibrary(player);
     }
 
     public static void resume(ServerPlayer player, int mode, java.util.UUID buildId) {
-        if (!held(player)) {
+        if (!requireTool(player)) {
             return;
         }
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
@@ -173,7 +170,7 @@ public final class BlueprintActions {
     }
 
     public static void startCapture(ServerPlayer player) {
-        if (!held(player)) {
+        if (!requireTool(player)) {
             return;
         }
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
@@ -183,7 +180,7 @@ public final class BlueprintActions {
     }
 
     public static void pick(ServerPlayer player, BlockPos pos, int action) {
-        if (!held(player) || pos == null) {
+        if (!requireTool(player) || pos == null) {
             return;
         }
         if (action == BlueprintPayloads.CapturePick.SECOND) {
@@ -198,7 +195,7 @@ public final class BlueprintActions {
     }
 
     public static void setCorner(ServerPlayer player, BlockPos pos, boolean wantSecond) {
-        if (!held(player)) {
+        if (!requireTool(player)) {
             return;
         }
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
@@ -291,7 +288,7 @@ public final class BlueprintActions {
     }
 
     public static void updateCapture(ServerPlayer player, int generation, int seq, boolean hasA, BlockPos cornerA, boolean hasB, BlockPos cornerB, String name) {
-        if (!held(player)) {
+        if (!requireTool(player)) {
             return;
         }
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
@@ -335,7 +332,7 @@ public final class BlueprintActions {
     }
 
     public static void confirm(ServerPlayer player, String name, boolean copyFluids, boolean buildAfter) {
-        if (!held(player)) {
+        if (!requireTool(player)) {
             return;
         }
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
@@ -377,7 +374,7 @@ public final class BlueprintActions {
     }
 
     public static void cancel(ServerPlayer player) {
-        if (!held(player)) {
+        if (!requireTool(player)) {
             return;
         }
         BlueprintSessions.get(player).clear();
@@ -404,9 +401,6 @@ public final class BlueprintActions {
     }
 
     public static void delete(ServerPlayer player, java.util.UUID id) {
-        if (!held(player)) {
-            return;
-        }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         if (library.isInUse(id)) {
             Messages.actionBar(player, "message.wrights.blueprint_in_use");
@@ -429,9 +423,6 @@ public final class BlueprintActions {
     }
 
     public static void rename(ServerPlayer player, java.util.UUID id, String name) {
-        if (!held(player)) {
-            return;
-        }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         Schematic schematic = library.schematic(id).orElse(null);
         if (schematic == null) {
@@ -452,7 +443,7 @@ public final class BlueprintActions {
     }
 
     public static void duplicate(ServerPlayer player, UUID id, UUID copyId) {
-        if (!held(player) || id == null || copyId == null || id.equals(copyId)) {
+        if (id == null || copyId == null || id.equals(copyId)) {
             return;
         }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
@@ -531,9 +522,6 @@ public final class BlueprintActions {
     }
 
     public static void beginEdit(ServerPlayer player, java.util.UUID id) {
-        if (!held(player)) {
-            return;
-        }
         Schematic schematic = editable(player, id, false);
         if (schematic == null) {
             return;
@@ -545,9 +533,6 @@ public final class BlueprintActions {
     }
 
     public static void finishEdit(ServerPlayer player, boolean keep) {
-        if (!held(player)) {
-            return;
-        }
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
         Schematic baseline = session.editBaseline();
         boolean wasDraft = session.editWasDraft();
@@ -601,7 +586,7 @@ public final class BlueprintActions {
     }
 
     public static void recapture(ServerPlayer player, java.util.UUID id) {
-        if (!held(player)) {
+        if (!requireTool(player)) {
             return;
         }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
@@ -638,9 +623,6 @@ public final class BlueprintActions {
     }
 
     public static void setAnchor(ServerPlayer player, java.util.UUID id, int x, int y, int z) {
-        if (!held(player)) {
-            return;
-        }
         Schematic schematic = editable(player, id, true);
         if (schematic == null) {
             return;
@@ -649,9 +631,6 @@ public final class BlueprintActions {
     }
 
     public static void editCell(ServerPlayer player, java.util.UUID id, int x, int y, int z, int stateId, boolean remove) {
-        if (!held(player)) {
-            return;
-        }
         Schematic schematic = editable(player, id, true);
         if (schematic == null) {
             return;
@@ -683,9 +662,6 @@ public final class BlueprintActions {
     }
 
     public static void editLayer(ServerPlayer player, java.util.UUID id, int operation, int from, int to) {
-        if (!held(player)) {
-            return;
-        }
         Schematic schematic = editable(player, id, true);
         if (schematic == null) {
             return;
@@ -796,9 +772,6 @@ public final class BlueprintActions {
     }
 
     public static void transform(ServerPlayer player, java.util.UUID id, int operation) {
-        if (!held(player)) {
-            return;
-        }
         Schematic schematic = editable(player, id, true);
         if (schematic == null) {
             return;
@@ -811,9 +784,6 @@ public final class BlueprintActions {
     }
 
     public static void previewBlueprint(ServerPlayer player, java.util.UUID id) {
-        if (!held(player)) {
-            return;
-        }
         Schematic schematic = SchematicLibrary.get(player.getServer()).schematic(id).orElse(null);
         if (schematic == null) {
             return;
@@ -826,9 +796,6 @@ public final class BlueprintActions {
     }
 
     public static void sendMaterials(ServerPlayer player, java.util.UUID id, int clipX, int clipY, int clipZ, boolean placeFluids) {
-        if (!held(player)) {
-            return;
-        }
         Schematic schematic = workingCopy(player, id);
         if (schematic == null) {
             schematic = SchematicLibrary.get(player.getServer()).schematic(id).orElse(null);
@@ -842,7 +809,7 @@ public final class BlueprintActions {
     }
 
     public static void saveSession(ServerPlayer player, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt) {
-        if (!held(player)) {
+        if (!requireTool(player)) {
             return;
         }
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
@@ -870,7 +837,7 @@ public final class BlueprintActions {
     }
 
     public static void beginBuild(ServerPlayer player, java.util.UUID id) {
-        if (!held(player)) {
+        if (!requireTool(player)) {
             return;
         }
         if (id == null || id.equals(Util.NIL_UUID)) {
@@ -901,7 +868,7 @@ public final class BlueprintActions {
     }
 
     public static void stop(ServerPlayer player) {
-        if (!held(player)) {
+        if (!requireTool(player)) {
             return;
         }
         JobManager.cancel(player, true);
@@ -921,7 +888,7 @@ public final class BlueprintActions {
     }
 
     public static void launch(ServerPlayer player, java.util.UUID id, BlockPos anchorPoint, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean force, boolean playerFirst) {
-        if (!held(player)) {
+        if (!requireTool(player)) {
             return;
         }
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
@@ -1021,9 +988,6 @@ public final class BlueprintActions {
     }
 
     public static void shelf(ServerPlayer player, BlueprintPayloads.ShelfEdit edit) {
-        if (!held(player)) {
-            return;
-        }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         BlueprintShelf shelf = library.shelf();
         Map<UUID, String> names = schematicNames(library);
@@ -1112,6 +1076,15 @@ public final class BlueprintActions {
 
     private static boolean held(ServerPlayer player) {
         return ControllerItem.isHeld(player);
+    }
+
+    /** World build / capture / drone work needs the controller in hand. Library browsing does not. */
+    private static boolean requireTool(ServerPlayer player) {
+        if (held(player)) {
+            return true;
+        }
+        Messages.actionBar(player, "message.wrights.need_controller");
+        return false;
     }
 
     private static int clampSize(int size) {

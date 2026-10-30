@@ -269,7 +269,11 @@ public class WrightsMenuScreen extends Screen {
         addRenderableWidget(new WrightsButton(detailX + detailW - detailButtonW, bottom, detailButtonW, 18, Component.translatable("menu.wrights.close"), button -> onClose()));
         renameButton = add(new WrightsButton(detailX + Math.max(48, detailW - 78), detailSplit + 52, 74, 14, Component.translatable("menu.wrights.rename"), button -> rename()));
         materialsButton = add(new WrightsButton(detailX + 4, detailSplit + 72, Math.max(40, detailW - 8), 16, Component.translatable("menu.wrights.materials"), button -> openMaterials()));
-        stopButton = add(new WrightsButton(detailX + 4, detailSplit + 92, Math.max(40, detailW - 8), 16, Component.translatable("menu.wrights.stop"), button -> PacketDistributor.sendToServer(new BlueprintPayloads.StopJob())));
+        stopButton = add(new WrightsButton(detailX + 4, detailSplit + 92, Math.max(40, detailW - 8), 16, Component.translatable("menu.wrights.stop"), button -> {
+            if (requireTool()) {
+                PacketDistributor.sendToServer(new BlueprintPayloads.StopJob());
+            }
+        }));
         discardButton = add(new WrightsButton(panelX + 14, panelY + panelH - 48, 92, 16, Component.translatable("menu.wrights.discard"), button -> discard()));
         resumeButton = add(new WrightsButton(panelX + 14, panelY + panelH - 68, 92, 16, Component.translatable("menu.wrights.resume"), button -> closeKeepingMode()));
         previewButton = add(new WrightsButton(panelX + 14, panelY + panelH - 48, 92, 16, Component.translatable("menu.wrights.cancel_preview"), button -> cancelPreview()));
@@ -292,7 +296,7 @@ public class WrightsMenuScreen extends Screen {
         savedHistoryScroll = historyScroll;
         savedOptionScroll = optionScroll;
         savedSearch = searchText == null ? "" : searchText;
-        if (!preserveMode) {
+        if (!preserveMode && toolHeld()) {
             if (jobsPage) {
                 WrightsClientState.enterJobs();
             } else if (!options
@@ -303,6 +307,23 @@ public class WrightsMenuScreen extends Screen {
             }
         }
         super.removed();
+    }
+
+    private boolean toolHeld() {
+        return this.minecraft != null && this.minecraft.player != null
+                && com.wrights.item.ControllerItem.isHeld(this.minecraft.player);
+    }
+
+    /** World build / capture / job actions need the controller; library browsing does not. */
+    private boolean requireTool() {
+        if (toolHeld()) {
+            return true;
+        }
+        if (this.minecraft != null && this.minecraft.player != null) {
+            this.minecraft.player.displayClientMessage(
+                    Component.translatable("message.wrights.need_controller"), true);
+        }
+        return false;
     }
 
     private <T extends WrightsButton> T add(T button) {
@@ -373,9 +394,10 @@ public class WrightsMenuScreen extends Screen {
         BlueprintPayloads.Summary selected = row == null || row.folder() ? null : row.summary();
         boolean blueprint = selected != null;
         boolean any = row != null;
+        boolean tool = toolHeld();
         editButton.active = blueprint;
         deleteButton.active = any;
-        buildButton.active = blueprint;
+        buildButton.active = blueprint && tool;
         renameButton.active = any;
         deleteButton.setMessage(Component.translatable(any && row.id().equals(confirmDelete) ? "menu.wrights.delete_confirm" : "menu.wrights.delete"));
         if (any && !rename.isFocused()) {
@@ -423,10 +445,22 @@ public class WrightsMenuScreen extends Screen {
         }
         if (stopButton != null) {
             stopButton.visible = building && WrightsClientState.busy;
-            stopButton.active = WrightsClientState.busy;
+            stopButton.active = WrightsClientState.busy && tool;
             stopButton.setX(detailX + 4);
             stopButton.setY(detailSplit + 92);
             stopButton.setWidth(Math.max(40, detailW - 8));
+        }
+        if (newButton != null) {
+            newButton.active = tool;
+        }
+        if (discardButton != null) {
+            discardButton.active = tool;
+        }
+        if (resumeButton != null) {
+            resumeButton.active = tool;
+        }
+        if (previewButton != null) {
+            previewButton.active = tool;
         }
         if (materialsButton != null) {
             materialsButton.visible = building;
@@ -489,6 +523,9 @@ public class WrightsMenuScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, Component.translatable("menu.wrights.title"), panelX + 16, panelY + 10, WrightsUi.COPPER, false);
         graphics.drawString(this.font, Component.translatable("menu.wrights.subtitle"), panelX + 16, panelY + 22, WrightsUi.MUTED, false);
+        if (!toolHeld()) {
+            graphics.drawString(this.font, Component.translatable("menu.wrights.need_controller"), panelX + 150, panelY + 10, WrightsUi.MUTED, false);
+        }
         drawTask(graphics, Component.translatable("menu.wrights.building"), !options && !jobsPage, false, panelY + 46);
         drawTask(graphics, Component.translatable("menu.wrights.jobs"), jobsPage, false, panelY + 72);
         drawTask(graphics, Component.translatable("menu.wrights.mining"), false, true, panelY + 98);
@@ -1558,21 +1595,33 @@ public class WrightsMenuScreen extends Screen {
     private boolean clickJob(double mouseX, double mouseY) {
         prepareJobs();
         if (hitWide(mouseX, mouseY, manageAllRight, manageAllY, manageAllWidth)) {
+            if (!requireTool()) {
+                return true;
+            }
             this.minecraft.setScreen(new DroneRosterScreen(null));
             return true;
         }
         if (!workingJobs.isEmpty()) {
             if (hitWide(mouseX, mouseY, workRemoveRight, workHeaderY, workRemoveWidth)) {
+                if (!requireTool()) {
+                    return true;
+                }
                 PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(new UUID(0L, 0L), BlueprintPayloads.JobControl.REMOVE_ACTIVE));
                 return true;
             }
             if (hitWide(mouseX, mouseY, workPauseRight, workHeaderY, workPauseWidth)) {
+                if (!requireTool()) {
+                    return true;
+                }
                 int action = workAllPaused ? BlueprintPayloads.JobControl.RESUME_ALL : BlueprintPayloads.JobControl.PAUSE_ALL;
                 PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(new UUID(0L, 0L), action));
                 return true;
             }
         }
         if (!finishedJobs.isEmpty() && hitWide(mouseX, mouseY, doneRemoveRight, doneHeaderY, doneRemoveWidth)) {
+            if (!requireTool()) {
+                return true;
+            }
             PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(new UUID(0L, 0L), BlueprintPayloads.JobControl.REMOVE_DONE));
             return true;
         }
@@ -1604,18 +1653,27 @@ public class WrightsMenuScreen extends Screen {
             int manageW = jobButtonWidth("menu.wrights.manage_drones");
             int manageRight = rowX + 6 + this.font.width(count) + 6 + manageW;
             if (mouseX >= manageRight - manageW && mouseX < manageRight) {
+                if (!requireTool()) {
+                    return true;
+                }
                 this.minecraft.setScreen(new JobDroneScreen(job.id(), null));
                 return true;
             }
         }
         int right = rowX + rowW - 4;
         if (hitJobButton(mouseX, right, buttonY)) {
+            if (!requireTool()) {
+                return true;
+            }
             PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.REMOVE));
             return true;
         }
         right -= 56;
         if (creativeVisit()) {
             if (hitJobButton(mouseX, right, buttonY)) {
+                if (!requireTool()) {
+                    return true;
+                }
                 PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.VISIT));
                 return true;
             }
@@ -1630,22 +1688,34 @@ public class WrightsMenuScreen extends Screen {
         right -= markW + 4;
         if (job.finished()) {
             if (hitJobButton(mouseX, right, buttonY)) {
+                if (!requireTool()) {
+                    return true;
+                }
                 PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.REDO));
                 return true;
             }
             right -= 56;
             if (job.canUndo() && hitJobButton(mouseX, right, buttonY)) {
+                if (!requireTool()) {
+                    return true;
+                }
                 PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.UNDO));
                 return true;
             }
             return false;
         }
         if (hitJobButton(mouseX, right, buttonY)) {
+            if (!requireTool()) {
+                return true;
+            }
             PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.STOP));
             return true;
         }
         right -= 56;
         if (hitJobButton(mouseX, right, buttonY)) {
+            if (!requireTool()) {
+                return true;
+            }
             PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), job.paused() ? BlueprintPayloads.JobControl.RESUME : BlueprintPayloads.JobControl.PAUSE));
             return true;
         }
@@ -1701,6 +1771,9 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private void closeKeepingMode() {
+        if (!requireTool()) {
+            return;
+        }
         preserveMode = true;
         this.minecraft.setScreen(null);
     }
@@ -1763,6 +1836,9 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private void newBlueprint() {
+        if (!requireTool()) {
+            return;
+        }
         preserveMode = true;
         WrightsClientState.beginCaptureLocal();
         PacketDistributor.sendToServer(new BlueprintPayloads.StartCapture());
@@ -1779,7 +1855,7 @@ public class WrightsMenuScreen extends Screen {
 
     private void build() {
         BlueprintPayloads.Summary summary = selected();
-        if (summary == null) {
+        if (summary == null || !requireTool()) {
             return;
         }
         WrightsClientState.armBuild(summary);
@@ -1848,6 +1924,9 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private void discard() {
+        if (!requireTool()) {
+            return;
+        }
         PacketDistributor.sendToServer(new BlueprintPayloads.CaptureCancel());
         WrightsClientState.clearLocal();
         WrightsClientState.forgetMode();
@@ -1855,6 +1934,9 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private void cancelPreview() {
+        if (!requireTool()) {
+            return;
+        }
         PacketDistributor.sendToServer(new BlueprintPayloads.CaptureCancel());
         WrightsClientState.clearLocal();
         WrightsClientState.forgetMode();

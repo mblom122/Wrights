@@ -78,6 +78,9 @@ public class JobActionScreen extends Screen {
     }
 
     private void manage() {
+        if (!requireTool()) {
+            return;
+        }
         if (this.minecraft != null) {
             this.minecraft.setScreen(new JobDroneScreen(id, this));
         }
@@ -85,7 +88,7 @@ public class JobActionScreen extends Screen {
 
     private void togglePace() {
         BlueprintPayloads.JobLine job = live();
-        if (job == null || job.finished()) {
+        if (job == null || job.finished() || !requireTool()) {
             return;
         }
         int action = job.paused() ? BlueprintPayloads.JobControl.RESUME : BlueprintPayloads.JobControl.PAUSE;
@@ -93,8 +96,23 @@ public class JobActionScreen extends Screen {
     }
 
     private void stop() {
+        if (!requireTool()) {
+            return;
+        }
         PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(id, BlueprintPayloads.JobControl.STOP));
         onClose();
+    }
+
+    private boolean requireTool() {
+        if (this.minecraft != null && this.minecraft.player != null
+                && com.wrights.item.ControllerItem.isHeld(this.minecraft.player)) {
+            return true;
+        }
+        if (this.minecraft != null && this.minecraft.player != null) {
+            this.minecraft.player.displayClientMessage(
+                    Component.translatable("message.wrights.need_controller"), true);
+        }
+        return false;
     }
 
     private BlueprintPayloads.JobLine live() {
