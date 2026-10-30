@@ -1,9 +1,11 @@
 package com.wrights.compat.jade;
 
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
 import com.wrights.WrightsMod;
 import com.wrights.block.WrightportBlockEntity;
+import com.wrights.drone.Swarm;
 
 import snownee.jade.api.BlockAccessor;
 import snownee.jade.api.IBlockComponentProvider;
@@ -19,6 +21,7 @@ public enum WrightportJadeProvider implements IBlockComponentProvider {
     public void appendTooltip(ITooltip tooltip, BlockAccessor accessor, IPluginConfig config) {
         if (accessor.getBlockEntity() instanceof WrightportBlockEntity port) {
             tooltip.add(port.ownerLabel());
+            tooltip.add(Component.translatable("item.wrights.personal_wrightport.drones", port.swarm().units().size(), Swarm.capacity()));
         }
     }
 

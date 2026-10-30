@@ -89,6 +89,7 @@ public final class BlueprintNetwork {
         registrar.playToClient(BlueprintPayloads.JobHologram.TYPE, BlueprintPayloads.JobHologram.STREAM_CODEC, BlueprintNetwork::clientJobHologram);
         registrar.playToClient(BlueprintPayloads.JobSync.TYPE, BlueprintPayloads.JobSync.STREAM_CODEC, BlueprintNetwork::clientJobs);
         registrar.playToClient(BlueprintPayloads.PlacedPorts.TYPE, BlueprintPayloads.PlacedPorts.STREAM_CODEC, BlueprintNetwork::clientPlacedPorts);
+        registrar.playToClient(BlueprintPayloads.PortGlow.TYPE, BlueprintPayloads.PortGlow.STREAM_CODEC, BlueprintNetwork::clientPortGlow);
         registrar.playToClient(BlueprintPayloads.PlacedSwarm.TYPE, BlueprintPayloads.PlacedSwarm.STREAM_CODEC, BlueprintNetwork::clientPlacedSwarm);
         registrar.playToClient(BlueprintPayloads.DeployPool.TYPE, BlueprintPayloads.DeployPool.STREAM_CODEC, BlueprintNetwork::clientDeployPool);
         registrar.playToClient(BlueprintPayloads.SupplySync.TYPE, BlueprintPayloads.SupplySync.STREAM_CODEC, BlueprintNetwork::clientSupply);
@@ -418,6 +419,13 @@ public final class BlueprintNetwork {
     private static void placedBatch(BlueprintPayloads.PlacedBatch payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
         context.enqueueWork(() -> com.wrights.drone.PlacedPortManage.batch(player, payload.dimension(), payload.pos(), payload.action(), payload.value(), payload.units()));
+    }
+
+    private static void clientPortGlow(BlueprintPayloads.PortGlow payload, IPayloadContext context) {
+        if (FMLEnvironment.dist != Dist.CLIENT) {
+            return;
+        }
+        context.enqueueWork(() -> com.wrights.client.WrightsClientState.glowPort(payload.dimension(), payload.pos()));
     }
 
     private static void clientPlacedPorts(BlueprintPayloads.PlacedPorts payload, IPayloadContext context) {

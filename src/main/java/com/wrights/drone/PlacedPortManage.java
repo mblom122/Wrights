@@ -25,11 +25,13 @@ public final class PlacedPortManage {
         if (player.getServer() == null) {
             return;
         }
-        var owned = WrightLedger.get(player.getServer()).owned(player.getUUID());
+        WrightLedger ledger = WrightLedger.get(player.getServer());
+        ledger.sweep(player.getServer());
+        var owned = ledger.listed(player.getUUID());
         var ports = new java.util.ArrayList<BlueprintPayloads.PlacedPort>(Math.min(owned.size(), 512));
         for (int i = 0; i < owned.size() && ports.size() < 512; i++) {
             WrightLedger.Placed placed = owned.get(i);
-            ports.add(new BlueprintPayloads.PlacedPort(placed.dimension(), placed.pos(), placed.units()));
+            ports.add(new BlueprintPayloads.PlacedPort(placed.dimension(), placed.pos(), placed.units(), placed.unowned()));
         }
         PacketDistributor.sendToPlayer(player, new BlueprintPayloads.PlacedPorts(ports));
     }
@@ -51,6 +53,9 @@ public final class PlacedPortManage {
             sync(player);
             return;
         }
+        if (port.owner() == null) {
+            port.assignOwner(player.getUUID(), player.getGameProfile().getName());
+        }
         Swarm next = HangarOps.edit(player, port.swarm(), action, unit);
         port.setSwarm(next);
         sendSwarm(player, dimension, pos, false, next);
@@ -63,6 +68,9 @@ public final class PlacedPortManage {
             sendSwarm(player, dimension, pos, true, Swarm.EMPTY);
             sync(player);
             return;
+        }
+        if (port.owner() == null) {
+            port.assignOwner(player.getUUID(), player.getGameProfile().getName());
         }
         Swarm next = HangarOps.applyBatch(player, port.swarm(), action, value, units);
         port.setSwarm(next);
@@ -105,7 +113,7 @@ public final class PlacedPortManage {
             WrightLedger.get(player.getServer()).forget(level.dimension(), pos);
             return null;
         }
-        if (port.owner() == null || !port.owner().equals(player.getUUID())) {
+        if (port.owner() != null && !port.owner().equals(player.getUUID())) {
             return null;
         }
         return port;

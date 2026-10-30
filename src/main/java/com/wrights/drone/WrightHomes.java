@@ -159,6 +159,42 @@ public final class WrightHomes {
     }
 
     /**
+     * The wrightport nearest the build. Looks a few chunks past the port's reach so one
+     * sitting just outside still gets pointed out.
+     */
+    @Nullable
+    public static BlockPos closestPort(ServerLevel level, BlockPos site) {
+        if (level == null || site == null) {
+            return null;
+        }
+        BlockPos best = null;
+        double bestDistance = Double.MAX_VALUE;
+        Vec3 from = Vec3.atCenterOf(site);
+        int centerX = SectionPos.blockToSectionCoord(site.getX());
+        int centerZ = SectionPos.blockToSectionCoord(site.getZ());
+        int reach = PORT_CHUNKS + 6;
+        for (int chunkX = centerX - reach; chunkX <= centerX + reach; chunkX++) {
+            for (int chunkZ = centerZ - reach; chunkZ <= centerZ + reach; chunkZ++) {
+                if (!level.hasChunk(chunkX, chunkZ)) {
+                    continue;
+                }
+                for (BlockEntity entity : level.getChunk(chunkX, chunkZ).getBlockEntities().values()) {
+                    if (!(entity instanceof WrightportBlockEntity)) {
+                        continue;
+                    }
+                    BlockPos pos = entity.getBlockPos();
+                    double distance = from.distanceToSqr(Vec3.atCenterOf(pos));
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        best = pos.immutable();
+                    }
+                }
+            }
+        }
+        return best;
+    }
+
+    /**
      * Free wrights that can reach {@code site}. Personal ones count only while you are in range.
      * Block ones count while their port's 7 by 7 chunk square contains the site.
      */

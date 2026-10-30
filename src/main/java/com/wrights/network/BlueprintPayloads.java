@@ -1035,15 +1035,32 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record PlacedPort(String dimension, BlockPos pos, int units) {
+    public record PlacedPort(String dimension, BlockPos pos, int units, boolean unowned) {
         public void write(RegistryFriendlyByteBuf buf) {
             buf.writeUtf(dimension);
             buf.writeBlockPos(pos);
             buf.writeVarInt(units);
+            buf.writeBoolean(unowned);
         }
 
         public static PlacedPort read(RegistryFriendlyByteBuf buf) {
-            return new PlacedPort(buf.readUtf(), buf.readBlockPos(), buf.readVarInt());
+            return new PlacedPort(buf.readUtf(), buf.readBlockPos(), buf.readVarInt(), buf.readBoolean());
+        }
+    }
+
+    /** Blink a wrightport in the world for a few seconds. */
+    public record PortGlow(String dimension, BlockPos pos) implements CustomPacketPayload {
+        public static final Type<PortGlow> TYPE = payloadType("port_glow");
+        public static final StreamCodec<RegistryFriendlyByteBuf, PortGlow> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeUtf(value.dimension);
+                    buf.writeBlockPos(value.pos);
+                },
+                buf -> new PortGlow(buf.readUtf(), buf.readBlockPos()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
         }
     }
 

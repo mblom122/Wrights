@@ -57,15 +57,13 @@ public final class WrightLedger extends SavedData {
         ListTag list = tag.getList("ports", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) {
             CompoundTag entry = list.getCompound(i);
-            if (!entry.hasUUID("owner")) {
-                continue;
-            }
             BlockPos pos = NbtUtils.readBlockPos(entry, "pos").orElse(null);
             ResourceLocation dimension = ResourceLocation.tryParse(entry.getString("dim"));
             if (pos == null || dimension == null) {
                 continue;
             }
-            ledger.ports.put(new Key(dimension.toString(), pos.asLong()), new Port(entry.getUUID("owner"), Math.max(0, entry.getInt("units"))));
+            UUID owner = entry.hasUUID("owner") ? entry.getUUID("owner") : null;
+            ledger.ports.put(new Key(dimension.toString(), pos.asLong()), new Port(owner, Math.max(0, entry.getInt("units"))));
         }
         return ledger;
     }
@@ -83,8 +81,8 @@ public final class WrightLedger extends SavedData {
         return Math.max(0, WrightsConfig.maxWrightsOwned() - owned);
     }
 
-    public void remember(UUID owner, ResourceKey<Level> dimension, BlockPos pos, int units) {
-        if (owner == null || dimension == null || pos == null) {
+    public void remember(@javax.annotation.Nullable UUID owner, ResourceKey<Level> dimension, BlockPos pos, int units) {
+        if (dimension == null || pos == null) {
             return;
         }
         Port next = new Port(owner, Math.max(0, units));
@@ -103,16 +101,15 @@ public final class WrightLedger extends SavedData {
         }
     }
 
-    public List<Placed> owned(UUID owner) {
+    /** Ports this player owns, plus ones placed before owners existed. */
+    public List<Placed> listed(UUID owner) {
         List<Placed> list = new ArrayList<>();
-        if (owner == null) {
-            return list;
-        }
         for (Map.Entry<Key, Port> entry : ports.entrySet()) {
-            if (!owner.equals(entry.getValue().owner)) {
+            UUID holder = entry.getValue().owner;
+            if (holder != null && !holder.equals(owner)) {
                 continue;
             }
-            list.add(new Placed(entry.getKey().dimension, BlockPos.of(entry.getKey().pos), entry.getValue().units));
+            list.add(new Placed(entry.getKey().dimension, BlockPos.of(entry.getKey().pos), entry.getValue().units, holder == null));
         }
         list.sort((a, b) -> {
             int dim = a.dimension.compareTo(b.dimension);
@@ -146,7 +143,7 @@ public final class WrightLedger extends SavedData {
         int chunkZ = chunk.getPos().z;
         Map<Long, Port> live = new HashMap<>();
         for (BlockEntity entity : chunk.getBlockEntities().values()) {
-            if (!(entity instanceof WrightportBlockEntity port) || port.owner() == null) {
+            if (!(entity instanceof WrightportBlockEntity port)) {
                 continue;
             }
             live.put(entity.getBlockPos().asLong(), new Port(port.owner(), port.swarm().units().size()));
@@ -205,7 +202,9 @@ public final class WrightLedger extends SavedData {
                 continue;
             }
             CompoundTag saved = new CompoundTag();
-            saved.putUUID("owner", entry.getValue().owner);
+            if (entry.getValue().owner != null) {
+                saved.putUUID("owner", entry.getValue().owner);
+            }
             saved.putString("dim", dimension.toString());
             saved.put("pos", NbtUtils.writeBlockPos(BlockPos.of(entry.getKey().pos)));
             saved.putInt("units", entry.getValue().units);
@@ -223,7 +222,28 @@ public final class WrightLedger extends SavedData {
         get(level.getServer()).reconcile(level.dimension(), chunk);
     }
 
-    public record Placed(String dimension, BlockPos pos, int units) {
+    /** Reads every loaded chunk so a port placed before owners were stored still shows up. */
+    public void sweep(MinecraftServer server) {
+        if (server == null) {
+            return;
+        }
+        int radius = Math.max(2, server.getPlayerList().getViewDistance());
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            ServerLevel level = player.serverLevel();
+            int centerX = player.chunkPosition().x;
+            int centerZ = player.chunkPosition().z;
+            for (int chunkX = centerX - radius; chunkX <= centerX + radius; chunkX++) {
+                for (int chunkZ = centerZ - radius; chunkZ <= centerZ + radius; chunkZ++) {
+                    LevelChunk chunk = level.getChunkSource().getChunkNow(chunkX, chunkZ);
+                    if (chunk != null) {
+                        reconcile(level.dimension(), chunk);
+                    }
+                }
+            }
+        }
+    }
+
+    public record Placed(String dimension, BlockPos pos, int units, boolean unowned) {
     }
 
     private record Key(String dimension, long pos) {

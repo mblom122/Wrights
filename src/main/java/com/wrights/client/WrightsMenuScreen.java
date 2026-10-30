@@ -3236,14 +3236,16 @@ public class WrightsMenuScreen extends Screen {
     private Component placedLine(BlueprintPayloads.PlacedPort port, int units) {
         String here = this.minecraft.level == null ? "" : this.minecraft.level.dimension().location().toString();
         if (here.equals(port.dimension())) {
-            return Component.translatable("menu.wrights.placed_line", port.pos().getX(), port.pos().getY(), port.pos().getZ(), units);
+            Component line = Component.translatable("menu.wrights.placed_line", port.pos().getX(), port.pos().getY(), port.pos().getZ(), units);
+            return port.unowned() ? line.copy().append(" · ").append(Component.translatable("block.wrights.wrightport.no_owner")) : line;
         }
         String dim = port.dimension();
         int colon = dim.indexOf(':');
         if (colon >= 0 && colon + 1 < dim.length()) {
             dim = dim.substring(colon + 1);
         }
-        return Component.translatable("menu.wrights.placed_line_dim", port.pos().getX(), port.pos().getY(), port.pos().getZ(), units, dim);
+        Component line = Component.translatable("menu.wrights.placed_line_dim", port.pos().getX(), port.pos().getY(), port.pos().getZ(), units, dim);
+        return port.unowned() ? line.copy().append(" · ").append(Component.translatable("block.wrights.wrightport.no_owner")) : line;
     }
 
     private void drawManageTabs(GuiGraphics graphics, int mouseX, int mouseY) {

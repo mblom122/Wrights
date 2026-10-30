@@ -85,6 +85,9 @@ public final class WrightsClientState {
     public static boolean supplyBound;
     public static BlockPos supplyPos;
     public static long supplyHighlightUntil;
+    public static String portGlowDim = "";
+    public static BlockPos portGlowPos;
+    public static long portGlowUntil;
     public static int digitalKind;
     public static boolean digitalOnline;
     public static boolean digitalBound;
@@ -1351,6 +1354,16 @@ public final class WrightsClientState {
 
     public static boolean supplyHighlighting() {
         return supplyPos != null && System.currentTimeMillis() < supplyHighlightUntil;
+    }
+
+    public static void glowPort(String dimension, BlockPos pos) {
+        portGlowDim = dimension == null ? "" : dimension;
+        portGlowPos = pos;
+        portGlowUntil = System.currentTimeMillis() + 10_000L;
+    }
+
+    public static boolean portGlowing() {
+        return portGlowPos != null && System.currentTimeMillis() < portGlowUntil;
     }
 
     public static void applySupply(BlueprintPayloads.SupplySync payload) {

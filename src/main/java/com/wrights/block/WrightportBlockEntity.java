@@ -106,7 +106,7 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
     }
 
     private void remember() {
-        if (owner != null && level instanceof ServerLevel server) {
+        if (level instanceof ServerLevel server) {
             com.wrights.drone.WrightLedger.get(server.getServer()).remember(owner, server.dimension(), worldPosition, swarm().units().size());
         }
     }

@@ -37,6 +37,7 @@ import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.util.BlockSnapshot;
@@ -2051,6 +2052,9 @@ public final class JobManager {
             job.setPaused(true);
             dirty = true;
             Messages.actionBar(player, noCrewMessage(player, job, true));
+            if (crewGap(player, job) != CrewGap.NONE_AVAILABLE) {
+                glowClosestPort(player, player.getServer().getLevel(job.dimension()), job.min());
+            }
             BlueprintNetwork.syncJobs(player);
         }
         if (dirty) {
@@ -2085,6 +2089,7 @@ public final class JobManager {
         Messages.actionBar(player, reach.ports() > 0 && reach.personal() == 0
                 ? "message.wrights.port_empty"
                 : "message.wrights.none_in_range");
+        glowClosestPort(player, level, site);
         return false;
     }
 
@@ -2101,6 +2106,15 @@ public final class JobManager {
             return CrewGap.PORT_EMPTY;
         }
         return CrewGap.OUT_OF_RANGE;
+    }
+
+    /** Points at the nearest wrightport for ten seconds when a build cannot take one. */
+    private static void glowClosestPort(ServerPlayer player, ServerLevel level, BlockPos site) {
+        BlockPos pos = WrightHomes.closestPort(level, site);
+        if (pos == null || level == null) {
+            return;
+        }
+        PacketDistributor.sendToPlayer(player, new com.wrights.network.BlueprintPayloads.PortGlow(level.dimension().location().toString(), pos));
     }
 
     private static boolean assignCrew(ServerPlayer player, BuildJob job, Schematic schematic) {
@@ -2128,6 +2142,9 @@ public final class JobManager {
         List<WrightHomes.FreeWright> units = freeUnits(player, library, job, wanted);
         if (units.isEmpty()) {
             Messages.actionBar(player, noCrewMessage(player, job, false));
+            if (crewGap(player, job) != CrewGap.NONE_AVAILABLE) {
+                glowClosestPort(player, player.getServer().getLevel(job.dimension()), job.min());
+            }
             return false;
         }
         List<Integer> speeds = new ArrayList<>();

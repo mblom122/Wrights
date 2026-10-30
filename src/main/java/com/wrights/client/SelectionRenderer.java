@@ -67,6 +67,7 @@ public final class SelectionRenderer {
         Vec3 camera = event.getCamera().getPosition();
         MultiBufferSource.BufferSource buffers = minecraft.renderBuffers().bufferSource();
         drawPortBounds(pose, buffers, camera, minecraft);
+        drawPortGlow(pose, buffers, camera, minecraft);
         if (!ControllerItem.isHeld(player)) {
             return;
         }
@@ -221,6 +222,28 @@ public final class SelectionRenderer {
                 drawBox(pose, lines, markedBox(job), camera, 0.98F, 0.86F, 0.32F, pulse);
             }
         }
+        buffers.endBatch(RenderType.lines());
+    }
+
+    private static void drawPortGlow(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
+        if (!WrightsClientState.portGlowing() || minecraft.level == null) {
+            return;
+        }
+        if (!minecraft.level.dimension().location().toString().equals(WrightsClientState.portGlowDim)) {
+            return;
+        }
+        boolean on = (System.currentTimeMillis() / 180L) % 2L == 0L;
+        float alpha = on ? 1.0F : 0.2F;
+        AABB box = new AABB(WrightsClientState.portGlowPos).inflate(0.08D);
+        VertexConsumer fill = buffers.getBuffer(RenderType.debugFilledBox());
+        AABB local = box.move(-camera.x, -camera.y, -camera.z);
+        LevelRenderer.addChainedFilledBoxVertices(
+                pose, fill, local.minX, local.minY, local.minZ, local.maxX, local.maxY, local.maxZ,
+                0.95F, 0.72F, 0.18F, on ? 0.28F : 0.06F);
+        buffers.endBatch(RenderType.debugFilledBox());
+        VertexConsumer lines = buffers.getBuffer(RenderType.lines());
+        drawBox(pose, lines, box, camera, 1.0F, 0.78F, 0.2F, alpha);
+        drawBox(pose, lines, box.inflate(0.06D), camera, 1.0F, 0.92F, 0.45F, alpha * 0.7F);
         buffers.endBatch(RenderType.lines());
     }
 
