@@ -414,8 +414,6 @@ public class BlueprintAdjustScreen extends Screen {
     }
 
     private void cancel() {
-        WrightsClientState.releaseSelection();
-        WrightsClientState.sendUpdate();
         this.minecraft.setScreen(null);
     }
 
