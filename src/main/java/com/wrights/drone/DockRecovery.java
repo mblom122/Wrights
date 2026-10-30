@@ -4,6 +4,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import javax.annotation.Nullable;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -25,26 +27,47 @@ public final class DockRecovery {
     private DockRecovery() {
     }
 
-    public static void recover(ServerLevel level, ServerPlayer player, BlockPos where, int tier) {
+    /**
+     * Saves one wright. Tries {@code where} first, then any other owned port in range of that spot.
+     * Returns the port it docked in, or null when the wright went to digital storage or the ground.
+     */
+    @Nullable
+    public static BlockPos recover(ServerLevel level, ServerPlayer player, BlockPos where, @Nullable UUID unitId, int tier) {
+        return recover(level, player, where, unitId, tier, "");
+    }
+
+    /**
+     * Saves one wright. Tries {@code where} first, then any other owned port in range of that spot.
+     * Returns the port it docked in, or null when the wright went to digital storage or the ground.
+     */
+    @Nullable
+    public static BlockPos recover(ServerLevel level, ServerPlayer player, BlockPos where, @Nullable UUID unitId, int tier, @Nullable String name) {
         if (level == null || where == null) {
-            return;
+            return null;
         }
-        if (redock(level, player, where, tier)) {
+        if (redock(level, player, where, unitId, tier, name)) {
             notice(player, level, null, where, Where.DOCK);
-            return;
+            return where;
+        }
+        UUID owner = player == null ? null : player.getUUID();
+        BlockPos other = WrightHomes.openPort(level, where, owner, null);
+        if (other != null && !other.equals(where) && redock(level, player, other, unitId, tier, name)) {
+            notice(player, level, null, other, Where.DOCK);
+            return other;
         }
         ItemStack stack = WrightItem.stack(tier, 1);
         BlockPos digitalAt = insertDigital(player, level, stack);
         if (stack.isEmpty()) {
             notice(player, level, digitalAt, where, Where.DIGITAL);
-            return;
+            return null;
         }
         drop(level, where, stack);
         notice(player, level, digitalAt, where, Where.GROUND);
+        return null;
     }
 
-    private static boolean redock(ServerLevel level, ServerPlayer player, BlockPos where, int tier) {
-        if (player == null || !level.isLoaded(where)) {
+    private static boolean redock(ServerLevel level, ServerPlayer player, BlockPos where, @Nullable UUID unitId, int tier, @Nullable String name) {
+        if (!level.isLoaded(where)) {
             return false;
         }
         BlockEntity entity = level.getBlockEntity(where);
@@ -55,7 +78,12 @@ public final class DockRecovery {
         if (player != null && owner != null && !owner.equals(player.getUUID())) {
             return false;
         }
-        Swarm next = port.swarm().addUnit(tier);
+        if (unitId != null && port.swarm().contains(unitId)) {
+            return true;
+        }
+        Swarm next = unitId == null
+                ? port.swarm().addUnit(tier)
+                : port.swarm().adopt(new Swarm.Unit(unitId, tier, 0, name == null ? "" : name));
         if (next == port.swarm()) {
             return false;
         }

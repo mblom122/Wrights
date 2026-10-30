@@ -2,8 +2,10 @@ package com.wrights.job;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
@@ -52,7 +54,9 @@ import com.wrights.blueprint.BoxEdits;
 import com.wrights.network.BlueprintNetwork;
 import com.wrights.network.BlueprintPayloads;
 import com.wrights.WrightsMod;
+import com.wrights.drone.DockRecovery;
 import com.wrights.drone.WrightTier;
+import com.wrights.drone.WrightportPlaces;
 import com.wrights.drone.Wrightports;
 import com.wrights.drone.WrightHomes;
 import com.wrights.drone.CrewSplit;
@@ -911,6 +915,7 @@ public final class JobManager {
             }
             return;
         }
+        shelterLost(level, player, library, job);
         if (player == null) {
             return;
         }
@@ -1035,6 +1040,7 @@ public final class JobManager {
             archive(library, job, true);
             return;
         }
+        shelterLost(level, player, library, job);
         if (player == null || job.paused()) {
             return;
         }
@@ -1439,9 +1445,18 @@ public final class JobManager {
             }
             ServerLevel jobLevel = player.getServer().getLevel(job.dimension());
             List<UUID> current = new ArrayList<>();
-            for (UUID unit : job.crewUnits()) {
-                BlockPos home = homeOfCrew(job, unit);
+            List<UUID> crew = job.crewUnits();
+            for (int i = 0; i < crew.size(); i++) {
+                UUID unit = crew.get(i);
+                BuildJob.Hand hand = i < job.hands().size() ? job.hands().get(i) : null;
+                if (hand != null && hand.sheltering && taken.add(unit)) {
+                    current.add(unit);
+                    continue;
+                }
+                BlockPos home = hand == null ? null : hand.homePort;
                 if (WrightHomes.stillThere(jobLevel, player, home, unit) && taken.add(unit)) {
+                    current.add(unit);
+                } else if (WrightHomes.dockGone(jobLevel, player, home, unit) && taken.add(unit)) {
                     current.add(unit);
                 }
             }
@@ -1483,6 +1498,9 @@ public final class JobManager {
                 dirty = true;
             } else if (job.hasCrew() && !current.isEmpty()) {
                 for (int i = 0; i < job.hands().size() && i < current.size(); i++) {
+                    if (job.hands().get(i).sheltering) {
+                        continue;
+                    }
                     WrightHomes.FreeWright found = WrightHomes.locate(jobLevel, player, current.get(i), job.min());
                     if (found != null) {
                         job.hands().get(i).homePort = found.homePort();
@@ -1995,6 +2013,11 @@ public final class JobManager {
         if (job.crewUnits().isEmpty()) {
             return false;
         }
+        for (BuildJob.Hand hand : job.hands()) {
+            if (hand.sheltering) {
+                return true;
+            }
+        }
         ServerLevel level = player.getServer().getLevel(job.dimension());
         for (UUID unit : job.crewUnits()) {
             if (WrightHomes.stillThere(level, player, homeOfCrew(job, unit), unit)) {
@@ -2225,6 +2248,10 @@ public final class JobManager {
         boolean waitingItems = false;
         int[] skipBudget = {8192};
         for (BuildJob.Hand hand : job.hands()) {
+            if (hand.sheltering) {
+                working = true;
+                continue;
+            }
             hand.waitingOnOthers = false;
             int index = nextWork(level, schematic, job, hand, skipBudget);
             if (index == -2) {
@@ -2345,6 +2372,10 @@ public final class JobManager {
         }
         boolean working = false;
         for (BuildJob.Hand hand : job.hands()) {
+            if (hand.sheltering) {
+                working = true;
+                continue;
+            }
             int index = refundIndex(job, hand);
             if (index < 0) {
                 hand.idle = true;
@@ -3762,6 +3793,14 @@ public final class JobManager {
                 }
                 away.add(units.get(i));
                 hand.stranded = true;
+                if (level.getBlockEntity(pos) instanceof WrightportBlockEntity port) {
+                    for (Swarm.Unit unit : port.swarm().units()) {
+                        if (unit.id().equals(units.get(i)) && unit.name() != null && !unit.name().isBlank()) {
+                            hand.wrightName = unit.name();
+                            break;
+                        }
+                    }
+                }
                 dirty = true;
                 ServerLevel jobLevel = level.getServer().getLevel(job.dimension());
                 if (jobLevel == null || hand.entityId == null) {
@@ -3776,6 +3815,175 @@ public final class JobManager {
             library.setDirty();
         }
         return away;
+    }
+
+    /**
+     * A wright whose dock is gone should not hover there. Fly it to another port that
+     * covers the build and has a free slot. Otherwise put it in digital storage, or drop it.
+     */
+    private static void shelterLost(ServerLevel level, ServerPlayer player, SchematicLibrary library, BuildJob job) {
+        if (level == null || job == null || job.finished() || !job.hasCrew()) {
+            return;
+        }
+        List<UUID> units = job.crewUnits();
+        Map<BlockPos, Integer> reserved = new HashMap<>();
+        boolean dirty = false;
+        int flying = 0;
+        for (int i = Math.min(job.hands().size(), units.size()) - 1; i >= 0; i--) {
+            if (i >= job.hands().size()) {
+                continue;
+            }
+            BuildJob.Hand hand = job.hands().get(i);
+            UUID id = units.get(i);
+            if (hand.sheltering) {
+                Entity entity = hand.entityId == null ? null : level.getEntity(hand.entityId);
+                if (entity instanceof DroneEntity drone && drone.isAlive() && drone.returning()) {
+                    continue;
+                }
+                if (player != null && WrightHomes.stillThere(level, player, hand.homePort, id)) {
+                    hand.sheltering = false;
+                    hand.stranded = false;
+                    hand.entityId = null;
+                    dirty = true;
+                    continue;
+                }
+                hand.sheltering = false;
+            }
+            BlockPos home = hand.homePort;
+            boolean gone = WrightHomes.dockGone(level, player, home, id);
+            if (!gone && hand.stranded && player != null) {
+                gone = !WrightHomes.stillThere(level, player, home, id);
+            }
+            if (!gone) {
+                continue;
+            }
+            String name = hand.wrightName == null ? "" : hand.wrightName;
+            if (player != null) {
+                Swarm.Unit known = WrightHomes.findUnit(player, id);
+                if (known != null && known.name() != null && !known.name().isBlank()) {
+                    name = known.name();
+                    hand.wrightName = name;
+                }
+            }
+            WrightportPlaces.removeUnit(player, id);
+            int tier = WrightTier.clamp(hand.speed);
+            BlockPos next = WrightHomes.openPort(level, job.min(), job.owner(), reserved);
+            DroneEntity drone = null;
+            if (hand.entityId != null && level.getEntity(hand.entityId) instanceof DroneEntity found && found.isAlive()) {
+                drone = found;
+            }
+            if (player != null && drone != null && next != null) {
+                reserved.merge(next, 1, Integer::sum);
+                hand.homePort = next;
+                hand.stranded = true;
+                hand.sheltering = true;
+                hand.idle = false;
+                hand.waitingOnOthers = false;
+                drone.strand(id, name);
+                drone.setHomePort(next);
+                drone.flyHome(player, flying, Math.max(1, job.hands().size()), next);
+                flying++;
+                dirty = true;
+                continue;
+            }
+            BlockPos where = next != null
+                    ? next
+                    : (drone != null ? drone.blockPosition() : (hand.lastPos != null ? hand.lastPos : job.min()));
+            BlockPos docked = DockRecovery.recover(level, player, where, id, tier, name);
+            dirty = true;
+            if (docked != null) {
+                noteDocked(level.getServer(), id, docked);
+                if (drone != null && drone.isAlive()) {
+                    drone.forgetStrand();
+                    drone.discard();
+                }
+            } else {
+                noteReleased(level.getServer(), id);
+            }
+        }
+        if (dirty) {
+            library.setDirty();
+        }
+    }
+
+    /** The wright reached a real port and is stored there under the same id. */
+    public static void noteDocked(MinecraftServer server, UUID unitId, BlockPos port) {
+        if (server == null || unitId == null || port == null) {
+            return;
+        }
+        SchematicLibrary library = SchematicLibrary.get(server);
+        for (BuildJob job : library.jobs()) {
+            int index = job.crewUnits().indexOf(unitId);
+            if (index < 0 || index >= job.hands().size()) {
+                continue;
+            }
+            BuildJob.Hand hand = job.hands().get(index);
+            hand.homePort = port.immutable();
+            hand.stranded = false;
+            hand.sheltering = false;
+            hand.entityId = null;
+            library.setDirty();
+            return;
+        }
+    }
+
+    /** The wright was stored in digital storage or dropped, so the job must let go of it. */
+    public static void noteReleased(MinecraftServer server, UUID unitId) {
+        if (server == null || unitId == null) {
+            return;
+        }
+        SchematicLibrary library = SchematicLibrary.get(server);
+        for (BuildJob job : library.jobs()) {
+            int index = job.crewUnits().indexOf(unitId);
+            if (index < 0 || index >= job.hands().size()) {
+                continue;
+            }
+            retire(server, library, job, index);
+            return;
+        }
+    }
+
+    private static void retire(MinecraftServer server, SchematicLibrary library, BuildJob job, int index) {
+        List<BuildJob.Hand> hands = job.hands();
+        if (index < 0 || index >= hands.size()) {
+            return;
+        }
+        BuildJob.Hand hand = hands.get(index);
+        ServerLevel level = server.getLevel(job.dimension());
+        if (level != null && hand.entityId != null && level.getEntity(hand.entityId) instanceof DroneEntity drone) {
+            drone.forgetStrand();
+            drone.discard();
+        }
+        hand.sheltering = false;
+        hand.stranded = false;
+        hand.entityId = null;
+        if (hands.size() <= 1) {
+            job.setCrewUnits(List.of());
+            if (!job.paused()) {
+                job.noteHold(BuildJob.HOLD_NO_WRIGHTS, null);
+                job.setPaused(true);
+            }
+            library.setDirty();
+            return;
+        }
+        for (int i = 0; i < hands.size(); i++) {
+            if (i == index) {
+                continue;
+            }
+            hands.get(i).slices.addAll(hand.slices);
+            break;
+        }
+        hands.remove(index);
+        List<UUID> units = new ArrayList<>(job.crewUnits());
+        if (index < units.size()) {
+            units.remove(index);
+        }
+        job.setCrewUnits(units);
+        for (int i = 0; i < hands.size(); i++) {
+            hands.get(i).lane = i;
+            hands.get(i).lanes = hands.size();
+        }
+        library.setDirty();
     }
 
     private static void depart(DroneEntity drone, ServerPlayer player, Vec3 work, int lane, int lanes, BlockPos homePort) {

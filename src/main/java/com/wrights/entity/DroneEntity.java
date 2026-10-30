@@ -36,6 +36,7 @@ public class DroneEntity extends Entity {
     private int returnLimit;
     private UUID ownerId;
     private UUID unitId;
+    private String unitName = "";
     /** Null = personal wrightport (player back). Set = placed wrightport block. */
     @Nullable
     private BlockPos homePort;
@@ -57,14 +58,29 @@ public class DroneEntity extends Entity {
 
     /** The dock this wright left was broken. It still flies back, then looks for somewhere to go. */
     public void strand(@Nullable UUID unit) {
+        strand(unit, null);
+    }
+
+    public void strand(@Nullable UUID unit, @Nullable String name) {
         this.stranded = true;
         if (unit != null) {
             this.unitId = unit;
+        }
+        if (name != null && !name.isBlank()) {
+            this.unitName = name;
         }
     }
 
     public boolean stranded() {
         return this.stranded;
+    }
+
+    public boolean returning() {
+        return this.returning;
+    }
+
+    public void forgetStrand() {
+        this.stranded = false;
     }
 
     /** Saves a wright whose dock is already gone, when it will not get to fly home. */
@@ -74,8 +90,16 @@ public class DroneEntity extends Entity {
         }
         this.stranded = false;
         ServerPlayer player = this.ownerId == null ? null : server.getServer().getPlayerList().getPlayer(this.ownerId);
-        BlockPos where = this.homePort != null && server.isLoaded(this.homePort) ? this.homePort : this.blockPosition();
-        com.wrights.drone.DockRecovery.recover(server, player, where, this.tier());
+        BlockPos where = this.homePort != null ? this.homePort : this.blockPosition();
+        BlockPos docked = com.wrights.drone.DockRecovery.recover(server, player, where, this.unitId, this.tier(), this.unitName);
+        if (this.unitId == null) {
+            return;
+        }
+        if (docked != null) {
+            com.wrights.job.JobManager.noteDocked(server.getServer(), this.unitId, docked);
+        } else {
+            com.wrights.job.JobManager.noteReleased(server.getServer(), this.unitId);
+        }
     }
 
     /** Leaves the personal port behind the player, aimed at the work site. */
@@ -234,7 +258,10 @@ public class DroneEntity extends Entity {
             boolean timedOut = ++this.returnTicks > this.returnLimit;
             boolean arrived = this.distanceToSqr(dock) <= (blockHome ? 0.04D : 1.15D);
             if (timedOut || arrived) {
-                finishReturn(serverLevel, player, loadedHome ? homePort : this.blockPosition());
+                BlockPos arrivedAt = this.stranded && this.homePort != null
+                        ? this.homePort
+                        : (loadedHome ? homePort : this.blockPosition());
+                finishReturn(serverLevel, player, arrivedAt);
                 return;
             }
             this.moveToward(dock, returnStep(dock, blockHome));
@@ -287,6 +314,7 @@ public class DroneEntity extends Entity {
         if (tag.hasUUID("UnitId")) {
             this.unitId = tag.getUUID("UnitId");
         }
+        this.unitName = tag.getString("UnitName");
     }
 
     @Override
@@ -306,11 +334,22 @@ public class DroneEntity extends Entity {
         if (this.unitId != null) {
             tag.putUUID("UnitId", this.unitId);
         }
+        if (this.unitName != null && !this.unitName.isBlank()) {
+            tag.putString("UnitName", this.unitName);
+        }
     }
 
     private void finishReturn(ServerLevel level, ServerPlayer player, BlockPos where) {
         if (this.stranded) {
-            com.wrights.drone.DockRecovery.recover(level, player, where, this.tier());
+            this.stranded = false;
+            BlockPos docked = com.wrights.drone.DockRecovery.recover(level, player, where, this.unitId, this.tier(), this.unitName);
+            if (this.unitId != null) {
+                if (docked != null) {
+                    com.wrights.job.JobManager.noteDocked(level.getServer(), this.unitId, docked);
+                } else {
+                    com.wrights.job.JobManager.noteReleased(level.getServer(), this.unitId);
+                }
+            }
         }
         this.discard();
     }

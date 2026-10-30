@@ -2,6 +2,8 @@ package com.wrights.drone;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -82,6 +84,22 @@ public final class WrightportPlaces {
             case OFF -> player.getOffhandItem();
             default -> ItemStack.EMPTY;
         };
+    }
+
+    /** Takes one wright out of every personal port this player is carrying. */
+    public static void removeUnit(Player player, UUID id) {
+        if (player == null || id == null) {
+            return;
+        }
+        Set<UUID> ids = Set.of(id);
+        for (Spot spot : list(player)) {
+            ItemStack stack = stack(player, spot.kind(), spot.index());
+            Swarm swarm = Swarm.from(stack);
+            Swarm stripped = swarm.without(ids);
+            if (stripped != swarm) {
+                write(player, spot.kind(), spot.index(), stripped);
+            }
+        }
     }
 
     public static boolean write(Player player, int kind, int index, Swarm swarm) {

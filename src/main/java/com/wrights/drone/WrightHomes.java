@@ -2,6 +2,7 @@ package com.wrights.drone;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Predicate;
 
@@ -194,6 +195,69 @@ public final class WrightHomes {
                     }
                     BlockPos pos = entity.getBlockPos();
                     if (inRangeOnly && !portCovers(level.dimension(), pos, level.dimension(), site)) {
+                        continue;
+                    }
+                    double distance = from.distanceToSqr(Vec3.atCenterOf(pos));
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        best = pos.immutable();
+                    }
+                }
+            }
+        }
+        return best;
+    }
+
+    /**
+     * The dock this wright left is no longer a place it can return to.
+     * A personal wright counts once it is no longer in the worn port.
+     * A block wright counts once that block is loaded and is not a wrightport.
+     */
+    public static boolean dockGone(ServerLevel level, ServerPlayer player, @Nullable BlockPos home, UUID unit) {
+        if (unit == null) {
+            return false;
+        }
+        if (home == null) {
+            if (player == null) {
+                return false;
+            }
+            return !Wrightports.swarm(player).contains(unit);
+        }
+        if (level == null || !level.isLoaded(home)) {
+            return false;
+        }
+        return !(level.getBlockEntity(home) instanceof WrightportBlockEntity);
+    }
+
+    /**
+     * Nearest owned wrightport that covers {@code site} and still has a free slot.
+     * {@code reserved} counts slots already promised to other wrights this pass.
+     */
+    @Nullable
+    public static BlockPos openPort(ServerLevel level, BlockPos site, @Nullable UUID owner, @Nullable Map<BlockPos, Integer> reserved) {
+        if (level == null || site == null || owner == null) {
+            return null;
+        }
+        BlockPos best = null;
+        double bestDistance = Double.MAX_VALUE;
+        Vec3 from = Vec3.atCenterOf(site);
+        int centerX = SectionPos.blockToSectionCoord(site.getX());
+        int centerZ = SectionPos.blockToSectionCoord(site.getZ());
+        for (int chunkX = centerX - PORT_CHUNKS; chunkX <= centerX + PORT_CHUNKS; chunkX++) {
+            for (int chunkZ = centerZ - PORT_CHUNKS; chunkZ <= centerZ + PORT_CHUNKS; chunkZ++) {
+                if (!level.hasChunk(chunkX, chunkZ)) {
+                    continue;
+                }
+                for (BlockEntity entity : level.getChunk(chunkX, chunkZ).getBlockEntities().values()) {
+                    if (!(entity instanceof WrightportBlockEntity port) || !ownedBy(port, owner)) {
+                        continue;
+                    }
+                    BlockPos pos = entity.getBlockPos();
+                    if (!portCovers(level.dimension(), pos, level.dimension(), site)) {
+                        continue;
+                    }
+                    int held = reserved == null ? 0 : reserved.getOrDefault(pos, 0);
+                    if (port.swarm().units().size() + held >= Swarm.capacity()) {
                         continue;
                     }
                     double distance = from.distanceToSqr(Vec3.atCenterOf(pos));

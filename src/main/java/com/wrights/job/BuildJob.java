@@ -809,6 +809,12 @@ public final class BuildJob {
                 if (hand.stranded) {
                     handTag.putBoolean("stranded", true);
                 }
+                if (hand.sheltering) {
+                    handTag.putBoolean("sheltering", true);
+                }
+                if (hand.wrightName != null && !hand.wrightName.isBlank()) {
+                    handTag.putString("wrightName", hand.wrightName);
+                }
                 crew.add(handTag);
             }
             tag.put("hands", crew);
@@ -953,6 +959,8 @@ public final class BuildJob {
                     hand.homePort = NbtUtils.readBlockPos(handTag, "home").orElse(null);
                 }
                 hand.stranded = handTag.getBoolean("stranded");
+                hand.sheltering = handTag.getBoolean("sheltering");
+                hand.wrightName = handTag.getString("wrightName");
                 job.hands.add(hand);
             }
         }
@@ -1057,8 +1065,12 @@ public final class BuildJob {
         public BlockPos lastPos;
         /** Null = personal wrightport (player back). Set = placed wrightport block. */
         public BlockPos homePort;
-        /** The placed dock was broken while this wright was out. Recover it on the way home. */
+        /** The dock this wright left is gone. Recover it on the way home. */
         public boolean stranded;
+        /** Flying to another wrightport because the old dock is gone. Not dropped from the crew yet. */
+        public boolean sheltering;
+        /** Name to keep when this wright has to leave a dock that is gone. */
+        public String wrightName = "";
         public final List<Slice> slices = new ArrayList<>();
     }
 
