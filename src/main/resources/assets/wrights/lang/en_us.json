@@ -366,6 +366,7 @@
   "screen.wrights.picker_inventory": "Inventory",
   "screen.wrights.picker_all": "All",
   "screen.wrights.picker_empty": "No blocks",
+  "screen.wrights.placement": "Placement",
   "screen.wrights.lock": "Lock in place",
   "screen.wrights.rotate_short": "Turn",
   "screen.wrights.rotate_ccw": "Rotate left",

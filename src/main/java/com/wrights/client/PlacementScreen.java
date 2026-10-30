@@ -68,13 +68,14 @@ public class PlacementScreen extends Screen implements JeiPreview {
             modelSize = Math.max(map ? openW : 88, this.width - 8 - pad * 2 - gap - controlsW);
         }
         panelW = pad + modelSize + gap + controlsW + pad;
-        panelH = 476;
+        boolean voiding = WrightsClientConfig.VOID_BLOCKS.get() || WrightsClientConfig.VOID_FLUIDS.get();
+        panelH = voiding ? 456 : 438;
         panelX = JeiPreview.left(this.width, panelW);
         panelY = Math.max(4, (this.height - panelH) / 2);
         int modelX = panelX + pad;
         int modelY = panelY + 28;
         controlsX = modelX + modelSize + gap;
-        rotateY = panelY + 128;
+        rotateY = panelY + 142;
         flipY = rotateY + 36;
         if (WrightsClientState.anchor == null) {
             WrightsClientState.anchor = WrightsClientState.lookTarget();
@@ -101,8 +102,8 @@ public class PlacementScreen extends Screen implements JeiPreview {
         step(right + 76, panelY + 72, "+", () -> resize(2, 1));
         int row = (controlsW - 28) / 2;
         int foot = panelY + panelH;
-        lockButton = new WrightsButton(controlsX + 12, panelY + 96, row, 16, Component.translatable("screen.wrights.lock"), button -> setAim(false));
-        followButton = new WrightsButton(controlsX + 16 + row, panelY + 96, row, 16, Component.translatable("screen.wrights.follow"), button -> setAim(true));
+        lockButton = new WrightsButton(controlsX + 12, panelY + 106, row, 16, Component.translatable("screen.wrights.lock"), button -> setAim(false));
+        followButton = new WrightsButton(controlsX + 16 + row, panelY + 106, row, 16, Component.translatable("screen.wrights.follow"), button -> setAim(true));
         addRenderableWidget(lockButton);
         addRenderableWidget(followButton);
         inventoryButton = new WrightsButton(controlsX + 12, foot - 118, row, 16, Component.translatable("screen.wrights.supply_player"), button -> useInventory());
@@ -208,6 +209,7 @@ public class PlacementScreen extends Screen implements JeiPreview {
         axis(graphics, controlsX + 222, panelY + 40, "X");
         axis(graphics, controlsX + 222, panelY + 56, "Y");
         axis(graphics, controlsX + 222, panelY + 72, "Z");
+        graphics.drawString(this.font, Component.translatable("screen.wrights.placement"), controlsX + 12, panelY + 94, WrightsUi.TEXT, false);
         int foot = panelY + panelH;
         graphics.drawString(this.font, Component.translatable("screen.wrights.deploy_on_job"), controlsX + 12, deployY - 14, WrightsUi.TEXT, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.use_items_from"), controlsX + 12, foot - 132, WrightsUi.MUTED, false);
@@ -479,13 +481,29 @@ public class PlacementScreen extends Screen implements JeiPreview {
     }
 
     private void toggleVoidBlocks() {
+        boolean before = voidRowOpen();
         WrightsClientConfig.setVoidBlocks(!WrightsClientConfig.VOID_BLOCKS.get());
-        refresh();
+        relayoutVoids(before);
     }
 
     private void toggleVoidFluids() {
+        boolean before = voidRowOpen();
         WrightsClientConfig.setVoidFluids(!WrightsClientConfig.VOID_FLUIDS.get());
-        refresh();
+        relayoutVoids(before);
+    }
+
+    private static boolean voidRowOpen() {
+        return WrightsClientConfig.VOID_BLOCKS.get() || WrightsClientConfig.VOID_FLUIDS.get();
+    }
+
+    private void relayoutVoids(boolean before) {
+        if (before == voidRowOpen()) {
+            refresh();
+            return;
+        }
+        if (this.minecraft != null) {
+            this.minecraft.execute(this::rebuildWidgets);
+        }
     }
 
     private void toggleVoidNbt() {
