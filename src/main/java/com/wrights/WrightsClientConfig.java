@@ -106,6 +106,9 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.ConfigValue<String> LIST_MANUAL = BUILDER
             .comment("Last hand-ordered blueprint list for each tab, kept when another sort is chosen.")
             .define("listManual", "");
+    public static final ModConfigSpec.BooleanValue PORT_PLAYER_FIRST = BUILDER
+            .comment("When true, a job takes wrights from you before a wrightport block. When false, the block is used first.")
+            .define("portPlayerFirst", true);
     public static final ModConfigSpec.BooleanValue SUPPLY_PLAYER_FIRST = BUILDER
             .comment("When true, a build takes blocks from your inventory before a bound chest. When false, the chest is used first.")
             .define("supplyPlayerFirst", true);
@@ -264,6 +267,11 @@ public final class WrightsClientConfig {
 
     public static void setVoidNbt(boolean enabled) {
         VOID_NBT.set(enabled);
+        save();
+    }
+
+    public static void setPortPlayerFirst(boolean enabled) {
+        PORT_PLAYER_FIRST.set(enabled);
         save();
     }
 

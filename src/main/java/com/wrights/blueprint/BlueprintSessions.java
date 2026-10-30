@@ -80,6 +80,7 @@ public final class BlueprintSessions {
         private boolean editWasDraft;
         private boolean editBaselineDirty;
         private boolean instantJobs;
+        private boolean portPlayerFirst = true;
         private boolean buildAfterSave;
         private int generation;
         private int seq;
@@ -195,6 +196,14 @@ public final class BlueprintSessions {
 
         public void setInstantJobs(boolean instantJobs) {
             this.instantJobs = instantJobs;
+        }
+
+        public boolean portPlayerFirst() {
+            return portPlayerFirst;
+        }
+
+        public void setPortPlayerFirst(boolean portPlayerFirst) {
+            this.portPlayerFirst = portPlayerFirst;
         }
 
         public void setBuildAfterSave(boolean buildAfterSave) {

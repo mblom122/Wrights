@@ -197,6 +197,10 @@ public class WrightsMenuScreen extends Screen {
     private int buildMenuY;
     private int buildMenuW;
     private int buildMenuHintY;
+    private int portOrderX;
+    private int portOrderY;
+    private int portOrderW;
+    private int portOrderHintY;
     private int supplyOrderX;
     private int supplyOrderY;
     private int supplyOrderW;
@@ -797,6 +801,14 @@ public class WrightsMenuScreen extends Screen {
         local += 16;
         droneHintY = optionY(local);
         local += 16;
+        Component youFirst = Component.translatable("menu.wrights.port_player_first");
+        Component blockFirst = Component.translatable("menu.wrights.port_block_first");
+        portOrderW = Math.max(this.font.width(youFirst), this.font.width(blockFirst)) + 16;
+        portOrderX = x + 108;
+        portOrderY = optionY(local - 3);
+        local += 14;
+        portOrderHintY = optionY(local);
+        local += 16;
         Component menuState = Component.translatable(WrightsClientConfig.BUILD_MENU.get() ? "menu.wrights.on" : "menu.wrights.off");
         buildMenuW = Math.max(36, this.font.width(menuState) + 16);
         buildMenuX = x + 108;
@@ -911,6 +923,14 @@ public class WrightsMenuScreen extends Screen {
         }
         Component droneHint = Component.translatable(droneMax ? "menu.wrights.drone_max_hint" : "menu.wrights.drone_fixed_hint");
         graphics.drawString(this.font, this.font.plainSubstrByWidth(droneHint.getString(), optionViewW - 28), x, droneHintY, 0xFF667480, false);
+        boolean youFirst = WrightsClientConfig.PORT_PLAYER_FIRST.get();
+        graphics.drawString(this.font, Component.translatable("menu.wrights.port_order"), x, portOrderY + 3, WrightsUi.MUTED, false);
+        Component portOrder = Component.translatable(youFirst ? "menu.wrights.port_player_first" : "menu.wrights.port_block_first");
+        graphics.fill(portOrderX, portOrderY, portOrderX + portOrderW, portOrderY + 16, youFirst ? 0xFF24384A : 0xFF18222C);
+        WrightsUi.border(graphics, portOrderX, portOrderY, portOrderW, 16, youFirst ? WrightsUi.COPPER : 0xFF3D4E5E);
+        graphics.drawCenteredString(this.font, portOrder, portOrderX + portOrderW / 2, portOrderY + 4, WrightsUi.TEXT);
+        Component portHint = Component.translatable(youFirst ? "menu.wrights.port_order_player_hint" : "menu.wrights.port_order_block_hint");
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(portHint.getString(), optionViewW - 28), x, portOrderHintY, 0xFF667480, false);
         boolean openMenu = WrightsClientConfig.BUILD_MENU.get();
         graphics.drawString(this.font, Component.translatable("menu.wrights.open_build_menu"), x, buildMenuY + 3, WrightsUi.MUTED, false);
         Component menuState = Component.translatable(openMenu ? "menu.wrights.on" : "menu.wrights.off");
@@ -1305,6 +1325,12 @@ public class WrightsMenuScreen extends Screen {
                         return true;
                     }
                 }
+                if (mouseX >= portOrderX && mouseX < portOrderX + portOrderW && mouseY >= portOrderY && mouseY < portOrderY + 16) {
+                    boolean next = !WrightsClientConfig.PORT_PLAYER_FIRST.get();
+                    WrightsClientConfig.setPortPlayerFirst(next);
+                    PacketDistributor.sendToServer(new BlueprintPayloads.SetPortOrder(next));
+                    return true;
+                }
                 if (mouseX >= buildMenuX && mouseX < buildMenuX + buildMenuW && mouseY >= buildMenuY && mouseY < buildMenuY + 16) {
                     WrightsClientConfig.setBuildMenu(!WrightsClientConfig.BUILD_MENU.get());
                     return true;
@@ -1589,7 +1615,7 @@ public class WrightsMenuScreen extends Screen {
         return min + (int) Math.round(t * (max - min));
     }
 
-    private static final int JOB_ROW = 58;
+    private static final int JOB_ROW = 70;
     private static final int JOB_HEADER = 20;
     private static final int JOB_GROUP_MIN = 46;
 
@@ -1717,16 +1743,20 @@ public class WrightsMenuScreen extends Screen {
 
     private void drawJobRow(GuiGraphics graphics, int mouseX, int mouseY, int x, int width, int y, BlueprintPayloads.JobLine job) {
         boolean working = !job.finished() && !job.saving();
-        int buttonY = y + 36;
-        boolean hover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 54;
-        graphics.fill(x, y, x + width, y + 54, hover ? 0xFF24303C : 0xFF18222C);
+        int buttonY = y + 48;
+        boolean hover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 66;
+        graphics.fill(x, y, x + width, y + 66, hover ? 0xFF24303C : 0xFF18222C);
         String name = this.font.plainSubstrByWidth(job.name(), Math.max(40, width / 2));
         graphics.drawString(this.font, name, x + 6, y + 4, WrightsUi.TEXT, false);
         Component statusText = Component.translatable(jobStatus(job));
         graphics.drawString(this.font, statusText, x + width - 8 - this.font.width(statusText), y + 4, jobColor(job), false);
+        Component source = jobSource(job);
+        if (!source.getString().isEmpty()) {
+            graphics.drawString(this.font, this.font.plainSubstrByWidth(source.getString(), Math.max(40, width - 12)), x + 6, y + 15, WrightsUi.MUTED, false);
+        }
         BlockPos anchor = job.anchor();
-        graphics.drawString(this.font, Component.translatable("menu.wrights.job_anchor", anchor.getX(), anchor.getY(), anchor.getZ()), x + 6, y + 15, WrightsUi.MUTED, false);
-        drawProgress(graphics, x + 6, y + 26, Math.max(40, width - 12), job);
+        graphics.drawString(this.font, Component.translatable("menu.wrights.job_anchor", anchor.getX(), anchor.getY(), anchor.getZ()), x + 6, y + 26, WrightsUi.MUTED, false);
+        drawProgress(graphics, x + 6, y + 37, Math.max(40, width - 12), job);
         int right = x + width - 4;
         if (working) {
             String count = Component.translatable("menu.wrights.job_drone_count", job.crew().size()).getString();
@@ -1769,9 +1799,38 @@ public class WrightsMenuScreen extends Screen {
             return "menu.wrights.saving";
         }
         if (job.paused()) {
-            return "menu.wrights.paused";
+            return holdStatus(job.hold(), true);
+        }
+        if (job.hold() != com.wrights.job.BuildJob.HOLD_NONE && job.hold() != com.wrights.job.BuildJob.HOLD_MANUAL) {
+            return holdStatus(job.hold(), false);
         }
         return "menu.wrights.running";
+    }
+
+    private static String holdStatus(int hold, boolean paused) {
+        return switch (hold) {
+            case com.wrights.job.BuildJob.HOLD_NO_WRIGHTS -> "menu.wrights.hold_no_wrights";
+            case com.wrights.job.BuildJob.HOLD_PLAYER_RANGE -> paused ? "menu.wrights.hold_player" : "menu.wrights.hold_waiting_player";
+            case com.wrights.job.BuildJob.HOLD_PORT_RANGE -> "menu.wrights.hold_port";
+            case com.wrights.job.BuildJob.HOLD_DIMENSION -> "menu.wrights.hold_dimension";
+            case com.wrights.job.BuildJob.HOLD_CHUNK -> "menu.wrights.hold_chunk";
+            default -> "menu.wrights.paused";
+        };
+    }
+
+    private Component jobSource(BlueprintPayloads.JobLine job) {
+        BlockPos at = job.sourcePort();
+        boolean coords = job.labelPort() && at != null && !at.equals(BlockPos.ZERO);
+        return switch (job.source()) {
+            case 1 -> Component.translatable("menu.wrights.job_from_you");
+            case 2 -> coords
+                    ? Component.translatable("menu.wrights.job_from_port_at", at.getX(), at.getY(), at.getZ())
+                    : Component.translatable("menu.wrights.job_from_port");
+            case 3 -> coords
+                    ? Component.translatable("menu.wrights.job_from_both_at", at.getX(), at.getY(), at.getZ())
+                    : Component.translatable("menu.wrights.job_from_both");
+            default -> Component.empty();
+        };
     }
 
     private int jobColor(BlueprintPayloads.JobLine job) {
@@ -1896,7 +1955,7 @@ public class WrightsMenuScreen extends Screen {
 
     private boolean clickJobRow(double mouseX, double mouseY, int y, BlueprintPayloads.JobLine job) {
         boolean working = !job.finished() && !job.saving();
-        int buttonY = y + 36;
+        int buttonY = y + 48;
         if (mouseY < buttonY || mouseY >= buttonY + 16) {
             return false;
         }

@@ -480,7 +480,17 @@ public final class BuildJob {
         return clipZ == Integer.MAX_VALUE ? 1 : clipZ;
     }
 
+    public static final int HOLD_NONE = 0;
+    public static final int HOLD_MANUAL = 1;
+    public static final int HOLD_NO_WRIGHTS = 2;
+    public static final int HOLD_PLAYER_RANGE = 3;
+    public static final int HOLD_PORT_RANGE = 4;
+    public static final int HOLD_DIMENSION = 5;
+    public static final int HOLD_CHUNK = 6;
+
     private boolean paused;
+    private int hold = HOLD_NONE;
+    private BlockPos holdPort;
     private boolean awaitDrones;
     private int crewQuota;
     private boolean finished;
@@ -493,6 +503,24 @@ public final class BuildJob {
 
     public boolean paused() {
         return paused;
+    }
+
+    public int hold() {
+        return hold;
+    }
+
+    public BlockPos holdPort() {
+        return holdPort;
+    }
+
+    public void noteHold(int reason, BlockPos port) {
+        this.hold = reason;
+        this.holdPort = port == null ? null : port.immutable();
+    }
+
+    public void clearHold() {
+        hold = HOLD_NONE;
+        holdPort = null;
     }
 
     public void setPaused(boolean paused) {
@@ -798,6 +826,10 @@ public final class BuildJob {
         }
         tag.putInt("workedTicks", workedTicks);
         tag.putBoolean("paused", paused);
+        tag.putInt("hold", hold);
+        if (holdPort != null) {
+            tag.put("holdPort", NbtUtils.writeBlockPos(holdPort));
+        }
         tag.putBoolean("awaitDrones", awaitDrones);
         tag.putInt("crewQuota", crewQuota);
         tag.putBoolean("finished", finished);
@@ -937,6 +969,10 @@ public final class BuildJob {
         }
         job.workedTicks = tag.getInt("workedTicks");
         job.paused = tag.getBoolean("paused");
+        job.hold = tag.getInt("hold");
+        if (tag.contains("holdPort")) {
+            job.holdPort = NbtUtils.readBlockPos(tag, "holdPort").orElse(null);
+        }
         job.awaitDrones = tag.getBoolean("awaitDrones");
         job.crewQuota = Math.max(0, tag.getInt("crewQuota"));
         job.finished = tag.getBoolean("finished");

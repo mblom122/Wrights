@@ -47,6 +47,7 @@ public final class BlueprintNetwork {
         registrar.playToServer(BlueprintPayloads.SaveSession.TYPE, BlueprintPayloads.SaveSession.STREAM_CODEC, BlueprintNetwork::saveSession);
         registrar.playToServer(BlueprintPayloads.JobControl.TYPE, BlueprintPayloads.JobControl.STREAM_CODEC, BlueprintNetwork::control);
         registrar.playToServer(BlueprintPayloads.SetPace.TYPE, BlueprintPayloads.SetPace.STREAM_CODEC, BlueprintNetwork::pace);
+        registrar.playToServer(BlueprintPayloads.SetPortOrder.TYPE, BlueprintPayloads.SetPortOrder.STREAM_CODEC, BlueprintNetwork::portOrder);
         registrar.playToServer(BlueprintPayloads.SetAssign.TYPE, BlueprintPayloads.SetAssign.STREAM_CODEC, BlueprintNetwork::assign);
         registrar.playToServer(BlueprintPayloads.DeployAsk.TYPE, BlueprintPayloads.DeployAsk.STREAM_CODEC, BlueprintNetwork::deployAsk);
         registrar.playToServer(BlueprintPayloads.SetJobDrones.TYPE, BlueprintPayloads.SetJobDrones.STREAM_CODEC, BlueprintNetwork::jobDrones);
@@ -304,6 +305,11 @@ public final class BlueprintNetwork {
     private static void control(BlueprintPayloads.JobControl payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
         context.enqueueWork(() -> JobManager.control(player, payload.id(), payload.action()));
+    }
+
+    private static void portOrder(BlueprintPayloads.SetPortOrder payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> BlueprintSessions.get(player).setPortPlayerFirst(payload.playerFirst()));
     }
 
     private static void pace(BlueprintPayloads.SetPace payload, IPayloadContext context) {
@@ -622,9 +628,46 @@ public final class BlueprintNetwork {
                     job.boxSizeZ(),
                     job.crewUnits().size(),
                     job.crewUnits(),
-                    job.workedTicks()));
+                    job.workedTicks(),
+                    job.hold(),
+                    jobSource(job),
+                    jobSourcePort(job),
+                    labelPort(player, job)));
         }
         PacketDistributor.sendToPlayer(player, new BlueprintPayloads.JobSync(lines));
+    }
+
+    private static int jobSource(BuildJob job) {
+        boolean you = false;
+        boolean port = false;
+        for (BuildJob.Hand hand : job.hands()) {
+            if (hand.homePort == null) {
+                you = true;
+            } else {
+                port = true;
+            }
+        }
+        if (you && port) {
+            return 3;
+        }
+        if (port) {
+            return 2;
+        }
+        return you ? 1 : 0;
+    }
+
+    private static BlockPos jobSourcePort(BuildJob job) {
+        for (BuildJob.Hand hand : job.hands()) {
+            if (hand.homePort != null) {
+                return hand.homePort;
+            }
+        }
+        return BlockPos.ZERO;
+    }
+
+    private static boolean labelPort(ServerPlayer player, BuildJob job) {
+        net.minecraft.server.level.ServerLevel level = player.getServer().getLevel(job.dimension());
+        return level != null && com.wrights.drone.WrightHomes.coveringPortCount(level, job.min()) > 1;
     }
 
     public static void syncSupply(ServerPlayer player) {

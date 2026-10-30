@@ -75,6 +75,7 @@ public final class WrightsInput {
         }
         if (!paceSent && minecraft.getConnection() != null) {
             net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.wrights.network.BlueprintPayloads.SetPace(com.wrights.WrightsClientConfig.INSTANT_JOBS.get()));
+            net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.wrights.network.BlueprintPayloads.SetPortOrder(com.wrights.WrightsClientConfig.PORT_PLAYER_FIRST.get()));
             paceSent = true;
         }
         boolean held = com.wrights.item.ControllerItem.isHeld(minecraft.player);

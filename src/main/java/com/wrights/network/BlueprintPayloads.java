@@ -677,7 +677,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record JobLine(UUID id, String name, int done, int total, int skipped, boolean paused, boolean saving, boolean finished, boolean canUndo, boolean undoing, boolean stopped, boolean undone, String dimension, BlockPos anchor, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, List<UUID> crew, int workedTicks) {
+    public record JobLine(UUID id, String name, int done, int total, int skipped, boolean paused, boolean saving, boolean finished, boolean canUndo, boolean undoing, boolean stopped, boolean undone, String dimension, BlockPos anchor, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, List<UUID> crew, int workedTicks, int hold, int source, BlockPos sourcePort, boolean labelPort) {
         public void write(RegistryFriendlyByteBuf buf) {
             buf.writeUUID(id);
             buf.writeUtf(name, 48);
@@ -703,6 +703,10 @@ public final class BlueprintPayloads {
                 buf.writeUUID(unit);
             }
             buf.writeVarInt(workedTicks);
+            buf.writeVarInt(hold);
+            buf.writeVarInt(source);
+            buf.writeBlockPos(sourcePort);
+            buf.writeBoolean(labelPort);
         }
 
         public static JobLine read(RegistryFriendlyByteBuf buf) {
@@ -727,7 +731,11 @@ public final class BlueprintPayloads {
                     buf.readVarInt(),
                     buf.readVarInt(),
                     readCrew(buf),
-                    buf.readVarInt());
+                    buf.readVarInt(),
+                    buf.readVarInt(),
+                    buf.readVarInt(),
+                    buf.readBlockPos(),
+                    buf.readBoolean());
         }
 
         private static List<UUID> readCrew(RegistryFriendlyByteBuf buf) {
@@ -786,6 +794,18 @@ public final class BlueprintPayloads {
                     buf.writeByte(value.action);
                 },
                 buf -> new JobControl(buf.readUUID(), buf.readByte()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record SetPortOrder(boolean playerFirst) implements CustomPacketPayload {
+        public static final Type<SetPortOrder> TYPE = payloadType("set_port_order");
+        public static final StreamCodec<RegistryFriendlyByteBuf, SetPortOrder> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> buf.writeBoolean(value.playerFirst),
+                buf -> new SetPortOrder(buf.readBoolean()));
 
         @Override
         public Type<? extends CustomPacketPayload> type() {

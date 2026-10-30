@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -164,14 +165,16 @@ public final class JobManager {
         if (action == com.wrights.network.BlueprintPayloads.JobControl.STOP) {
             stopOne(player, library, job, true);
         } else if (action == com.wrights.network.BlueprintPayloads.JobControl.PAUSE && !job.finished()) {
+            job.noteHold(BuildJob.HOLD_MANUAL, null);
             job.setPaused(true);
             library.setDirty();
         } else if (action == com.wrights.network.BlueprintPayloads.JobControl.RESUME && !job.finished()) {
             bindCrewIds(player, library);
             if (job.paused() && !restorePausedCrew(player, library, job)) {
-                Messages.actionBar(player, "message.wrights.paused_no_drones");
+                explainResume(player, job);
             } else if (job.paused()) {
                 job.setPaused(false);
+                job.clearHold();
                 library.setDirty();
             }
         } else if (action == com.wrights.network.BlueprintPayloads.JobControl.REDO) {
@@ -322,6 +325,11 @@ public final class JobManager {
                     blocked++;
                     continue;
                 }
+                if (paused) {
+                    job.noteHold(BuildJob.HOLD_MANUAL, null);
+                } else {
+                    job.clearHold();
+                }
                 job.setPaused(paused);
                 changed = true;
             }
@@ -329,8 +337,8 @@ public final class JobManager {
         if (changed) {
             library.setDirty();
             Messages.actionBar(player, paused ? "message.wrights.paused_all" : "message.wrights.resumed_all");
-        } else if (blocked > 0) {
-            Messages.actionBar(player, "message.wrights.paused_no_drones");
+            } else if (blocked > 0) {
+            Messages.actionBar(player, "message.wrights.resume_none");
         }
         BlueprintNetwork.syncJobs(player);
     }
@@ -504,7 +512,7 @@ public final class JobManager {
             Messages.actionBar(player, "message.wrights.need_copy");
             return;
         }
-        if (!instant(player) && !crewReady(player)) {
+        if (!instant(player) && !crewReady(player, origin.dimension(), origin.pos())) {
             return;
         }
         cancel(player, false);
@@ -673,7 +681,7 @@ public final class JobManager {
             if (!level.isLoaded(pos)) {
                 if (WrightsConfig.REQUIRE_CHUNKS_LOADED.getAsBoolean()) {
                     if (job.tickMessage()) {
-                        Messages.actionBar(player, "message.wrights.paused_chunk");
+                        noteChunk(player, library, job);
                     }
                     return;
                 }
@@ -887,32 +895,14 @@ public final class JobManager {
             return;
         }
         if (job.hasCrew()) {
-            if (!player.level().dimension().equals(job.dimension())) {
-                if (job.tickMessage()) {
-                    Messages.actionBar(player, "message.wrights.other_dimension");
-                }
-                return;
-            }
-            if (!nearSite(player, job)) {
-                if (job.tickMessage()) {
-                    Messages.actionBar(player, "message.wrights.out_of_range");
-                }
+            if (!inReach(player, library, job)) {
                 return;
             }
             job.workedTick();
             tickCrew(level, player, library, job, schematic);
             return;
         }
-        if (!player.level().dimension().equals(job.dimension())) {
-            if (job.tickMessage()) {
-                Messages.actionBar(player, "message.wrights.other_dimension");
-            }
-            return;
-        }
-        if (!nearSite(player, job)) {
-            if (job.tickMessage()) {
-                Messages.actionBar(player, "message.wrights.out_of_range");
-            }
+        if (!inReach(player, library, job)) {
             return;
         }
         job.workedTick();
@@ -930,7 +920,7 @@ public final class JobManager {
         DroneEntity drone = ensureDrone(level, player, job, nextPos);
         if (drone == null) {
             if (job.tickMessage()) {
-                Messages.actionBar(player, "message.wrights.paused_chunk");
+                noteChunk(player, library, job);
             }
             return;
         }
@@ -965,7 +955,7 @@ public final class JobManager {
             PlaceResult placed = placeOne(level, player, job, pos, entry, false);
             if (placed == PlaceResult.PAUSE) {
                 if (job.tickMessage()) {
-                    Messages.actionBar(player, "message.wrights.paused_chunk");
+                    noteChunk(player, library, job);
                 }
                 library.setDirty();
                 return;
@@ -1000,32 +990,14 @@ public final class JobManager {
             return;
         }
         if (job.hasCrew()) {
-            if (!player.level().dimension().equals(job.dimension())) {
-                if (job.tickMessage()) {
-                    Messages.actionBar(player, "message.wrights.other_dimension");
-                }
-                return;
-            }
-            if (!nearSite(player, job)) {
-                if (job.tickMessage()) {
-                    Messages.actionBar(player, "message.wrights.out_of_range");
-                }
+            if (!inReach(player, library, job)) {
                 return;
             }
             job.workedTick();
             tickUndoCrew(level, player, library, job);
             return;
         }
-        if (!player.level().dimension().equals(job.dimension())) {
-            if (job.tickMessage()) {
-                Messages.actionBar(player, "message.wrights.other_dimension");
-            }
-            return;
-        }
-        if (!nearSite(player, job)) {
-            if (job.tickMessage()) {
-                Messages.actionBar(player, "message.wrights.out_of_range");
-            }
+        if (!inReach(player, library, job)) {
             return;
         }
         job.workedTick();
@@ -1037,7 +1009,7 @@ public final class JobManager {
         DroneEntity drone = ensureDrone(level, player, job, nextPos);
         if (drone == null) {
             if (job.tickMessage()) {
-                Messages.actionBar(player, "message.wrights.paused_chunk");
+                noteChunk(player, library, job);
             }
             return;
         }
@@ -1060,7 +1032,7 @@ public final class JobManager {
                 if (WrightsConfig.REQUIRE_CHUNKS_LOADED.getAsBoolean()) {
                     job.restoreRefund(refund);
                     if (job.tickMessage()) {
-                        Messages.actionBar(player, "message.wrights.paused_chunk");
+                        noteChunk(player, library, job);
                     }
                     return;
                 }
@@ -1266,12 +1238,82 @@ public final class JobManager {
         }
     }
 
-    private static boolean nearSite(ServerPlayer player, BuildJob job) {
-        if (!player.level().dimension().equals(job.dimension())) {
-            return false;
+    private static void noteChunk(ServerPlayer player, SchematicLibrary library, BuildJob job) {
+        if (job.hold() != BuildJob.HOLD_CHUNK) {
+            job.noteHold(BuildJob.HOLD_CHUNK, null);
+            library.setDirty();
+            BlueprintNetwork.syncJobs(player);
         }
-        double range = WrightsConfig.MAX_RANGE.getAsInt();
-        return player.distanceToSqr(Vec3.atCenterOf(job.min())) <= range * range;
+        if (job.tickMessage()) {
+            Messages.actionBar(player, "message.wrights.paused_chunk");
+        }
+    }
+
+    private static boolean nearSite(ServerPlayer player, BuildJob job) {
+        return WrightHomes.playerCovers(player, job.dimension(), job.min());
+    }
+
+    /** Block crews keep working from the wrightport. Personal crews wait on the player. */
+    private static boolean inReach(ServerPlayer player, SchematicLibrary library, BuildJob job) {
+        boolean personal = !job.hasCrew();
+        boolean block = false;
+        boolean blockOk = true;
+        BlockPos badPort = null;
+        if (job.hasCrew()) {
+            personal = false;
+            for (BuildJob.Hand hand : job.hands()) {
+                if (hand.homePort == null) {
+                    personal = true;
+                    continue;
+                }
+                block = true;
+                if (!WrightHomes.portCovers(job.dimension(), hand.homePort, job.dimension(), job.min())) {
+                    blockOk = false;
+                    badPort = hand.homePort;
+                }
+            }
+        }
+        int reason = BuildJob.HOLD_NONE;
+        String message = null;
+        BlockPos shown = null;
+        if (block && !blockOk) {
+            reason = BuildJob.HOLD_PORT_RANGE;
+            message = "message.wrights.paused_port_range";
+            shown = badPort;
+        } else if (personal && !player.level().dimension().equals(job.dimension())) {
+            reason = BuildJob.HOLD_DIMENSION;
+            message = "message.wrights.other_dimension";
+        } else if (personal && !nearSite(player, job)) {
+            reason = BuildJob.HOLD_PLAYER_RANGE;
+            message = "message.wrights.out_of_range";
+        }
+        if (reason == BuildJob.HOLD_NONE) {
+            if (job.hold() != BuildJob.HOLD_NONE && !job.paused()) {
+                job.clearHold();
+                library.setDirty();
+                BlueprintNetwork.syncJobs(player);
+            }
+            return true;
+        }
+        boolean changed = job.hold() != reason;
+        job.noteHold(reason, shown);
+        if (reason == BuildJob.HOLD_PORT_RANGE && !job.paused()) {
+            job.setPaused(true);
+            changed = true;
+            if (shown != null) {
+                Messages.actionBar(player, message, shown.getX(), shown.getY(), shown.getZ());
+            }
+            BlueprintNetwork.syncJobs(player);
+        } else if (job.tickMessage()) {
+            Messages.actionBar(player, message);
+        }
+        if (changed) {
+            library.setDirty();
+            if (reason != BuildJob.HOLD_PORT_RANGE) {
+                BlueprintNetwork.syncJobs(player);
+            }
+        }
+        return false;
     }
 
     private static boolean ready(ServerPlayer player, ServerLevel level, BlockPos pos, BuildJob job, boolean copy) {
@@ -1329,11 +1371,6 @@ public final class JobManager {
     }
 
     public static void bindCrewIds(ServerPlayer player, SchematicLibrary library) {
-        boolean hasPort = WrightHomes.hasAny(player);
-        Set<UUID> known = new HashSet<>();
-        for (WrightHomes.FreeWright free : WrightHomes.freeNear(player, id -> true, Integer.MAX_VALUE)) {
-            known.add(free.unit().id());
-        }
         Set<UUID> taken = new HashSet<>();
         boolean dirty = false;
         for (BuildJob job : library.jobsFor(player.getUUID())) {
@@ -1344,13 +1381,11 @@ public final class JobManager {
                 }
                 continue;
             }
-            if (!hasPort) {
-                dirty |= job.rememberCrewQuota(assignedCount(job));
-                continue;
-            }
+            ServerLevel jobLevel = player.getServer().getLevel(job.dimension());
             List<UUID> current = new ArrayList<>();
             for (UUID unit : job.crewUnits()) {
-                if (known.contains(unit) && taken.add(unit)) {
+                BlockPos home = homeOfCrew(job, unit);
+                if (WrightHomes.stillThere(jobLevel, player, home, unit) && taken.add(unit)) {
                     current.add(unit);
                 }
             }
@@ -1361,7 +1396,7 @@ public final class JobManager {
             if (current.isEmpty() && job.crewUnits().isEmpty() && !(job.paused() && job.crewQuota() > 0)) {
                 int need = job.hasCrew() ? job.hands().size() : (instant(player) ? 0 : 1);
                 int jobCap = WrightsConfig.maxWrightsPerJob();
-                for (WrightHomes.FreeWright free : WrightHomes.freeNear(player, id -> !taken.contains(id), need)) {
+                for (WrightHomes.FreeWright free : freeUnits(player, library, job, need)) {
                     if (current.size() >= need || current.size() >= jobCap) {
                         break;
                     }
@@ -1392,7 +1427,10 @@ public final class JobManager {
                 dirty = true;
             } else if (job.hasCrew() && !current.isEmpty()) {
                 for (int i = 0; i < job.hands().size() && i < current.size(); i++) {
-                    job.hands().get(i).homePort = WrightHomes.homeOf(player, current.get(i));
+                    WrightHomes.FreeWright found = WrightHomes.locate(jobLevel, player, current.get(i), job.min());
+                    if (found != null) {
+                        job.hands().get(i).homePort = found.homePort();
+                    }
                 }
             }
         }
@@ -1426,6 +1464,7 @@ public final class JobManager {
             changed = true;
         }
         if (!job.paused()) {
+            job.noteHold(BuildJob.HOLD_NO_WRIGHTS, null);
             job.setPaused(true);
             changed = true;
         }
@@ -1549,6 +1588,7 @@ public final class JobManager {
             sendHome(player.getServer(), player, job);
             job.setCrewQuota(0);
             job.clearAssigned();
+            job.noteHold(BuildJob.HOLD_NO_WRIGHTS, null);
             job.setPaused(true);
         } else {
             fitCrew(player, library, job, ids);
@@ -1588,8 +1628,111 @@ public final class JobManager {
         return false;
     }
 
-    private static List<WrightHomes.FreeWright> freeUnits(ServerPlayer player, SchematicLibrary library, UUID exceptJob, int limit) {
-        return WrightHomes.freeNear(player, id -> !claimedByOther(library, player.getUUID(), exceptJob, id), limit);
+    private static List<WrightHomes.FreeWright> freeUnits(ServerPlayer player, SchematicLibrary library, BuildJob job, int limit) {
+        ServerLevel level = player.getServer().getLevel(job.dimension());
+        if (level == null) {
+            return List.of();
+        }
+        boolean playerFirst = com.wrights.blueprint.BlueprintSessions.get(player).portPlayerFirst();
+        return WrightHomes.freeFor(player, level, job.min(), playerFirst, id -> !claimedByOther(library, player.getUUID(), job.id(), id), limit);
+    }
+
+    private static List<UUID> pickResume(ServerPlayer player, SchematicLibrary library, BuildJob job, int wanted) {
+        ServerLevel level = player.getServer().getLevel(job.dimension());
+        List<BlockPos> origins = new ArrayList<>();
+        boolean fromPlayer = job.hands().isEmpty();
+        for (BuildJob.Hand hand : job.hands()) {
+            if (hand.homePort == null) {
+                fromPlayer = true;
+            } else if (!origins.contains(hand.homePort)) {
+                origins.add(hand.homePort);
+            }
+        }
+        List<WrightHomes.FreeWright> personal = new ArrayList<>();
+        List<WrightHomes.FreeWright> blocks = new ArrayList<>();
+        if (level != null) {
+            for (WrightHomes.FreeWright free : WrightHomes.freeFor(player, level, job.min(), true, id -> !claimedByOther(library, player.getUUID(), job.id(), id), Integer.MAX_VALUE)) {
+                if (free.personal()) {
+                    personal.add(free);
+                } else {
+                    blocks.add(free);
+                }
+            }
+        }
+        List<UUID> ids = new ArrayList<>();
+        if (!origins.isEmpty()) {
+            takeResume(ids, wanted, blocks, free -> origins.contains(free.homePort()), job.crewUnits());
+            if (ids.isEmpty()) {
+                takeResume(ids, wanted, personal, free -> true, job.crewUnits());
+            }
+            if (ids.isEmpty()) {
+                takeResume(ids, wanted, blocks, free -> true, job.crewUnits());
+            }
+        } else {
+            takeResume(ids, wanted, personal, free -> true, job.crewUnits());
+            if (ids.isEmpty()) {
+                takeResume(ids, wanted, blocks, free -> true, job.crewUnits());
+            }
+        }
+        if (fromPlayer && !origins.isEmpty() && ids.isEmpty()) {
+            takeResume(ids, wanted, personal, free -> true, job.crewUnits());
+        }
+        return ids;
+    }
+
+    private static void takeResume(List<UUID> ids, int wanted, List<WrightHomes.FreeWright> from, Predicate<WrightHomes.FreeWright> ok, List<UUID> prefer) {
+        for (UUID id : prefer) {
+            if (ids.size() >= wanted) {
+                return;
+            }
+            for (WrightHomes.FreeWright free : from) {
+                if (ok.test(free) && free.unit().id().equals(id) && !ids.contains(id)) {
+                    ids.add(id);
+                    break;
+                }
+            }
+        }
+        for (WrightHomes.FreeWright free : from) {
+            if (ids.size() >= wanted) {
+                return;
+            }
+            UUID id = free.unit().id();
+            if (ok.test(free) && !ids.contains(id)) {
+                ids.add(id);
+            }
+        }
+    }
+
+    private static void explainResume(ServerPlayer player, BuildJob job) {
+        ServerLevel level = player.getServer().getLevel(job.dimension());
+        boolean fromBlock = false;
+        BlockPos origin = null;
+        for (BuildJob.Hand hand : job.hands()) {
+            if (hand.homePort != null) {
+                fromBlock = true;
+                origin = hand.homePort;
+                break;
+            }
+        }
+        boolean playerNear = WrightHomes.playerCovers(player, job.dimension(), job.min());
+        int ports = level == null ? 0 : WrightHomes.coveringPortCount(level, job.min());
+        if (fromBlock && origin != null && level != null && !level.isLoaded(origin)) {
+            Messages.actionBar(player, "message.wrights.paused_chunk");
+        } else if (fromBlock && origin != null && !WrightHomes.portCovers(job.dimension(), origin, job.dimension(), job.min()) && !playerNear) {
+            Messages.actionBar(player, "message.wrights.resume_port_far", origin.getX(), origin.getY(), origin.getZ());
+        } else if (!fromBlock && !playerNear && ports == 0) {
+            Messages.actionBar(player, "message.wrights.resume_player_far");
+        } else {
+            Messages.actionBar(player, "message.wrights.resume_none");
+        }
+    }
+
+    private static BlockPos homeOfCrew(BuildJob job, UUID unit) {
+        int index = job.crewUnits().indexOf(unit);
+        if (index >= 0 && index < job.hands().size()) {
+            return job.hands().get(index).homePort;
+        }
+        return null;
     }
 
     /** Wrights near the player that are not already out on a job. */
@@ -1607,14 +1750,15 @@ public final class JobManager {
         List<Integer> speeds = new ArrayList<>();
         List<UUID> kept = new ArrayList<>();
         List<BlockPos> homes = new ArrayList<>();
+        ServerLevel jobLevel = player.getServer().getLevel(job.dimension());
         for (UUID unitId : ids) {
-            Swarm.Unit unit = WrightHomes.findUnit(player, unitId);
-            if (unit == null) {
+            WrightHomes.FreeWright found = WrightHomes.locate(jobLevel, player, unitId, job.min());
+            if (found == null) {
                 continue;
             }
-            speeds.add(WrightTier.clamp(unit.speed()));
+            speeds.add(WrightTier.clamp(found.unit().speed()));
             kept.add(unitId);
-            homes.add(WrightHomes.homeOf(player, unitId));
+            homes.add(found.homePort());
         }
         Schematic schematic = job.schematicId() == null ? null : library.schematic(job.schematicId()).orElse(null);
         int room = placeableBlocks(schematic, job);
@@ -1634,6 +1778,7 @@ public final class JobManager {
         if (kept.isEmpty()) {
             discardDrone(player.getServer(), job);
             job.clearAssigned();
+            job.noteHold(BuildJob.HOLD_NO_WRIGHTS, null);
             job.setPaused(true);
             return;
         }
@@ -1710,7 +1855,24 @@ public final class JobManager {
         if (instant(player) || job.kind() != BuildJob.Kind.PASTE) {
             return false;
         }
-        return !WrightHomes.hasAny(player) || job.awaitingDrones();
+        if (crewStillThere(player, job)) {
+            return false;
+        }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        return job.awaitingDrones() || freeUnits(player, library, job, 1).isEmpty();
+    }
+
+    private static boolean crewStillThere(ServerPlayer player, BuildJob job) {
+        if (job.crewUnits().isEmpty()) {
+            return false;
+        }
+        ServerLevel level = player.getServer().getLevel(job.dimension());
+        for (UUID unit : job.crewUnits()) {
+            if (WrightHomes.stillThere(level, player, homeOfCrew(job, unit), unit)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -1720,9 +1882,6 @@ public final class JobManager {
     private static boolean restorePausedCrew(ServerPlayer player, SchematicLibrary library, BuildJob job) {
         if (instant(player) || job.kind() != BuildJob.Kind.PASTE || job.finished()) {
             return true;
-        }
-        if (!WrightHomes.hasAny(player)) {
-            return false;
         }
         int quota = job.crewQuota();
         if (quota <= 0) {
@@ -1734,28 +1893,7 @@ public final class JobManager {
             return false;
         }
         int wanted = Math.min(quota, Math.min(room, WrightsConfig.maxWrightsPerJob()));
-        Set<UUID> have = new HashSet<>();
-        for (WrightHomes.FreeWright free : WrightHomes.freeNear(player, id -> true, Integer.MAX_VALUE)) {
-            have.add(free.unit().id());
-        }
-        List<UUID> ids = new ArrayList<>();
-        for (UUID unit : job.crewUnits()) {
-            if (ids.size() >= wanted) {
-                break;
-            }
-            if (have.contains(unit)) {
-                ids.add(unit);
-            }
-        }
-        for (WrightHomes.FreeWright free : freeUnits(player, library, job.id(), wanted)) {
-            if (ids.size() >= wanted) {
-                break;
-            }
-            if (ids.contains(free.unit().id())) {
-                continue;
-            }
-            ids.add(free.unit().id());
-        }
+        List<UUID> ids = pickResume(player, library, job, wanted);
         if (ids.isEmpty()) {
             return false;
         }
@@ -1782,6 +1920,7 @@ public final class JobManager {
         }
         boolean dirty = job.rememberCrewQuota(assignedCount(job));
         if (!job.paused()) {
+            job.noteHold(BuildJob.HOLD_NO_WRIGHTS, null);
             job.setPaused(true);
             dirty = true;
             Messages.actionBar(player, "message.wrights.paused_no_drones");
@@ -1793,14 +1932,19 @@ public final class JobManager {
         return true;
     }
 
-    private static boolean crewReady(ServerPlayer player) {
-        if (!Wrightports.worn(player).isEmpty() && !Swarm.from(Wrightports.worn(player)).units().isEmpty()) {
+    private static boolean crewReady(ServerPlayer player, ResourceKey<net.minecraft.world.level.Level> dimension, BlockPos site) {
+        ServerLevel level = player.getServer().getLevel(dimension);
+        boolean playerNear = WrightHomes.playerCovers(player, dimension, site);
+        boolean worn = !Wrightports.swarm(player).units().isEmpty();
+        int ports = level == null ? 0 : WrightHomes.coveringPortCount(level, site);
+        if ((playerNear && worn) || ports > 0) {
             return true;
         }
-        if (WrightHomes.hasAny(player)) {
-            return true;
+        if (!playerNear && ports == 0) {
+            Messages.actionBar(player, "message.wrights.no_cover");
+            return false;
         }
-        if (Wrightports.worn(player).isEmpty()) {
+        if (Wrightports.worn(player).isEmpty() && ports == 0) {
             Messages.actionBar(player, "message.wrights.need_wrightport");
             return false;
         }
@@ -1813,7 +1957,7 @@ public final class JobManager {
     }
 
     private static boolean assignCrew(ServerPlayer player, BuildJob job, Schematic schematic, int requested) {
-        if (!crewReady(player)) {
+        if (!crewReady(player, job.dimension(), job.min())) {
             return false;
         }
         int sizeX = schematic.sizeX();
@@ -1833,9 +1977,15 @@ public final class JobManager {
         }
         int room = Math.min(blocks, WrightsConfig.maxWrightsPerJob());
         int wanted = requested > 0 ? Math.min(requested, room) : room;
-        List<WrightHomes.FreeWright> units = freeUnits(player, library, job.id(), wanted);
+        List<WrightHomes.FreeWright> units = freeUnits(player, library, job, wanted);
         if (units.isEmpty()) {
-            Messages.actionBar(player, "message.wrights.drones_busy");
+            ServerLevel level = player.getServer().getLevel(job.dimension());
+            int ports = level == null ? 0 : WrightHomes.coveringPortCount(level, job.min());
+            if (!WrightHomes.playerCovers(player, job.dimension(), job.min()) && ports == 0) {
+                Messages.actionBar(player, "message.wrights.no_cover");
+            } else {
+                Messages.actionBar(player, "message.wrights.drones_busy");
+            }
             return false;
         }
         List<Integer> speeds = new ArrayList<>();
@@ -1926,7 +2076,7 @@ public final class JobManager {
                     waitingChunk = true;
                     library.setDirty();
                     if (job.tickMessage()) {
-                        Messages.actionBar(player, "message.wrights.paused_chunk");
+                        noteChunk(player, library, job);
                     }
                     return;
                 }
@@ -1954,7 +2104,7 @@ public final class JobManager {
         if (!working && !scanning && !waiting) {
             finishPaste(level.getServer(), library, player, job);
         } else if (waitingChunk && job.tickMessage()) {
-            Messages.actionBar(player, "message.wrights.paused_chunk");
+            noteChunk(player, library, job);
         }
     }
 
@@ -2004,7 +2154,7 @@ public final class JobManager {
                     if (WrightsConfig.REQUIRE_CHUNKS_LOADED.getAsBoolean()) {
                         job.restoreRefund(at, refund);
                         if (job.tickMessage()) {
-                            Messages.actionBar(player, "message.wrights.paused_chunk");
+                            noteChunk(player, library, job);
                         }
                         return;
                     }
