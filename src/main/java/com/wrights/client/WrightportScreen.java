@@ -1,64 +1,134 @@
 package com.wrights.client;
 
+import java.util.UUID;
+
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Renderable;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-import com.wrights.drone.HangarOps;
 import com.wrights.drone.Swarm;
+import com.wrights.menu.WrightportMenu;
 import com.wrights.network.BlueprintPayloads;
 
-public class WrightportScreen extends AbstractContainerScreen<com.wrights.menu.WrightportMenu> {
-    private static final int ROW = 12;
-    private static final int LIST_X = 8;
-    private static final int LIST_Y = 22;
-    private static final int VISIBLE = 8;
-    private int selected;
-    private int scroll;
+/** The placed wrightport. Same wright list as Manage, for this block alone. */
+public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> implements ManageHost {
+    private final WrightManagePanel manage = new WrightManagePanel();
 
-    public WrightportScreen(com.wrights.menu.WrightportMenu menu, Inventory inventory, Component title) {
+    public WrightportScreen(WrightportMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
-        this.imageWidth = 176;
-        this.imageHeight = 164;
-        this.titleLabelY = 6;
+        this.imageWidth = 368;
+        this.imageHeight = 348;
     }
 
     @Override
     protected void init() {
+        this.imageWidth = Math.min(368, this.width - 16);
+        this.imageHeight = Math.min(348, this.height - 16);
         super.init();
-        int y = topPos + 122;
-        addRenderableWidget(new WrightsButton(leftPos + 8, y, 32, 16, Component.translatable("screen.wrights.hangar_build"), button -> edit(HangarOps.BUILD, selected)));
-        addRenderableWidget(new WrightsButton(leftPos + 42, y, 32, 16, Component.translatable("screen.wrights.hangar_remove"), button -> edit(HangarOps.REMOVE, selected)));
-        addRenderableWidget(new WrightsButton(leftPos + 76, y, 32, 16, Component.translatable("screen.wrights.hangar_speed"), button -> edit(HangarOps.SPEED, selected)));
-        addRenderableWidget(new WrightsButton(leftPos + 110, y, 28, 16, Component.translatable("screen.wrights.hangar_up"), button -> shift(-1)));
-        addRenderableWidget(new WrightsButton(leftPos + 140, y, 28, 16, Component.translatable("screen.wrights.hangar_down"), button -> shift(1)));
+        manage.setActive(true);
+        clearWidgets();
+        manage.addWidgets(this);
     }
 
-    private void shift(int delta) {
-        Swarm swarm = swarm();
-        if (selected < 0 || selected >= swarm.units().size()) {
-            return;
-        }
-        edit(delta < 0 ? HangarOps.UP : HangarOps.DOWN, selected);
-        int next = selected + delta;
-        if (next >= 0 && next < swarm.units().size()) {
-            selected = next;
-        }
+    @Override
+    public void addButton(WrightsButton button) {
+        addRenderableWidget(button);
     }
 
-    private void edit(int action, int index) {
+    @Override
+    public void addField(EditBox box) {
+        addRenderableWidget(box);
+    }
+
+    @Override
+    public void focus(GuiEventListener listener) {
+        setFocused(listener);
+    }
+
+    @Override
+    public void edit(int action, int index) {
         PacketDistributor.sendToServer(new BlueprintPayloads.HangarEdit(menu.pos(), action, index));
     }
 
-    private Swarm swarm() {
+    @Override
+    public void batch(int action, int value, int[] units) {
+        PacketDistributor.sendToServer(new BlueprintPayloads.HangarBatch(menu.pos(), action, value, units));
+    }
+
+    @Override
+    public Font font() {
+        return this.font;
+    }
+
+    @Override
+    public int screenWidth() {
+        return this.width;
+    }
+
+    @Override
+    public int screenHeight() {
+        return this.height;
+    }
+
+    @Override
+    public Minecraft minecraft() {
+        return getMinecraft();
+    }
+
+    @Override
+    public Swarm swarm() {
         return Swarm.from(menu.getSlot(0).getItem());
     }
 
     @Override
+    public boolean away(UUID id) {
+        for (BlueprintPayloads.JobLine job : WrightsClientState.jobs) {
+            if (!job.finished() && job.crew().contains(id)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public void relayout() {
+        manage.layoutChrome(this);
+    }
+
+    @Override
+    public boolean embedded() {
+        return true;
+    }
+
+    @Override
+    public int areaX() {
+        return leftPos + 4;
+    }
+
+    @Override
+    public int areaY() {
+        return topPos + 4;
+    }
+
+    @Override
+    public int areaW() {
+        return Math.max(160, imageWidth - 8);
+    }
+
+    @Override
+    public int areaH() {
+        return Math.max(120, imageHeight - 8);
+    }
+
+    @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
-        graphics.drawString(this.font, this.title, this.titleLabelX, this.titleLabelY, WrightsUi.COPPER, false);
     }
 
     @Override
@@ -68,46 +138,56 @@ public class WrightportScreen extends AbstractContainerScreen<com.wrights.menu.W
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
-        Swarm swarm = swarm();
-        if (selected >= swarm.units().size()) {
-            selected = Math.max(0, swarm.units().size() - 1);
+        this.renderBackground(graphics, mouseX, mouseY, partialTick);
+        renderBg(graphics, partialTick, mouseX, mouseY);
+        manage.render(this, graphics, mouseX, mouseY);
+        for (Renderable widget : this.renderables) {
+            widget.render(graphics, mouseX, mouseY, partialTick);
         }
-        scroll = Math.max(0, Math.min(scroll, Math.max(0, swarm.units().size() - VISIBLE)));
-        for (int i = scroll; i < swarm.units().size() && i < scroll + VISIBLE; i++) {
-            Swarm.Unit unit = swarm.units().get(i);
-            int y = topPos + LIST_Y + (i - scroll) * ROW;
-            if (i == selected) {
-                graphics.fill(leftPos + LIST_X - 2, y - 1, leftPos + 168, y + 11, 0x553C2A1A);
-            }
-            int speed = com.wrights.drone.WrightTier.clamp(unit.speed());
-            String duty = Component.translatable("drone.wrights.speed." + speed).getString();
-            String line = (i + 1) + "  " + duty;
-            graphics.drawString(this.font, line, leftPos + LIST_X, y + 1, WrightsUi.TEXT, false);
-        }
-        if (swarm.units().isEmpty()) {
-            graphics.drawString(this.font, Component.translatable("screen.wrights.hangar_empty"), leftPos + LIST_X, topPos + LIST_Y + 2, WrightsUi.MUTED, false);
-        }
-        graphics.drawString(this.font, Component.translatable("screen.wrights.wrightport_hint"), leftPos + 8, topPos + 146, WrightsUi.MUTED, false);
-        renderTooltip(graphics, mouseX, mouseY);
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        Swarm swarm = swarm();
-        int row = (int) ((mouseY - topPos - LIST_Y) / ROW);
-        int index = row + scroll;
-        if (mouseX >= leftPos + LIST_X && mouseX <= leftPos + 168 && row >= 0 && row < VISIBLE && index >= 0 && index < swarm.units().size()) {
-            selected = index;
+        if (manage.mouseClicked(this, mouseX, mouseY, button)) {
+            return true;
+        }
+        for (GuiEventListener child : this.children()) {
+            if (child.mouseClicked(mouseX, mouseY, button)) {
+                setFocused(child);
+                return true;
+            }
+        }
+        if (mouseX >= leftPos && mouseX < leftPos + imageWidth && mouseY >= topPos && mouseY < topPos + imageHeight) {
             return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        int max = Math.max(0, swarm().units().size() - VISIBLE);
-        scroll = Math.max(0, Math.min(max, scroll - (int) Math.signum(scrollY)));
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        for (GuiEventListener child : this.children()) {
+            if (child.mouseReleased(mouseX, mouseY, button)) {
+                return true;
+            }
+        }
         return true;
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        return true;
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        return manage.mouseScrolled(this, mouseX, mouseY, scrollY);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == 256 && manage.closeTop()) {
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 }

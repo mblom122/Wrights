@@ -338,6 +338,8 @@ public final class BlueprintNetwork {
         context.enqueueWork(() -> {
             if (player.containerMenu instanceof com.wrights.menu.HangarMenu menu && menu.pos().equals(payload.pos())) {
                 com.wrights.drone.HangarOps.batch(player, menu, payload.action(), payload.value(), payload.units());
+            } else if (player.containerMenu instanceof com.wrights.menu.WrightportMenu menu && menu.pos().equals(payload.pos())) {
+                com.wrights.drone.WrightportOps.batch(player, menu, payload.action(), payload.value(), payload.units());
             }
         });
     }

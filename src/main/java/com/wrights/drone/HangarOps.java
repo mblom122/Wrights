@@ -133,7 +133,7 @@ public final class HangarOps {
         storePort(player, kind, index, swarm, applyBatch(player, swarm, action, value, home));
     }
 
-    private static Swarm applyBatch(ServerPlayer player, Swarm swarm, int action, int value, int[] units) {
+    static Swarm applyBatch(ServerPlayer player, Swarm swarm, int action, int value, int[] units) {
         return switch (action) {
             case ADD_COUNT -> insertCount(player, swarm, value);
             case TO_TIER -> moveMarked(player, swarm, units, WrightTier.clamp(value));
@@ -151,16 +151,16 @@ public final class HangarOps {
         ManageLock.hold(player, kind, index);
     }
 
-    private static boolean targetsUnit(int action) {
+    static boolean targetsUnit(int action) {
         return action == REMOVE || action == SPEED || action == UP || action == DOWN
                 || action == UPGRADE || action == TAKE || action == DOWNGRADE;
     }
 
-    private static boolean awayUnit(ServerPlayer player, Swarm swarm, int unit) {
+    static boolean awayUnit(ServerPlayer player, Swarm swarm, int unit) {
         return unit >= 0 && unit < swarm.units().size() && ManageLock.away(player, swarm.units().get(unit).id());
     }
 
-    private static int[] homeUnits(ServerPlayer player, Swarm swarm, int[] units) {
+    static int[] homeUnits(ServerPlayer player, Swarm swarm, int[] units) {
         if (units == null || units.length == 0) {
             return new int[0];
         }
