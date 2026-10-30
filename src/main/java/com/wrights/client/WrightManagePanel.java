@@ -200,8 +200,8 @@ final class WrightManagePanel {
         }
         boolean all = home > 0 && marked == home;
         int allY = panelY + 36 + headExtra;
-        drawCheck(graphics, panelX + 12, allY, all, mouseX, mouseY);
-        graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_all"), panelX + 26, allY + 1, WrightsUi.TEXT, false);
+        drawCheck(graphics, panelX + 12, allY, all, home > 0, mouseX, mouseY);
+        graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_all"), panelX + 26, allY + 1, home > 0 ? WrightsUi.TEXT : WrightsUi.MUTED, false);
 
         int listTop = listTop();
         int listBottom = panelY + panelH - 62;
@@ -225,7 +225,7 @@ final class WrightManagePanel {
                 if (mark || i == expanded) {
                     graphics.fill(panelX + 10, y - 1, panelX + panelW - 10, y + ROW - 1, i == expanded ? 0x553C2A1A : 0x33243340);
                 }
-                drawCheck(graphics, panelX + 12, y + 2, mark, mouseX, mouseY);
+                drawCheck(graphics, panelX + 12, y + 2, mark, true, mouseX, mouseY);
                 String name = Component.translatable("screen.wrights.drone_name", i + 1).getString();
                 graphics.drawString(screen.font(), name, panelX + 28, y + 3, WrightsUi.TEXT, false);
                 Component tierName = Component.translatable(WrightTier.nameKey(tier));
@@ -269,7 +269,9 @@ final class WrightManagePanel {
         headExtra = awayCount(screen, swarm) > 0 ? 12 : 0;
         int allY = panelY + 36 + headExtra;
         if (hit(mouseX, mouseY, panelX + 12, allY, 10, 10) || hit(mouseX, mouseY, panelX + 26, allY, 40, 12)) {
-            toggleAll(screen, swarm);
+            if (swarm.units().size() - awayCount(screen, swarm) > 0) {
+                toggleAll(screen, swarm);
+            }
             return true;
         }
         int listTop = listTop();
@@ -697,11 +699,11 @@ final class WrightManagePanel {
         return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
     }
 
-    private static void drawCheck(GuiGraphics graphics, int x, int y, boolean checked, int mouseX, int mouseY) {
-        boolean hover = mouseX >= x && mouseX < x + 10 && mouseY >= y && mouseY < y + 10;
-        graphics.fill(x, y, x + 10, y + 10, hover ? 0xFF2C3E52 : 0xFF1A2633);
-        WrightsUi.border(graphics, x, y, 10, 10, checked ? WrightsUi.COPPER : (hover ? WrightsUi.COPPER : 0xFF3D4E5E));
-        if (checked) {
+    private static void drawCheck(GuiGraphics graphics, int x, int y, boolean checked, boolean enabled, int mouseX, int mouseY) {
+        boolean hover = enabled && mouseX >= x && mouseX < x + 10 && mouseY >= y && mouseY < y + 10;
+        graphics.fill(x, y, x + 10, y + 10, !enabled ? 0xFF141A22 : (hover ? 0xFF2C3E52 : 0xFF1A2633));
+        WrightsUi.border(graphics, x, y, 10, 10, !enabled ? 0xFF2A3440 : (checked ? WrightsUi.COPPER : (hover ? WrightsUi.COPPER : 0xFF3D4E5E)));
+        if (checked && enabled) {
             graphics.fill(x + 2, y + 2, x + 8, y + 8, WrightsUi.COPPER);
         }
     }
