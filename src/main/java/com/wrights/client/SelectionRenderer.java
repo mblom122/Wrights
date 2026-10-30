@@ -508,15 +508,31 @@ public final class SelectionRenderer {
         }
         VertexConsumer lines = buffers.getBuffer(RenderType.lines());
         boolean boxed = false;
-        for (WrightsClientState.ActiveBuild build : WrightsClientState.activeBuilds.values()) {
+        for (var entry : WrightsClientState.activeBuilds.entrySet()) {
+            WrightsClientState.ActiveBuild build = entry.getValue();
             BlockPos origin = build.origin();
             AABB box = new AABB(origin.getX(), origin.getY(), origin.getZ(), origin.getX() + build.clipX(), origin.getY() + build.clipY(), origin.getZ() + build.clipZ());
-            drawBox(pose, lines, box, camera, 0.45F, 0.78F, 1.0F, 0.45F);
+            boolean queued = queuedBuild(entry.getKey());
+            int rgb = queued ? com.wrights.WrightsClientConfig.queueEdgeRgb() : 0x73C7FF;
+            drawBox(pose, lines, box, camera,
+                    com.wrights.WrightsClientConfig.channel(rgb, 16),
+                    com.wrights.WrightsClientConfig.channel(rgb, 8),
+                    com.wrights.WrightsClientConfig.channel(rgb, 0),
+                    queued ? 0.9F : 0.45F);
             boxed = true;
         }
         if (boxed) {
             buffers.endBatch(RenderType.lines());
         }
+    }
+
+    private static boolean queuedBuild(java.util.UUID id) {
+        for (com.wrights.network.BlueprintPayloads.JobLine job : WrightsClientState.jobs) {
+            if (job.id().equals(id)) {
+                return job.queued();
+            }
+        }
+        return false;
     }
 
     private static boolean alreadyBuilt(BlockPos pos, int stateId) {

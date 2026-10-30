@@ -37,6 +37,15 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.IntValue EDGE_OPACITY = BUILDER
             .comment("How solid the selection outline is, from 0 to 100 percent.")
             .defineInRange("edgeOpacity", 100, 0, 100);
+    public static final ModConfigSpec.IntValue QUEUE_EDGE_RED = BUILDER
+            .comment("Outline color of a queued build, red channel.")
+            .defineInRange("queueEdgeRed", 111, 0, 255);
+    public static final ModConfigSpec.IntValue QUEUE_EDGE_GREEN = BUILDER
+            .comment("Outline color of a queued build, green channel.")
+            .defineInRange("queueEdgeGreen", 207, 0, 255);
+    public static final ModConfigSpec.IntValue QUEUE_EDGE_BLUE = BUILDER
+            .comment("Outline color of a queued build, blue channel.")
+            .defineInRange("queueEdgeBlue", 151, 0, 255);
     public static final ModConfigSpec.IntValue GHOST_TRANSPARENCY = BUILDER
             .comment("How see-through blueprint blocks are in the world, from 0 to 100 percent. 0 is solid and 100 is invisible.")
             .defineInRange("ghostTransparency", 50, 0, 100);
@@ -143,6 +152,10 @@ public final class WrightsClientConfig {
         return (EDGE_RED.get() << 16) | (EDGE_GREEN.get() << 8) | EDGE_BLUE.get();
     }
 
+    public static int queueEdgeRgb() {
+        return (QUEUE_EDGE_RED.get() << 16) | (QUEUE_EDGE_GREEN.get() << 8) | QUEUE_EDGE_BLUE.get();
+    }
+
     public static float wallAlpha() {
         return 1.0F - WALL_TRANSPARENCY.get() / 100.0F;
     }
@@ -170,6 +183,13 @@ public final class WrightsClientConfig {
         EDGE_RED.set((rgb >> 16) & 255);
         EDGE_GREEN.set((rgb >> 8) & 255);
         EDGE_BLUE.set(rgb & 255);
+        save();
+    }
+
+    public static void setQueueEdgeRgb(int rgb) {
+        QUEUE_EDGE_RED.set((rgb >> 16) & 255);
+        QUEUE_EDGE_GREEN.set((rgb >> 8) & 255);
+        QUEUE_EDGE_BLUE.set(rgb & 255);
         save();
     }
 
