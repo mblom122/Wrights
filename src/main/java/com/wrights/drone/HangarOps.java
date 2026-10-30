@@ -14,6 +14,7 @@ import net.minecraft.world.level.Level;
 
 import com.wrights.block.HangarBlockEntity;
 import com.wrights.item.ModItems;
+import com.wrights.item.PersonalWrightportItem;
 import com.wrights.item.WrightItem;
 import com.wrights.menu.HangarMenu;
 import com.wrights.storage.DigitalNetworks;
@@ -92,7 +93,48 @@ public final class HangarOps {
             return;
         }
         Swarm swarm = Swarm.from(worn);
-        Swarm next = switch (action) {
+        Swarm next = applyBatch(player, swarm, action, value, units);
+        if (next == swarm) {
+            return;
+        }
+        Swarm.write(worn, next);
+        hangar.setChanged();
+        open.broadcastChanges();
+    }
+
+    public static void editPort(ServerPlayer player, int kind, int index, int action, int unit) {
+        ItemStack stack = WrightportPlaces.stack(player, kind, index);
+        if (!(stack.getItem() instanceof PersonalWrightportItem)) {
+            Messages.actionBar(player, "message.wrights.manage_missing");
+            return;
+        }
+        Swarm swarm = Swarm.from(stack);
+        if (targetsUnit(action) && awayUnit(player, swarm, unit)) {
+            Messages.actionBar(player, "message.wrights.wright_away");
+            ManageLock.hold(player, kind, index);
+            return;
+        }
+        storePort(player, kind, index, swarm, edit(player, swarm, action, unit));
+    }
+
+    public static void batchPort(ServerPlayer player, int kind, int index, int action, int value, int[] units) {
+        ItemStack stack = WrightportPlaces.stack(player, kind, index);
+        if (!(stack.getItem() instanceof PersonalWrightportItem)) {
+            Messages.actionBar(player, "message.wrights.manage_missing");
+            return;
+        }
+        Swarm swarm = Swarm.from(stack);
+        int[] home = action == ADD_COUNT ? units : homeUnits(player, swarm, units);
+        if (action != ADD_COUNT && units != null && units.length > 0 && home.length == 0) {
+            Messages.actionBar(player, "message.wrights.wright_away");
+            ManageLock.hold(player, kind, index);
+            return;
+        }
+        storePort(player, kind, index, swarm, applyBatch(player, swarm, action, value, home));
+    }
+
+    private static Swarm applyBatch(ServerPlayer player, Swarm swarm, int action, int value, int[] units) {
+        return switch (action) {
             case ADD_COUNT -> insertCount(player, swarm, value);
             case TO_TIER -> moveMarked(player, swarm, units, WrightTier.clamp(value));
             case MAX_AFFORD -> raiseMarked(player, swarm, units);
@@ -100,12 +142,45 @@ public final class HangarOps {
             case DOWN_ONE -> downOne(player, swarm, units);
             default -> swarm;
         };
-        if (next == swarm) {
-            return;
+    }
+
+    private static void storePort(ServerPlayer player, int kind, int index, Swarm swarm, Swarm next) {
+        if (next != swarm) {
+            WrightportPlaces.write(player, kind, index, next);
         }
-        Swarm.write(worn, next);
-        hangar.setChanged();
-        open.broadcastChanges();
+        ManageLock.hold(player, kind, index);
+    }
+
+    private static boolean targetsUnit(int action) {
+        return action == REMOVE || action == SPEED || action == UP || action == DOWN
+                || action == UPGRADE || action == TAKE || action == DOWNGRADE;
+    }
+
+    private static boolean awayUnit(ServerPlayer player, Swarm swarm, int unit) {
+        return unit >= 0 && unit < swarm.units().size() && ManageLock.away(player, swarm.units().get(unit).id());
+    }
+
+    private static int[] homeUnits(ServerPlayer player, Swarm swarm, int[] units) {
+        if (units == null || units.length == 0) {
+            return new int[0];
+        }
+        int[] kept = new int[units.length];
+        int count = 0;
+        for (int unit : units) {
+            if (unit < 0 || unit >= swarm.units().size()) {
+                continue;
+            }
+            if (ManageLock.away(player, swarm.units().get(unit).id())) {
+                continue;
+            }
+            kept[count++] = unit;
+        }
+        if (count == kept.length) {
+            return kept;
+        }
+        int[] trimmed = new int[count];
+        System.arraycopy(kept, 0, trimmed, 0, count);
+        return trimmed;
     }
 
     public static Swarm edit(ServerPlayer player, Swarm swarm, int action, int index) {

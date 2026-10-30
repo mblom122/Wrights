@@ -29,7 +29,6 @@ public final class ModCreativeTabs {
                 output.accept(ModItems.UPGRADE_NETHERITE.get());
                 output.accept(ModItems.PERSONAL_WRIGHTPORT.get());
                 output.accept(ModBlocks.WRIGHTPORT_ITEM.get());
-                output.accept(ModBlocks.HANGAR_ITEM.get());
             })
             .build());
 

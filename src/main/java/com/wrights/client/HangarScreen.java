@@ -1,7 +1,11 @@
 package com.wrights.client;
 
+import java.util.UUID;
+
 import org.jetbrains.annotations.Nullable;
 
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -15,7 +19,7 @@ import com.wrights.drone.Swarm;
 import com.wrights.item.PersonalWrightportItem;
 import com.wrights.network.BlueprintPayloads;
 
-public class HangarScreen extends AbstractContainerScreen<com.wrights.menu.HangarMenu> {
+public class HangarScreen extends AbstractContainerScreen<com.wrights.menu.HangarMenu> implements ManageHost {
     /** Tab that holds the worn wrightport, sticking out of the window's left edge. */
     private static final int EAR_W = 40;
     private static final int EAR_H = 42;
@@ -52,28 +56,89 @@ public class HangarScreen extends AbstractContainerScreen<com.wrights.menu.Hanga
         addRenderableWidget(manageButton);
     }
 
-    void addButton(WrightsButton button) {
+    @Override
+    public void addButton(WrightsButton button) {
         addRenderableWidget(button);
     }
 
-    void edit(int action, int index) {
+    @Override
+    public void edit(int action, int index) {
         PacketDistributor.sendToServer(new BlueprintPayloads.HangarEdit(menu.pos(), action, index));
     }
 
-    void batch(int action, int value, int[] units) {
+    @Override
+    public void batch(int action, int value, int[] units) {
         PacketDistributor.sendToServer(new BlueprintPayloads.HangarBatch(menu.pos(), action, value, units));
     }
 
-    void addField(net.minecraft.client.gui.components.EditBox box) {
+    @Override
+    public void addField(net.minecraft.client.gui.components.EditBox box) {
         addRenderableWidget(box);
     }
 
-    void focus(net.minecraft.client.gui.components.events.GuiEventListener listener) {
+    @Override
+    public void focus(net.minecraft.client.gui.components.events.GuiEventListener listener) {
         setFocused(listener);
     }
 
-    net.minecraft.client.gui.Font font() {
+    @Override
+    public Font font() {
         return this.font;
+    }
+
+    @Override
+    public int screenWidth() {
+        return this.width;
+    }
+
+    @Override
+    public int screenHeight() {
+        return this.height;
+    }
+
+    @Override
+    public Minecraft minecraft() {
+        return getMinecraft();
+    }
+
+    @Override
+    public Swarm swarm() {
+        return Swarm.from(menu.getSlot(0).getItem());
+    }
+
+    @Override
+    public boolean away(UUID id) {
+        return false;
+    }
+
+    @Override
+    public void relayout() {
+        layoutHangar();
+    }
+
+    @Override
+    public boolean embedded() {
+        return false;
+    }
+
+    @Override
+    public int areaX() {
+        return 0;
+    }
+
+    @Override
+    public int areaY() {
+        return 0;
+    }
+
+    @Override
+    public int areaW() {
+        return this.width;
+    }
+
+    @Override
+    public int areaH() {
+        return this.height;
     }
 
     @Override
@@ -89,11 +154,6 @@ public class HangarScreen extends AbstractContainerScreen<com.wrights.menu.Hanga
 
     private boolean docked() {
         return !menu.getSlot(0).getItem().isEmpty();
-    }
-
-    private Swarm swarm() {
-        ItemStack stack = menu.getSlot(0).getItem();
-        return Swarm.from(stack);
     }
 
     @Override

@@ -5,18 +5,25 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.core.BlockPos;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.Util;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.WrightsClientConfig;
 import com.wrights.WrightsConfig;
+import com.wrights.drone.Swarm;
+import com.wrights.drone.WrightportPlaces;
 import com.wrights.drone.Wrightports;
+import com.wrights.item.PersonalWrightportItem;
 import com.wrights.network.BlueprintPayloads;
 
 public class WrightsMenuScreen extends Screen {
@@ -25,6 +32,8 @@ public class WrightsMenuScreen extends Screen {
     private static final int PAGE_JOBS = 1;
     private static final int PAGE_OPTIONS = 2;
     private static final int PAGE_INFO = 3;
+    private static final int PAGE_MANAGE = 4;
+    private static final int PORT_ROWS = 8;
     private static int savedPage = PAGE_BUILDING;
     private static int savedScroll;
     private static int savedJobScroll;
@@ -110,6 +119,15 @@ public class WrightsMenuScreen extends Screen {
     private int infoScroll;
     private static int savedInfoScroll;
     private boolean jobsPage;
+    private boolean managePage;
+    private final WrightManagePanel manage = new WrightManagePanel();
+    private final ManageHost manageHost = new MenuManageHost();
+    private int portKind = -1;
+    private int portIndex = -1;
+    private boolean portListOpen;
+    private int portScroll;
+    private boolean holding;
+    private int holdTicker;
     private int jobScroll;
     private int historyScroll;
     private final List<BlueprintPayloads.JobLine> workingJobs = new ArrayList<>();
@@ -213,6 +231,7 @@ public class WrightsMenuScreen extends Screen {
             jobsPage = savedPage == PAGE_JOBS;
             options = savedPage == PAGE_OPTIONS;
             infoPage = savedPage == PAGE_INFO;
+            managePage = savedPage == PAGE_MANAGE;
         }
         scroll = savedScroll;
         jobScroll = savedJobScroll;
@@ -297,9 +316,13 @@ public class WrightsMenuScreen extends Screen {
         placeZ = offsetBox(2);
         unbindDigital = add(new WrightsButton(panelX + 140, panelY + panelH - 48, 120, 18,
                 Component.translatable("menu.wrights.digital_unbind"), button -> clearDigitalLink()));
+        manage.addWidgets(manageHost);
         refresh();
         if (infoPage) {
             requestDigitalInfo();
+        }
+        if (managePage) {
+            sendHold(true);
         }
     }
 
@@ -307,7 +330,8 @@ public class WrightsMenuScreen extends Screen {
 
     @Override
     public void removed() {
-        savedPage = jobsPage ? PAGE_JOBS : options ? PAGE_OPTIONS : infoPage ? PAGE_INFO : PAGE_BUILDING;
+        savedPage = managePage ? PAGE_MANAGE : jobsPage ? PAGE_JOBS : options ? PAGE_OPTIONS : infoPage ? PAGE_INFO : PAGE_BUILDING;
+        sendHold(false);
         savedScroll = scroll;
         savedJobScroll = jobScroll;
         savedHistoryScroll = historyScroll;
@@ -432,7 +456,7 @@ public class WrightsMenuScreen extends Screen {
             suggestRename = false;
         }
         boolean capture = WrightsClientState.mode == WrightsClientState.Mode.CAPTURE;
-        boolean building = !options && !jobsPage && !infoPage;
+        boolean building = !options && !jobsPage && !infoPage && !managePage;
         search.setX(listX);
         search.setY(searchY);
         int sortW = sortButton == null ? 0 : sortButton.getWidth();
@@ -526,6 +550,11 @@ public class WrightsMenuScreen extends Screen {
             unbindDigital.setX(panelX + 140);
             unbindDigital.setY(panelY + panelH - 48);
         }
+        boolean showManage = managePage && currentSpot() != null;
+        manage.setActive(showManage);
+        if (showManage) {
+            manage.layoutChrome(manageHost);
+        }
     }
 
     public void refreshDigital() {
@@ -547,7 +576,7 @@ public class WrightsMenuScreen extends Screen {
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         graphics.fill(0, 0, this.width, this.height, 0xC0060C14);
         WrightsUi.panel(graphics, panelX, panelY, panelW, panelH);
-        if (options || jobsPage || infoPage) {
+        if (options || jobsPage || infoPage || managePage) {
             int x = listX - 2;
             int width = panelX + panelW - 12 - x;
             int top = jobsPage ? jobsInsetY() : panelY + 34;
@@ -564,17 +593,21 @@ public class WrightsMenuScreen extends Screen {
         if (options) {
             layoutOptions();
         }
+        if (managePage) {
+            manage.layoutChrome(manageHost);
+        }
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, Component.translatable("menu.wrights.title"), panelX + 16, panelY + 10, WrightsUi.COPPER, false);
         graphics.drawString(this.font, Component.translatable("menu.wrights.subtitle"), panelX + 16, panelY + 22, WrightsUi.MUTED, false);
         if (!toolHeld()) {
             graphics.drawString(this.font, Component.translatable("menu.wrights.need_controller"), panelX + 150, panelY + 10, WrightsUi.MUTED, false);
         }
-        drawTask(graphics, Component.translatable("menu.wrights.building"), !options && !jobsPage && !infoPage, false, panelY + 46);
+        drawTask(graphics, Component.translatable("menu.wrights.building"), !options && !jobsPage && !infoPage && !managePage, false, panelY + 46);
         drawTask(graphics, Component.translatable("menu.wrights.jobs"), jobsPage, false, panelY + 72);
-        drawTask(graphics, Component.translatable("menu.wrights.mining"), false, true, panelY + 98);
-        drawTask(graphics, Component.translatable("menu.wrights.info"), infoPage, false, panelY + 124);
-        drawTask(graphics, Component.translatable("menu.wrights.options"), options, false, panelY + 150);
+        drawTask(graphics, Component.translatable("menu.wrights.manage"), managePage, false, panelY + 98);
+        drawTask(graphics, Component.translatable("menu.wrights.mining"), false, true, panelY + 124);
+        drawTask(graphics, Component.translatable("menu.wrights.info"), infoPage, false, panelY + 150);
+        drawTask(graphics, Component.translatable("menu.wrights.options"), options, false, panelY + 176);
         if (options) {
             renderOptions(graphics);
             return;
@@ -589,6 +622,10 @@ public class WrightsMenuScreen extends Screen {
         }
         if (jobsPage) {
             renderJobs(graphics, mouseX, mouseY);
+            return;
+        }
+        if (managePage) {
+            renderManage(graphics, mouseX, mouseY);
             return;
         }
 
@@ -1136,6 +1173,7 @@ public class WrightsMenuScreen extends Screen {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0 && hitTask(mouseX, mouseY, panelY + 46)) {
+            leaveManage();
             options = false;
             jobsPage = false;
             infoPage = false;
@@ -1143,6 +1181,7 @@ public class WrightsMenuScreen extends Screen {
             return true;
         }
         if (button == 0 && hitTask(mouseX, mouseY, panelY + 72)) {
+            leaveManage();
             options = false;
             jobsPage = true;
             infoPage = false;
@@ -1150,7 +1189,19 @@ public class WrightsMenuScreen extends Screen {
             refresh();
             return true;
         }
-        if (button == 0 && hitTask(mouseX, mouseY, panelY + 124)) {
+        if (button == 0 && hitTask(mouseX, mouseY, panelY + 98)) {
+            options = false;
+            jobsPage = false;
+            infoPage = false;
+            managePage = true;
+            portListOpen = false;
+            setFocused(null);
+            refresh();
+            sendHold(true);
+            return true;
+        }
+        if (button == 0 && hitTask(mouseX, mouseY, panelY + 150)) {
+            leaveManage();
             options = false;
             jobsPage = false;
             infoPage = true;
@@ -1159,12 +1210,23 @@ public class WrightsMenuScreen extends Screen {
             refresh();
             return true;
         }
-        if (button == 0 && hitTask(mouseX, mouseY, panelY + 150)) {
+        if (button == 0 && hitTask(mouseX, mouseY, panelY + 176)) {
+            leaveManage();
             options = true;
             jobsPage = false;
             infoPage = false;
             setFocused(null);
             refresh();
+            return true;
+        }
+        if (managePage) {
+            if (button == 0 && clickPortList(mouseX, mouseY)) {
+                return true;
+            }
+            if (manage.isOpen() && manage.mouseClicked(manageHost, mouseX, mouseY, button)) {
+                return true;
+            }
+            super.mouseClicked(mouseX, mouseY, button);
             return true;
         }
         if (jobsPage && button == 0 && clickJob(mouseX, mouseY)) {
@@ -1352,6 +1414,15 @@ public class WrightsMenuScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (managePage && keyCode == 256) {
+            if (manage.closeTop()) {
+                return true;
+            }
+            if (portListOpen) {
+                portListOpen = false;
+                return true;
+            }
+        }
         if (sortOpen && keyCode == 256) {
             sortOpen = false;
             if (sortButton != null) {
@@ -1892,6 +1963,18 @@ public class WrightsMenuScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (managePage) {
+            if (portListOpen) {
+                List<WrightportPlaces.Spot> spots = ports();
+                int max = Math.max(0, spots.size() - PORT_ROWS);
+                portScroll = Mth.clamp(portScroll - (int) Math.signum(scrollY), 0, max);
+                return true;
+            }
+            if (manage.isOpen()) {
+                manage.mouseScrolled(manageHost, mouseX, mouseY, scrollY);
+            }
+            return true;
+        }
         if (jobsPage) {
             prepareJobs();
             int delta = (int) Math.signum(scrollY);
@@ -1912,6 +1995,17 @@ public class WrightsMenuScreen extends Screen {
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+        if (!managePage) {
+            return;
+        }
+        if (holdTicker++ % 10 == 0) {
+            sendHold(true);
+        }
     }
 
     @Override
@@ -2427,5 +2521,305 @@ public class WrightsMenuScreen extends Screen {
 
     private boolean insideList(double mouseX, double mouseY) {
         return mouseX >= listX && mouseX < listX + listW && mouseY >= listY && mouseY < listY + listH;
+    }
+
+    private void leaveManage() {
+        if (!managePage && !holding) {
+            return;
+        }
+        managePage = false;
+        portListOpen = false;
+        manage.setActive(false);
+        sendHold(false);
+    }
+
+    private int manageX() {
+        return listX - 2;
+    }
+
+    private int manageY() {
+        return panelY + 34;
+    }
+
+    private int manageW() {
+        return panelX + panelW - 12 - manageX();
+    }
+
+    private int manageH() {
+        return panelH - 68;
+    }
+
+    private int portBarX() {
+        return manageX() + 8;
+    }
+
+    private int portBarY() {
+        return manageY() + 6;
+    }
+
+    private int portBarW() {
+        return Math.max(40, manageW() - 16);
+    }
+
+    private List<WrightportPlaces.Spot> ports() {
+        if (this.minecraft == null || this.minecraft.player == null) {
+            return List.of();
+        }
+        return WrightportPlaces.list(this.minecraft.player);
+    }
+
+    private WrightportPlaces.Spot currentSpot() {
+        List<WrightportPlaces.Spot> spots = ports();
+        if (spots.isEmpty()) {
+            return null;
+        }
+        for (WrightportPlaces.Spot spot : spots) {
+            if (spot.kind() == portKind && spot.index() == portIndex) {
+                return spot;
+            }
+        }
+        WrightportPlaces.Spot first = spots.get(0);
+        if (portKind != first.kind() || portIndex != first.index()) {
+            portKind = first.kind();
+            portIndex = first.index();
+            manage.resetView();
+        }
+        return first;
+    }
+
+    private void sendHold(boolean active) {
+        if (this.minecraft == null || this.minecraft.player == null) {
+            return;
+        }
+        if (!active || !managePage) {
+            if (holding) {
+                holding = false;
+                PacketDistributor.sendToServer(new BlueprintPayloads.PortHold(0, 0, false));
+            }
+            return;
+        }
+        WrightportPlaces.Spot spot = currentSpot();
+        if (spot == null) {
+            if (holding) {
+                holding = false;
+                PacketDistributor.sendToServer(new BlueprintPayloads.PortHold(0, 0, false));
+            }
+            return;
+        }
+        holding = true;
+        PacketDistributor.sendToServer(new BlueprintPayloads.PortHold(spot.kind(), spot.index(), true));
+    }
+
+    private void renderManage(GuiGraphics graphics, int mouseX, int mouseY) {
+        List<WrightportPlaces.Spot> spots = ports();
+        WrightportPlaces.Spot spot = currentSpot();
+        if (spot == null) {
+            graphics.drawString(this.font, Component.translatable("menu.wrights.manage_none"), portBarX(), portBarY() + 4, WrightsUi.MUTED, false);
+            return;
+        }
+        drawPortBar(graphics, spots, spot, mouseX, mouseY);
+        if (manage.isOpen()) {
+            manage.render(manageHost, graphics, mouseX, mouseY);
+        }
+        if (portListOpen) {
+            drawPortList(graphics, spots, mouseX, mouseY);
+        }
+    }
+
+    private void drawPortBar(GuiGraphics graphics, List<WrightportPlaces.Spot> spots, WrightportPlaces.Spot spot, int mouseX, int mouseY) {
+        int x = portBarX();
+        int y = portBarY();
+        int w = portBarW();
+        boolean open = portListOpen;
+        boolean hover = spots.size() > 1 && mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + 16;
+        graphics.fill(x, y, x + w, y + 16, open || hover ? 0xFF2C3E52 : 0xFF1A2633);
+        WrightsUi.border(graphics, x, y, w, 16, open || hover ? WrightsUi.COPPER : 0xFF3D4E5E);
+        String text = this.font.plainSubstrByWidth(portLabel(spots, spot).getString(), Math.max(0, w - (spots.size() > 1 ? 18 : 8)));
+        graphics.drawString(this.font, text, x + 6, y + 4, WrightsUi.TEXT, false);
+        if (spots.size() > 1) {
+            graphics.drawString(this.font, open ? "^" : "v", x + w - 12, y + 4, WrightsUi.MUTED, false);
+        }
+    }
+
+    private void drawPortList(GuiGraphics graphics, List<WrightportPlaces.Spot> spots, int mouseX, int mouseY) {
+        int x = portBarX();
+        int y = portBarY() + 16;
+        int w = portBarW();
+        int rows = Math.min(PORT_ROWS, spots.size());
+        int h = rows * 16;
+        graphics.fill(x, y, x + w, y + h, 0xFF121A22);
+        WrightsUi.border(graphics, x, y, w, h, WrightsUi.COPPER);
+        int start = Mth.clamp(portScroll, 0, Math.max(0, spots.size() - rows));
+        for (int i = 0; i < rows; i++) {
+            WrightportPlaces.Spot spot = spots.get(start + i);
+            int rowY = y + i * 16;
+            boolean hover = mouseX >= x && mouseX < x + w && mouseY >= rowY && mouseY < rowY + 16;
+            boolean picked = spot.kind() == portKind && spot.index() == portIndex;
+            if (hover || picked) {
+                graphics.fill(x + 1, rowY, x + w - 1, rowY + 16, picked ? 0xFF2A4054 : 0xFF243244);
+            }
+            String text = this.font.plainSubstrByWidth(portLabel(spots, spot).getString(), Math.max(0, w - 12));
+            graphics.drawString(this.font, text, x + 6, rowY + 4, WrightsUi.TEXT, false);
+        }
+    }
+
+    private Component portLabel(List<WrightportPlaces.Spot> spots, WrightportPlaces.Spot spot) {
+        ItemStack stack = ItemStack.EMPTY;
+        if (this.minecraft != null && this.minecraft.player != null) {
+            stack = WrightportPlaces.stack(this.minecraft.player, spot.kind(), spot.index());
+        }
+        Component name = stack.isEmpty() ? Component.translatable("item.wrights.personal_wrightport") : stack.getHoverName();
+        if (spots.size() < 2) {
+            return name;
+        }
+        return Component.empty().append(name).append(Component.literal(" — ")).append(WrightportPlaces.where(spot));
+    }
+
+    private boolean clickPortList(double mouseX, double mouseY) {
+        List<WrightportPlaces.Spot> spots = ports();
+        if (spots.isEmpty()) {
+            portListOpen = false;
+            return false;
+        }
+        int x = portBarX();
+        int y = portBarY();
+        int w = portBarW();
+        if (!portListOpen && spots.size() > 1 && mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + 16) {
+            portListOpen = true;
+            portScroll = 0;
+            return true;
+        }
+        if (!portListOpen) {
+            return false;
+        }
+        int rows = Math.min(PORT_ROWS, spots.size());
+        int listY = y + 16;
+        if (mouseX >= x && mouseX < x + w && mouseY >= listY && mouseY < listY + rows * 16) {
+            int row = (int) ((mouseY - listY) / 16);
+            int index = portScroll + row;
+            if (index >= 0 && index < spots.size()) {
+                WrightportPlaces.Spot spot = spots.get(index);
+                if (spot.kind() != portKind || spot.index() != portIndex) {
+                    portKind = spot.kind();
+                    portIndex = spot.index();
+                    manage.resetView();
+                    sendHold(true);
+                }
+            }
+            portListOpen = false;
+            return true;
+        }
+        portListOpen = false;
+        return true;
+    }
+
+    private final class MenuManageHost implements ManageHost {
+        @Override
+        public int screenWidth() {
+            return WrightsMenuScreen.this.width;
+        }
+
+        @Override
+        public int screenHeight() {
+            return WrightsMenuScreen.this.height;
+        }
+
+        @Override
+        public Font font() {
+            return WrightsMenuScreen.this.font;
+        }
+
+        @Override
+        public Minecraft minecraft() {
+            return WrightsMenuScreen.this.minecraft;
+        }
+
+        @Override
+        public Swarm swarm() {
+            WrightportPlaces.Spot spot = currentSpot();
+            if (spot == null || WrightsMenuScreen.this.minecraft == null || WrightsMenuScreen.this.minecraft.player == null) {
+                return Swarm.from(ItemStack.EMPTY);
+            }
+            ItemStack stack = WrightportPlaces.stack(WrightsMenuScreen.this.minecraft.player, spot.kind(), spot.index());
+            if (!(stack.getItem() instanceof PersonalWrightportItem)) {
+                return Swarm.from(ItemStack.EMPTY);
+            }
+            return Swarm.from(stack);
+        }
+
+        @Override
+        public boolean away(UUID id) {
+            for (BlueprintPayloads.JobLine job : WrightsClientState.jobs) {
+                if (!job.finished() && job.crew().contains(id)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public void edit(int action, int index) {
+            WrightportPlaces.Spot spot = currentSpot();
+            if (spot == null) {
+                return;
+            }
+            PacketDistributor.sendToServer(new BlueprintPayloads.PortEdit(spot.kind(), spot.index(), action, index));
+            sendHold(true);
+        }
+
+        @Override
+        public void batch(int action, int value, int[] units) {
+            WrightportPlaces.Spot spot = currentSpot();
+            if (spot == null) {
+                return;
+            }
+            PacketDistributor.sendToServer(new BlueprintPayloads.PortBatch(spot.kind(), spot.index(), action, value, units));
+            sendHold(true);
+        }
+
+        @Override
+        public void addButton(WrightsButton button) {
+            addRenderableWidget(button);
+        }
+
+        @Override
+        public void addField(EditBox box) {
+            addRenderableWidget(box);
+        }
+
+        @Override
+        public void focus(GuiEventListener listener) {
+            setFocused(listener);
+        }
+
+        @Override
+        public void relayout() {
+            refresh();
+        }
+
+        @Override
+        public boolean embedded() {
+            return true;
+        }
+
+        @Override
+        public int areaX() {
+            return manageX() + 4;
+        }
+
+        @Override
+        public int areaY() {
+            return portBarY() + 22;
+        }
+
+        @Override
+        public int areaW() {
+            return Math.max(160, manageW() - 8);
+        }
+
+        @Override
+        public int areaH() {
+            return Math.max(120, manageY() + manageH() - areaY() - 4);
+        }
     }
 }

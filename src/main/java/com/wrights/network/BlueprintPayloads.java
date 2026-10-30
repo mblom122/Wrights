@@ -886,6 +886,75 @@ public final class BlueprintPayloads {
         }
     }
 
+    public record PortEdit(int kind, int index, int action, int unit) implements CustomPacketPayload {
+        public static final Type<PortEdit> TYPE = payloadType("port_edit");
+        public static final StreamCodec<RegistryFriendlyByteBuf, PortEdit> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeByte(value.kind);
+                    buf.writeVarInt(value.index);
+                    buf.writeByte(value.action);
+                    buf.writeVarInt(value.unit);
+                },
+                buf -> new PortEdit(buf.readByte(), buf.readVarInt(), buf.readByte(), buf.readVarInt()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record PortBatch(int kind, int index, int action, int value, int[] units) implements CustomPacketPayload {
+        public static final Type<PortBatch> TYPE = payloadType("port_batch");
+        public static final StreamCodec<RegistryFriendlyByteBuf, PortBatch> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeByte(value.kind);
+                    buf.writeVarInt(value.index);
+                    buf.writeByte(value.action);
+                    buf.writeVarInt(value.value);
+                    int[] units = value.units == null ? new int[0] : value.units;
+                    buf.writeVarInt(units.length);
+                    for (int unit : units) {
+                        buf.writeVarInt(unit);
+                    }
+                },
+                buf -> {
+                    int kind = buf.readByte();
+                    int index = buf.readVarInt();
+                    int action = buf.readByte();
+                    int value = buf.readVarInt();
+                    int count = buf.readVarInt();
+                    if (count < 0 || count > 1024) {
+                        throw new IllegalArgumentException("port");
+                    }
+                    int[] units = new int[count];
+                    for (int i = 0; i < count; i++) {
+                        units[i] = buf.readVarInt();
+                    }
+                    return new PortBatch(kind, index, action, value, units);
+                });
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record PortHold(int kind, int index, boolean active) implements CustomPacketPayload {
+        public static final Type<PortHold> TYPE = payloadType("port_hold");
+        public static final StreamCodec<RegistryFriendlyByteBuf, PortHold> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeByte(value.kind);
+                    buf.writeVarInt(value.index);
+                    buf.writeBoolean(value.active);
+                },
+                buf -> new PortHold(buf.readByte(), buf.readVarInt(), buf.readBoolean()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public record BindSupply(BlockPos pos, boolean clear) implements CustomPacketPayload {
         public static final Type<BindSupply> TYPE = payloadType("bind_supply");
         public static final StreamCodec<RegistryFriendlyByteBuf, BindSupply> STREAM_CODEC = StreamCodec.of(

@@ -1426,6 +1426,11 @@ public final class JobManager {
             BlueprintNetwork.syncJobs(player);
             return;
         }
+        if (add && com.wrights.drone.ManageLock.blocks(player, unitId)) {
+            Messages.actionBar(player, "message.wrights.wright_locked");
+            BlueprintNetwork.syncJobs(player);
+            return;
+        }
         if (add && !job.crewUnits().contains(unitId) && job.crewUnits().size() >= WrightsConfig.maxWrightsPerJob()) {
             Messages.actionBar(player, "message.wrights.job_wright_cap", WrightsConfig.maxWrightsPerJob());
             BlueprintNetwork.syncJobs(player);
@@ -1465,6 +1470,11 @@ public final class JobManager {
             }
         }
         if (WrightHomes.findUnit(player, unitId) == null) {
+            BlueprintNetwork.syncJobs(player);
+            return;
+        }
+        if (target != null && com.wrights.drone.ManageLock.blocks(player, unitId)) {
+            Messages.actionBar(player, "message.wrights.wright_locked");
             BlueprintNetwork.syncJobs(player);
             return;
         }

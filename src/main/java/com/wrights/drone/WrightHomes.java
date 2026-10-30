@@ -51,7 +51,7 @@ public final class WrightHomes {
             return out;
         }
         for (Swarm.Unit unit : Wrightports.swarm(player).units()) {
-            if (!free.test(unit.id())) {
+            if (!free.test(unit.id()) || ManageLock.blocks(player, unit.id())) {
                 continue;
             }
             out.add(new FreeWright(unit, null));

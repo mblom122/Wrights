@@ -52,6 +52,9 @@ public final class BlueprintNetwork {
         registrar.playToServer(BlueprintPayloads.MoveDrone.TYPE, BlueprintPayloads.MoveDrone.STREAM_CODEC, BlueprintNetwork::moveDrone);
         registrar.playToServer(BlueprintPayloads.HangarEdit.TYPE, BlueprintPayloads.HangarEdit.STREAM_CODEC, BlueprintNetwork::hangar);
         registrar.playToServer(BlueprintPayloads.HangarBatch.TYPE, BlueprintPayloads.HangarBatch.STREAM_CODEC, BlueprintNetwork::hangarBatch);
+        registrar.playToServer(BlueprintPayloads.PortEdit.TYPE, BlueprintPayloads.PortEdit.STREAM_CODEC, BlueprintNetwork::portEdit);
+        registrar.playToServer(BlueprintPayloads.PortBatch.TYPE, BlueprintPayloads.PortBatch.STREAM_CODEC, BlueprintNetwork::portBatch);
+        registrar.playToServer(BlueprintPayloads.PortHold.TYPE, BlueprintPayloads.PortHold.STREAM_CODEC, BlueprintNetwork::portHold);
         registrar.playToServer(BlueprintPayloads.BindSupply.TYPE, BlueprintPayloads.BindSupply.STREAM_CODEC, BlueprintNetwork::bindSupply);
         registrar.playToServer(BlueprintPayloads.BindDigital.TYPE, BlueprintPayloads.BindDigital.STREAM_CODEC, BlueprintNetwork::bindDigital);
         registrar.playToServer(BlueprintPayloads.DigitalInfoRequest.TYPE, BlueprintPayloads.DigitalInfoRequest.STREAM_CODEC, BlueprintNetwork::digitalInfo);
@@ -333,6 +336,32 @@ public final class BlueprintNetwork {
             if (player.containerMenu instanceof com.wrights.menu.HangarMenu menu && menu.pos().equals(payload.pos())) {
                 com.wrights.drone.HangarOps.batch(player, menu, payload.action(), payload.value(), payload.units());
             }
+        });
+    }
+
+    private static void portEdit(BlueprintPayloads.PortEdit payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> com.wrights.drone.HangarOps.editPort(player, payload.kind(), payload.index(), payload.action(), payload.unit()));
+    }
+
+    private static void portBatch(BlueprintPayloads.PortBatch payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> com.wrights.drone.HangarOps.batchPort(player, payload.kind(), payload.index(), payload.action(), payload.value(), payload.units()));
+    }
+
+    private static void portHold(BlueprintPayloads.PortHold payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> {
+            if (!payload.active()) {
+                com.wrights.drone.ManageLock.clear(player);
+                return;
+            }
+            net.minecraft.world.item.ItemStack stack = com.wrights.drone.WrightportPlaces.stack(player, payload.kind(), payload.index());
+            if (!(stack.getItem() instanceof com.wrights.item.PersonalWrightportItem)) {
+                com.wrights.drone.ManageLock.clear(player);
+                return;
+            }
+            com.wrights.drone.ManageLock.hold(player, payload.kind(), payload.index());
         });
     }
 
