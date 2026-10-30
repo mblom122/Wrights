@@ -356,7 +356,7 @@ public final class BlueprintActions {
         BlueprintNetwork.syncCapture(player);
     }
 
-    public static void confirm(ServerPlayer player, String name, boolean copyFluids, boolean copyNbtBlocks, boolean copyNbtSettings, boolean buildAfter) {
+    public static void confirm(ServerPlayer player, String name, boolean copyFluids, boolean copyNbtBlocks, boolean copyNbtSettings, boolean copyNbtAll, boolean buildAfter) {
         if (!requireTool(player)) {
             return;
         }
@@ -383,6 +383,11 @@ public final class BlueprintActions {
         session.setBuildAfterSave(buildAfter);
         session.setMode(BlueprintSessions.Mode.SAVING);
         BlueprintNetwork.syncCapture(player);
+        boolean settings = copyNbtBlocks && copyNbtSettings && WrightsConfig.copySettings();
+        boolean all = copyNbtBlocks && copyNbtAll && WrightsConfig.copyAll() && player.getAbilities().instabuild && !player.isSpectator();
+        if (all) {
+            settings = false;
+        }
         boolean started = JobManager.startBlueprintSave(
                 player,
                 clean,
@@ -392,7 +397,8 @@ public final class BlueprintActions {
                 session.cornerB(),
                 copyFluids,
                 copyNbtBlocks,
-                copyNbtSettings);
+                settings,
+                all);
         if (!started) {
             session.setBuildAfterSave(false);
             session.setMode(BlueprintSessions.Mode.CAPTURE);

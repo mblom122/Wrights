@@ -61,6 +61,7 @@ public final class BuildJob {
     private boolean copyFluids;
     private boolean copyNbtBlocks;
     private boolean copyNbtSettings;
+    private boolean copyNbtAll;
     private boolean placeFluids = true;
     private boolean voidBlocks;
     private boolean voidFluids;
@@ -372,9 +373,14 @@ public final class BuildJob {
         return copyNbtSettings;
     }
 
-    public void setCopyNbt(boolean copyNbtBlocks, boolean copyNbtSettings) {
+    public boolean copyNbtAll() {
+        return copyNbtAll;
+    }
+
+    public void setCopyNbt(boolean copyNbtBlocks, boolean copyNbtSettings, boolean copyNbtAll) {
         this.copyNbtBlocks = copyNbtBlocks;
-        this.copyNbtSettings = copyNbtBlocks && copyNbtSettings;
+        this.copyNbtSettings = copyNbtBlocks && copyNbtSettings && !copyNbtAll;
+        this.copyNbtAll = copyNbtBlocks && copyNbtAll;
     }
 
     public boolean placeFluids() {
@@ -754,6 +760,7 @@ public final class BuildJob {
         tag.putBoolean("copyFluids", copyFluids);
         tag.putBoolean("copyNbtBlocks", copyNbtBlocks);
         tag.putBoolean("copyNbtSettings", copyNbtSettings);
+        tag.putBoolean("copyNbtAll", copyNbtAll);
         tag.putBoolean("placeFluids", placeFluids);
         tag.putBoolean("voidBlocks", voidBlocks);
         tag.putBoolean("voidFluids", voidFluids);
@@ -883,7 +890,8 @@ public final class BuildJob {
         }
         job.copyFluids = tag.getBoolean("copyFluids");
         job.copyNbtBlocks = tag.getBoolean("copyNbtBlocks");
-        job.copyNbtSettings = job.copyNbtBlocks && tag.getBoolean("copyNbtSettings");
+        job.copyNbtAll = job.copyNbtBlocks && tag.getBoolean("copyNbtAll");
+        job.copyNbtSettings = job.copyNbtBlocks && !job.copyNbtAll && tag.getBoolean("copyNbtSettings");
         job.placeFluids = !tag.contains("placeFluids") || tag.getBoolean("placeFluids");
         job.voidBlocks = tag.getBoolean("voidBlocks");
         job.voidFluids = tag.getBoolean("voidFluids");

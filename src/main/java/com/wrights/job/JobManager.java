@@ -527,7 +527,7 @@ public final class JobManager {
         launched(player, job);
     }
 
-    public static boolean startBlueprintSave(ServerPlayer player, String name, UUID replaceId, ResourceKey<Level> dimension, BlockPos cornerA, BlockPos cornerB, boolean copyFluids, boolean copyNbtBlocks, boolean copyNbtSettings) {
+    public static boolean startBlueprintSave(ServerPlayer player, String name, UUID replaceId, ResourceKey<Level> dimension, BlockPos cornerA, BlockPos cornerB, boolean copyFluids, boolean copyNbtBlocks, boolean copyNbtSettings, boolean copyNbtAll) {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         if (hasCopy(library, player.getUUID())) {
             Messages.actionBar(player, "message.wrights.busy");
@@ -548,7 +548,7 @@ public final class JobManager {
         BuildJob job = BuildJob.copy(player.getUUID(), player.getUUID(), dimension, min, max);
         job.setBlueprintName(name);
         job.setCopyFluids(copyFluids);
-        job.setCopyNbt(copyNbtBlocks, copyNbtSettings);
+        job.setCopyNbt(copyNbtBlocks, copyNbtSettings, copyNbtAll);
         job.setReplaceSchematicId(replaceId);
         library.addJob(job);
         Messages.actionBar(player, "message.wrights.saving");
@@ -685,10 +685,17 @@ public final class JobManager {
                     job.skippedSpecialOne();
                 } else {
                     net.minecraft.nbt.CompoundTag nbt = null;
-                    if (state.hasBlockEntity() && job.copyNbtSettings()) {
+                    boolean nbtFull = false;
+                    if (state.hasBlockEntity() && (job.copyNbtAll() || job.copyNbtSettings())) {
                         BlockEntity be = level.getBlockEntity(pos);
                         if (be != null) {
-                            nbt = com.wrights.util.BlockEntityNbt.settings(be.saveWithoutMetadata(level.registryAccess()));
+                            net.minecraft.nbt.CompoundTag raw = be.saveWithoutMetadata(level.registryAccess());
+                            if (job.copyNbtAll()) {
+                                nbt = raw.isEmpty() ? null : raw;
+                                nbtFull = nbt != null;
+                            } else if (WrightsConfig.settingsAllowed(state.getBlock())) {
+                                nbt = com.wrights.util.BlockEntityNbt.settings(raw);
+                            }
                         }
                     }
                     job.partial().add(new Schematic.Entry(
@@ -697,7 +704,8 @@ public final class JobManager {
                             (short) (pos.getZ() - job.min().getZ()),
                             state,
                             BlockFilters.isSecondary(state),
-                            nbt));
+                            nbt,
+                            nbtFull));
                 }
             }
             job.advance();
@@ -2804,7 +2812,7 @@ public final class JobManager {
         Item payment = BlockFilters.payment(state);
         BlockState existing = level.getBlockState(pos);
         if (existing.equals(state)) {
-            applyEntryNbt(level, pos, entry);
+            applyEntryNbt(level, player, pos, entry);
             return PlaceResult.DONE;
         }
         if (!job.placeFluids() && BlockFilters.isFluid(state)) {
@@ -2874,7 +2882,7 @@ public final class JobManager {
         if (paid) {
             consumeItem(player, level, job, payment);
         }
-        applyEntryNbt(level, pos, entry);
+        applyEntryNbt(level, player, pos, entry);
         job.recordPlaced(entry.x(), entry.y(), entry.z(), after, paid);
         if (!quiet) {
             level.gameEvent(player, GameEvent.BLOCK_PLACE, pos);
@@ -2886,10 +2894,10 @@ public final class JobManager {
     }
 
     /**
-     * A placed machine should start like a hand-placed one. Item components carry the default
-     * side config; copied settings, if any, are applied on top and never include stored contents.
+     * A placed machine starts like a hand-placed one. Copied settings are applied on top.
+     * A full copy replaces that, and only a creative player may place one.
      */
-    private static void applyEntryNbt(ServerLevel level, BlockPos pos, Schematic.Entry entry) {
+    private static void applyEntryNbt(ServerLevel level, ServerPlayer player, BlockPos pos, Schematic.Entry entry) {
         BlockEntity be = level.getBlockEntity(pos);
         if (be == null) {
             return;
@@ -2905,16 +2913,27 @@ public final class JobManager {
         if (entry.nbt() == null) {
             return;
         }
-        net.minecraft.nbt.CompoundTag settings = com.wrights.util.BlockEntityNbt.settings(entry.nbt());
-        if (settings == null) {
-            return;
+        net.minecraft.nbt.CompoundTag data = entry.nbt();
+        boolean full = entry.nbtFull() && WrightsConfig.copyAll() && creative(player);
+        if (!full) {
+            if (!WrightsConfig.copySettings() || !WrightsConfig.settingsAllowed(be.getBlockState().getBlock())) {
+                return;
+            }
+            data = com.wrights.util.BlockEntityNbt.settings(data);
+            if (data == null) {
+                return;
+            }
         }
         try {
-            be.loadWithComponents(settings, level.registryAccess());
+            be.loadWithComponents(data, level.registryAccess());
             be.setChanged();
         } catch (RuntimeException ignored) {
             // Bad or version-mismatched settings NBT must not break the place.
         }
+    }
+
+    private static boolean creative(ServerPlayer player) {
+        return player.getAbilities().instabuild && !player.isSpectator();
     }
 
     /** A chest or other stored block stays unless voiding those was turned on. */

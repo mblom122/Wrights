@@ -185,6 +185,7 @@ public final class BlueprintNetwork {
                 payload.fluids(),
                 payload.nbtBlocks(),
                 payload.nbtSettings(),
+                payload.nbtAll(),
                 payload.buildAfter()));
     }
 

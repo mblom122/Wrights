@@ -1,5 +1,10 @@
 package com.wrights;
 
+import java.util.List;
+import java.util.Locale;
+
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.level.block.Block;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 public final class WrightsConfig {
@@ -67,6 +72,30 @@ public final class WrightsConfig {
             .comment("While true, a job waits for the chunk to load. While false, unloaded positions are skipped.")
             .define("requireChunksLoaded", true);
 
+    public static final ModConfigSpec.BooleanValue COPY_SETTINGS = BUILDER
+            .comment(
+                    "When false, Copy settings is unavailable. Machines are saved as freshly placed blocks.",
+                    "Copy settings keeps sides and modes. It tries to drop items, fluids, energy, and upgrades, but a mod can store those under a name the filter does not know.")
+            .define("copySettings", true);
+
+    public static final ModConfigSpec.BooleanValue COPY_ALL = BUILDER
+            .comment(
+                    "When false, Copy all is unavailable.",
+                    "Copy all saves every tag on the block, including items and energy, and can duplicate them. It only works in creative, even when this is true.")
+            .define("copyAll", true);
+
+    public static final ModConfigSpec.BooleanValue COPY_SETTINGS_WHITELIST = BUILDER
+            .comment(
+                    "When true, Copy settings only keeps data for blocks from copySettingsMods.",
+                    "Other machines are saved as freshly placed blocks. Copy all ignores this list. Off by default, so every mod can use Copy settings.")
+            .define("copySettingsWhitelist", false);
+
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> COPY_SETTINGS_MODS = BUILDER
+            .comment(
+                    "Mod ids that may keep settings while copySettingsWhitelist is true.",
+                    "mekanism is energy cubes and machines. ae2 is Applied Energistics 2. Add other ids, such as mekanismgenerators, when you want those too.")
+            .defineListAllowEmpty("copySettingsMods", List.of("mekanism", "ae2"), () -> "", WrightsConfig::modId);
+
     static final ModConfigSpec SPEC = BUILDER.build();
 
     private WrightsConfig() {
@@ -90,6 +119,58 @@ public final class WrightsConfig {
 
     public static int ghostRange() {
         return read(GHOST_RANGE, 48);
+    }
+
+    public static boolean copySettings() {
+        return read(COPY_SETTINGS, true);
+    }
+
+    public static boolean copyAll() {
+        return read(COPY_ALL, true);
+    }
+
+    public static boolean copySettingsWhitelist() {
+        return read(COPY_SETTINGS_WHITELIST, false);
+    }
+
+    /** Copy settings may keep this block's data. Copy all does not ask. */
+    public static boolean settingsAllowed(Block block) {
+        if (!copySettingsWhitelist()) {
+            return true;
+        }
+        String namespace = BuiltInRegistries.BLOCK.getKey(block).getNamespace();
+        try {
+            for (String id : COPY_SETTINGS_MODS.get()) {
+                if (namespace.equals(id.toLowerCase(Locale.ROOT))) {
+                    return true;
+                }
+            }
+        } catch (IllegalStateException exception) {
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean modId(Object value) {
+        if (!(value instanceof String id) || id.isEmpty() || id.length() > 64) {
+            return false;
+        }
+        for (int i = 0; i < id.length(); i++) {
+            char c = id.charAt(i);
+            boolean ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.';
+            if (!ok) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean read(ModConfigSpec.BooleanValue value, boolean fallback) {
+        try {
+            return value.getAsBoolean();
+        } catch (IllegalStateException exception) {
+            return fallback;
+        }
     }
 
     private static int read(ModConfigSpec.IntValue value, int fallback) {

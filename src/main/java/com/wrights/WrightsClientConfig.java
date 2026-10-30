@@ -64,6 +64,9 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.BooleanValue COPY_NBT_SETTINGS = BUILDER
             .comment("When true with copyNbtBlocks, also saves machine settings (sides, modes, filters) but never items, fluids, energy, or upgrades.")
             .define("copyNbtSettings", false);
+    public static final ModConfigSpec.BooleanValue COPY_NBT_ALL = BUILDER
+            .comment("When true with copyNbtBlocks, saves every tag on the block. Creative only, and the server can turn it off.")
+            .define("copyNbtAll", false);
     public static final ModConfigSpec.BooleanValue PLACE_FLUIDS = BUILDER
             .comment("When true, a build places water and lava saved in the blueprint.")
             .define("placeFluids", true);
@@ -203,6 +206,7 @@ public final class WrightsClientConfig {
         COPY_NBT_BLOCKS.set(enabled);
         if (!enabled) {
             COPY_NBT_SETTINGS.set(false);
+            COPY_NBT_ALL.set(false);
         }
         save();
     }
@@ -211,7 +215,21 @@ public final class WrightsClientConfig {
         if (enabled && !COPY_NBT_BLOCKS.get()) {
             COPY_NBT_BLOCKS.set(true);
         }
+        if (enabled) {
+            COPY_NBT_ALL.set(false);
+        }
         COPY_NBT_SETTINGS.set(enabled);
+        save();
+    }
+
+    public static void setCopyNbtAll(boolean enabled) {
+        if (enabled && !COPY_NBT_BLOCKS.get()) {
+            COPY_NBT_BLOCKS.set(true);
+        }
+        if (enabled) {
+            COPY_NBT_SETTINGS.set(false);
+        }
+        COPY_NBT_ALL.set(enabled);
         save();
     }
 

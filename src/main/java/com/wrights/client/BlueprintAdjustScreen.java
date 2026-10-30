@@ -40,6 +40,8 @@ public class BlueprintAdjustScreen extends Screen {
     private int nbtY;
     private int settingsX;
     private int settingsY;
+    private int allX;
+    private int allY;
     private boolean spinning;
     private float yaw = 35.0F;
     private float pitch = 28.0F;
@@ -57,7 +59,7 @@ public class BlueprintAdjustScreen extends Screen {
     @Override
     protected void init() {
         panelW = 392;
-        panelH = 332;
+        panelH = 364;
         panelX = Math.max(8, (this.width - panelW) / 2);
         panelY = Math.max(4, (this.height - panelH) / 2);
         nameBox = box(panelX + 12, panelY + 28, 190, 16, 48, false);
@@ -285,7 +287,8 @@ public class BlueprintAdjustScreen extends Screen {
                 nameBox.getValue(),
                 WrightsClientConfig.COPY_FLUIDS.get(),
                 WrightsClientConfig.COPY_NBT_BLOCKS.get(),
-                WrightsClientConfig.COPY_NBT_SETTINGS.get(),
+                settingsChosen(),
+                allChosen(),
                 buildAfter));
     }
 
@@ -308,7 +311,8 @@ public class BlueprintAdjustScreen extends Screen {
         String label = nameBox == null ? "" : nameBox.getValue();
         return label + "\n" + WrightsClientConfig.COPY_FLUIDS.get()
                 + "\n" + WrightsClientConfig.COPY_NBT_BLOCKS.get()
-                + "\n" + WrightsClientConfig.COPY_NBT_SETTINGS.get()
+                + "\n" + settingsChosen()
+                + "\n" + allChosen()
                 + "\n" + WrightsClientState.cornerA + "\n" + WrightsClientState.cornerB;
     }
 
@@ -410,6 +414,8 @@ public class BlueprintAdjustScreen extends Screen {
         nbtY = fluidY + 32;
         settingsX = modelX;
         settingsY = nbtY + 32;
+        allX = modelX;
+        allY = settingsY + 32;
         WrightsUi.inset(graphics, modelX - 4, modelY - 4, modelW + 8, modelH + 8);
         ensurePreview();
         if (!spinning) {
@@ -425,7 +431,13 @@ public class BlueprintAdjustScreen extends Screen {
         }
         drawToggle(graphics, fluidX, fluidY, WrightsClientConfig.COPY_FLUIDS.get(), "screen.wrights.copy_fluids", "screen.wrights.copy_fluids_hint", true);
         drawToggle(graphics, nbtX, nbtY, WrightsClientConfig.COPY_NBT_BLOCKS.get(), "screen.wrights.copy_nbt_blocks", "screen.wrights.copy_nbt_blocks_hint", true);
-        drawToggle(graphics, settingsX, settingsY, WrightsClientConfig.COPY_NBT_SETTINGS.get(), "screen.wrights.copy_nbt_settings", "screen.wrights.copy_nbt_settings_hint", WrightsClientConfig.COPY_NBT_BLOCKS.get());
+        boolean settingsOn = WrightsConfig.copySettings();
+        String settingsHint = settingsOn
+                ? (WrightsConfig.copySettingsWhitelist() ? "screen.wrights.copy_nbt_settings_whitelist_hint" : "screen.wrights.copy_nbt_settings_hint")
+                : "screen.wrights.copy_off_hint";
+        drawToggle(graphics, settingsX, settingsY, settingsChosen(), "screen.wrights.copy_nbt_settings", settingsHint, WrightsClientConfig.COPY_NBT_BLOCKS.get() && settingsOn);
+        String allHint = WrightsConfig.copyAll() ? "screen.wrights.copy_nbt_all_hint" : "screen.wrights.copy_off_hint";
+        drawToggle(graphics, allX, allY, allChosen(), "screen.wrights.copy_nbt_all", allHint, WrightsClientConfig.COPY_NBT_BLOCKS.get() && copyAllUsable());
     }
 
     private void drawToggle(GuiGraphics graphics, int x, int y, boolean on, String label, String hint, boolean enabled) {
@@ -464,6 +476,19 @@ public class BlueprintAdjustScreen extends Screen {
         return left == null ? right == null : left.equals(right);
     }
 
+    private boolean settingsChosen() {
+        return WrightsConfig.copySettings() && WrightsClientConfig.COPY_NBT_SETTINGS.get() && !allChosen();
+    }
+
+    private boolean allChosen() {
+        return copyAllUsable() && WrightsClientConfig.COPY_NBT_ALL.get();
+    }
+
+    private boolean copyAllUsable() {
+        return WrightsConfig.copyAll() && this.minecraft != null && this.minecraft.player != null
+                && this.minecraft.player.getAbilities().instabuild && !this.minecraft.player.isSpectator();
+    }
+
     private boolean insideModel(double mouseX, double mouseY) {
         return mouseX >= modelX && mouseX < modelX + modelW && mouseY >= modelY && mouseY < modelY + modelH;
     }
@@ -495,10 +520,18 @@ public class BlueprintAdjustScreen extends Screen {
             return true;
         }
         if (button == 0 && hitToggle(mouseX, mouseY, settingsX, settingsY)) {
-            if (saving() || !WrightsClientConfig.COPY_NBT_BLOCKS.get()) {
+            if (saving() || !WrightsClientConfig.COPY_NBT_BLOCKS.get() || !WrightsConfig.copySettings()) {
                 return true;
             }
             WrightsClientConfig.setCopyNbtSettings(!WrightsClientConfig.COPY_NBT_SETTINGS.get());
+            updateSaveButton();
+            return true;
+        }
+        if (button == 0 && hitToggle(mouseX, mouseY, allX, allY)) {
+            if (saving() || !WrightsClientConfig.COPY_NBT_BLOCKS.get() || !copyAllUsable()) {
+                return true;
+            }
+            WrightsClientConfig.setCopyNbtAll(!WrightsClientConfig.COPY_NBT_ALL.get());
             updateSaveButton();
             return true;
         }
