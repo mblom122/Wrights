@@ -51,6 +51,7 @@ public class BlueprintAdjustScreen extends Screen {
     private boolean previewNbt;
     private boolean previewReady;
     private SelectionPreview.Shot preview = SelectionPreview.Shot.empty();
+    private Component helpTip;
 
     public BlueprintAdjustScreen() {
         super(Component.translatable("screen.wrights.adjust"));
@@ -131,7 +132,8 @@ public class BlueprintAdjustScreen extends Screen {
         axis(graphics, panelY + 138, "X");
         axis(graphics, panelY + 156, "Y");
         axis(graphics, panelY + 174, "Z");
-        renderModel(graphics);
+        helpTip = null;
+        renderModel(graphics, mouseX, mouseY);
         if (WrightsClientState.cornerA != null && WrightsClientState.cornerB != null) {
             graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable(
                     "screen.wrights.volume",
@@ -142,6 +144,9 @@ public class BlueprintAdjustScreen extends Screen {
                     WrightsClientState.solidSelection()).getString(), 198), panelX + 12, panelY + 192, WrightsUi.MUTED, false);
         } else {
             graphics.drawString(this.font, Component.translatable("hud.wrights.capture"), panelX + 12, panelY + 192, WrightsUi.MUTED, false);
+        }
+        if (helpTip != null) {
+            graphics.renderTooltip(this.font, helpTip, mouseX, mouseY);
         }
     }
 
@@ -403,7 +408,7 @@ public class BlueprintAdjustScreen extends Screen {
         graphics.drawString(this.font, label, panelX + 134, y, WrightsUi.MUTED, false);
     }
 
-    private void renderModel(GuiGraphics graphics) {
+    private void renderModel(GuiGraphics graphics, int mouseX, int mouseY) {
         modelX = panelX + 222;
         modelY = panelY + 28;
         modelW = panelW - 234;
@@ -411,11 +416,11 @@ public class BlueprintAdjustScreen extends Screen {
         fluidX = modelX;
         fluidY = modelY + modelH + 8;
         nbtX = modelX;
-        nbtY = fluidY + 32;
+        nbtY = fluidY + 18;
         settingsX = modelX;
-        settingsY = nbtY + 32;
+        settingsY = nbtY + 18;
         allX = modelX;
-        allY = settingsY + 32;
+        allY = settingsY + 18;
         WrightsUi.inset(graphics, modelX - 4, modelY - 4, modelW + 8, modelH + 8);
         ensurePreview();
         if (!spinning) {
@@ -429,18 +434,18 @@ public class BlueprintAdjustScreen extends Screen {
         } else if (WrightsClientState.cornerA != null && WrightsClientState.cornerB != null) {
             graphics.drawCenteredString(this.font, Component.translatable("message.wrights.copy_empty"), modelX + modelW / 2, modelY + modelH / 2, WrightsUi.MUTED);
         }
-        drawToggle(graphics, fluidX, fluidY, WrightsClientConfig.COPY_FLUIDS.get(), "screen.wrights.copy_fluids", "screen.wrights.copy_fluids_hint", true);
-        drawToggle(graphics, nbtX, nbtY, WrightsClientConfig.COPY_NBT_BLOCKS.get(), "screen.wrights.copy_nbt_blocks", "screen.wrights.copy_nbt_blocks_hint", true);
+        drawToggle(graphics, mouseX, mouseY, fluidX, fluidY, WrightsClientConfig.COPY_FLUIDS.get(), "screen.wrights.copy_fluids", "screen.wrights.copy_fluids_hint", true);
+        drawToggle(graphics, mouseX, mouseY, nbtX, nbtY, WrightsClientConfig.COPY_NBT_BLOCKS.get(), "screen.wrights.copy_nbt_blocks", "screen.wrights.copy_nbt_blocks_hint", true);
         boolean settingsOn = WrightsConfig.copySettings();
         String settingsHint = settingsOn
                 ? (WrightsConfig.copySettingsWhitelist() ? "screen.wrights.copy_nbt_settings_whitelist_hint" : "screen.wrights.copy_nbt_settings_hint")
                 : "screen.wrights.copy_off_hint";
-        drawToggle(graphics, settingsX, settingsY, settingsChosen(), "screen.wrights.copy_nbt_settings", settingsHint, WrightsClientConfig.COPY_NBT_BLOCKS.get() && settingsOn);
+        drawToggle(graphics, mouseX, mouseY, settingsX, settingsY, settingsChosen(), "screen.wrights.copy_nbt_settings", settingsHint, WrightsClientConfig.COPY_NBT_BLOCKS.get() && settingsOn);
         String allHint = WrightsConfig.copyAll() ? "screen.wrights.copy_nbt_all_hint" : "screen.wrights.copy_off_hint";
-        drawToggle(graphics, allX, allY, allChosen(), "screen.wrights.copy_nbt_all", allHint, WrightsClientConfig.COPY_NBT_BLOCKS.get() && copyAllUsable());
+        drawToggle(graphics, mouseX, mouseY, allX, allY, allChosen(), "screen.wrights.copy_nbt_all", allHint, WrightsClientConfig.COPY_NBT_BLOCKS.get() && copyAllUsable());
     }
 
-    private void drawToggle(GuiGraphics graphics, int x, int y, boolean on, String label, String hint, boolean enabled) {
+    private void drawToggle(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, boolean on, String label, String hint, boolean enabled) {
         int box = enabled ? 0xFF18222C : 0xFF12171C;
         int border = !enabled ? 0xFF2A343C : on ? WrightsUi.COPPER : 0xFF3D4E5E;
         graphics.fill(x, y, x + 12, y + 12, box);
@@ -449,8 +454,16 @@ public class BlueprintAdjustScreen extends Screen {
             graphics.fill(x + 3, y + 3, x + 9, y + 9, WrightsUi.COPPER);
         }
         int text = enabled ? WrightsUi.TEXT : WrightsUi.MUTED;
-        graphics.drawString(this.font, Component.translatable(label), x + 16, y + 2, text, false);
-        graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable(hint).getString(), modelW - 4), x, y + 16, WrightsUi.MUTED, false);
+        Component title = Component.translatable(label);
+        graphics.drawString(this.font, title, x + 16, y + 2, text, false);
+        int helpX = x + 16 + this.font.width(title) + 4;
+        boolean over = mouseX >= helpX && mouseX < helpX + 12 && mouseY >= y && mouseY < y + 12;
+        graphics.fill(helpX, y, helpX + 12, y + 12, 0xFF18222C);
+        WrightsUi.border(graphics, helpX, y, 12, 12, over ? WrightsUi.COPPER : 0xFF3D4E5E);
+        graphics.drawCenteredString(this.font, "?", helpX + 6, y + 2, over ? WrightsUi.COPPER : WrightsUi.MUTED);
+        if (over) {
+            helpTip = Component.translatable(hint);
+        }
     }
 
     private void ensurePreview() {
@@ -493,13 +506,28 @@ public class BlueprintAdjustScreen extends Screen {
         return mouseX >= modelX && mouseX < modelX + modelW && mouseY >= modelY && mouseY < modelY + modelH;
     }
 
-    private boolean hitToggle(double mouseX, double mouseY, int x, int y) {
-        return mouseX >= x && mouseX < x + modelW && mouseY >= y && mouseY < y + 28;
+    private boolean hitToggle(double mouseX, double mouseY, int x, int y, String label) {
+        if (hitHelp(mouseX, mouseY, x, y, label)) {
+            return false;
+        }
+        int width = 16 + this.font.width(Component.translatable(label));
+        return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 12;
+    }
+
+    private boolean hitHelp(double mouseX, double mouseY, int x, int y, String label) {
+        int helpX = x + 16 + this.font.width(Component.translatable(label)) + 4;
+        return mouseX >= helpX && mouseX < helpX + 12 && mouseY >= y && mouseY < y + 12;
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 0 && hitToggle(mouseX, mouseY, fluidX, fluidY)) {
+        if (button == 0 && (hitHelp(mouseX, mouseY, fluidX, fluidY, "screen.wrights.copy_fluids")
+                || hitHelp(mouseX, mouseY, nbtX, nbtY, "screen.wrights.copy_nbt_blocks")
+                || hitHelp(mouseX, mouseY, settingsX, settingsY, "screen.wrights.copy_nbt_settings")
+                || hitHelp(mouseX, mouseY, allX, allY, "screen.wrights.copy_nbt_all"))) {
+            return true;
+        }
+        if (button == 0 && hitToggle(mouseX, mouseY, fluidX, fluidY, "screen.wrights.copy_fluids")) {
             if (saving()) {
                 return true;
             }
@@ -509,7 +537,7 @@ public class BlueprintAdjustScreen extends Screen {
             updateSaveButton();
             return true;
         }
-        if (button == 0 && hitToggle(mouseX, mouseY, nbtX, nbtY)) {
+        if (button == 0 && hitToggle(mouseX, mouseY, nbtX, nbtY, "screen.wrights.copy_nbt_blocks")) {
             if (saving()) {
                 return true;
             }
@@ -519,7 +547,7 @@ public class BlueprintAdjustScreen extends Screen {
             updateSaveButton();
             return true;
         }
-        if (button == 0 && hitToggle(mouseX, mouseY, settingsX, settingsY)) {
+        if (button == 0 && hitToggle(mouseX, mouseY, settingsX, settingsY, "screen.wrights.copy_nbt_settings")) {
             if (saving() || !WrightsClientConfig.COPY_NBT_BLOCKS.get() || !WrightsConfig.copySettings()) {
                 return true;
             }
@@ -527,7 +555,7 @@ public class BlueprintAdjustScreen extends Screen {
             updateSaveButton();
             return true;
         }
-        if (button == 0 && hitToggle(mouseX, mouseY, allX, allY)) {
+        if (button == 0 && hitToggle(mouseX, mouseY, allX, allY, "screen.wrights.copy_nbt_all")) {
             if (saving() || !WrightsClientConfig.COPY_NBT_BLOCKS.get() || !copyAllUsable()) {
                 return true;
             }
