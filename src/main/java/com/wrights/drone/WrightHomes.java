@@ -8,9 +8,12 @@ import java.util.function.Predicate;
 import javax.annotation.Nullable;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.Vec3;
 
 import com.wrights.block.WrightportBlockEntity;
@@ -56,6 +59,54 @@ public final class WrightHomes {
         double angle = (Math.PI * 2.0D * slot) / n;
         double radius = n <= 1 ? 0.0D : 0.6D;
         return lip(port).add(Math.cos(angle) * radius, 5.0D, Math.sin(angle) * radius);
+    }
+
+    /** Wrights in the worn port and in placed wrightports within {@link #BLOCK_RANGE}, kept when {@code include} says so. */
+    public static int countUnits(Player player, Predicate<UUID> include) {
+        int count = 0;
+        if (player == null) {
+            return 0;
+        }
+        for (Swarm.Unit unit : Wrightports.swarm(player).units()) {
+            if (include.test(unit.id())) {
+                count++;
+            }
+        }
+        Level level = player.level();
+        BlockPos center = player.blockPosition();
+        int minX = center.getX() - BLOCK_RANGE;
+        int maxX = center.getX() + BLOCK_RANGE;
+        int minY = center.getY() - 8;
+        int maxY = center.getY() + 8;
+        int minZ = center.getZ() - BLOCK_RANGE;
+        int maxZ = center.getZ() + BLOCK_RANGE;
+        int minChunkX = SectionPos.blockToSectionCoord(minX);
+        int maxChunkX = SectionPos.blockToSectionCoord(maxX);
+        int minChunkZ = SectionPos.blockToSectionCoord(minZ);
+        int maxChunkZ = SectionPos.blockToSectionCoord(maxZ);
+        for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+            for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
+                if (!level.hasChunk(chunkX, chunkZ)) {
+                    continue;
+                }
+                LevelChunk chunk = level.getChunk(chunkX, chunkZ);
+                for (BlockEntity entity : chunk.getBlockEntities().values()) {
+                    if (!(entity instanceof WrightportBlockEntity port)) {
+                        continue;
+                    }
+                    BlockPos pos = entity.getBlockPos();
+                    if (pos.getX() < minX || pos.getX() > maxX || pos.getY() < minY || pos.getY() > maxY || pos.getZ() < minZ || pos.getZ() > maxZ) {
+                        continue;
+                    }
+                    for (Swarm.Unit unit : port.swarm().units()) {
+                        if (include.test(unit.id())) {
+                            count++;
+                        }
+                    }
+                }
+            }
+        }
+        return count;
     }
 
     public static List<FreeWright> freeNear(ServerPlayer player, Predicate<UUID> free, int limit) {

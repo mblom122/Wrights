@@ -213,12 +213,12 @@ public class PlacementScreen extends Screen implements JeiPreview {
         if (paceInstant) {
             graphics.drawString(this.font, Component.translatable("screen.wrights.drones_instant"), controlsX + 12, panelY + 122, WrightsUi.MUTED, false);
         } else if (this.minecraft.player != null) {
-            com.wrights.drone.Swarm swarm = com.wrights.drone.Wrightports.swarm(this.minecraft.player);
             int cap = WrightsClientState.deployCap();
-            Component line = swarm.units().isEmpty()
-                    ? Component.translatable(com.wrights.drone.Wrightports.worn(this.minecraft.player).isEmpty() ? "screen.wrights.need_wrightport" : "screen.wrights.need_drone")
-                    : Component.translatable("screen.wrights.drones_send", Math.min(WrightsClientState.deployCount, Math.max(1, cap)), Math.max(1, cap));
-            int color = swarm.units().isEmpty() ? 0xFFE07A7A : WrightsUi.BLUE;
+            int stored = com.wrights.drone.WrightHomes.countUnits(this.minecraft.player, id -> true);
+            Component line = cap <= 0
+                    ? Component.translatable(stored <= 0 && com.wrights.drone.Wrightports.worn(this.minecraft.player).isEmpty() ? "screen.wrights.need_wrightport" : "screen.wrights.need_drone")
+                    : Component.translatable("screen.wrights.drones_send", Math.min(WrightsClientState.deployCount, cap), cap);
+            int color = cap <= 0 ? 0xFFE07A7A : WrightsUi.BLUE;
             graphics.drawString(this.font, this.font.plainSubstrByWidth(line.getString(), 168), controlsX + 32, panelY + 122, color, false);
         }
         column.render(graphics);

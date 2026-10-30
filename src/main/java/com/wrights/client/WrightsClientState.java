@@ -943,7 +943,7 @@ public final class WrightsClientState {
             return;
         }
         com.wrights.drone.Swarm swarm = com.wrights.drone.Wrightports.swarm(minecraft.player);
-        int next = WrightsClientConfig.deployTarget(swarm.units().size(), placeableBlocks());
+        int next = WrightsClientConfig.deployTarget(freeWrights(), placeableBlocks());
         if (next <= 0 || next == swarm.assignCount()) {
             return;
         }
@@ -956,8 +956,41 @@ public final class WrightsClientState {
         if (minecraft.player == null) {
             return 0;
         }
-        int free = com.wrights.drone.Wrightports.swarm(minecraft.player).units().size();
-        return Math.min(free, Math.min(Math.max(0, placeableBlocks()), WrightsConfig.maxWrightsPerJob()));
+        int blocks = Math.max(0, placeableBlocks());
+        if (blocks <= 0) {
+            return 0;
+        }
+        int stored = com.wrights.drone.WrightHomes.countUnits(minecraft.player, id -> true);
+        if (stored <= 0) {
+            return 0;
+        }
+        int free = freeWrights();
+        if (free <= 0) {
+            return 0;
+        }
+        int ceiling = Math.min(blocks, WrightsConfig.maxWrightsPerJob());
+        if (WrightsClientConfig.DRONE_MAX.get()) {
+            return Math.min(free, ceiling);
+        }
+        return Math.min(Math.max(1, WrightsClientConfig.DRONE_COUNT.get()), Math.min(free, ceiling));
+    }
+
+    /** Wrights that can leave a worn port or a nearby placed wrightport. */
+    public static int freeWrights() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null) {
+            return 0;
+        }
+        return com.wrights.drone.WrightHomes.countUnits(minecraft.player, WrightsClientState::wrightFree);
+    }
+
+    private static boolean wrightFree(java.util.UUID id) {
+        for (BlueprintPayloads.JobLine job : jobs) {
+            if (!job.finished() && !job.saving() && job.crew().contains(id)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** Keeps this job's wright count inside what the port and the blueprint can use. */
@@ -968,9 +1001,7 @@ public final class WrightsClientState {
             return;
         }
         if (!deployChosen) {
-            Minecraft minecraft = Minecraft.getInstance();
-            int free = minecraft.player == null ? 0 : com.wrights.drone.Wrightports.swarm(minecraft.player).units().size();
-            deployCount = WrightsClientConfig.deployTarget(free, placeableBlocks());
+            deployCount = WrightsClientConfig.deployTarget(freeWrights(), placeableBlocks());
         }
         deployCount = Mth.clamp(Math.max(1, deployCount), 1, cap);
     }

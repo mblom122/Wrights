@@ -1820,8 +1820,8 @@ public final class JobManager {
             Messages.actionBar(player, "message.wrights.drone_block_cap", 0);
             return false;
         }
-        int fromPersonal = Swarm.from(Wrightports.worn(player)).assignCount();
-        int wanted = Math.min(requested > 0 ? requested : Math.max(fromPersonal, 1), Math.min(blocks, WrightsConfig.maxWrightsPerJob()));
+        int room = Math.min(blocks, WrightsConfig.maxWrightsPerJob());
+        int wanted = requested > 0 ? Math.min(requested, room) : room;
         List<WrightHomes.FreeWright> units = freeUnits(player, library, job.id(), wanted);
         if (units.isEmpty()) {
             Messages.actionBar(player, "message.wrights.drones_busy");

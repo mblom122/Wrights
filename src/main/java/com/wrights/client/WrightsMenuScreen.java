@@ -22,7 +22,6 @@ import com.wrights.WrightsClientConfig;
 import com.wrights.WrightsConfig;
 import com.wrights.drone.Swarm;
 import com.wrights.drone.WrightportPlaces;
-import com.wrights.drone.Wrightports;
 import com.wrights.item.PersonalWrightportItem;
 import com.wrights.network.BlueprintPayloads;
 
@@ -1978,7 +1977,7 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private int[] dronePool() {
-        int total = this.minecraft.player == null ? 0 : Wrightports.swarm(this.minecraft.player).units().size();
+        int total = this.minecraft.player == null ? 0 : com.wrights.drone.WrightHomes.countUnits(this.minecraft.player, id -> true);
         int working = 0;
         for (BlueprintPayloads.JobLine job : WrightsClientState.jobs) {
             if (!job.finished() && !job.saving()) {
