@@ -3659,6 +3659,7 @@ public final class JobManager {
         if (hand.entityId != null) {
             Entity existing = level.getEntity(hand.entityId);
             if (existing instanceof DroneEntity drone && drone.isAlive()) {
+                carryStrand(job, hand, drone);
                 return drone;
             }
             BlockPos last = hand.lastPos;
@@ -3674,6 +3675,7 @@ public final class JobManager {
             }
             hand.entityId = drone.getUUID();
             hand.lastPos = drone.blockPosition();
+            carryStrand(job, hand, drone);
             return drone;
         }
         DroneEntity drone = new DroneEntity(ModEntities.DRONE.get(), level);
@@ -3682,8 +3684,54 @@ public final class JobManager {
         depart(drone, player, site, hand.lane, hand.lanes, hand.homePort);
         hand.entityId = drone.getUUID();
         hand.lastPos = drone.blockPosition();
+        carryStrand(job, hand, drone);
         level.addFreshEntity(drone);
         return drone;
+    }
+
+    private static void carryStrand(BuildJob job, BuildJob.Hand hand, DroneEntity drone) {
+        if (!hand.stranded) {
+            return;
+        }
+        int index = job.hands().indexOf(hand);
+        UUID unit = index >= 0 && index < job.crewUnits().size() ? job.crewUnits().get(index) : null;
+        drone.strand(unit);
+    }
+
+    /** Wrights that are out from this dock stay out. They are recovered when they fly home. */
+    public static Set<UUID> strandFromDock(ServerLevel level, BlockPos pos) {
+        Set<UUID> away = new HashSet<>();
+        if (level == null || pos == null || level.getServer() == null) {
+            return away;
+        }
+        SchematicLibrary library = SchematicLibrary.get(level.getServer());
+        boolean dirty = false;
+        for (BuildJob job : library.jobs()) {
+            if (job.finished()) {
+                continue;
+            }
+            List<UUID> units = job.crewUnits();
+            for (int i = 0; i < units.size() && i < job.hands().size(); i++) {
+                BuildJob.Hand hand = job.hands().get(i);
+                if (hand.homePort == null || !hand.homePort.equals(pos)) {
+                    continue;
+                }
+                away.add(units.get(i));
+                hand.stranded = true;
+                dirty = true;
+                ServerLevel jobLevel = level.getServer().getLevel(job.dimension());
+                if (jobLevel == null || hand.entityId == null) {
+                    continue;
+                }
+                if (jobLevel.getEntity(hand.entityId) instanceof DroneEntity drone && drone.isAlive()) {
+                    drone.strand(units.get(i));
+                }
+            }
+        }
+        if (dirty) {
+            library.setDirty();
+        }
+        return away;
     }
 
     private static void depart(DroneEntity drone, ServerPlayer player, Vec3 work, int lane, int lanes, BlockPos homePort) {
@@ -3768,6 +3816,9 @@ public final class JobManager {
             return;
         }
         Entity entity = level.getEntity(id);
+        if (entity instanceof DroneEntity drone) {
+            drone.recoverIfStranded();
+        }
         if (entity != null) {
             entity.discard();
         }

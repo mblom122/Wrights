@@ -280,7 +280,11 @@ public final class WrightHomes {
             return true;
         }
         BlockEntity entity = level.getBlockEntity(home);
-        if (!(entity instanceof WrightportBlockEntity port) || !ownedBy(port, player)) {
+        if (!(entity instanceof WrightportBlockEntity port)) {
+            // The dock was removed while this wright is still out. Keep it on the job until it comes back.
+            return true;
+        }
+        if (!ownedBy(port, player)) {
             return false;
         }
         for (Swarm.Unit unit : port.swarm().units()) {

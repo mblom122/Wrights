@@ -31,9 +31,11 @@ public class DroneEntity extends Entity {
     private static final EntityDataAccessor<Integer> TIER = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.INT);
 
     private boolean returning;
+    private boolean stranded;
     private int returnTicks;
     private int returnLimit;
     private UUID ownerId;
+    private UUID unitId;
     /** Null = personal wrightport (player back). Set = placed wrightport block. */
     @Nullable
     private BlockPos homePort;
@@ -51,6 +53,29 @@ public class DroneEntity extends Entity {
     @Nullable
     public BlockPos homePort() {
         return homePort;
+    }
+
+    /** The dock this wright left was broken. It still flies back, then looks for somewhere to go. */
+    public void strand(@Nullable UUID unit) {
+        this.stranded = true;
+        if (unit != null) {
+            this.unitId = unit;
+        }
+    }
+
+    public boolean stranded() {
+        return this.stranded;
+    }
+
+    /** Saves a wright whose dock is already gone, when it will not get to fly home. */
+    public void recoverIfStranded() {
+        if (!this.stranded || !(this.level() instanceof ServerLevel server)) {
+            return;
+        }
+        this.stranded = false;
+        ServerPlayer player = this.ownerId == null ? null : server.getServer().getPlayerList().getPlayer(this.ownerId);
+        BlockPos where = this.homePort != null && server.isLoaded(this.homePort) ? this.homePort : this.blockPosition();
+        com.wrights.drone.DockRecovery.recover(server, player, where, this.tier());
     }
 
     /** Leaves the personal port behind the player, aimed at the work site. */
@@ -188,21 +213,28 @@ public class DroneEntity extends Entity {
         }
         if (this.returning) {
             ServerPlayer player = this.ownerId == null ? null : serverLevel.getServer().getPlayerList().getPlayer(this.ownerId);
-            if (player == null || player.level() != this.level()) {
+            boolean loadedHome = homePort != null && serverLevel.isLoaded(homePort);
+            if (!this.stranded && (player == null || player.level() != this.level())) {
                 this.discard();
                 return;
             }
-            boolean blockHome = homePort != null && serverLevel.isLoaded(homePort);
-            Vec3 dock = blockHome ? WrightHomes.hatch(homePort) : WrightHomes.behindPlayer(player);
+            boolean blockHome = homePort != null && (this.stranded || loadedHome);
+            Vec3 dock;
+            if (blockHome) {
+                dock = WrightHomes.hatch(homePort);
+            } else if (player != null && player.level() == this.level()) {
+                dock = WrightHomes.behindPlayer(player);
+            } else {
+                finishReturn(serverLevel, player, this.blockPosition());
+                return;
+            }
             if (this.returnLimit <= 0) {
                 this.returnLimit = returnBudget(dock);
             }
-            if (++this.returnTicks > this.returnLimit) {
-                this.discard();
-                return;
-            }
-            if (this.distanceToSqr(dock) <= (blockHome ? 0.04D : 1.15D)) {
-                this.discard();
+            boolean timedOut = ++this.returnTicks > this.returnLimit;
+            boolean arrived = this.distanceToSqr(dock) <= (blockHome ? 0.04D : 1.15D);
+            if (timedOut || arrived) {
+                finishReturn(serverLevel, player, loadedHome ? homePort : this.blockPosition());
                 return;
             }
             this.moveToward(dock, returnStep(dock, blockHome));
@@ -251,6 +283,10 @@ public class DroneEntity extends Entity {
         if (tag.contains("HomePort")) {
             this.homePort = NbtUtils.readBlockPos(tag, "HomePort").orElse(null);
         }
+        this.stranded = tag.getBoolean("Stranded");
+        if (tag.hasUUID("UnitId")) {
+            this.unitId = tag.getUUID("UnitId");
+        }
     }
 
     @Override
@@ -264,5 +300,18 @@ public class DroneEntity extends Entity {
         if (this.homePort != null) {
             tag.put("HomePort", NbtUtils.writeBlockPos(this.homePort));
         }
+        if (this.stranded) {
+            tag.putBoolean("Stranded", true);
+        }
+        if (this.unitId != null) {
+            tag.putUUID("UnitId", this.unitId);
+        }
+    }
+
+    private void finishReturn(ServerLevel level, ServerPlayer player, BlockPos where) {
+        if (this.stranded) {
+            com.wrights.drone.DockRecovery.recover(level, player, where, this.tier());
+        }
+        this.discard();
     }
 }

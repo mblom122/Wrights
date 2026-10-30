@@ -97,6 +97,30 @@ public final class RsDigitalAccess implements DigitalAccess {
     }
 
     @Override
+    public long insert(ServerPlayer player, ServerLevel level, GlobalPos pos, ItemStack stack) {
+        Network network = network(level, pos);
+        if (network == null || stack.isEmpty()) {
+            return 0L;
+        }
+        StorageNetworkComponent storage = network.getComponent(StorageNetworkComponent.class);
+        ItemResource resource = ItemResource.ofItemStack(stack);
+        Actor actor = new PlayerActor(player);
+        long before = stored(storage, resource);
+        storage.insert(resource, stack.getCount(), Action.EXECUTE, actor);
+        return Math.max(0L, stored(storage, resource) - before);
+    }
+
+    private static long stored(StorageNetworkComponent storage, ItemResource resource) {
+        long total = 0L;
+        for (ResourceAmount entry : storage.getAll()) {
+            if (resource.equals(entry.resource())) {
+                total += entry.amount();
+            }
+        }
+        return total;
+    }
+
+    @Override
     public boolean craftable(ServerLevel level, GlobalPos pos, Item item) {
         Network network = network(level, pos);
         if (network == null) {

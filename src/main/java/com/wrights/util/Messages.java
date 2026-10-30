@@ -10,4 +10,8 @@ public final class Messages {
     public static void actionBar(ServerPlayer player, String key, Object... args) {
         player.displayClientMessage(Component.translatable(key, args), true);
     }
+
+    public static void actionBar(ServerPlayer player, Component text) {
+        player.displayClientMessage(text, true);
+    }
 }

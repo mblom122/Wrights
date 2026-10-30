@@ -806,6 +806,9 @@ public final class BuildJob {
                 if (hand.homePort != null) {
                     handTag.put("home", NbtUtils.writeBlockPos(hand.homePort));
                 }
+                if (hand.stranded) {
+                    handTag.putBoolean("stranded", true);
+                }
                 crew.add(handTag);
             }
             tag.put("hands", crew);
@@ -949,6 +952,7 @@ public final class BuildJob {
                 if (handTag.contains("home")) {
                     hand.homePort = NbtUtils.readBlockPos(handTag, "home").orElse(null);
                 }
+                hand.stranded = handTag.getBoolean("stranded");
                 job.hands.add(hand);
             }
         }
@@ -1053,6 +1057,8 @@ public final class BuildJob {
         public BlockPos lastPos;
         /** Null = personal wrightport (player back). Set = placed wrightport block. */
         public BlockPos homePort;
+        /** The placed dock was broken while this wright was out. Recover it on the way home. */
+        public boolean stranded;
         public final List<Slice> slices = new ArrayList<>();
     }
 

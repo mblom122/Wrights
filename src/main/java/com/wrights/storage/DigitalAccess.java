@@ -24,6 +24,11 @@ public interface DigitalAccess {
     /** Removes up to {@code amount} from the network. Returns how many were taken. */
     long extract(ServerPlayer player, ServerLevel level, GlobalPos pos, Item item, long amount);
 
+    /** Inserts as many of {@code stack} as the network can hold. Returns how many were stored. */
+    default long insert(ServerPlayer player, ServerLevel level, GlobalPos pos, net.minecraft.world.item.ItemStack stack) {
+        return 0L;
+    }
+
     boolean craftable(ServerLevel level, GlobalPos pos, Item item);
 
     /** Asks the network to autocraft {@code amount} of the item into storage. */

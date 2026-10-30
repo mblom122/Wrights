@@ -98,6 +98,17 @@ public final class DigitalNetworks {
         return Math.max(0L, access.count(level, link.pos(), item));
     }
 
+    public static long insert(ServerPlayer player, ServerLevel level, DigitalLink link, net.minecraft.world.item.ItemStack stack) {
+        if (player == null || stack == null || stack.isEmpty() || link == null || !link.bound()) {
+            return 0L;
+        }
+        DigitalAccess access = access(link.kind());
+        if (access == null || !access.online(level, link.pos())) {
+            return 0L;
+        }
+        return Math.max(0L, access.insert(player, level, link.pos(), stack));
+    }
+
     public static long extract(ServerPlayer player, ServerLevel level, DigitalLink link, Item item, long amount) {
         if (amount <= 0L || link == null || !link.bound()) {
             return 0L;

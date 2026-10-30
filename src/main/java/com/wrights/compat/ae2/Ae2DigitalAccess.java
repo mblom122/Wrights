@@ -103,6 +103,19 @@ public final class Ae2DigitalAccess implements DigitalAccess {
     }
 
     @Override
+    public long insert(ServerPlayer player, ServerLevel level, GlobalPos pos, ItemStack stack) {
+        IGrid grid = grid(level, pos);
+        if (grid == null || stack.isEmpty()) {
+            return 0L;
+        }
+        AEItemKey key = AEItemKey.of(stack);
+        if (key == null) {
+            return 0L;
+        }
+        return Math.max(0L, grid.getStorageService().getInventory().insert(key, stack.getCount(), Actionable.MODULATE, IActionSource.ofPlayer(player)));
+    }
+
+    @Override
     public boolean craftable(ServerLevel level, GlobalPos pos, Item item) {
         IGrid grid = grid(level, pos);
         if (grid == null) {

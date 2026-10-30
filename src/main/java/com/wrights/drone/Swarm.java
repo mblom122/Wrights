@@ -100,6 +100,22 @@ public record Swarm(List<Unit> units, int assign) {
         return new Swarm(List.copyOf(next), keep);
     }
 
+    public Swarm without(java.util.Set<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return this;
+        }
+        List<Unit> next = new ArrayList<>();
+        for (Unit unit : units) {
+            if (!ids.contains(unit.id())) {
+                next.add(unit);
+            }
+        }
+        if (next.size() == units.size()) {
+            return this;
+        }
+        return new Swarm(List.copyOf(next), assign);
+    }
+
     public Swarm removeUnit(int index) {
         if (index < 0 || index >= units.size()) {
             return this;
