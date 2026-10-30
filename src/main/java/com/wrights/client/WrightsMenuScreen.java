@@ -57,6 +57,9 @@ public class WrightsMenuScreen extends Screen {
     private int detailW;
     private int scroll;
     private UUID confirmDelete;
+    private final List<UUID> marked = new ArrayList<>();
+    private UUID markAnchor;
+    private List<UUID> confirmSet = List.of();
     private long lastClick;
     private EditBox search;
     private EditBox rename;
@@ -1461,9 +1464,10 @@ public class WrightsMenuScreen extends Screen {
             spinning = true;
             return true;
         }
-        if (button == 0 && !options && !jobsPage && !infoPage && insideList(mouseX, mouseY) && !rows.isEmpty()) {
-            int index = scroll + (int) ((mouseY - listY) / ROW);
-            if (index >= 0 && index < rows.size()) {
+        if (button == 0 && !options && !jobsPage && !infoPage && insideList(mouseX, mouseY) && !rows.isEmpty() && !overWidget(mouseX, mouseY)) {
+            int shown = (int) ((mouseY - listY) / ROW);
+            int index = scroll + shown;
+            if (shown >= 0 && shown < visibleRows() && index < rows.size()) {
                 BlueprintList.Row entry = rows.get(index);
                 if (!entry.folder() && mouseX < listX + 14) {
                     WrightsClientState.toggleFavoriteLocal(entry.id());
@@ -2748,6 +2752,16 @@ public class WrightsMenuScreen extends Screen {
 
     private boolean insideList(double mouseX, double mouseY) {
         return mouseX >= listX && mouseX < listX + listW && mouseY >= listY && mouseY < listY + listH;
+    }
+
+    /** Shelf buttons sit on the bottom edge of the list, so a click there belongs to the button. */
+    private boolean overWidget(double mouseX, double mouseY) {
+        for (net.minecraft.client.gui.components.events.GuiEventListener child : this.children()) {
+            if (child instanceof WrightsButton button && button.visible && button.isMouseOver(mouseX, mouseY)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void leaveManage() {
