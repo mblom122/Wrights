@@ -2382,10 +2382,36 @@ public final class JobManager {
     }
 
     private static Falling falling(ServerLevel level, Schematic schematic, BuildJob job, Schematic.Entry entry) {
-        if (!BlockFilters.falls(entry.state())) {
+        if (BlockFilters.falls(entry.state())) {
+            return fallingAt(level, schematic, job, entry, new HashSet<>());
+        }
+        if (BlockFilters.needsGround(entry.state())) {
+            return groundAt(level, schematic, job, entry, new HashSet<>());
+        }
+        return Falling.READY;
+    }
+
+    /**
+     * A plant with nothing under it, and no block in the build that will land there, cannot be placed.
+     * Waiting would sit forever when the ground layer of the pattern is the plant itself.
+     */
+    private static Falling groundAt(ServerLevel level, Schematic schematic, BuildJob job, Schematic.Entry entry, Set<Long> seen) {
+        if (!seen.add(BlockPos.asLong(entry.x(), entry.y(), entry.z()))) {
+            return Falling.SKIP;
+        }
+        BlockPos pos = job.min().offset(entry.x(), entry.y(), entry.z());
+        BlockPos below = pos.below();
+        if (level.isOutsideBuildHeight(pos) || !level.isLoaded(pos) || !level.isLoaded(below)) {
+            return Falling.WAIT;
+        }
+        if (entry.state().canSurvive(level, pos)) {
             return Falling.READY;
         }
-        return fallingAt(level, schematic, job, entry, new HashSet<>());
+        int support = schematic.indexAt(entry.x(), entry.y() - 1, entry.z());
+        if (support >= 0 && floorComing(level, schematic, job, support, seen)) {
+            return Falling.WAIT;
+        }
+        return Falling.SKIP;
     }
 
     private static Falling fallingAt(ServerLevel level, Schematic schematic, BuildJob job, Schematic.Entry entry, Set<Long> seen) {
@@ -2450,10 +2476,13 @@ public final class JobManager {
         if (!stillQueued(job, floor.x(), floor.y(), floor.z(), support)) {
             return false;
         }
-        if (!BlockFilters.falls(floor.state())) {
-            return true;
+        if (BlockFilters.falls(floor.state())) {
+            return fallingAt(level, schematic, job, floor, seen) != Falling.SKIP;
         }
-        return fallingAt(level, schematic, job, floor, seen) != Falling.SKIP;
+        if (BlockFilters.needsGround(floor.state())) {
+            return groundAt(level, schematic, job, floor, seen) != Falling.SKIP;
+        }
+        return true;
     }
 
     private static boolean stillQueued(BuildJob job, int x, int y, int z, int index) {
@@ -3102,6 +3131,9 @@ public final class JobManager {
                 job.skippedOne();
                 return PlaceResult.DONE;
             }
+        } else if (BlockFilters.needsGround(state) && level.isLoaded(pos.below()) && !state.canSurvive(level, pos)) {
+            job.skippedOne();
+            return PlaceResult.DONE;
         } else if (!freePlace(player) && payment != null) {
             if (!hasItem(player, level, job, payment)) {
                 if (job.supplyPos() != null && supply(level, player, job) == null && job.tickMessage()) {

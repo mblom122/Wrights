@@ -11,6 +11,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.BushBlock;
 import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.FallingBlock;
 import net.minecraft.world.level.block.DoublePlantBlock;
@@ -184,6 +185,11 @@ public final class BlockFilters {
     /** Sand, gravel, anvils, and the other blocks that fall when the block under them is missing. */
     public static boolean falls(BlockState state) {
         return state.getBlock() instanceof FallingBlock;
+    }
+
+    /** Grass, flowers, crops, and the other plants that break unless a block is under them. */
+    public static boolean needsGround(BlockState state) {
+        return state.getBlock() instanceof BushBlock;
     }
 
     public static boolean isSecondary(BlockState state) {
