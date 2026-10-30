@@ -3,11 +3,16 @@ package com.wrights.entity;
 import java.util.Optional;
 import java.util.UUID;
 
+import javax.annotation.Nullable;
+
+import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtUtils;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
@@ -16,6 +21,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
 import com.wrights.block.Hangars;
+import com.wrights.drone.WrightHomes;
 import com.wrights.job.BuildJob;
 import com.wrights.schematic.SchematicLibrary;
 
@@ -26,6 +32,9 @@ public class DroneEntity extends Entity {
     private boolean returning;
     private int returnTicks;
     private UUID ownerId;
+    /** Null = personal wrightport (player back). Set = placed wrightport block. */
+    @Nullable
+    private BlockPos homePort;
 
     public DroneEntity(EntityType<? extends DroneEntity> type, Level level) {
         super(type, level);
@@ -33,12 +42,37 @@ public class DroneEntity extends Entity {
         this.setNoGravity(true);
     }
 
-    /** Leaves the player's eyes, aimed at the block this wright is going to work on. */
-    public void departFrom(net.minecraft.server.level.ServerPlayer player, Vec3 work, int lane, int lanes) {
-        Vec3 from = player.getEyePosition();
+    public void setHomePort(@Nullable BlockPos homePort) {
+        this.homePort = homePort == null ? null : homePort.immutable();
+    }
+
+    @Nullable
+    public BlockPos homePort() {
+        return homePort;
+    }
+
+    /** Leaves the personal port behind the player, aimed at the work site. */
+    public void departFromPlayer(ServerPlayer player, Vec3 work, int lane, int lanes) {
+        setHomePort(null);
+        Vec3 from = WrightHomes.behindPlayer(player);
+        launchToward(from, work, lane, lanes, player.getYRot());
+        Hangars.pulseTraffic(player.level(), from, 8.0D);
+        Hangars.pulseTraffic(player.level(), player.position(), 12.0D);
+    }
+
+    /** Leaves a placed wrightport hatch, aimed at the work site. */
+    public void departFromBlock(BlockPos port, Vec3 work, int lane, int lanes) {
+        setHomePort(port);
+        Vec3 from = WrightHomes.abovePort(port);
+        launchToward(from, work, lane, lanes, 0.0F);
+        Hangars.pulseTraffic(level(), from, 8.0D);
+        Hangars.pulseTraffic(level(), port, 8.0D);
+    }
+
+    private void launchToward(Vec3 from, Vec3 work, int lane, int lanes, float fallbackYaw) {
         Vec3 toward = work.subtract(from);
         if (toward.lengthSqr() < 1.0E-4D) {
-            toward = player.getLookAngle();
+            toward = new Vec3(0.0D, 0.0D, 1.0D);
         }
         toward = toward.normalize();
         Vec3 side = new Vec3(-toward.z, 0.0D, toward.x);
@@ -48,28 +82,35 @@ public class DroneEntity extends Entity {
             side = side.normalize();
         }
         double spread = lanes <= 1 ? 0.0D : (lane - (lanes - 1) * 0.5D) * 0.45D;
-        Vec3 start = from.add(toward.scale(0.75D)).add(side.scale(spread));
+        Vec3 start = from.add(toward.scale(0.35D)).add(side.scale(spread));
         float yaw = (float) (Mth.atan2(toward.z, toward.x) * Mth.RAD_TO_DEG) - 90.0F;
+        if (!Float.isFinite(yaw)) {
+            yaw = fallbackYaw;
+        }
         this.moveTo(start.x, start.y, start.z, yaw, 0.0F);
         this.setYRot(yaw);
-        Hangars.pulseTraffic(player.level(), player.position(), 12.0D);
-        Hangars.pulseTraffic(player.level(), start, 8.0D);
     }
 
-    /** Appears above the player, then flies down into them. */
-    public void flyHome(net.minecraft.server.level.ServerPlayer player, int slot, int count) {
+    /** Returns to the personal port (behind the player) or a placed wrightport hatch. */
+    public void flyHome(ServerPlayer player, int slot, int count, @Nullable BlockPos port) {
         this.returning = true;
         this.returnTicks = 0;
         this.ownerId = player.getUUID();
         this.setJobId(null);
+        setHomePort(port);
         int n = Math.max(1, count);
         double angle = (Math.PI * 2.0D * slot) / n;
         double radius = n <= 1 ? 0.0D : 0.55D;
-        Vec3 above = player.position().add(Math.cos(angle) * radius, 5.0D, Math.sin(angle) * radius);
+        Vec3 above;
+        if (port != null) {
+            above = WrightHomes.abovePort(port).add(Math.cos(angle) * radius, 2.5D, Math.sin(angle) * radius);
+            Hangars.pulseTraffic(player.level(), port, 10.0D);
+        } else {
+            above = WrightHomes.behindPlayer(player).add(Math.cos(angle) * radius, 4.0D, Math.sin(angle) * radius);
+            Hangars.pulseTraffic(player.level(), player.position(), 12.0D);
+        }
         this.moveTo(above.x, above.y, above.z, player.getYRot(), 0.0F);
         this.setYRot(player.getYRot());
-        Hangars.pulseTraffic(player.level(), player.position(), 12.0D);
-        Hangars.pulseTraffic(player.level(), above, 8.0D);
     }
 
     @Override
@@ -127,17 +168,19 @@ public class DroneEntity extends Entity {
             return;
         }
         if (this.returning) {
-            net.minecraft.server.level.ServerPlayer player = this.ownerId == null ? null : serverLevel.getServer().getPlayerList().getPlayer(this.ownerId);
+            ServerPlayer player = this.ownerId == null ? null : serverLevel.getServer().getPlayerList().getPlayer(this.ownerId);
             if (player == null || player.level() != this.level() || ++this.returnTicks > 200) {
                 this.discard();
                 return;
             }
-            Vec3 dock = player.position().add(0.0D, 0.9D, 0.0D);
-            if (this.distanceToSqr(dock) <= 1.0D) {
+            Vec3 dock = homePort != null && serverLevel.isLoaded(homePort)
+                    ? WrightHomes.abovePort(homePort)
+                    : WrightHomes.behindPlayer(player);
+            if (this.distanceToSqr(dock) <= 1.15D) {
                 this.discard();
                 return;
             }
-            this.moveToward(dock, 0.5D);
+            this.moveToward(dock, homePort != null ? 0.55D : 0.5D);
             return;
         }
         Optional<UUID> id = jobId();
@@ -180,6 +223,9 @@ public class DroneEntity extends Entity {
         if (tag.hasUUID("Owner")) {
             this.ownerId = tag.getUUID("Owner");
         }
+        if (tag.contains("HomePort")) {
+            this.homePort = NbtUtils.readBlockPos(tag, "HomePort").orElse(null);
+        }
     }
 
     @Override
@@ -189,6 +235,9 @@ public class DroneEntity extends Entity {
         tag.putBoolean("Returning", this.returning);
         if (this.ownerId != null) {
             tag.putUUID("Owner", this.ownerId);
+        }
+        if (this.homePort != null) {
+            tag.put("HomePort", NbtUtils.writeBlockPos(this.homePort));
         }
     }
 }

@@ -714,6 +714,9 @@ public final class BuildJob {
                 if (hand.lastPos != null) {
                     handTag.put("pos", NbtUtils.writeBlockPos(hand.lastPos));
                 }
+                if (hand.homePort != null) {
+                    handTag.put("home", NbtUtils.writeBlockPos(hand.homePort));
+                }
                 crew.add(handTag);
             }
             tag.put("hands", crew);
@@ -843,6 +846,9 @@ public final class BuildJob {
                 if (handTag.contains("pos")) {
                     hand.lastPos = NbtUtils.readBlockPos(handTag, "pos").orElse(null);
                 }
+                if (handTag.contains("home")) {
+                    hand.homePort = NbtUtils.readBlockPos(handTag, "home").orElse(null);
+                }
                 job.hands.add(hand);
             }
         }
@@ -932,6 +938,8 @@ public final class BuildJob {
         public boolean idle;
         public UUID entityId;
         public BlockPos lastPos;
+        /** Null = personal wrightport (player back). Set = placed wrightport block. */
+        public BlockPos homePort;
         public final List<Slice> slices = new ArrayList<>();
     }
 

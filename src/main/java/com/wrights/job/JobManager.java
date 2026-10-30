@@ -50,6 +50,7 @@ import com.wrights.network.BlueprintPayloads;
 import com.wrights.WrightsMod;
 import com.wrights.drone.WrightTier;
 import com.wrights.drone.Wrightports;
+import com.wrights.drone.WrightHomes;
 import com.wrights.drone.CrewSplit;
 import com.wrights.drone.Swarm;
 import com.wrights.entity.DroneEntity;
@@ -1289,11 +1290,10 @@ public final class JobManager {
     }
 
     public static void bindCrewIds(ServerPlayer player, SchematicLibrary library) {
-        boolean worn = !Wrightports.worn(player).isEmpty();
-        Swarm swarm = Wrightports.swarm(player);
+        boolean hasPort = WrightHomes.hasAny(player);
         Set<UUID> known = new HashSet<>();
-        for (Swarm.Unit unit : swarm.units()) {
-            known.add(unit.id());
+        for (WrightHomes.FreeWright free : WrightHomes.freeNear(player, id -> true, Integer.MAX_VALUE)) {
+            known.add(free.unit().id());
         }
         Set<UUID> taken = new HashSet<>();
         boolean dirty = false;
@@ -1305,7 +1305,7 @@ public final class JobManager {
                 }
                 continue;
             }
-            if (!worn) {
+            if (!hasPort) {
                 dirty |= job.rememberCrewQuota(assignedCount(job));
                 continue;
             }
@@ -1322,12 +1322,12 @@ public final class JobManager {
             if (current.isEmpty() && job.crewUnits().isEmpty() && !(job.paused() && job.crewQuota() > 0)) {
                 int need = job.hasCrew() ? job.hands().size() : (instant(player) ? 0 : 1);
                 int jobCap = WrightsConfig.maxWrightsPerJob();
-                for (Swarm.Unit unit : swarm.units()) {
+                for (WrightHomes.FreeWright free : WrightHomes.freeNear(player, id -> !taken.contains(id), need)) {
                     if (current.size() >= need || current.size() >= jobCap) {
                         break;
                     }
-                    if (taken.add(unit.id())) {
-                        current.add(unit.id());
+                    if (taken.add(free.unit().id())) {
+                        current.add(free.unit().id());
                     }
                 }
             }
@@ -1351,6 +1351,10 @@ public final class JobManager {
             if (job.hasCrew() && current.size() != job.hands().size()) {
                 fitCrew(player, library, job, current);
                 dirty = true;
+            } else if (job.hasCrew() && !current.isEmpty()) {
+                for (int i = 0; i < job.hands().size() && i < current.size(); i++) {
+                    job.hands().get(i).homePort = WrightHomes.homeOf(player, current.get(i));
+                }
             }
         }
         if (dirty) {
@@ -1400,14 +1404,7 @@ public final class JobManager {
             BlueprintNetwork.syncJobs(player);
             return;
         }
-        Swarm swarm = Wrightports.swarm(player);
-        Swarm.Unit unit = null;
-        for (Swarm.Unit candidate : swarm.units()) {
-            if (candidate.id().equals(unitId)) {
-                unit = candidate;
-                break;
-            }
-        }
+        Swarm.Unit unit = WrightHomes.findUnit(player, unitId);
         if (add && unit == null) {
             BlueprintNetwork.syncJobs(player);
             return;
@@ -1454,14 +1451,7 @@ public final class JobManager {
                 return;
             }
         }
-        boolean known = false;
-        for (Swarm.Unit unit : Wrightports.swarm(player).units()) {
-            if (unit.id().equals(unitId)) {
-                known = true;
-                break;
-            }
-        }
-        if (!known) {
+        if (WrightHomes.findUnit(player, unitId) == null) {
             BlueprintNetwork.syncJobs(player);
             return;
         }
@@ -1547,33 +1537,22 @@ public final class JobManager {
         return false;
     }
 
-    private static List<Swarm.Unit> freeUnits(ServerPlayer player, SchematicLibrary library, UUID exceptJob, int limit) {
-        Swarm swarm = Wrightports.swarm(player);
-        List<Swarm.Unit> free = new ArrayList<>();
-        for (Swarm.Unit unit : swarm.units()) {
-            if (claimedByOther(library, player.getUUID(), exceptJob, unit.id())) {
-                continue;
-            }
-            free.add(unit);
-            if (free.size() >= limit) {
-                break;
-            }
-        }
-        return free;
+    private static List<WrightHomes.FreeWright> freeUnits(ServerPlayer player, SchematicLibrary library, UUID exceptJob, int limit) {
+        return WrightHomes.freeNear(player, id -> !claimedByOther(library, player.getUUID(), exceptJob, id), limit);
     }
 
     private static void fitCrew(ServerPlayer player, SchematicLibrary library, BuildJob job, List<UUID> ids) {
-        Swarm swarm = Wrightports.swarm(player);
         List<Integer> speeds = new ArrayList<>();
         List<UUID> kept = new ArrayList<>();
+        List<BlockPos> homes = new ArrayList<>();
         for (UUID unitId : ids) {
-            for (Swarm.Unit unit : swarm.units()) {
-                if (unit.id().equals(unitId)) {
-                    speeds.add(Math.max(1, Math.min(Swarm.MAX_SPEED, unit.speed())));
-                    kept.add(unitId);
-                    break;
-                }
+            Swarm.Unit unit = WrightHomes.findUnit(player, unitId);
+            if (unit == null) {
+                continue;
             }
+            speeds.add(Math.max(1, Math.min(Swarm.MAX_SPEED, unit.speed())));
+            kept.add(unitId);
+            homes.add(WrightHomes.homeOf(player, unitId));
         }
         Schematic schematic = job.schematicId() == null ? null : library.schematic(job.schematicId()).orElse(null);
         int room = placeableBlocks(schematic, job);
@@ -1585,6 +1564,9 @@ public final class JobManager {
             while (kept.size() > limit) {
                 kept.remove(kept.size() - 1);
                 speeds.remove(speeds.size() - 1);
+                if (!homes.isEmpty()) {
+                    homes.remove(homes.size() - 1);
+                }
             }
         }
         if (kept.isEmpty()) {
@@ -1657,13 +1639,16 @@ public final class JobManager {
             recall(level, player, droppedId, slot++, dropped.size());
         }
         job.setCrewUnits(kept);
+        for (int i = 0; i < job.hands().size() && i < homes.size(); i++) {
+            job.hands().get(i).homePort = homes.get(i);
+        }
     }
 
     private static boolean missingDrones(ServerPlayer player, BuildJob job) {
         if (instant(player) || job.kind() != BuildJob.Kind.PASTE) {
             return false;
         }
-        return Wrightports.worn(player).isEmpty() || Wrightports.swarm(player).units().isEmpty() || job.awaitingDrones();
+        return !WrightHomes.hasAny(player) || job.awaitingDrones();
     }
 
     /**
@@ -1674,7 +1659,7 @@ public final class JobManager {
         if (instant(player) || job.kind() != BuildJob.Kind.PASTE || job.finished()) {
             return true;
         }
-        if (Wrightports.worn(player).isEmpty() || Wrightports.swarm(player).units().isEmpty()) {
+        if (!WrightHomes.hasAny(player)) {
             return false;
         }
         int quota = job.crewQuota();
@@ -1687,10 +1672,9 @@ public final class JobManager {
             return false;
         }
         int wanted = Math.min(quota, Math.min(room, WrightsConfig.maxWrightsPerJob()));
-        Swarm swarm = Wrightports.swarm(player);
         Set<UUID> have = new HashSet<>();
-        for (Swarm.Unit unit : swarm.units()) {
-            have.add(unit.id());
+        for (WrightHomes.FreeWright free : WrightHomes.freeNear(player, id -> true, Integer.MAX_VALUE)) {
+            have.add(free.unit().id());
         }
         List<UUID> ids = new ArrayList<>();
         for (UUID unit : job.crewUnits()) {
@@ -1701,14 +1685,14 @@ public final class JobManager {
                 ids.add(unit);
             }
         }
-        for (Swarm.Unit unit : swarm.units()) {
+        for (WrightHomes.FreeWright free : freeUnits(player, library, job.id(), wanted)) {
             if (ids.size() >= wanted) {
                 break;
             }
-            if (ids.contains(unit.id()) || claimedByOther(library, player.getUUID(), job.id(), unit.id())) {
+            if (ids.contains(free.unit().id())) {
                 continue;
             }
-            ids.add(unit.id());
+            ids.add(free.unit().id());
         }
         if (ids.isEmpty()) {
             return false;
@@ -1748,15 +1732,18 @@ public final class JobManager {
     }
 
     private static boolean crewReady(ServerPlayer player) {
+        if (!Wrightports.worn(player).isEmpty() && !Swarm.from(Wrightports.worn(player)).units().isEmpty()) {
+            return true;
+        }
+        if (WrightHomes.hasAny(player)) {
+            return true;
+        }
         if (Wrightports.worn(player).isEmpty()) {
             Messages.actionBar(player, "message.wrights.need_wrightport");
             return false;
         }
-        if (Swarm.from(Wrightports.worn(player)).units().isEmpty()) {
-            Messages.actionBar(player, "message.wrights.need_drone");
-            return false;
-        }
-        return true;
+        Messages.actionBar(player, "message.wrights.need_drone");
+        return false;
     }
 
     private static boolean assignCrew(ServerPlayer player, BuildJob job, Schematic schematic) {
@@ -1782,21 +1769,24 @@ public final class JobManager {
             Messages.actionBar(player, "message.wrights.drone_block_cap", 0);
             return false;
         }
-        int fromPort = Swarm.from(Wrightports.worn(player)).assignCount();
-        int wanted = Math.min(requested > 0 ? requested : fromPort, Math.min(blocks, WrightsConfig.maxWrightsPerJob()));
-        List<Swarm.Unit> units = freeUnits(player, library, job.id(), wanted);
+        int fromPersonal = Swarm.from(Wrightports.worn(player)).assignCount();
+        int wanted = Math.min(requested > 0 ? requested : Math.max(fromPersonal, 1), Math.min(blocks, WrightsConfig.maxWrightsPerJob()));
+        List<WrightHomes.FreeWright> units = freeUnits(player, library, job.id(), wanted);
         if (units.isEmpty()) {
             Messages.actionBar(player, "message.wrights.drones_busy");
             return false;
         }
         List<Integer> speeds = new ArrayList<>();
         List<UUID> ids = new ArrayList<>();
-        for (Swarm.Unit unit : units) {
-            speeds.add(Math.max(1, Math.min(Swarm.MAX_SPEED, unit.speed())));
-            ids.add(unit.id());
+        for (WrightHomes.FreeWright unit : units) {
+            speeds.add(Math.max(1, Math.min(Swarm.MAX_SPEED, unit.unit().speed())));
+            ids.add(unit.unit().id());
         }
         job.setCrew(speeds, sizeX, sizeY, sizeZ);
         job.setCrewUnits(ids);
+        for (int i = 0; i < job.hands().size() && i < units.size(); i++) {
+            job.hands().get(i).homePort = units.get(i).homePort();
+        }
         job.setCrewQuota(ids.size());
         evenOut(job, schematic);
         return job.hasCrew();
@@ -3136,7 +3126,8 @@ public final class JobManager {
         DroneEntity drone = new DroneEntity(ModEntities.DRONE.get(), level);
         drone.setJobId(job.id());
         Vec3 site = Vec3.atCenterOf(workPos).add(0.0D, 1.15D, 0.0D);
-        depart(drone, player, site, 0, 1);
+        BlockPos home = job.hands().isEmpty() ? null : job.hands().get(0).homePort;
+        depart(drone, player, site, 0, 1, home);
         job.setDroneId(drone.getUUID());
         job.setLastDronePos(drone.blockPosition());
         level.addFreshEntity(drone);
@@ -3173,16 +3164,20 @@ public final class JobManager {
         DroneEntity drone = new DroneEntity(ModEntities.DRONE.get(), level);
         drone.setJobId(job.id());
         Vec3 site = Vec3.atCenterOf(workPos).add(0.0D, 1.15D, 0.0D);
-        depart(drone, player, site, hand.lane, hand.lanes);
+        depart(drone, player, site, hand.lane, hand.lanes, hand.homePort);
         hand.entityId = drone.getUUID();
         hand.lastPos = drone.blockPosition();
         level.addFreshEntity(drone);
         return drone;
     }
 
-    private static void depart(DroneEntity drone, ServerPlayer player, Vec3 work, int lane, int lanes) {
-        if (player != null && player.level() == drone.level() && !Wrightports.worn(player).isEmpty()) {
-            drone.departFrom(player, work, lane, lanes);
+    private static void depart(DroneEntity drone, ServerPlayer player, Vec3 work, int lane, int lanes, BlockPos homePort) {
+        if (homePort != null && player != null && player.level() == drone.level() && player.level().isLoaded(homePort)) {
+            drone.departFromBlock(homePort, work, lane, lanes);
+            return;
+        }
+        if (player != null && player.level() == drone.level()) {
+            drone.departFromPlayer(player, work, lane, lanes);
             return;
         }
         drone.moveTo(work.x, work.y, work.z, player == null ? 0.0F : player.getYRot(), 0.0F);
@@ -3195,17 +3190,21 @@ public final class JobManager {
             return;
         }
         List<UUID> ids = new ArrayList<>();
+        List<BlockPos> homes = new ArrayList<>();
         if (job.droneId() != null) {
             ids.add(job.droneId());
+            homes.add(job.hands().isEmpty() ? null : job.hands().get(0).homePort);
         }
         for (BuildJob.Hand hand : job.hands()) {
             if (hand.entityId != null && !ids.contains(hand.entityId)) {
                 ids.add(hand.entityId);
+                homes.add(hand.homePort);
             }
         }
         int slot = 0;
         for (UUID id : ids) {
-            recall(level, player, id, slot++, ids.size());
+            recall(level, player, id, slot, ids.size(), homes.get(slot));
+            slot++;
         }
         job.setDroneId(null);
         for (BuildJob.Hand hand : job.hands()) {
@@ -3214,6 +3213,10 @@ public final class JobManager {
     }
 
     private static void recall(ServerLevel level, ServerPlayer player, UUID id, int slot, int count) {
+        recall(level, player, id, slot, count, null);
+    }
+
+    private static void recall(ServerLevel level, ServerPlayer player, UUID id, int slot, int count, BlockPos homePort) {
         if (level == null || id == null) {
             return;
         }
@@ -3223,7 +3226,8 @@ public final class JobManager {
         }
         Entity entity = level.getEntity(id);
         if (entity instanceof DroneEntity drone && drone.isAlive()) {
-            drone.flyHome(player, slot, count);
+            BlockPos home = homePort != null ? homePort : drone.homePort();
+            drone.flyHome(player, slot, count, home);
         }
     }
 
