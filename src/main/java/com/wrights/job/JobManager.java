@@ -2074,6 +2074,20 @@ public final class JobManager {
         };
     }
 
+    /** A wright exists that can reach this site, ignoring jobs a paste is about to replace. */
+    private static boolean crewReady(ServerPlayer player, ResourceKey<net.minecraft.world.level.Level> dimension, BlockPos site) {
+        ServerLevel level = player.getServer().getLevel(dimension);
+        WrightHomes.Reach reach = WrightHomes.reach(player, level, site, id -> true);
+        int owned = (reach.playerNear() ? reach.personal() : 0) + reach.portWrights();
+        if (owned > 0) {
+            return true;
+        }
+        Messages.actionBar(player, reach.ports() > 0 && reach.personal() == 0
+                ? "message.wrights.port_empty"
+                : "message.wrights.none_in_range");
+        return false;
+    }
+
     private static CrewGap crewGap(ServerPlayer player, BuildJob job) {
         ServerLevel level = player.getServer().getLevel(job.dimension());
         SchematicLibrary library = SchematicLibrary.get(player.getServer());

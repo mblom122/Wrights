@@ -116,7 +116,7 @@ public final class WrightHomes {
                         continue;
                     }
                     for (BlockEntity entity : level.getChunk(chunkX, chunkZ).getBlockEntities().values()) {
-                        if (!(entity instanceof WrightportBlockEntity)) {
+                        if (!(entity instanceof WrightportBlockEntity port)) {
                             continue;
                         }
                         if (!portCovers(level.dimension(), entity.getBlockPos(), level.dimension(), site)) {
