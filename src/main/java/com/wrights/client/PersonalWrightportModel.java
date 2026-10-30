@@ -72,12 +72,13 @@ public class PersonalWrightportModel extends Model {
                 CubeListBuilder.create().texOffs(30, 42).addBox(-1.5F, -4.0F, -0.5F, 3.0F, 4.0F, 1.0F),
                 PartPose.offset(1.5F, 9.0F, 6.5F));
 
+        // Same thin mast and bulb as the earlier pack, standing on the collar.
         root.addOrReplaceChild("antenna",
-                CubeListBuilder.create().texOffs(40, 28).addBox(-1.0F, -3.0F, -1.0F, 2.0F, 3.0F, 2.0F),
+                CubeListBuilder.create().texOffs(40, 28).addBox(-0.35F, -3.5F, -0.35F, 0.7F, 3.5F, 0.7F),
                 PartPose.offset(0.0F, -1.0F, 4.0F));
         root.addOrReplaceChild("lamp",
-                CubeListBuilder.create().texOffs(48, 28).addBox(-1.0F, -2.0F, -1.0F, 2.0F, 2.0F, 2.0F),
-                PartPose.offset(0.0F, -4.0F, 4.0F));
+                CubeListBuilder.create().texOffs(48, 28).addBox(-0.5F, -1.0F, -0.5F, 1.0F, 1.0F, 1.0F),
+                PartPose.offset(0.0F, -4.5F, 4.0F));
 
         return LayerDefinition.create(mesh, 64, 64);
     }
