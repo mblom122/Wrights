@@ -52,10 +52,10 @@ public class WrightportBlock extends BaseEntityBlock {
     @Override
     @Nullable
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
-        if (!level.isClientSide) {
-            return null;
+        if (level.isClientSide) {
+            return createTickerHelper(type, ModBlockEntities.WRIGHTPORT.get(), (lvl, pos, blockState, port) -> port.animateHatch());
         }
-        return createTickerHelper(type, ModBlockEntities.WRIGHTPORT.get(), (lvl, pos, blockState, port) -> port.animateHatch());
+        return createTickerHelper(type, ModBlockEntities.WRIGHTPORT.get(), (lvl, pos, blockState, port) -> port.tickLamp());
     }
 
     @Override

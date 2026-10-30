@@ -1,10 +1,19 @@
 package com.wrights.block;
 
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.network.Connection;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.SimpleContainer;
@@ -14,6 +23,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
@@ -21,7 +31,9 @@ import net.minecraft.world.phys.AABB;
 import com.wrights.drone.Swarm;
 import com.wrights.entity.DroneEntity;
 import com.wrights.item.ModItems;
+import com.wrights.job.BuildJob;
 import com.wrights.menu.WrightportMenu;
+import com.wrights.schematic.SchematicLibrary;
 
 public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
     private final SimpleContainer items = new SimpleContainer(1);
@@ -29,6 +41,8 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
     private float hatch;
     private float hatchPrev;
     private int hatchHold;
+    /** Corner lamps. Red until the server has looked at the crew. */
+    private int lamp = WrightportLamp.RED;
 
     public WrightportBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.WRIGHTPORT.get(), pos, state);
@@ -47,6 +61,12 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
         }
         Swarm.write(stack, swarm);
         items.setChanged();
+        refreshLamp();
+        sync();
+    }
+
+    public int lampColor() {
+        return lamp;
     }
 
     public SimpleContainer items() {
@@ -81,6 +101,47 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
         return Mth.lerp(partialTick, this.hatchPrev, this.hatch);
     }
 
+    /** Keeps the corner lamps in step with the crew and any job they are on. */
+    public void tickLamp() {
+        Level level = this.level;
+        if (level == null || ((level.getGameTime() + this.worldPosition.asLong()) & 7L) != 0L) {
+            return;
+        }
+        int previous = this.lamp;
+        refreshLamp();
+        if (previous != this.lamp) {
+            sync();
+        }
+    }
+
+    private void refreshLamp() {
+        Level level = this.level;
+        if (level == null || level.isClientSide || level.getServer() == null) {
+            return;
+        }
+        Swarm swarm = swarm();
+        Set<UUID> busy = new HashSet<>();
+        if (!swarm.units().isEmpty()) {
+            for (BuildJob job : SchematicLibrary.get(level.getServer()).jobs()) {
+                if (job.finished() || job.kind() == BuildJob.Kind.COPY) {
+                    continue;
+                }
+                busy.addAll(job.crewUnits());
+            }
+        }
+        int next = WrightportLamp.color(swarm, busy::contains);
+        if (next != this.lamp) {
+            this.lamp = next;
+            setChanged();
+        }
+    }
+
+    private void sync() {
+        if (level instanceof ServerLevel server) {
+            server.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+        }
+    }
+
     @Override
     public Component getDisplayName() {
         return Component.translatable("block.wrights.wrightport");
@@ -98,11 +159,31 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
         tag.put("Wrights", items.createTag(registries));
+        tag.putInt("Lamp", lamp);
     }
 
     @Override
     protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
         items.fromTag(tag.getList("Wrights", Tag.TAG_COMPOUND), registries);
+        if (tag.contains("Lamp")) {
+            lamp = tag.getInt("Lamp");
+        }
+    }
+
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    @Override
+    public void onDataPacket(Connection net, ClientboundBlockEntityDataPacket packet, HolderLookup.Provider registries) {
+        CompoundTag tag = packet.getTag();
+        if (tag != null) {
+            handleUpdateTag(tag, registries);
+        }
+        if (this.level != null) {
+            this.level.sendBlockUpdated(this.worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+        }
     }
 }

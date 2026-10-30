@@ -2,6 +2,10 @@ package com.wrights.client;
 
 import com.wrights.WrightsMod;
 import com.wrights.block.ModBlockEntities;
+import com.wrights.block.ModBlocks;
+import com.wrights.block.WrightportBlockEntity;
+import com.wrights.block.WrightportLamp;
+import com.wrights.drone.Swarm;
 import com.wrights.entity.ModEntities;
 import com.wrights.item.BlueprintFolderItem;
 import com.wrights.item.BlueprintItem;
@@ -12,6 +16,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelLayerLocation;
 import net.minecraft.client.renderer.item.ItemProperties;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
@@ -20,6 +25,7 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterClientTooltipComponentFactoriesEvent;
+import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
@@ -78,5 +84,34 @@ public class WrightsClient {
     @SubscribeEvent
     public static void registerScreens(RegisterMenuScreensEvent event) {
         event.register(ModMenus.WRIGHTPORT.get(), WrightportScreen::new);
+    }
+
+    @SubscribeEvent
+    public static void registerBlockColors(RegisterColorHandlersEvent.Block event) {
+        event.register((state, level, pos, tintIndex) -> {
+            if (level == null || pos == null) {
+                return WrightportLamp.RED;
+            }
+            BlockEntity entity = level.getBlockEntity(pos);
+            if (entity instanceof WrightportBlockEntity port) {
+                return port.lampColor();
+            }
+            return WrightportLamp.RED;
+        }, ModBlocks.WRIGHTPORT.get());
+    }
+
+    @SubscribeEvent
+    public static void registerItemColors(RegisterColorHandlersEvent.Item event) {
+        event.register((stack, tintIndex) -> WrightportLamp.color(Swarm.from(stack), id -> {
+            for (var job : WrightsClientState.jobs) {
+                if (job.finished() || job.saving()) {
+                    continue;
+                }
+                if (job.crew().contains(id)) {
+                    return true;
+                }
+            }
+            return false;
+        }), ModBlocks.WRIGHTPORT_ITEM.get());
     }
 }
