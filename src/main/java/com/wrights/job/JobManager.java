@@ -274,8 +274,10 @@ public final class JobManager {
         if (session.mode() != BlueprintSessions.Mode.BUILD) {
             return;
         }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
         if (clear || pos == null) {
-            session.setSupply(null);
+            session.setSupply(null, null);
+            library.setSupply(player.getUUID(), null);
             BlueprintNetwork.syncSupply(player);
             Messages.actionBar(player, "message.wrights.supply_inventory");
             return;
@@ -292,7 +294,8 @@ public final class JobManager {
             Messages.actionBar(player, "message.wrights.supply_not_container");
             return;
         }
-        session.setSupply(pos.immutable());
+        session.setSupply(pos.immutable(), level.dimension());
+        library.setSupply(player.getUUID(), net.minecraft.core.GlobalPos.of(level.dimension(), pos));
         BlueprintNetwork.syncSupply(player);
         Messages.actionBar(player, "message.wrights.supply_chest");
     }
@@ -580,7 +583,8 @@ public final class JobManager {
         job.setClip(sizeX, sizeY, sizeZ);
         job.setPasteOptions(placeFluids, voidBlocks, voidFluids, voidNbt);
         job.setAnchor(origin.offset(schematic.anchorX(), schematic.anchorY(), schematic.anchorZ()));
-        job.setSupply(com.wrights.blueprint.BlueprintSessions.get(player).supplyPos());
+        com.wrights.blueprint.BlueprintSessions.BlueprintSession session = com.wrights.blueprint.BlueprintSessions.get(player);
+        job.setSupply(session.supplyPos(), session.supplyDimension());
         job.setSupplyPlayerFirst(supplyPlayerFirst);
         if (!instant(player) && !assignCrew(player, job, schematic, drones)) {
             return false;
@@ -2974,10 +2978,24 @@ public final class JobManager {
 
     private static Container supply(ServerLevel level, ServerPlayer player, BuildJob job) {
         BlockPos pos = job.supplyPos();
-        if (pos == null || !level.mayInteract(player, pos)) {
+        ServerLevel stored = supplyLevel(level, player, job);
+        if (pos == null || !stored.mayInteract(player, pos)) {
             return null;
         }
-        return containerAt(level, pos);
+        return containerAt(stored, pos);
+    }
+
+    private static ServerLevel supplyLevel(ServerLevel fallback, ServerPlayer player, BuildJob job) {
+        String raw = job.supplyDimension();
+        if (raw == null || raw.isEmpty()) {
+            return fallback;
+        }
+        net.minecraft.resources.ResourceLocation id = net.minecraft.resources.ResourceLocation.tryParse(raw);
+        if (id == null) {
+            return fallback;
+        }
+        ServerLevel stored = player.server.getLevel(ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, id));
+        return stored == null ? fallback : stored;
     }
 
     private static Container containerAt(ServerLevel level, BlockPos pos) {

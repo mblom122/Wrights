@@ -53,6 +53,11 @@ public final class BlueprintSessions {
     public static void onLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             com.wrights.item.ControllerItem.quietLegacy(player);
+            com.wrights.schematic.SchematicLibrary library = com.wrights.schematic.SchematicLibrary.get(player.getServer());
+            net.minecraft.core.GlobalPos supply = library.supply(player.getUUID());
+            if (supply != null) {
+                get(player).setSupply(supply.pos(), supply.dimension());
+            }
             com.wrights.network.BlueprintNetwork.syncCapture(player);
             com.wrights.network.BlueprintNetwork.syncJobHolograms(player);
             com.wrights.network.BlueprintNetwork.syncSupply(player);
@@ -224,13 +229,19 @@ public final class BlueprintSessions {
         }
 
         private BlockPos supplyPos;
+        private ResourceKey<Level> supplyDimension;
 
         public BlockPos supplyPos() {
             return supplyPos;
         }
 
-        public void setSupply(BlockPos supplyPos) {
-            this.supplyPos = supplyPos;
+        public ResourceKey<Level> supplyDimension() {
+            return supplyDimension;
+        }
+
+        public void setSupply(BlockPos supplyPos, ResourceKey<Level> supplyDimension) {
+            this.supplyPos = supplyPos == null ? null : supplyPos.immutable();
+            this.supplyDimension = supplyPos == null ? null : supplyDimension;
         }
 
         public void clear() {

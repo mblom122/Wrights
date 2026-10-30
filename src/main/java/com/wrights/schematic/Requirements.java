@@ -7,8 +7,10 @@ import java.util.List;
 import java.util.Map;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.Container;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -59,21 +61,21 @@ public final class Requirements {
     }
 
     /** Fills in how many of each item the player and a bound chest currently hold. */
-    public static List<Cost> stocked(ServerPlayer player, List<Cost> costs, BlockPos supply) {
+    public static List<Cost> stocked(ServerPlayer player, List<Cost> costs, BlockPos supply, ResourceKey<Level> dimension) {
         List<Cost> stocked = new ArrayList<>(costs.size());
         for (Cost cost : costs) {
             Item item = Item.byId(cost.itemId());
-            stocked.add(new Cost(cost.itemId(), cost.count(), playerCount(player, item), supplyCount(player, supply, item)));
+            stocked.add(new Cost(cost.itemId(), cost.count(), playerCount(player, item), supplyCount(player, supply, dimension, item)));
         }
         return stocked;
     }
 
-    public static List<Cost> missing(ServerPlayer player, List<Cost> costs, BlockPos supply) {
+    public static List<Cost> missing(ServerPlayer player, List<Cost> costs, BlockPos supply, ResourceKey<Level> dimension) {
         if (player.getAbilities().instabuild || player.isSpectator()) {
             return List.of();
         }
         List<Cost> missing = new ArrayList<>();
-        for (Cost cost : stocked(player, costs, supply)) {
+        for (Cost cost : stocked(player, costs, supply, dimension)) {
             if (cost.player() + cost.supply() < cost.count()) {
                 missing.add(cost);
             }
@@ -85,8 +87,14 @@ public final class Requirements {
         return player.getInventory().countItem(item);
     }
 
-    public static int supplyCount(ServerPlayer player, BlockPos supply, Item item) {
-        if (!(player.level() instanceof ServerLevel level) || supply == null || !level.mayInteract(player, supply)) {
+    public static int supplyCount(ServerPlayer player, BlockPos supply, ResourceKey<Level> dimension, Item item) {
+        ServerLevel level = null;
+        if (dimension != null) {
+            level = player.server.getLevel(dimension);
+        } else if (player.level() instanceof ServerLevel current) {
+            level = current;
+        }
+        if (level == null || supply == null || !level.mayInteract(player, supply)) {
             return 0;
         }
         Container container = containerAt(level, supply);

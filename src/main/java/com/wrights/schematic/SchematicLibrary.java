@@ -9,11 +9,18 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
 
 import com.wrights.job.BuildJob;
@@ -29,6 +36,7 @@ public final class SchematicLibrary extends SavedData {
     private final BlueprintShelf shelf = new BlueprintShelf();
     private final Map<UUID, BuildJob> jobs = new HashMap<>();
     private final Map<UUID, List<UUID>> jobsByPlayer = new HashMap<>();
+    private final Map<UUID, GlobalPos> supplies = new HashMap<>();
     private int historyClock;
 
     public static SchematicLibrary get(MinecraftServer server) {
@@ -53,6 +61,21 @@ public final class SchematicLibrary extends SavedData {
         if (tag.contains("shelf", Tag.TAG_COMPOUND)) {
             library.shelf.load(tag.getCompound("shelf"));
         }
+        if (tag.contains("supplies", Tag.TAG_LIST)) {
+            ListTag supplies = tag.getList("supplies", Tag.TAG_COMPOUND);
+            for (int i = 0; i < supplies.size(); i++) {
+                CompoundTag supply = supplies.getCompound(i);
+                if (!supply.hasUUID("player")) {
+                    continue;
+                }
+                BlockPos pos = NbtUtils.readBlockPos(supply, "pos").orElse(null);
+                ResourceLocation dimension = ResourceLocation.tryParse(supply.getString("dim"));
+                if (pos == null || dimension == null) {
+                    continue;
+                }
+                library.supplies.put(supply.getUUID("player"), GlobalPos.of(ResourceKey.create(Registries.DIMENSION, dimension), pos));
+            }
+        }
         return library;
     }
 
@@ -70,7 +93,32 @@ public final class SchematicLibrary extends SavedData {
         tag.put("jobs", jobs);
         tag.putInt("historyClock", historyClock);
         tag.put("shelf", shelf.save());
+        ListTag supplies = new ListTag();
+        for (Map.Entry<UUID, GlobalPos> entry : this.supplies.entrySet()) {
+            CompoundTag supply = new CompoundTag();
+            supply.putUUID("player", entry.getKey());
+            supply.putString("dim", entry.getValue().dimension().location().toString());
+            supply.put("pos", NbtUtils.writeBlockPos(entry.getValue().pos()));
+            supplies.add(supply);
+        }
+        tag.put("supplies", supplies);
         return tag;
+    }
+
+    /** The chest every blueprint for this player draws from, until it is cleared. */
+    public GlobalPos supply(UUID playerId) {
+        return supplies.get(playerId);
+    }
+
+    public void setSupply(UUID playerId, GlobalPos pos) {
+        if (pos == null) {
+            if (supplies.remove(playerId) != null) {
+                setDirty();
+            }
+            return;
+        }
+        supplies.put(playerId, pos);
+        setDirty();
     }
 
     public Optional<Schematic> schematic(UUID id) {

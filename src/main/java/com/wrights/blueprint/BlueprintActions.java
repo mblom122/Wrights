@@ -837,8 +837,8 @@ public final class BlueprintActions {
             Messages.actionBar(player, "message.wrights.blueprint_missing");
             return;
         }
-        BlockPos supply = BlueprintSessions.get(player).supplyPos();
-        BlueprintNetwork.materials(player, id, false, Requirements.stocked(player, Requirements.of(schematic, clipX, clipY, clipZ, placeFluids), supply));
+        BlueprintSessions.BlueprintSession supplySession = BlueprintSessions.get(player);
+        BlueprintNetwork.materials(player, id, false, Requirements.stocked(player, Requirements.of(schematic, clipX, clipY, clipZ, placeFluids), supplySession.supplyPos(), supplySession.supplyDimension()));
     }
 
     public static void saveSession(ServerPlayer player, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt) {
@@ -948,7 +948,7 @@ public final class BlueprintActions {
             return;
         }
         if (!force) {
-            java.util.List<Requirements.Cost> missing = Requirements.missing(player, Requirements.of(schematic, sx, sy, sz, placeFluids), session.supplyPos());
+            java.util.List<Requirements.Cost> missing = Requirements.missing(player, Requirements.of(schematic, sx, sy, sz, placeFluids), session.supplyPos(), session.supplyDimension());
             if (!missing.isEmpty()) {
                 BlueprintNetwork.materials(player, id, true, missing);
                 return;

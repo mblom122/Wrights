@@ -511,8 +511,15 @@ public final class BuildJob {
         return supplyPos;
     }
 
-    public void setSupply(BlockPos supplyPos) {
-        this.supplyPos = supplyPos;
+    private String supplyDimension;
+
+    public void setSupply(BlockPos supplyPos, ResourceKey<Level> dimension) {
+        this.supplyPos = supplyPos == null ? null : supplyPos.immutable();
+        this.supplyDimension = supplyPos == null || dimension == null ? null : dimension.location().toString();
+    }
+
+    public String supplyDimension() {
+        return supplyDimension;
     }
 
     private boolean supplyPlayerFirst = true;
@@ -736,6 +743,9 @@ public final class BuildJob {
         }
         if (supplyPos != null) {
             tag.put("supply", NbtUtils.writeBlockPos(supplyPos));
+            if (supplyDimension != null) {
+                tag.putString("supplyDim", supplyDimension);
+            }
         }
         tag.putBoolean("supplyPlayerFirst", supplyPlayerFirst);
         if (anchor != null) {
@@ -858,6 +868,9 @@ public final class BuildJob {
         }
         if (tag.contains("supply")) {
             job.supplyPos = NbtUtils.readBlockPos(tag, "supply").orElse(null);
+            if (tag.contains("supplyDim")) {
+                job.supplyDimension = tag.getString("supplyDim");
+            }
         }
         job.supplyPlayerFirst = !tag.contains("supplyPlayerFirst") || tag.getBoolean("supplyPlayerFirst");
         if (tag.contains("anchor")) {
