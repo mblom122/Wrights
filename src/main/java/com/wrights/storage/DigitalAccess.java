@@ -31,13 +31,13 @@ public interface DigitalAccess {
 
     /**
      * Pulls wright item stacks of any tier. Returns the tier of each extracted wright.
-     * Default drains via {@link #extract} and treats them as copper.
+     * Default drains via {@link #extract} and treats them as stock wrights.
      */
     default List<Integer> extractWrights(ServerPlayer player, ServerLevel level, GlobalPos pos, int count) {
         List<Integer> tiers = new ArrayList<>();
         long taken = extract(player, level, pos, com.wrights.item.ModItems.WRIGHT.get(), count);
         for (int i = 0; i < taken; i++) {
-            tiers.add(com.wrights.drone.WrightTier.COPPER);
+            tiers.add(com.wrights.drone.WrightTier.BASE);
         }
         return tiers;
     }

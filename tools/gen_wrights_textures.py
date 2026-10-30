@@ -584,6 +584,7 @@ def main() -> None:
     make_personal_wrightport_entity()
     make_controller()
     make_wright_item()
+    make_upgrade("copper", COPPER, COPPER_L)
     make_upgrade("iron", IRON, WHITE)
     make_upgrade("gold", GOLD, AMBER_L)
     make_upgrade("diamond", DIAMOND, CYAN_L)

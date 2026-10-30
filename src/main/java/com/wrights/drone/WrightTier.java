@@ -6,11 +6,11 @@ import net.minecraft.world.item.Item;
 import com.wrights.item.ModItems;
 
 /**
- * Copper through netherite. The tier is the wright's speed: a higher tier places more
- * blocks and flies faster. Copper is half the old copper rate and netherite is double
- * the old netherite rate, with iron, gold, and diamond on the straight line between them.
+ * Stock through netherite. A crafted wright has no upgrade. Each step, including
+ * stock to copper, is the same gap that separates copper from iron.
  */
 public final class WrightTier {
+    public static final int BASE = 0;
     public static final int COPPER = 1;
     public static final int IRON = 2;
     public static final int GOLD = 3;
@@ -21,26 +21,28 @@ public final class WrightTier {
     }
 
     public static int clamp(int tier) {
-        return Mth.clamp(tier, COPPER, Swarm.MAX_SPEED);
+        return Mth.clamp(tier, BASE, Swarm.MAX_SPEED);
     }
 
     public static int textColor(int tier) {
         return switch (clamp(tier)) {
+            case COPPER -> 0xFFE08A45;
             case IRON -> 0xFFD8DCE2;
             case GOLD -> 0xFFF6D56A;
             case DIAMOND -> 0xFF7EF0E8;
             case NETHERITE -> 0xFFE0C2D0;
-            default -> 0xFFE08A45;
+            default -> 0xFFD5DCE4;
         };
     }
 
     public static int modelColor(int tier) {
         return switch (clamp(tier)) {
+            case COPPER -> 0xFFC47A3A;
             case IRON -> 0xFFC5C9CF;
             case GOLD -> 0xFFF0C44A;
             case DIAMOND -> 0xFF5EDED4;
             case NETHERITE -> 0xFF6B5564;
-            default -> 0xFFC47A3A;
+            default -> 0xFF8E98A4;
         };
     }
 
@@ -49,27 +51,22 @@ public final class WrightTier {
     }
 
     /**
-     * Eighths of a block this tier adds each tick. Eight eighths is one block, so copper
-     * places one block every other tick and netherite places ten.
+     * Eighths of a block this tier adds each tick. Stock places one block every
+     * other tick. Each upgrade adds nineteen eighths, the old copper-to-iron step.
      */
     public static int placeEighths(int tier) {
-        return switch (clamp(tier)) {
-            case IRON -> 23;
-            case GOLD -> 42;
-            case DIAMOND -> 61;
-            case NETHERITE -> 80;
-            default -> 4;
-        };
+        return 4 + 19 * (clamp(tier) - BASE);
     }
 
     /** Flight step in blocks per tick while the wright is within eight blocks of its work. */
     public static double flyClose(int tier) {
-        return 0.23D + 0.5325D * (clamp(tier) - COPPER);
+        return 0.23D + 0.5325D * (clamp(tier) - BASE);
     }
 
-    /** The crafted item that raises a wright of {@code tier - 1} to this tier. Copper has none. */
+    /** The crafted item that raises a wright of {@code tier - 1} to this tier. Stock has none. */
     public static Item upgradeItem(int tier) {
         return switch (clamp(tier)) {
+            case COPPER -> ModItems.UPGRADE_COPPER.get();
             case IRON -> ModItems.UPGRADE_IRON.get();
             case GOLD -> ModItems.UPGRADE_GOLD.get();
             case DIAMOND -> ModItems.UPGRADE_DIAMOND.get();

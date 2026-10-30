@@ -114,7 +114,7 @@ public final class Ae2DigitalAccess implements DigitalAccess {
             return true;
         }
         if (item == ModItems.WRIGHT.get()) {
-            for (int tier = WrightTier.COPPER; tier <= WrightTier.NETHERITE; tier++) {
+            for (int tier = WrightTier.BASE; tier <= WrightTier.NETHERITE; tier++) {
                 AEItemKey key = AEItemKey.of(WrightItem.stack(tier, 1));
                 if (key != null && crafting.isCraftable(key)) {
                     return true;
@@ -191,7 +191,7 @@ public final class Ae2DigitalAccess implements DigitalAccess {
             return plain;
         }
         if (item == ModItems.WRIGHT.get()) {
-            for (int tier = WrightTier.COPPER; tier <= WrightTier.NETHERITE; tier++) {
+            for (int tier = WrightTier.BASE; tier <= WrightTier.NETHERITE; tier++) {
                 AEItemKey key = AEItemKey.of(WrightItem.stack(tier, 1));
                 if (key != null && crafting.isCraftable(key)) {
                     return key;

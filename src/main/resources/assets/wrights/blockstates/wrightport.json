@@ -1,7 +1,7 @@
 {
   "variants": {
     "": {
-      "model": "wrights:block/wrightport"
+      "model": "wrights:block/hangar"
     }
   }
 }

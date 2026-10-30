@@ -14,6 +14,7 @@ public final class DigitalCatalog {
     public static List<Item> items() {
         return List.of(
                 ModItems.WRIGHT.get(),
+                ModItems.UPGRADE_COPPER.get(),
                 ModItems.UPGRADE_IRON.get(),
                 ModItems.UPGRADE_GOLD.get(),
                 ModItems.UPGRADE_DIAMOND.get(),

@@ -18,7 +18,7 @@ public class WrightItem extends Item {
     public static ItemStack stack(int tier, int count) {
         ItemStack stack = new ItemStack(ModItems.WRIGHT.get(), count);
         int clamped = WrightTier.clamp(tier);
-        if (clamped > WrightTier.COPPER) {
+        if (clamped > WrightTier.BASE) {
             stack.set(ModDataComponents.WRIGHT_TIER.get(), clamped);
         }
         return stack;
@@ -26,14 +26,18 @@ public class WrightItem extends Item {
 
     public static int tier(ItemStack stack) {
         Integer tier = stack.get(ModDataComponents.WRIGHT_TIER.get());
-        return tier == null ? WrightTier.COPPER : WrightTier.clamp(tier);
+        return tier == null ? WrightTier.BASE : WrightTier.clamp(tier);
     }
 
     @Override
     public Component getName(ItemStack stack) {
         int tier = tier(stack);
+        int color = WrightTier.textColor(tier) & 0xFFFFFF;
+        if (tier <= WrightTier.BASE) {
+            return Component.translatable("item.wrights.wright").withColor(color);
+        }
         return Component.translatable("item.wrights.wright.named", Component.translatable(WrightTier.nameKey(tier)))
-                .withColor(WrightTier.textColor(tier) & 0xFFFFFF);
+                .withColor(color);
     }
 
     @Override

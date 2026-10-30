@@ -116,7 +116,7 @@ public class DroneEntity extends Entity {
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         builder.define(JOB_ID, "");
-        builder.define(TIER, 1);
+        builder.define(TIER, com.wrights.drone.WrightTier.BASE);
     }
 
     public int tier() {

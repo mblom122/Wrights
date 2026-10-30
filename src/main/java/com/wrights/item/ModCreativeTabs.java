@@ -22,6 +22,7 @@ public final class ModCreativeTabs {
                 output.accept(ModItems.BLUEPRINT.get());
                 output.accept(ModItems.BLUEPRINT_FOLDER.get());
                 output.accept(ModItems.WRIGHT.get());
+                output.accept(ModItems.UPGRADE_COPPER.get());
                 output.accept(ModItems.UPGRADE_IRON.get());
                 output.accept(ModItems.UPGRADE_GOLD.get());
                 output.accept(ModItems.UPGRADE_DIAMOND.get());

@@ -217,7 +217,7 @@ public final class HangarOps {
         }
         if (player.getAbilities().instabuild) {
             while (tiers.size() < count) {
-                tiers.add(WrightTier.COPPER);
+                tiers.add(WrightTier.BASE);
             }
         }
         return tiers;
@@ -261,7 +261,7 @@ public final class HangarOps {
             return swarm;
         }
         int tier = WrightTier.clamp(swarm.units().get(index).speed());
-        if (tier <= WrightTier.COPPER) {
+        if (tier <= WrightTier.BASE) {
             Messages.actionBar(player, "message.wrights.downgrade_none");
             return swarm;
         }
@@ -389,14 +389,14 @@ public final class HangarOps {
         int moved = 0;
         for (int index : picked) {
             int tier = WrightTier.clamp(next.units().get(index).speed());
-            if (tier <= WrightTier.COPPER) {
+            if (tier <= WrightTier.BASE) {
                 continue;
             }
             next = applyTier(player, next, index, tier, tier - 1);
             moved++;
         }
         if (moved == 0) {
-            Messages.actionBar(player, "message.wrights.marked_copper");
+            Messages.actionBar(player, "message.wrights.marked_basic");
             return swarm;
         }
         Messages.actionBar(player, "message.wrights.marked_down", moved);
@@ -569,8 +569,8 @@ public final class HangarOps {
             Messages.actionBar(player, "message.wrights.speed_max");
             return swarm;
         }
-        int gold = speed;
-        int redstone = speed;
+        int gold = Math.max(1, speed);
+        int redstone = Math.max(1, speed);
         if (!ItemSource.canAfford(player, Items.GOLD_INGOT, gold) || !ItemSource.canAfford(player, Items.REDSTONE, redstone)) {
             if (tryCraftParts(player, Items.GOLD_INGOT, gold) || tryCraftParts(player, Items.REDSTONE, redstone)) {
                 Messages.actionBar(player, "message.wrights.digital_crafting");

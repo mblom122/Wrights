@@ -242,7 +242,7 @@ public final class BuildJob {
             Hand hand = new Hand();
             hand.lane = i;
             hand.lanes = lanes;
-            hand.speed = Math.max(1, Math.min(Swarm.MAX_SPEED, speeds.get(i)));
+            hand.speed = com.wrights.drone.WrightTier.clamp(speeds.get(i));
             hands.add(hand);
         }
     }
@@ -288,7 +288,7 @@ public final class BuildJob {
             Hand hand = i < hands.size() ? hands.get(i) : new Hand();
             hand.lane = i;
             hand.lanes = lanes;
-            hand.speed = Math.max(1, Math.min(Swarm.MAX_SPEED, speeds.get(i)));
+            hand.speed = com.wrights.drone.WrightTier.clamp(speeds.get(i));
             if (scan) {
                 hand.cursor = 0;
                 hand.rescan = true;

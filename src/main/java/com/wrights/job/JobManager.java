@@ -1563,7 +1563,7 @@ public final class JobManager {
             if (unit == null) {
                 continue;
             }
-            speeds.add(Math.max(1, Math.min(Swarm.MAX_SPEED, unit.speed())));
+            speeds.add(WrightTier.clamp(unit.speed()));
             kept.add(unitId);
             homes.add(WrightHomes.homeOf(player, unitId));
         }
@@ -1640,7 +1640,7 @@ public final class JobManager {
                 BuildJob.Hand hand = job.hands().get(i);
                 hand.lane = i;
                 hand.lanes = job.hands().size();
-                hand.speed = Math.max(1, Math.min(Swarm.MAX_SPEED, speeds.get(i)));
+                hand.speed = WrightTier.clamp(speeds.get(i));
             }
             if (job.hands().size() != before) {
                 evenOut(job, schematic);
@@ -1792,7 +1792,7 @@ public final class JobManager {
         List<Integer> speeds = new ArrayList<>();
         List<UUID> ids = new ArrayList<>();
         for (WrightHomes.FreeWright unit : units) {
-            speeds.add(Math.max(1, Math.min(Swarm.MAX_SPEED, unit.unit().speed())));
+            speeds.add(WrightTier.clamp(unit.unit().speed()));
             ids.add(unit.unit().id());
         }
         job.setCrew(speeds, sizeX, sizeY, sizeZ);

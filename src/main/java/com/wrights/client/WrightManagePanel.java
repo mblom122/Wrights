@@ -169,7 +169,7 @@ final class WrightManagePanel {
             if (i == expanded) {
                 if (y + EXPAND > listTop && y < listBottom) {
                     graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_pace"), panelX + 18, y + 2, WrightsUi.TEXT, false);
-                    boolean canDowngrade = tier > WrightTier.COPPER;
+                    boolean canDowngrade = tier > WrightTier.BASE;
                     if (tier < WrightTier.NETHERITE) {
                         Component next = Component.translatable(WrightTier.nameKey(tier + 1));
                         graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_next", next), panelX + 18, y + 14, WrightsUi.MUTED, false);
@@ -230,14 +230,14 @@ final class WrightManagePanel {
                     }
                     int downX = tier < WrightTier.NETHERITE ? panelX + DOWNGRADE_X : panelX + UPGRADE_X;
                     int downW = tier < WrightTier.NETHERITE ? DOWNGRADE_W : UPGRADE_W;
-                    if (tier > WrightTier.COPPER && mouseX >= downX && mouseX < downX + downW) {
+                    if (tier > WrightTier.BASE && mouseX >= downX && mouseX < downX + downW) {
                         screen.edit(HangarOps.DOWNGRADE, i);
                         return true;
                     }
                 }
                 if (local >= y + 46 && local < y + 60) {
                     int picked = tierAt(mouseX);
-                    if (picked > 0 && picked != tier && (picked < tier || canAfford(screen, tier, picked))) {
+                    if (picked >= WrightTier.BASE && picked != tier && (picked < tier || canAfford(screen, tier, picked))) {
                         screen.batch(HangarOps.TO_TIER, picked, new int[] { i });
                     }
                     return true;
@@ -339,7 +339,7 @@ final class WrightManagePanel {
             return true;
         }
         int tier = tierAt(mouseX, dx + 12, dy + 78, dw - 24);
-        if (tier > 0 && mouseY >= dy + 78 && mouseY < dy + 94) {
+        if (tier >= WrightTier.BASE && mouseY >= dy + 78 && mouseY < dy + 94) {
             screen.batch(HangarOps.TO_TIER, tier, marked(swarm(screen)));
             closeTop();
             return true;
@@ -393,7 +393,7 @@ final class WrightManagePanel {
                 graphics.drawString(screen.font(), line, dx + 12, hintY, WrightsUi.MUTED, false);
                 hintY += 10;
             }
-            drawTierChoices(graphics, screen, dx + 12, dy + 78, dw - 24, 0, mouseX, mouseY);
+            drawTierChoices(graphics, screen, dx + 12, dy + 78, dw - 24, -1, mouseX, mouseY);
             drawMini(graphics, screen, dx + 12, dy + 102, dw - 24, Component.translatable("screen.wrights.manage_max"), true, false, mouseX, mouseY);
             drawMini(graphics, screen, dx + 12, dy + 124, dw - 24, Component.translatable("screen.wrights.manage_down_one"), true, false, mouseX, mouseY);
         }
@@ -406,11 +406,12 @@ final class WrightManagePanel {
 
     private void drawTierChoices(GuiGraphics graphics, HangarScreen screen, int x, int y, int width, int current, int mouseX, int mouseY) {
         int gap = 4;
-        int chip = (width - gap * 4) / 5;
-        for (int tier = WrightTier.COPPER; tier <= WrightTier.NETHERITE; tier++) {
-            int chipX = x + (tier - WrightTier.COPPER) * (chip + gap);
-            boolean enabled = current == 0 || tier != current;
-            if (current > 0 && tier > current) {
+        int steps = WrightTier.NETHERITE - WrightTier.BASE;
+        int chip = (width - gap * steps) / (steps + 1);
+        for (int tier = WrightTier.BASE; tier <= WrightTier.NETHERITE; tier++) {
+            int chipX = x + (tier - WrightTier.BASE) * (chip + gap);
+            boolean enabled = current < WrightTier.BASE || tier != current;
+            if (current >= WrightTier.BASE && tier > current) {
                 enabled = canAfford(screen, current, tier);
             }
             drawMini(graphics, screen, chipX, y, chip, Component.translatable(WrightTier.nameKey(tier)), enabled || tier == current, tier == current, mouseX, mouseY);
@@ -423,19 +424,20 @@ final class WrightManagePanel {
 
     private int tierAt(double mouseX, int x, int ignoredY, int width) {
         int gap = 4;
-        int chip = (width - gap * 4) / 5;
+        int steps = WrightTier.NETHERITE - WrightTier.BASE;
+        int chip = (width - gap * steps) / (steps + 1);
         if (chip <= 0 || mouseX < x) {
-            return 0;
+            return -1;
         }
         int index = (int) (mouseX - x) / (chip + gap);
-        if (index < 0 || index > WrightTier.NETHERITE - WrightTier.COPPER) {
-            return 0;
+        if (index < 0 || index > steps) {
+            return -1;
         }
         int chipX = x + index * (chip + gap);
         if (mouseX >= chipX + chip) {
-            return 0;
+            return -1;
         }
-        return WrightTier.COPPER + index;
+        return WrightTier.BASE + index;
     }
 
     private void place(int screenW, int screenH) {

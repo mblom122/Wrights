@@ -107,7 +107,7 @@ public final class RsDigitalAccess implements DigitalAccess {
             return true;
         }
         if (item == ModItems.WRIGHT.get()) {
-            for (int tier = WrightTier.COPPER; tier <= WrightTier.NETHERITE; tier++) {
+            for (int tier = WrightTier.BASE; tier <= WrightTier.NETHERITE; tier++) {
                 if (matchesCraft(crafting, ItemResource.ofItemStack(WrightItem.stack(tier, 1)))) {
                     return true;
                 }
@@ -174,7 +174,7 @@ public final class RsDigitalAccess implements DigitalAccess {
             return plain;
         }
         if (item == ModItems.WRIGHT.get()) {
-            for (int tier = WrightTier.COPPER; tier <= WrightTier.NETHERITE; tier++) {
+            for (int tier = WrightTier.BASE; tier <= WrightTier.NETHERITE; tier++) {
                 ItemResource keyed = ItemResource.ofItemStack(WrightItem.stack(tier, 1));
                 if (matchesCraft(crafting, keyed)) {
                     return keyed;

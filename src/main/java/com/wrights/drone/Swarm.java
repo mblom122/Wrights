@@ -72,7 +72,7 @@ public record Swarm(List<Unit> units, int assign) {
         int n = Math.min(Math.max(0, count), units.size());
         List<Integer> speeds = new ArrayList<>(n);
         for (int i = 0; i < n; i++) {
-            speeds.add(Mth.clamp(units.get(i).speed(), 1, MAX_SPEED));
+            speeds.add(Mth.clamp(units.get(i).speed(), WrightTier.BASE, MAX_SPEED));
         }
         return speeds;
     }
@@ -81,13 +81,13 @@ public record Swarm(List<Unit> units, int assign) {
         int count = assignCount();
         List<Integer> speeds = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
-            speeds.add(Mth.clamp(units.get(i).speed(), 1, MAX_SPEED));
+            speeds.add(Mth.clamp(units.get(i).speed(), WrightTier.BASE, MAX_SPEED));
         }
         return speeds;
     }
 
     public Swarm addUnit() {
-        return addUnit(1);
+        return addUnit(WrightTier.BASE);
     }
 
     public Swarm addUnit(int speed) {
@@ -95,7 +95,7 @@ public record Swarm(List<Unit> units, int assign) {
             return this;
         }
         List<Unit> next = new ArrayList<>(units);
-        next.add(new Unit(UUID.randomUUID(), Mth.clamp(speed, 1, MAX_SPEED), 0));
+        next.add(new Unit(UUID.randomUUID(), Mth.clamp(speed, WrightTier.BASE, MAX_SPEED), 0));
         int keep = assign <= 0 ? 1 : assign;
         return new Swarm(List.copyOf(next), keep);
     }
@@ -115,7 +115,7 @@ public record Swarm(List<Unit> units, int assign) {
         }
         List<Unit> next = new ArrayList<>(units);
         Unit unit = next.get(index);
-        next.set(index, new Unit(unit.id(), Mth.clamp(speed, 1, MAX_SPEED), unit.power()));
+        next.set(index, new Unit(unit.id(), Mth.clamp(speed, WrightTier.BASE, MAX_SPEED), unit.power()));
         return new Swarm(List.copyOf(next), assign);
     }
 

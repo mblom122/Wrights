@@ -80,7 +80,7 @@ public class WrightportScreen extends AbstractContainerScreen<com.wrights.menu.W
             if (i == selected) {
                 graphics.fill(leftPos + LIST_X - 2, y - 1, leftPos + 168, y + 11, 0x553C2A1A);
             }
-            int speed = Math.max(1, Math.min(Swarm.MAX_SPEED, unit.speed()));
+            int speed = com.wrights.drone.WrightTier.clamp(unit.speed());
             String duty = Component.translatable("drone.wrights.speed." + speed).getString();
             String line = (i + 1) + "  " + duty;
             graphics.drawString(this.font, line, leftPos + LIST_X, y + 1, WrightsUi.TEXT, false);
