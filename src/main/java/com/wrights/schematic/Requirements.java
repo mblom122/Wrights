@@ -21,9 +21,9 @@ import net.minecraft.world.level.block.state.BlockState;
 import com.wrights.util.BlockFilters;
 
 public final class Requirements {
-    public record Cost(int itemId, int count, int player, int supply) {
+    public record Cost(int itemId, int count, int player, int supply, int digital) {
         public Cost(int itemId, int count) {
-            this(itemId, count, 0, 0);
+            this(itemId, count, 0, 0, 0);
         }
     }
 
@@ -60,12 +60,12 @@ public final class Requirements {
         return costs;
     }
 
-    /** Fills in how many of each item the player and a bound chest currently hold. */
+    /** Fills in how many of each item the player, a bound chest, and a bound digital network currently hold. */
     public static List<Cost> stocked(ServerPlayer player, List<Cost> costs, BlockPos supply, ResourceKey<Level> dimension) {
         List<Cost> stocked = new ArrayList<>(costs.size());
         for (Cost cost : costs) {
             Item item = Item.byId(cost.itemId());
-            stocked.add(new Cost(cost.itemId(), cost.count(), playerCount(player, item), supplyCount(player, supply, dimension, item)));
+            stocked.add(new Cost(cost.itemId(), cost.count(), playerCount(player, item), supplyCount(player, supply, dimension, item), digitalCount(player, item)));
         }
         return stocked;
     }
@@ -94,7 +94,7 @@ public final class Requirements {
     }
 
     private static boolean shortOf(Cost cost) {
-        return cost.player() + cost.supply() < cost.count();
+        return (long) cost.player() + cost.supply() + cost.digital() < cost.count();
     }
 
     public static int playerCount(ServerPlayer player, Item item) {
@@ -120,7 +120,11 @@ public final class Requirements {
                 }
             }
         }
-        stored += com.wrights.storage.ItemSource.digitalCount(player, item);
+        return stored > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) stored;
+    }
+
+    public static int digitalCount(ServerPlayer player, Item item) {
+        long stored = com.wrights.storage.ItemSource.digitalCount(player, item);
         return stored > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) stored;
     }
 

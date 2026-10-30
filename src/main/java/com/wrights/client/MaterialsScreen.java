@@ -27,6 +27,7 @@ public class MaterialsScreen extends Screen {
     private final Screen parent;
     private final List<BlueprintPayloads.MaterialLine> lines = new ArrayList<>();
     private boolean shortage;
+    private boolean digitalBound;
     private boolean loaded;
     private int panelX;
     private int panelY;
@@ -71,6 +72,7 @@ public class MaterialsScreen extends Screen {
         lines.clear();
         lines.addAll(payload.lines());
         shortage = payload.shortage();
+        digitalBound = payload.digital();
         loaded = true;
         scroll = 0;
         if (this.minecraft != null && this.minecraft.screen == this) {
@@ -80,7 +82,7 @@ public class MaterialsScreen extends Screen {
 
     @Override
     protected void init() {
-        panelW = Math.min(520, this.width - 16);
+        panelW = Math.min(digitalBound ? 640 : 520, this.width - 16);
         panelH = Math.min(240, this.height - 16);
         panelX = (this.width - panelW) / 2;
         panelY = (this.height - panelH) / 2;
@@ -120,7 +122,8 @@ public class MaterialsScreen extends Screen {
         Component title = Component.translatable(shortage ? "menu.wrights.need_title" : "menu.wrights.materials_title");
         graphics.drawString(this.font, title, panelX + 14, panelY + 8, WrightsUi.COPPER, false);
         boolean creative = this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild && !this.minecraft.player.isSpectator();
-        Component hint = Component.translatable(creative ? "menu.wrights.materials_creative" : shortage ? "menu.wrights.need_hint" : "menu.wrights.materials_hint");
+        String hintKey = creative ? "menu.wrights.materials_creative" : shortage ? "menu.wrights.need_hint" : digitalBound ? "menu.wrights.materials_hint_digital" : "menu.wrights.materials_hint";
+        Component hint = Component.translatable(hintKey);
         graphics.drawString(this.font, this.font.plainSubstrByWidth(hint.getString(), panelW - 28), panelX + 14, panelY + 20, WrightsUi.MUTED, false);
         if (!loaded) {
             graphics.drawString(this.font, Component.translatable("menu.wrights.materials_loading"), panelX + 18, listY + 6, WrightsUi.MUTED, false);
@@ -132,9 +135,24 @@ public class MaterialsScreen extends Screen {
         }
         int right = panelX + panelW - 18;
         int inventoryW = Math.max(COUNT_W, this.font.width(Component.translatable("menu.wrights.column_inventory").getString()));
+        int digitalW = COUNT_W;
+        if (digitalBound) {
+            digitalW = Math.max(digitalW, this.font.width(Component.translatable("menu.wrights.column_digital").getString()));
+            for (BlueprintPayloads.MaterialLine line : lines) {
+                digitalW = Math.max(digitalW, this.font.width(Integer.toString(line.digital())));
+            }
+        }
+        int totalW = COUNT_W;
+        if (digitalBound) {
+            for (BlueprintPayloads.MaterialLine line : lines) {
+                long sum = (long) line.player() + line.supply() + line.digital();
+                totalW = Math.max(totalW, this.font.width(Long.toString(sum)));
+            }
+        }
         int needX = right - COUNT_W;
-        int totalX = needX - 8 - COUNT_W;
-        int inventoryX = totalX - 8 - inventoryW;
+        int totalX = needX - 8 - totalW;
+        int digitalX = totalX - 8 - digitalW;
+        int inventoryX = (digitalBound ? digitalX : totalX) - 8 - inventoryW;
         int playerX = inventoryX - 8 - COUNT_W;
         int iconX = panelX + 16;
         int nameX = iconX + 22;
@@ -142,7 +160,10 @@ public class MaterialsScreen extends Screen {
         drawColumn(graphics, Component.translatable("menu.wrights.column_material"), iconX, listY + 2, COUNT_W, false);
         drawColumn(graphics, Component.translatable("menu.wrights.column_player"), playerX, listY + 2, COUNT_W, true);
         drawColumn(graphics, Component.translatable("menu.wrights.column_inventory"), inventoryX, listY + 2, inventoryW, true);
-        drawColumn(graphics, Component.translatable("menu.wrights.column_total"), totalX, listY + 2, COUNT_W, true);
+        if (digitalBound) {
+            drawColumn(graphics, Component.translatable("menu.wrights.column_digital"), digitalX, listY + 2, digitalW, true);
+        }
+        drawColumn(graphics, Component.translatable("menu.wrights.column_total"), totalX, listY + 2, totalW, true);
         drawColumn(graphics, Component.translatable("menu.wrights.column_need"), needX, listY + 2, COUNT_W, true);
         graphics.fill(panelX + 16, listY + HEADER - 2, right, listY + HEADER - 1, 0xFF31404E);
         int rows = Math.max(1, (listH - HEADER) / ROW);
@@ -158,14 +179,17 @@ public class MaterialsScreen extends Screen {
             int y = bodyY + (i - scroll) * ROW;
             ItemStack stack = new ItemStack(item);
             int need = line.count();
-            int total = line.player() + line.supply();
+            long total = (long) line.player() + line.supply() + line.digital();
             WrightsUi.slot(graphics, iconX, y, 0xFF31404E);
             graphics.renderItem(stack, iconX + 1, y + 1);
             String name = this.font.plainSubstrByWidth(stack.getHoverName().getString(), nameW);
             graphics.drawString(this.font, name, nameX, y + 5, WrightsUi.TEXT, false);
             drawCount(graphics, Integer.toString(line.player()), playerX, y + 5, COUNT_W, stockColor(creative, line.player(), need));
             drawCount(graphics, Integer.toString(line.supply()), inventoryX, y + 5, inventoryW, stockColor(creative, line.supply(), need));
-            drawCount(graphics, Integer.toString(total), totalX, y + 5, COUNT_W, stockColor(creative, total, need));
+            if (digitalBound) {
+                drawCount(graphics, Integer.toString(line.digital()), digitalX, y + 5, digitalW, stockColor(creative, line.digital(), need));
+            }
+            drawCount(graphics, Long.toString(total), totalX, y + 5, totalW, stockColor(creative, total, need));
             drawCount(graphics, Integer.toString(need), needX, y + 5, COUNT_W, WrightsUi.TEXT);
             if (mouseX >= iconX && mouseX < right && mouseY >= y && mouseY < y + ROW) {
                 hovered = stack;
@@ -177,7 +201,7 @@ public class MaterialsScreen extends Screen {
         }
     }
 
-    private int stockColor(boolean creative, int held, int need) {
+    private int stockColor(boolean creative, long held, int need) {
         if (creative) {
             return WrightsUi.BLUE;
         }

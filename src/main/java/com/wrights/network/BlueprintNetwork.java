@@ -126,9 +126,10 @@ public final class BlueprintNetwork {
     public static void materials(ServerPlayer player, java.util.UUID id, boolean shortage, java.util.List<Requirements.Cost> costs) {
         java.util.List<BlueprintPayloads.MaterialLine> lines = new java.util.ArrayList<>(costs.size());
         for (Requirements.Cost cost : costs) {
-            lines.add(new BlueprintPayloads.MaterialLine(cost.itemId(), cost.count(), cost.player(), cost.supply()));
+            lines.add(new BlueprintPayloads.MaterialLine(cost.itemId(), cost.count(), cost.player(), cost.supply(), cost.digital()));
         }
-        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.Materials(id, shortage, lines));
+        boolean digital = com.wrights.storage.ItemSource.linkOf(player).bound();
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.Materials(id, shortage, digital, lines));
     }
 
     public static void finished(ServerPlayer player, UUID id, boolean saved, boolean stay) {

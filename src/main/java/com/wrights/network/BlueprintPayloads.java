@@ -353,7 +353,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record MaterialLine(int itemId, int count, int player, int supply) {
+    public record MaterialLine(int itemId, int count, int player, int supply, int digital) {
     }
 
     public record MaterialsRequest(UUID id, int clipX, int clipY, int clipZ, boolean placeFluids) implements CustomPacketPayload {
@@ -374,31 +374,34 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record Materials(UUID id, boolean shortage, List<MaterialLine> lines) implements CustomPacketPayload {
+    public record Materials(UUID id, boolean shortage, boolean digital, List<MaterialLine> lines) implements CustomPacketPayload {
         public static final Type<Materials> TYPE = payloadType("materials");
         public static final StreamCodec<RegistryFriendlyByteBuf, Materials> STREAM_CODEC = StreamCodec.of((buf, value) -> value.write(buf), Materials::read);
 
         public void write(RegistryFriendlyByteBuf buf) {
             buf.writeUUID(id);
             buf.writeBoolean(shortage);
+            buf.writeBoolean(digital);
             buf.writeVarInt(lines.size());
             for (MaterialLine line : lines) {
                 buf.writeVarInt(line.itemId());
                 buf.writeVarInt(line.count());
                 buf.writeVarInt(line.player());
                 buf.writeVarInt(line.supply());
+                buf.writeVarInt(line.digital());
             }
         }
 
         public static Materials read(RegistryFriendlyByteBuf buf) {
             UUID id = buf.readUUID();
             boolean shortage = buf.readBoolean();
+            boolean digital = buf.readBoolean();
             int count = buf.readVarInt();
             List<MaterialLine> lines = new ArrayList<>(count);
             for (int i = 0; i < count; i++) {
-                lines.add(new MaterialLine(buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt()));
+                lines.add(new MaterialLine(buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt()));
             }
-            return new Materials(id, shortage, lines);
+            return new Materials(id, shortage, digital, lines);
         }
 
         @Override
