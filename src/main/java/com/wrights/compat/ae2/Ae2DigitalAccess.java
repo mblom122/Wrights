@@ -86,10 +86,13 @@ public final class Ae2DigitalAccess implements DigitalAccess {
             left -= inventory.extract(plain, left, Actionable.MODULATE, src);
         }
         if (left > 0L) {
-            for (var entry : List.copyOf(grid.getStorageService().getCachedInventory())) {
-                if (!(entry.getKey() instanceof AEItemKey itemKey) || itemKey.getItem() != item) {
-                    continue;
+            List<AEItemKey> matches = new ArrayList<>();
+            for (var entry : grid.getStorageService().getCachedInventory()) {
+                if (entry.getKey() instanceof AEItemKey itemKey && itemKey.getItem() == item) {
+                    matches.add(itemKey);
                 }
+            }
+            for (AEItemKey itemKey : matches) {
                 left -= inventory.extract(itemKey, left, Actionable.MODULATE, src);
                 if (left <= 0L) {
                     break;

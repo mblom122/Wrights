@@ -15,6 +15,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -108,7 +109,7 @@ public class HangarBlockEntity extends BlockEntity implements MenuProvider {
             return HangarSignal.YELLOW;
         }
         Swarm swarm = Swarm.from(stack);
-        return swarm.size() > 0 ? HangarSignal.GREEN : HangarSignal.RED;
+        return swarm.units().isEmpty() ? HangarSignal.RED : HangarSignal.GREEN;
     }
 
     private void sync() {
