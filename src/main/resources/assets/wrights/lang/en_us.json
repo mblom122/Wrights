@@ -179,6 +179,7 @@
   "menu.wrights.edit": "Edit",
   "menu.wrights.duplicate": "Duplicate",
   "menu.wrights.delete": "Delete",
+  "menu.wrights.drag_many": "%s selected",
   "menu.wrights.delete_confirm": "Confirm",
   "menu.wrights.build": "Build",
   "menu.wrights.queue": "Queue",
