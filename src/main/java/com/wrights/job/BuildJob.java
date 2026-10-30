@@ -488,8 +488,14 @@ public final class BuildJob {
     public static final int HOLD_DIMENSION = 5;
     public static final int HOLD_CHUNK = 6;
 
+    public static final int WAIT_NONE = 0;
+    public static final int WAIT_FLOOR = 1;
+    public static final int WAIT_CHUNK = 2;
+    public static final int WAIT_ITEMS = 3;
+
     private boolean paused;
     private int hold = HOLD_NONE;
+    private int waitKind = WAIT_NONE;
     private BlockPos holdPort;
     private boolean awaitDrones;
     private int crewQuota;
@@ -507,6 +513,14 @@ public final class BuildJob {
 
     public int hold() {
         return hold;
+    }
+
+    public int waitKind() {
+        return waitKind;
+    }
+
+    public void setWaitKind(int waitKind) {
+        this.waitKind = waitKind;
     }
 
     public BlockPos holdPort() {
@@ -1020,6 +1034,8 @@ public final class BuildJob {
         public int probe;
         public boolean rescan;
         public boolean idle;
+        /** This tick the only work left is a block another wright has to place first. Not saved. */
+        public boolean waitingOnOthers;
         public UUID entityId;
         public BlockPos lastPos;
         /** Null = personal wrightport (player back). Set = placed wrightport block. */

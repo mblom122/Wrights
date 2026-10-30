@@ -13,6 +13,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.Util;
@@ -1713,6 +1714,7 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private void renderJobs(GuiGraphics graphics, int mouseX, int mouseY) {
+        hoveredJob = null;
         prepareJobs();
         int[] pool = dronePool();
         String drones = this.font.plainSubstrByWidth(Component.translatable("menu.wrights.drones_pool", pool[0], pool[1]).getString(), Math.max(40, jobW - manageAllWidth - 8));
@@ -1735,6 +1737,9 @@ public class WrightsMenuScreen extends Screen {
                 drawJobRow(graphics, mouseX, mouseY, rowX, rowW, doneListY + row * JOB_ROW, finishedJobs.get(historyScroll + row));
             }
         }
+        if (hoveredJob != null) {
+            drawJobTooltip(graphics, mouseX, mouseY, hoveredJob);
+        }
     }
 
     private void drawJobGroup(GuiGraphics graphics, int x, int y, int width, int height, String title, String empty, int reserved) {
@@ -1754,6 +1759,7 @@ public class WrightsMenuScreen extends Screen {
         boolean working = !job.finished() && !job.saving();
         int buttonY = y + 48;
         boolean hover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 66;
+        hoveredJob = hover ? job : hoveredJob;
         graphics.fill(x, y, x + width, y + 66, hover ? 0xFF24303C : 0xFF18222C);
         String name = this.font.plainSubstrByWidth(job.name(), Math.max(40, width / 2));
         graphics.drawString(this.font, name, x + 6, y + 4, WrightsUi.TEXT, false);
@@ -1789,6 +1795,24 @@ public class WrightsMenuScreen extends Screen {
             right = drawJobButton(graphics, right, buttonY, "menu.wrights.stop", mouseX, mouseY, 52);
             drawJobButton(graphics, right, buttonY, job.paused() ? "menu.wrights.resume" : "menu.wrights.pause", mouseX, mouseY, 52);
         }
+    }
+
+    private BlueprintPayloads.JobLine hoveredJob;
+
+    private void drawJobTooltip(GuiGraphics graphics, int mouseX, int mouseY, BlueprintPayloads.JobLine job) {
+        List<FormattedCharSequence> lines = new ArrayList<>();
+        lines.add(Component.literal(job.name()).getVisualOrderText());
+        lines.add(Component.translatable(jobStatus(job)).getVisualOrderText());
+        lines.add(progressLine(job).getVisualOrderText());
+        Component wait = WrightsClientState.jobWait(job);
+        if (wait != null) {
+            lines.add(wait.getVisualOrderText());
+        }
+        String skipped = skippedLine(job);
+        if (!skipped.isEmpty()) {
+            lines.add(Component.literal(skipped).getVisualOrderText());
+        }
+        graphics.renderTooltip(this.font, lines, mouseX, mouseY);
     }
 
     private String jobStatus(BlueprintPayloads.JobLine job) {

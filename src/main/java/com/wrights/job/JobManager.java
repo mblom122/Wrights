@@ -885,6 +885,7 @@ public final class JobManager {
             return;
         }
         if (job.paused()) {
+            job.setWaitKind(BuildJob.WAIT_NONE);
             return;
         }
         if (instant(player)) {
@@ -892,10 +893,12 @@ public final class JobManager {
             return;
         }
         if (holdWithoutDrones(player, library, job)) {
+            job.setWaitKind(BuildJob.WAIT_NONE);
             return;
         }
         if (job.hasCrew()) {
             if (!inReach(player, library, job)) {
+                job.setWaitKind(BuildJob.WAIT_NONE);
                 return;
             }
             job.workedTick();
@@ -903,11 +906,13 @@ public final class JobManager {
             return;
         }
         if (!inReach(player, library, job)) {
+            job.setWaitKind(BuildJob.WAIT_NONE);
             return;
         }
         job.workedTick();
         int at = nextSolo(level, schematic, job);
         if (at == SUPPORT_WAIT) {
+            job.setWaitKind(BuildJob.WAIT_FLOOR);
             library.setDirty();
             return;
         }
@@ -929,13 +934,18 @@ public final class JobManager {
             double step = drone.distanceToSqr(hover) > 64.0D ? 0.85D : 0.4D;
             drone.moveToward(hover, step);
             job.setLastDronePos(drone.blockPosition());
+            job.setWaitKind(BuildJob.WAIT_NONE);
             library.setDirty();
             return;
         }
         int budget = WrightsConfig.BLOCKS_PER_TICK.getAsInt();
         for (int i = 0; i < budget; i++) {
             int index = i == 0 ? at : nextSolo(level, schematic, job);
-            if (index == SUPPORT_WAIT || index < 0) {
+            if (index == SUPPORT_WAIT) {
+                job.setWaitKind(BuildJob.WAIT_FLOOR);
+                break;
+            }
+            if (index < 0) {
                 break;
             }
             Schematic.Entry entry = schematic.entry(index);
@@ -954,6 +964,7 @@ public final class JobManager {
             }
             PlaceResult placed = placeOne(level, player, job, pos, entry, false);
             if (placed == PlaceResult.PAUSE) {
+                job.setWaitKind(BuildJob.WAIT_CHUNK);
                 if (job.tickMessage()) {
                     noteChunk(player, library, job);
                 }
@@ -961,9 +972,13 @@ public final class JobManager {
                 return;
             }
             if (placed == PlaceResult.WAIT) {
+                job.setWaitKind(BuildJob.WAIT_ITEMS);
                 break;
             }
             markSolo(job, index);
+        }
+        if (job.waitKind() != BuildJob.WAIT_ITEMS && job.waitKind() != BuildJob.WAIT_FLOOR) {
+            job.setWaitKind(BuildJob.WAIT_NONE);
         }
         library.setDirty();
         if (job.cursor() >= job.total()) {
@@ -2009,8 +2024,10 @@ public final class JobManager {
         boolean scanning = false;
         boolean waiting = false;
         boolean waitingChunk = false;
+        boolean waitingItems = false;
         int[] skipBudget = {8192};
         for (BuildJob.Hand hand : job.hands()) {
+            hand.waitingOnOthers = false;
             int index = nextWork(level, schematic, job, hand, skipBudget);
             if (index == -2) {
                 scanning = true;
@@ -2018,6 +2035,7 @@ public final class JobManager {
             }
             if (index == SUPPORT_WAIT) {
                 waiting = true;
+                hand.waitingOnOthers = true;
                 hand.idle = false;
                 continue;
             }
@@ -2052,6 +2070,7 @@ public final class JobManager {
                 }
                 if (at == SUPPORT_WAIT) {
                     waiting = true;
+                    hand.waitingOnOthers = true;
                     break;
                 }
                 if (at < 0) {
@@ -2073,6 +2092,7 @@ public final class JobManager {
                 }
                 PlaceResult placed = placeOne(level, player, job, pos, entry, false);
                 if (placed == PlaceResult.PAUSE) {
+                    job.setWaitKind(BuildJob.WAIT_CHUNK);
                     waitingChunk = true;
                     library.setDirty();
                     if (job.tickMessage()) {
@@ -2081,6 +2101,7 @@ public final class JobManager {
                     return;
                 }
                 if (placed == PlaceResult.WAIT) {
+                    waitingItems = true;
                     waiting = true;
                     break;
                 }
@@ -2090,6 +2111,7 @@ public final class JobManager {
         }
         shareWithIdle(job, schematic);
         releaseIdle(level, player, job, schematic);
+        parkWaiters(level, player, job, working);
         if (!working && !scanning) {
             for (BuildJob.Hand hand : job.hands()) {
                 int peek = nextInLane(level, schematic, job, hand);
@@ -2102,6 +2124,15 @@ public final class JobManager {
             }
         }
         library.setDirty();
+        int reason = BuildJob.WAIT_NONE;
+        if (waitingChunk) {
+            reason = BuildJob.WAIT_CHUNK;
+        } else if (waitingItems) {
+            reason = BuildJob.WAIT_ITEMS;
+        } else if (waiting) {
+            reason = BuildJob.WAIT_FLOOR;
+        }
+        job.setWaitKind(reason);
         if (!working && !scanning && !waiting) {
             finishPaste(level.getServer(), library, player, job);
         } else if (waitingChunk && job.tickMessage()) {
@@ -2675,6 +2706,33 @@ public final class JobManager {
         int slot = 0;
         for (BuildJob.Hand hand : job.hands()) {
             if (!hand.idle || countPaste(schematic, hand) > 0 || hand.entityId == null) {
+                continue;
+            }
+            recall(level, player, hand.entityId, slot++, going, hand.homePort);
+            hand.entityId = null;
+        }
+    }
+
+    /** A wright with nothing to place until another wright finishes the block under it goes home. */
+    private static void parkWaiters(ServerLevel level, ServerPlayer player, BuildJob job, boolean someoneWorking) {
+        if (!someoneWorking || job.hands().size() < 2) {
+            return;
+        }
+        boolean othersBusy = false;
+        int going = 0;
+        for (BuildJob.Hand hand : job.hands()) {
+            if (hand.waitingOnOthers && hand.entityId != null) {
+                going++;
+            } else if (!hand.idle && !hand.waitingOnOthers) {
+                othersBusy = true;
+            }
+        }
+        if (!othersBusy || going == 0) {
+            return;
+        }
+        int slot = 0;
+        for (BuildJob.Hand hand : job.hands()) {
+            if (!hand.waitingOnOthers || hand.entityId == null) {
                 continue;
             }
             recall(level, player, hand.entityId, slot++, going, hand.homePort);

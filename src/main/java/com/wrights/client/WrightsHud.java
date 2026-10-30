@@ -36,6 +36,7 @@ public final class WrightsHud {
         }
         Component line = null;
         Component sub = null;
+        Component note = null;
         Component task = taskLine();
         if (WrightsClientState.mode == WrightsClientState.Mode.CAPTURE) {
             boolean box = WrightsClientState.captureStyle == WrightsClientState.CaptureStyle.BOX;
@@ -90,6 +91,7 @@ public final class WrightsHud {
                 sub = time.isEmpty()
                         ? Component.translatable("hud.wrights.job_detail", aimed.done(), aimed.total(), percent, aimed.skipped())
                         : Component.translatable("hud.wrights.job_detail_time", aimed.done(), aimed.total(), percent, aimed.skipped(), time);
+                note = WrightsClientState.jobWait(aimed);
             }
         } else if (WrightsClientState.mode == WrightsClientState.Mode.NONE) {
             line = Component.translatable("hud.wrights.task_ready_sub");
@@ -103,8 +105,11 @@ public final class WrightsHud {
             if (sub != null) {
                 detailWidth = Math.max(detailWidth, minecraft.font.width(sub));
             }
+            if (note != null) {
+                detailWidth = Math.max(detailWidth, minecraft.font.width(note));
+            }
             detailWidth += 16;
-            detailHeight = sub == null ? 18 : 30;
+            detailHeight = sub == null ? 18 : note == null ? 30 : 42;
         }
         int stackWidth = Math.max(taskWidth, detailWidth);
         int stackHeight = 14 + (detailHeight == 0 ? 0 : 4 + detailHeight);
@@ -126,6 +131,9 @@ public final class WrightsHud {
             graphics.drawString(minecraft.font, line, x + 8, top + 4, WrightsUi.TEXT, false);
             if (sub != null) {
                 graphics.drawString(minecraft.font, sub, x + 8, top + 16, WrightsUi.MUTED, false);
+            }
+            if (note != null) {
+                graphics.drawString(minecraft.font, note, x + 8, top + 28, 0xFFF0C14A, false);
             }
         }
         if (showMainModes(minecraft)) {

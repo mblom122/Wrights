@@ -12,6 +12,7 @@ import java.util.UUID;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.util.Mth;
@@ -222,6 +223,20 @@ public final class WrightsClientState {
     public static int percent(BlueprintPayloads.JobLine job) {
         int total = Math.max(1, job.total());
         return Mth.clamp(job.done() * 100 / total, 0, 100);
+    }
+
+    /** Why a running job is standing still, or null when it is placing blocks. */
+    public static Component jobWait(BlueprintPayloads.JobLine job) {
+        if (job == null || job.finished() || job.paused() || job.undoing()) {
+            return null;
+        }
+        String key = switch (job.waitKind()) {
+            case com.wrights.job.BuildJob.WAIT_FLOOR -> "hud.wrights.wait_floor";
+            case com.wrights.job.BuildJob.WAIT_CHUNK -> "hud.wrights.wait_chunk";
+            case com.wrights.job.BuildJob.WAIT_ITEMS -> "hud.wrights.wait_items";
+            default -> null;
+        };
+        return key == null ? null : Component.translatable(key);
     }
 
     public static String timeLeft(BlueprintPayloads.JobLine job) {

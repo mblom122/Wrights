@@ -630,6 +630,7 @@ public final class BlueprintNetwork {
                     job.crewUnits(),
                     job.workedTicks(),
                     job.hold(),
+                    job.waitKind(),
                     jobSource(job),
                     jobSourcePort(job),
                     labelPort(player, job)));
