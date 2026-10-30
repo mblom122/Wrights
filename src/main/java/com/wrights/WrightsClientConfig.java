@@ -89,8 +89,8 @@ public final class WrightsClientConfig {
             .comment("Blocks in front of you when a paste is not aimed at a block.")
             .defineInRange("placeZ", 1, -32, 32);
     public static final ModConfigSpec.IntValue LAST_MODE = BUILDER
-            .comment("Last controller task. 0 ready, 1 new blueprint, 2 building, 3 jobs.")
-            .defineInRange("lastMode", 0, 0, 3);
+            .comment("Last controller task. 0 ready, 1 new blueprint, 2 building, 3 jobs, 4 manage, 5 info.")
+            .defineInRange("lastMode", 0, 0, 5);
     public static final ModConfigSpec.IntValue LAST_STYLE = BUILDER
             .comment("Last new-blueprint tool. 0 corners, 1 box, 2 move.")
             .defineInRange("lastStyle", 1, 0, 2);
@@ -409,7 +409,7 @@ public final class WrightsClientConfig {
     }
 
     public static void setLastMode(int mode, int style, String buildId) {
-        LAST_MODE.set(clamp(mode, 0, 3));
+        LAST_MODE.set(clamp(mode, 0, 5));
         LAST_STYLE.set(clamp(style, 0, 2));
         LAST_BUILD.set(buildId == null ? "" : buildId);
         save();

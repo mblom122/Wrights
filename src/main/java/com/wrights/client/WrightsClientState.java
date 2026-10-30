@@ -38,7 +38,9 @@ public final class WrightsClientState {
         CAPTURE,
         SAVING,
         BUILD,
-        JOBS
+        JOBS,
+        MANAGE,
+        INFO
     }
 
     public static Mode mode = Mode.NONE;
@@ -349,7 +351,14 @@ public final class WrightsClientState {
     private static String rememberedBuild = "";
 
     private static void rememberMode() {
-        int modeId = mode == Mode.CAPTURE ? 1 : mode == Mode.BUILD ? 2 : mode == Mode.JOBS ? 3 : 0;
+        int modeId = switch (mode) {
+            case CAPTURE -> 1;
+            case BUILD -> 2;
+            case JOBS -> 3;
+            case MANAGE -> 4;
+            case INFO -> 5;
+            default -> 0;
+        };
         if (modeId == 0) {
             return;
         }
@@ -429,6 +438,16 @@ public final class WrightsClientState {
             enterJobs();
             return;
         }
+        if (last == 4) {
+            resumeSent = true;
+            enterManage();
+            return;
+        }
+        if (last == 5) {
+            resumeSent = true;
+            enterInfo();
+            return;
+        }
         if (last != 1 && last != 2) {
             return;
         }
@@ -452,9 +471,14 @@ public final class WrightsClientState {
         name = com.wrights.blueprint.BlueprintActions.suggestName(libraryNames());
         editingId = null;
         ghosts = List.of();
+        clearCapturePreview();
         follow = false;
         boxDragging = false;
         moveGrabbed = false;
+        moveOriginA = null;
+        moveOriginB = null;
+        captureDirty = false;
+        clearedGeneration = generation;
         styleHudTicks = 70;
         updateFlags();
     }
@@ -474,8 +498,27 @@ public final class WrightsClientState {
         updateFlags();
     }
 
+    public static void enterManage() {
+        leaveCapture();
+        mode = Mode.MANAGE;
+        bindSupply = false;
+        updateFlags();
+    }
+
+    public static void enterInfo() {
+        leaveCapture();
+        mode = Mode.INFO;
+        bindSupply = false;
+        updateFlags();
+    }
+
+    /** True once New has been left for Build, so coming back starts a blank capture. */
+    private static boolean captureDirty;
+    /** Server generation at the moment New was cleared. Older syncs must not restore that box. */
+    private static int clearedGeneration = -1;
+
     public static void enterNewMode() {
-        if (mode == Mode.CAPTURE || mode == Mode.SAVING) {
+        if (mode == Mode.SAVING) {
             return;
         }
         beginCaptureLocal();
@@ -513,14 +556,20 @@ public final class WrightsClientState {
         int index = switch (mode) {
             case CAPTURE, SAVING, BUILD -> 0;
             case JOBS -> 1;
-            default -> delta > 0 ? -1 : 2;
+            case MANAGE -> 2;
+            case INFO -> 3;
+            default -> delta > 0 ? -1 : 4;
         };
-        int next = Math.floorMod(index + delta, 2);
+        int next = Math.floorMod(index + delta, 4);
         if (next == 0) {
             enterBuildFromLast();
             bindSupply = false;
-        } else {
+        } else if (next == 1) {
             enterJobs();
+        } else if (next == 2) {
+            enterManage();
+        } else {
+            enterInfo();
         }
         mainPicker = true;
         styleHudTicks = 70;
@@ -657,6 +706,7 @@ public final class WrightsClientState {
         pivotZ = 0;
         cornerA = null;
         cornerB = null;
+        clearCapturePreview();
         updateFlags();
     }
 
@@ -723,6 +773,11 @@ public final class WrightsClientState {
             if (keepLive && liveB != null) {
                 cornerB = liveB;
             }
+            if (incoming == Mode.CAPTURE && payload.generation() <= clearedGeneration) {
+                cornerA = null;
+                cornerB = null;
+                boxDragging = false;
+            }
             mode = incoming;
             if (incoming != Mode.CAPTURE) {
                 boxDragging = false;
@@ -735,7 +790,7 @@ public final class WrightsClientState {
                 concealed = false;
                 follow = false;
             }
-            if (incoming != Mode.CAPTURE && incoming != Mode.SAVING) {
+            if ((incoming != Mode.CAPTURE && incoming != Mode.SAVING) || cornerA == null || cornerB == null) {
                 clearCapturePreview();
             }
         }
@@ -1095,9 +1150,15 @@ public final class WrightsClientState {
     }
 
     private static void selectBuildTool(boolean bind) {
+        if (mode == Mode.CAPTURE) {
+            captureDirty = true;
+        }
         if (mode != Mode.BUILD) {
             boxDragging = false;
             moveGrabbed = false;
+            moveOriginA = null;
+            moveOriginB = null;
+            clearCapturePreview();
             enterBuildFromLast();
         }
         bindSupply = bind;
@@ -1107,10 +1168,14 @@ public final class WrightsClientState {
     }
 
     private static void selectNewStyle(CaptureStyle style) {
-        if (mode != Mode.CAPTURE) {
+        if (mode == Mode.SAVING) {
+            return;
+        }
+        boolean restart = mode != Mode.CAPTURE || captureDirty;
+        if (restart) {
             enterNewMode();
         }
-        if (mode != Mode.CAPTURE || style == captureStyle) {
+        if (mode != Mode.CAPTURE || (style == captureStyle && !restart)) {
             return;
         }
         if (moveGrabbed) {

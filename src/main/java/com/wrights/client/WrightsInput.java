@@ -162,6 +162,13 @@ public final class WrightsInput {
             event.setUseBlock(TriState.FALSE);
             event.setUseItem(TriState.FALSE);
             openAimedJob();
+            return;
+        }
+        if (menuMode() && Minecraft.getInstance().screen == null) {
+            event.setCanceled(true);
+            event.setUseBlock(TriState.FALSE);
+            event.setUseItem(TriState.FALSE);
+            openToolMenu();
         }
     }
 
@@ -194,11 +201,25 @@ public final class WrightsInput {
             if (WrightsClientState.jobAimed() != null) {
                 openAimedJob();
             } else {
-                Minecraft.getInstance().setScreen(new WrightsMenuScreen());
-                net.neoforged.neoforge.network.PacketDistributor.sendToServer(
-                        new BlueprintPayloads.LibraryRequest(WrightsClientState.libraryGlobal));
+                openToolMenu();
             }
+            return;
         }
+        if (menuMode() && Minecraft.getInstance().screen == null) {
+            event.setCanceled(true);
+            openToolMenu();
+        }
+    }
+
+    private static boolean menuMode() {
+        return WrightsClientState.mode == WrightsClientState.Mode.MANAGE
+                || WrightsClientState.mode == WrightsClientState.Mode.INFO;
+    }
+
+    private static void openToolMenu() {
+        Minecraft.getInstance().setScreen(new WrightsMenuScreen());
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                new BlueprintPayloads.LibraryRequest(WrightsClientState.libraryGlobal));
     }
 
     private static void useBuildClick(net.minecraft.world.entity.player.Player player, BlockPos pos) {

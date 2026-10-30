@@ -225,12 +225,24 @@ public class WrightsMenuScreen extends Screen {
             jobsPage = true;
             options = false;
             infoPage = false;
+            managePage = false;
+        } else if (WrightsClientState.mode == WrightsClientState.Mode.MANAGE) {
+            managePage = true;
+            jobsPage = false;
+            options = false;
+            infoPage = false;
+        } else if (WrightsClientState.mode == WrightsClientState.Mode.INFO) {
+            infoPage = true;
+            managePage = false;
+            jobsPage = false;
+            options = false;
         } else if (WrightsClientState.mode == WrightsClientState.Mode.BUILD
                 || WrightsClientState.mode == WrightsClientState.Mode.CAPTURE
                 || WrightsClientState.mode == WrightsClientState.Mode.SAVING) {
             jobsPage = false;
             options = false;
             infoPage = false;
+            managePage = false;
         } else {
             jobsPage = savedPage == PAGE_JOBS;
             options = savedPage == PAGE_OPTIONS;
@@ -345,6 +357,10 @@ public class WrightsMenuScreen extends Screen {
         if (!preserveMode && toolHeld()) {
             if (jobsPage) {
                 WrightsClientState.enterJobs();
+            } else if (managePage) {
+                WrightsClientState.enterManage();
+            } else if (infoPage) {
+                WrightsClientState.enterInfo();
             } else if (!options && !infoPage
                     && WrightsClientState.mode != WrightsClientState.Mode.CAPTURE
                     && WrightsClientState.mode != WrightsClientState.Mode.SAVING
