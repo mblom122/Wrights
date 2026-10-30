@@ -109,7 +109,8 @@ public final class WrightsInput {
             }
             if (minecraft.screen == null) {
                 minecraft.setScreen(new WrightsMenuScreen());
-                net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.wrights.network.BlueprintPayloads.LibraryRequest());
+                net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                        new com.wrights.network.BlueprintPayloads.LibraryRequest(WrightsClientState.libraryGlobal));
             } else if (minecraft.screen instanceof WrightsMenuScreen
                     || minecraft.screen instanceof BlueprintAdjustScreen
                     || minecraft.screen instanceof PlacementScreen
@@ -129,6 +130,17 @@ public final class WrightsInput {
             return;
         }
         if (!com.wrights.item.ControllerItem.isHeld(event.getEntity())) {
+            return;
+        }
+        if (event.getEntity().isShiftKeyDown()
+                && com.wrights.storage.DigitalNetworks.bindKindAt(event.getLevel(), event.getPos())
+                        != com.wrights.storage.DigitalLink.Kind.NONE) {
+            event.setCanceled(true);
+            event.setUseBlock(TriState.FALSE);
+            event.setUseItem(TriState.FALSE);
+            boundThisClick = true;
+            net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                    new BlueprintPayloads.BindDigital(event.getPos(), false));
             return;
         }
         if (com.wrights.blueprint.BlueprintClientFlags.capture) {
@@ -183,7 +195,8 @@ public final class WrightsInput {
                 openAimedJob();
             } else {
                 Minecraft.getInstance().setScreen(new WrightsMenuScreen());
-                net.neoforged.neoforge.network.PacketDistributor.sendToServer(new BlueprintPayloads.LibraryRequest());
+                net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                        new BlueprintPayloads.LibraryRequest(WrightsClientState.libraryGlobal));
             }
         }
     }
@@ -194,7 +207,8 @@ public final class WrightsInput {
         }
         if (WrightsClientState.buildId == null) {
             Minecraft.getInstance().setScreen(new WrightsMenuScreen());
-            net.neoforged.neoforge.network.PacketDistributor.sendToServer(new BlueprintPayloads.LibraryRequest());
+            net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                    new BlueprintPayloads.LibraryRequest(WrightsClientState.libraryGlobal));
             return;
         }
         if (player.isShiftKeyDown()) {

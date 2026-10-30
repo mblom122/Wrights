@@ -26,6 +26,7 @@ public final class BlueprintNetwork {
     public static void register(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar("1");
         registrar.playToServer(BlueprintPayloads.LibraryRequest.TYPE, BlueprintPayloads.LibraryRequest.STREAM_CODEC, BlueprintNetwork::library);
+        registrar.playToServer(BlueprintPayloads.LibraryMove.TYPE, BlueprintPayloads.LibraryMove.STREAM_CODEC, BlueprintNetwork::libraryMove);
         registrar.playToServer(BlueprintPayloads.ShelfEdit.TYPE, BlueprintPayloads.ShelfEdit.STREAM_CODEC, BlueprintNetwork::shelf);
         registrar.playToServer(BlueprintPayloads.StartCapture.TYPE, BlueprintPayloads.StartCapture.STREAM_CODEC, BlueprintNetwork::startCapture);
         registrar.playToServer(BlueprintPayloads.CaptureUpdate.TYPE, BlueprintPayloads.CaptureUpdate.STREAM_CODEC, BlueprintNetwork::update);
@@ -52,6 +53,8 @@ public final class BlueprintNetwork {
         registrar.playToServer(BlueprintPayloads.HangarEdit.TYPE, BlueprintPayloads.HangarEdit.STREAM_CODEC, BlueprintNetwork::hangar);
         registrar.playToServer(BlueprintPayloads.HangarBatch.TYPE, BlueprintPayloads.HangarBatch.STREAM_CODEC, BlueprintNetwork::hangarBatch);
         registrar.playToServer(BlueprintPayloads.BindSupply.TYPE, BlueprintPayloads.BindSupply.STREAM_CODEC, BlueprintNetwork::bindSupply);
+        registrar.playToServer(BlueprintPayloads.BindDigital.TYPE, BlueprintPayloads.BindDigital.STREAM_CODEC, BlueprintNetwork::bindDigital);
+        registrar.playToServer(BlueprintPayloads.DigitalInfoRequest.TYPE, BlueprintPayloads.DigitalInfoRequest.STREAM_CODEC, BlueprintNetwork::digitalInfo);
         registrar.playToServer(BlueprintPayloads.SetAnchor.TYPE, BlueprintPayloads.SetAnchor.STREAM_CODEC, BlueprintNetwork::anchor);
         registrar.playToServer(BlueprintPayloads.EditCell.TYPE, BlueprintPayloads.EditCell.STREAM_CODEC, BlueprintNetwork::editCell);
         registrar.playToServer(BlueprintPayloads.EditLayer.TYPE, BlueprintPayloads.EditLayer.STREAM_CODEC, BlueprintNetwork::editLayer);
@@ -76,6 +79,8 @@ public final class BlueprintNetwork {
         registrar.playToClient(BlueprintPayloads.JobHologram.TYPE, BlueprintPayloads.JobHologram.STREAM_CODEC, BlueprintNetwork::clientJobHologram);
         registrar.playToClient(BlueprintPayloads.JobSync.TYPE, BlueprintPayloads.JobSync.STREAM_CODEC, BlueprintNetwork::clientJobs);
         registrar.playToClient(BlueprintPayloads.SupplySync.TYPE, BlueprintPayloads.SupplySync.STREAM_CODEC, BlueprintNetwork::clientSupply);
+        registrar.playToClient(BlueprintPayloads.DigitalSync.TYPE, BlueprintPayloads.DigitalSync.STREAM_CODEC, BlueprintNetwork::clientDigital);
+        registrar.playToClient(BlueprintPayloads.DigitalInfoSync.TYPE, BlueprintPayloads.DigitalInfoSync.STREAM_CODEC, BlueprintNetwork::clientDigitalInfo);
         registrar.playToClient(BlueprintPayloads.UndoPrompt.TYPE, BlueprintPayloads.UndoPrompt.STREAM_CODEC, BlueprintNetwork::clientUndoPrompt);
         registrar.playToClient(BlueprintPayloads.JobDone.TYPE, BlueprintPayloads.JobDone.STREAM_CODEC, BlueprintNetwork::clientJobDone);
         registrar.playToClient(BlueprintPayloads.BlueprintItemList.TYPE, BlueprintPayloads.BlueprintItemList.STREAM_CODEC, BlueprintNetwork::clientBlueprintItems);
@@ -89,7 +94,8 @@ public final class BlueprintNetwork {
                 BlueprintActions.summaries(player),
                 BlueprintActions.busy(player),
                 BlueprintActions.folders(player),
-                BlueprintActions.openFolders(player)));
+                BlueprintActions.openFolders(player),
+                BlueprintSessions.get(player).libraryGlobal()));
     }
 
     public static void syncCapture(ServerPlayer player) {
@@ -129,9 +135,14 @@ public final class BlueprintNetwork {
     private static void library(BlueprintPayloads.LibraryRequest payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
         context.enqueueWork(() -> {
-            BlueprintActions.requestLibrary(player);
+            BlueprintActions.requestLibrary(player, payload.global());
             BlueprintNetwork.syncJobs(player);
         });
+    }
+
+    private static void libraryMove(BlueprintPayloads.LibraryMove payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> BlueprintActions.moveLibrary(player, payload.id(), payload.toGlobal()));
     }
 
     private static void shelf(BlueprintPayloads.ShelfEdit payload, IPayloadContext context) {
@@ -341,6 +352,16 @@ public final class BlueprintNetwork {
         context.enqueueWork(() -> JobManager.bindSupply(player, payload.pos(), payload.clear()));
     }
 
+    private static void bindDigital(BlueprintPayloads.BindDigital payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> com.wrights.storage.DigitalBinder.bind(player, payload.pos(), payload.clear()));
+    }
+
+    private static void digitalInfo(BlueprintPayloads.DigitalInfoRequest payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> syncDigitalInfo(player));
+    }
+
     private static void clientLibrary(BlueprintPayloads.LibrarySync payload, IPayloadContext context) {
         if (FMLEnvironment.dist != Dist.CLIENT) {
             return;
@@ -395,6 +416,20 @@ public final class BlueprintNetwork {
             return;
         }
         context.enqueueWork(() -> com.wrights.client.WrightsClientState.applySupply(payload));
+    }
+
+    private static void clientDigital(BlueprintPayloads.DigitalSync payload, IPayloadContext context) {
+        if (FMLEnvironment.dist != Dist.CLIENT) {
+            return;
+        }
+        context.enqueueWork(() -> com.wrights.client.WrightsClientState.applyDigital(payload));
+    }
+
+    private static void clientDigitalInfo(BlueprintPayloads.DigitalInfoSync payload, IPayloadContext context) {
+        if (FMLEnvironment.dist != Dist.CLIENT) {
+            return;
+        }
+        context.enqueueWork(() -> com.wrights.client.WrightsClientState.applyDigitalInfo(payload));
     }
 
     private static void clientJobDone(BlueprintPayloads.JobDone payload, IPayloadContext context) {
@@ -552,6 +587,46 @@ public final class BlueprintNetwork {
     public static void syncSupply(ServerPlayer player) {
         BlockPos pos = BlueprintSessions.get(player).supplyPos();
         PacketDistributor.sendToPlayer(player, new BlueprintPayloads.SupplySync(pos != null, pos == null ? BlockPos.ZERO : pos));
+    }
+
+    public static void syncDigital(ServerPlayer player) {
+        com.wrights.storage.DigitalLink link = BlueprintSessions.get(player).digitalLink();
+        boolean online = false;
+        BlockPos pos = BlockPos.ZERO;
+        String dim = "";
+        int kind = com.wrights.storage.DigitalLink.Kind.NONE.ordinal();
+        if (link != null && link.bound()) {
+            kind = link.kind().ordinal();
+            pos = link.pos().pos();
+            dim = link.pos().dimension().location().toString();
+            var level = com.wrights.storage.DigitalNetworks.levelOf(player, link.pos());
+            online = level != null && com.wrights.storage.DigitalNetworks.online(level, link);
+        }
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.DigitalSync(kind, online, pos, dim));
+    }
+
+    public static void syncDigitalInfo(ServerPlayer player) {
+        com.wrights.storage.DigitalLink link = com.wrights.storage.ItemSource.linkOf(player);
+        boolean online = false;
+        BlockPos pos = BlockPos.ZERO;
+        String dim = "";
+        int kind = com.wrights.storage.DigitalLink.Kind.NONE.ordinal();
+        java.util.List<BlueprintPayloads.DigitalInfoLine> lines = new java.util.ArrayList<>();
+        if (link != null && link.bound()) {
+            kind = link.kind().ordinal();
+            pos = link.pos().pos();
+            dim = link.pos().dimension().location().toString();
+            var level = com.wrights.storage.DigitalNetworks.levelOf(player, link.pos());
+            online = level != null && com.wrights.storage.DigitalNetworks.online(level, link);
+            if (level != null && online) {
+                for (net.minecraft.world.item.Item item : com.wrights.storage.DigitalCatalog.items()) {
+                    long stock = com.wrights.storage.DigitalNetworks.count(level, link, item);
+                    boolean craftable = com.wrights.storage.DigitalNetworks.craftable(level, link, item);
+                    lines.add(new BlueprintPayloads.DigitalInfoLine(net.minecraft.world.item.Item.getId(item), stock, craftable));
+                }
+            }
+        }
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.DigitalInfoSync(kind, online, pos, dim, lines));
     }
 
     public static void jobDone(ServerPlayer player, String name, int seconds) {

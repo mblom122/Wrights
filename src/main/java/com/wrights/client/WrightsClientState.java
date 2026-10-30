@@ -54,6 +54,8 @@ public final class WrightsClientState {
     public static boolean busy;
     public static List<BlueprintPayloads.JobLine> jobs = List.of();
     public static boolean libraryKnown;
+    /** False = this world's library. True = shared AppData / global library. */
+    public static boolean libraryGlobal;
     public static UUID selected;
     public static UUID buildId;
     public static String buildName = "";
@@ -75,6 +77,13 @@ public final class WrightsClientState {
     public static boolean supplyBound;
     public static BlockPos supplyPos;
     public static long supplyHighlightUntil;
+    public static int digitalKind;
+    public static boolean digitalOnline;
+    public static boolean digitalBound;
+    public static BlockPos digitalPos;
+    public static String digitalDim = "";
+    public static List<BlueprintPayloads.DigitalInfoLine> digitalLines = List.of();
+    public static long digitalInfoAt;
     public static BlockPos anchor;
     public static int pivotX;
     public static int pivotY;
@@ -658,6 +667,7 @@ public final class WrightsClientState {
         folders = List.copyOf(payload.folders());
         openFolders = Set.copyOf(payload.open());
         busy = payload.busy();
+        libraryGlobal = payload.global();
         libraryKnown = true;
         if (selected != null && library.stream().noneMatch(entry -> entry.id().equals(selected))
                 && folders.stream().noneMatch(folder -> folder.id().equals(selected))) {
@@ -667,6 +677,16 @@ public final class WrightsClientState {
         if (minecraft.screen instanceof WrightsMenuScreen menu) {
             menu.refresh();
         }
+    }
+
+    public static void setLibraryScope(boolean global) {
+        if (libraryGlobal == global && libraryKnown) {
+            return;
+        }
+        libraryGlobal = global;
+        libraryKnown = false;
+        selected = null;
+        PacketDistributor.sendToServer(new BlueprintPayloads.LibraryRequest(global));
     }
 
     public static void setOpenLocal(UUID id, boolean open) {
@@ -1053,6 +1073,28 @@ public final class WrightsClientState {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.screen instanceof PlacementScreen placement) {
             placement.refresh();
+        }
+    }
+
+    public static void applyDigital(BlueprintPayloads.DigitalSync payload) {
+        digitalKind = payload.kind();
+        digitalOnline = payload.online();
+        digitalBound = payload.kind() != com.wrights.storage.DigitalLink.Kind.NONE.ordinal();
+        digitalPos = digitalBound ? payload.pos() : null;
+        digitalDim = payload.dim() == null ? "" : payload.dim();
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.screen instanceof WrightsMenuScreen menu) {
+            menu.refreshDigital();
+        }
+    }
+
+    public static void applyDigitalInfo(BlueprintPayloads.DigitalInfoSync payload) {
+        applyDigital(new BlueprintPayloads.DigitalSync(payload.kind(), payload.online(), payload.pos(), payload.dim()));
+        digitalLines = payload.lines() == null ? List.of() : List.copyOf(payload.lines());
+        digitalInfoAt = System.currentTimeMillis();
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.screen instanceof WrightsMenuScreen menu) {
+            menu.refreshDigital();
         }
     }
 

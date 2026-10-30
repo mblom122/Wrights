@@ -88,27 +88,26 @@ public final class Requirements {
     }
 
     public static int supplyCount(ServerPlayer player, BlockPos supply, ResourceKey<Level> dimension, Item item) {
+        long stored = 0L;
         ServerLevel level = null;
         if (dimension != null) {
             level = player.server.getLevel(dimension);
         } else if (player.level() instanceof ServerLevel current) {
             level = current;
         }
-        if (level == null || supply == null || !level.mayInteract(player, supply)) {
-            return 0;
-        }
-        Container container = containerAt(level, supply);
-        if (container == null) {
-            return 0;
-        }
-        int stored = 0;
-        for (int slot = 0; slot < container.getContainerSize(); slot++) {
-            ItemStack stack = container.getItem(slot);
-            if (stack.is(item)) {
-                stored += stack.getCount();
+        if (level != null && supply != null && level.mayInteract(player, supply)) {
+            Container container = containerAt(level, supply);
+            if (container != null) {
+                for (int slot = 0; slot < container.getContainerSize(); slot++) {
+                    ItemStack stack = container.getItem(slot);
+                    if (stack.is(item)) {
+                        stored += stack.getCount();
+                    }
+                }
             }
         }
-        return stored;
+        stored += com.wrights.storage.ItemSource.digitalCount(player, item);
+        return stored > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) stored;
     }
 
     private static Container containerAt(ServerLevel level, BlockPos pos) {

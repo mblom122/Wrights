@@ -24,6 +24,7 @@ public class WrightsMenuScreen extends Screen {
     private static final int PAGE_BUILDING = 0;
     private static final int PAGE_JOBS = 1;
     private static final int PAGE_OPTIONS = 2;
+    private static final int PAGE_INFO = 3;
     private static int savedPage = PAGE_BUILDING;
     private static int savedScroll;
     private static int savedJobScroll;
@@ -70,6 +71,7 @@ public class WrightsMenuScreen extends Screen {
     private WrightsButton deleteButton;
     private WrightsButton duplicateButton;
     private WrightsButton importButton;
+    private WrightsButton moveButton;
     private WrightsButton buildButton;
     private WrightsButton renameButton;
     private WrightsButton discardButton;
@@ -103,6 +105,10 @@ public class WrightsMenuScreen extends Screen {
     private UUID dropHighlight;
     private int dropLineY = -1;
     private boolean options;
+    private boolean infoPage;
+    private WrightsButton unbindDigital;
+    private int infoScroll;
+    private static int savedInfoScroll;
     private boolean jobsPage;
     private int jobScroll;
     private int historyScroll;
@@ -196,19 +202,23 @@ public class WrightsMenuScreen extends Screen {
         if (WrightsClientState.mode == WrightsClientState.Mode.JOBS) {
             jobsPage = true;
             options = false;
+            infoPage = false;
         } else if (WrightsClientState.mode == WrightsClientState.Mode.BUILD
                 || WrightsClientState.mode == WrightsClientState.Mode.CAPTURE
                 || WrightsClientState.mode == WrightsClientState.Mode.SAVING) {
             jobsPage = false;
             options = false;
+            infoPage = false;
         } else {
             jobsPage = savedPage == PAGE_JOBS;
             options = savedPage == PAGE_OPTIONS;
+            infoPage = savedPage == PAGE_INFO;
         }
         scroll = savedScroll;
         jobScroll = savedJobScroll;
         historyScroll = savedHistoryScroll;
         optionScroll = savedOptionScroll;
+        infoScroll = savedInfoScroll;
         searchText = savedSearch;
     }
 
@@ -261,9 +271,11 @@ public class WrightsMenuScreen extends Screen {
         x += otherW + gap;
         deleteButton = add(new WrightsButton(x, y, otherW + Math.max(0, slack), 18, Component.translatable("menu.wrights.delete"), button -> delete(), true));
         int bottom = panelY + panelH - 26;
-        int importW = Math.max(40, listW - gap - otherW);
+        int moveW = Math.max(48, this.font.width(Component.translatable("menu.wrights.to_global").getString()) + 10);
+        int importW = Math.max(40, listW - gap * 2 - otherW - moveW);
         importButton = add(new WrightsButton(listX, bottom, importW, 18, Component.translatable("menu.wrights.transfer"), button -> openImport()));
-        newButton = add(new WrightsButton(listX + importW + gap, bottom, otherW, 18, Component.translatable("menu.wrights.new"), button -> newBlueprint()));
+        moveButton = add(new WrightsButton(listX + importW + gap, bottom, moveW, 18, Component.translatable("menu.wrights.to_global"), button -> moveSelected()));
+        newButton = add(new WrightsButton(listX + importW + gap + moveW + gap, bottom, otherW, 18, Component.translatable("menu.wrights.new"), button -> newBlueprint()));
         int detailButtonW = 58;
         buildButton = add(new WrightsButton(detailX + detailW - 120, bottom, detailButtonW, 18, Component.translatable("menu.wrights.build"), button -> build()));
         addRenderableWidget(new WrightsButton(detailX + detailW - detailButtonW, bottom, detailButtonW, 18, Component.translatable("menu.wrights.close"), button -> onClose()));
@@ -283,23 +295,29 @@ public class WrightsMenuScreen extends Screen {
         placeX = offsetBox(0);
         placeY = offsetBox(1);
         placeZ = offsetBox(2);
+        unbindDigital = add(new WrightsButton(panelX + 140, panelY + panelH - 48, 120, 18,
+                Component.translatable("menu.wrights.digital_unbind"), button -> clearDigitalLink()));
         refresh();
+        if (infoPage) {
+            requestDigitalInfo();
+        }
     }
 
     private boolean preserveMode;
 
     @Override
     public void removed() {
-        savedPage = jobsPage ? PAGE_JOBS : options ? PAGE_OPTIONS : PAGE_BUILDING;
+        savedPage = jobsPage ? PAGE_JOBS : options ? PAGE_OPTIONS : infoPage ? PAGE_INFO : PAGE_BUILDING;
         savedScroll = scroll;
         savedJobScroll = jobScroll;
         savedHistoryScroll = historyScroll;
         savedOptionScroll = optionScroll;
+        savedInfoScroll = infoScroll;
         savedSearch = searchText == null ? "" : searchText;
         if (!preserveMode && toolHeld()) {
             if (jobsPage) {
                 WrightsClientState.enterJobs();
-            } else if (!options
+            } else if (!options && !infoPage
                     && WrightsClientState.mode != WrightsClientState.Mode.CAPTURE
                     && WrightsClientState.mode != WrightsClientState.Mode.SAVING
                     && WrightsClientState.mode != WrightsClientState.Mode.BUILD) {
@@ -338,8 +356,8 @@ public class WrightsMenuScreen extends Screen {
         panelY = (this.height - panelH) / 2;
         listX = panelX + 126;
         headingY = panelY + 36;
-        searchY = panelY + 50;
-        listY = panelY + 72;
+        searchY = panelY + 68;
+        listY = panelY + 90;
         listW = Math.min(220, panelW - 300);
         if (listW < 120) {
             listW = Math.max(100, (panelW - 150) / 2);
@@ -395,9 +413,10 @@ public class WrightsMenuScreen extends Screen {
         boolean blueprint = selected != null;
         boolean any = row != null;
         boolean tool = toolHeld();
-        editButton.active = blueprint;
+        boolean world = !WrightsClientState.libraryGlobal;
+        editButton.active = blueprint && world;
         deleteButton.active = any;
-        buildButton.active = blueprint && tool;
+        buildButton.active = blueprint && tool && world;
         renameButton.active = any;
         deleteButton.setMessage(Component.translatable(any && row.id().equals(confirmDelete) ? "menu.wrights.delete_confirm" : "menu.wrights.delete"));
         if (any && !rename.isFocused()) {
@@ -413,7 +432,7 @@ public class WrightsMenuScreen extends Screen {
             suggestRename = false;
         }
         boolean capture = WrightsClientState.mode == WrightsClientState.Mode.CAPTURE;
-        boolean building = !options && !jobsPage;
+        boolean building = !options && !jobsPage && !infoPage;
         search.setX(listX);
         search.setY(searchY);
         int sortW = sortButton == null ? 0 : sortButton.getWidth();
@@ -451,7 +470,11 @@ public class WrightsMenuScreen extends Screen {
             stopButton.setWidth(Math.max(40, detailW - 8));
         }
         if (newButton != null) {
-            newButton.active = tool;
+            newButton.active = tool && world;
+        }
+        if (moveButton != null) {
+            moveButton.active = blueprint;
+            moveButton.setMessage(Component.translatable(world ? "menu.wrights.to_global" : "menu.wrights.to_world"));
         }
         if (discardButton != null) {
             discardButton.active = tool;
@@ -497,13 +520,34 @@ public class WrightsMenuScreen extends Screen {
             showOffset(placeZ, WrightsClientConfig.PLACE_Z.get());
             layoutOptions();
         }
+        if (unbindDigital != null) {
+            unbindDigital.visible = infoPage;
+            unbindDigital.active = infoPage && WrightsClientState.digitalBound;
+            unbindDigital.setX(panelX + 140);
+            unbindDigital.setY(panelY + panelH - 48);
+        }
+    }
+
+    public void refreshDigital() {
+        if (unbindDigital != null) {
+            unbindDigital.visible = infoPage;
+            unbindDigital.active = infoPage && WrightsClientState.digitalBound;
+        }
+    }
+
+    private void requestDigitalInfo() {
+        PacketDistributor.sendToServer(new BlueprintPayloads.DigitalInfoRequest());
+    }
+
+    private void clearDigitalLink() {
+        PacketDistributor.sendToServer(new BlueprintPayloads.BindDigital(BlockPos.ZERO, true));
     }
 
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         graphics.fill(0, 0, this.width, this.height, 0xC0060C14);
         WrightsUi.panel(graphics, panelX, panelY, panelW, panelH);
-        if (options || jobsPage) {
+        if (options || jobsPage || infoPage) {
             int x = listX - 2;
             int width = panelX + panelW - 12 - x;
             int top = jobsPage ? jobsInsetY() : panelY + 34;
@@ -526,13 +570,21 @@ public class WrightsMenuScreen extends Screen {
         if (!toolHeld()) {
             graphics.drawString(this.font, Component.translatable("menu.wrights.need_controller"), panelX + 150, panelY + 10, WrightsUi.MUTED, false);
         }
-        drawTask(graphics, Component.translatable("menu.wrights.building"), !options && !jobsPage, false, panelY + 46);
+        drawTask(graphics, Component.translatable("menu.wrights.building"), !options && !jobsPage && !infoPage, false, panelY + 46);
         drawTask(graphics, Component.translatable("menu.wrights.jobs"), jobsPage, false, panelY + 72);
         drawTask(graphics, Component.translatable("menu.wrights.mining"), false, true, panelY + 98);
-        drawTask(graphics, Component.translatable("menu.wrights.hauling"), false, true, panelY + 124);
+        drawTask(graphics, Component.translatable("menu.wrights.info"), infoPage, false, panelY + 124);
         drawTask(graphics, Component.translatable("menu.wrights.options"), options, false, panelY + 150);
         if (options) {
             renderOptions(graphics);
+            return;
+        }
+        if (infoPage) {
+            if (System.currentTimeMillis() - WrightsClientState.digitalInfoAt > 2000L) {
+                requestDigitalInfo();
+                WrightsClientState.digitalInfoAt = System.currentTimeMillis();
+            }
+            renderInfo(graphics);
             return;
         }
         if (jobsPage) {
@@ -540,8 +592,9 @@ public class WrightsMenuScreen extends Screen {
             return;
         }
 
+        drawScope(graphics, mouseX, mouseY);
         drawTabs(graphics, mouseX, mouseY);
-        if (WrightsClientState.busy) {
+        if (WrightsClientState.busy && !WrightsClientState.libraryGlobal) {
             graphics.drawString(this.font, Component.translatable("menu.wrights.busy"), detailX, headingY, WrightsUi.COPPER, false);
         }
         renderList(graphics, mouseX, mouseY);
@@ -561,6 +614,69 @@ public class WrightsMenuScreen extends Screen {
         graphics.drawString(this.font, label, x + 8, y + 7, active ? WrightsUi.TEXT : WrightsUi.MUTED, false);
         if (soon) {
             graphics.drawString(this.font, Component.translatable("menu.wrights.soon"), x + 68, y + 7, 0xFF667480, false);
+        }
+    }
+
+    private void renderInfo(GuiGraphics graphics) {
+        int x = listX;
+        int y = panelY + 42;
+        int width = panelX + panelW - 16 - x;
+        graphics.drawString(this.font, Component.translatable("menu.wrights.info_title"), x, y, WrightsUi.TEXT, false);
+        y += 14;
+        if (!WrightsClientState.digitalBound) {
+            graphics.drawString(this.font, Component.translatable("menu.wrights.digital_none"), x, y, WrightsUi.MUTED, false);
+            y += 14;
+            graphics.drawString(this.font, Component.translatable("menu.wrights.digital_bind_rs"), x, y, WrightsUi.MUTED, false);
+            y += 12;
+            graphics.drawString(this.font, Component.translatable("menu.wrights.digital_bind_ae2"), x, y, WrightsUi.MUTED, false);
+        } else {
+            Component kind = Component.translatable(WrightsClientState.digitalKind == com.wrights.storage.DigitalLink.Kind.AE2.ordinal()
+                    ? "menu.wrights.digital_ae2"
+                    : "menu.wrights.digital_rs");
+            Component status = Component.translatable(WrightsClientState.digitalOnline
+                    ? "menu.wrights.digital_online"
+                    : "menu.wrights.digital_offline");
+            graphics.drawString(this.font, Component.translatable("menu.wrights.digital_bound", kind, status), x, y, WrightsUi.TEXT, false);
+            y += 12;
+            BlockPos pos = WrightsClientState.digitalPos;
+            if (pos != null) {
+                String dim = WrightsClientState.digitalDim;
+                if (dim == null || dim.isEmpty()) {
+                    dim = "?";
+                }
+                graphics.drawString(this.font, Component.translatable("menu.wrights.digital_pos", pos.getX(), pos.getY(), pos.getZ(), dim), x, y, WrightsUi.MUTED, false);
+                y += 12;
+            }
+        }
+        y += 6;
+        if (WrightsClientState.supplyBound && WrightsClientState.supplyPos != null) {
+            BlockPos chest = WrightsClientState.supplyPos;
+            graphics.drawString(this.font, Component.translatable("menu.wrights.chest_bound", chest.getX(), chest.getY(), chest.getZ()), x, y, WrightsUi.BLUE, false);
+        } else {
+            graphics.drawString(this.font, Component.translatable("menu.wrights.chest_none"), x, y, WrightsUi.MUTED, false);
+        }
+        y += 16;
+        graphics.drawString(this.font, Component.translatable("menu.wrights.digital_items"), x, y, WrightsUi.TEXT, false);
+        y += 12;
+        if (!WrightsClientState.digitalBound || !WrightsClientState.digitalOnline) {
+            graphics.drawString(this.font, Component.translatable("menu.wrights.digital_items_offline"), x, y, WrightsUi.MUTED, false);
+            return;
+        }
+        if (WrightsClientState.digitalLines.isEmpty()) {
+            graphics.drawString(this.font, Component.translatable("menu.wrights.digital_items_empty"), x, y, WrightsUi.MUTED, false);
+            return;
+        }
+        int bottom = panelY + panelH - 56;
+        for (BlueprintPayloads.DigitalInfoLine line : WrightsClientState.digitalLines) {
+            if (y + 12 > bottom) {
+                break;
+            }
+            net.minecraft.world.item.Item item = net.minecraft.world.item.Item.byId(line.itemId());
+            Component name = item.getDefaultInstance().getHoverName();
+            Component craft = Component.translatable(line.craftable() ? "menu.wrights.digital_craftable" : "menu.wrights.digital_stock_only");
+            String text = name.getString() + "  x" + line.stock() + "  " + craft.getString();
+            graphics.drawString(this.font, this.font.plainSubstrByWidth(text, width), x, y, WrightsUi.MUTED, false);
+            y += 12;
         }
     }
 
@@ -792,20 +908,38 @@ public class WrightsMenuScreen extends Screen {
         box.setHeight(14);
     }
 
+    private void drawScope(GuiGraphics graphics, int mouseX, int mouseY) {
+        int half = listW / 2;
+        drawScopeChip(graphics, mouseX, mouseY, listX, headingY, half - 2, false, "menu.wrights.scope_world");
+        drawScopeChip(graphics, mouseX, mouseY, listX + half, headingY, listW - half, true, "menu.wrights.scope_global");
+    }
+
+    private void drawScopeChip(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int w, boolean global, String key) {
+        boolean on = WrightsClientState.libraryGlobal == global;
+        boolean hover = mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + 14;
+        graphics.fill(x, y, x + w, y + 14, on ? 0xFF24384A : (hover ? 0xFF223445 : 0xFF1C2A37));
+        if (on) {
+            graphics.fill(x, y, x + w, y + 2, WrightsUi.COPPER);
+        }
+        String label = this.font.plainSubstrByWidth(Component.translatable(key).getString(), w - 4);
+        graphics.drawString(this.font, label, x + (w - this.font.width(label)) / 2, y + 3, on ? WrightsUi.TEXT : WrightsUi.MUTED, false);
+    }
+
     private void drawTabs(GuiGraphics graphics, int mouseX, int mouseY) {
         String[] keys = {"menu.wrights.tab_all", "menu.wrights.tab_last", "menu.wrights.tab_most", "menu.wrights.tab_fav"};
         int width = listW / keys.length;
+        int tabY = headingY + 16;
         for (int i = 0; i < keys.length; i++) {
             int x = listX + i * width;
             int tabW = i == keys.length - 1 ? listX + listW - x : width;
             boolean on = savedTab == i;
-            boolean hover = mouseX >= x && mouseX < x + tabW && mouseY >= headingY && mouseY < headingY + 14;
-            graphics.fill(x, headingY, x + tabW - 1, headingY + 13, on ? 0xFF24384A : (hover ? 0xFF223445 : 0xFF1C2A37));
+            boolean hover = mouseX >= x && mouseX < x + tabW && mouseY >= tabY && mouseY < tabY + 14;
+            graphics.fill(x, tabY, x + tabW - 1, tabY + 13, on ? 0xFF24384A : (hover ? 0xFF223445 : 0xFF1C2A37));
             if (on) {
-                graphics.fill(x, headingY, x + tabW - 1, headingY + 2, WrightsUi.COPPER);
+                graphics.fill(x, tabY, x + tabW - 1, tabY + 2, WrightsUi.COPPER);
             }
             String label = this.font.plainSubstrByWidth(Component.translatable(keys[i]).getString(), tabW - 4);
-            graphics.drawString(this.font, label, x + (tabW - this.font.width(label)) / 2, headingY + 3, on ? WrightsUi.TEXT : WrightsUi.MUTED, false);
+            graphics.drawString(this.font, label, x + (tabW - this.font.width(label)) / 2, tabY + 3, on ? WrightsUi.TEXT : WrightsUi.MUTED, false);
         }
     }
 
@@ -1004,19 +1138,31 @@ public class WrightsMenuScreen extends Screen {
         if (button == 0 && hitTask(mouseX, mouseY, panelY + 46)) {
             options = false;
             jobsPage = false;
+            infoPage = false;
             refresh();
             return true;
         }
         if (button == 0 && hitTask(mouseX, mouseY, panelY + 72)) {
             options = false;
             jobsPage = true;
+            infoPage = false;
             setFocused(null);
+            refresh();
+            return true;
+        }
+        if (button == 0 && hitTask(mouseX, mouseY, panelY + 124)) {
+            options = false;
+            jobsPage = false;
+            infoPage = true;
+            setFocused(null);
+            requestDigitalInfo();
             refresh();
             return true;
         }
         if (button == 0 && hitTask(mouseX, mouseY, panelY + 150)) {
             options = true;
             jobsPage = false;
+            infoPage = false;
             setFocused(null);
             refresh();
             return true;
@@ -1093,24 +1239,27 @@ public class WrightsMenuScreen extends Screen {
             }
             return super.mouseClicked(mouseX, mouseY, button);
         }
-        if (button == 0 && !options && !jobsPage && sortOpen && pickSort(mouseX, mouseY)) {
+        if (button == 0 && !options && !jobsPage && !infoPage && sortOpen && pickSort(mouseX, mouseY)) {
             return true;
         }
-        if (button == 0 && !options && !jobsPage && clickTab(mouseX, mouseY)) {
+        if (button == 0 && !options && !jobsPage && !infoPage && clickScope(mouseX, mouseY)) {
             return true;
         }
-        if (button == 0 && !options && !jobsPage && sortOpen && (sortButton == null || !sortButton.isMouseOver(mouseX, mouseY))) {
+        if (button == 0 && !options && !jobsPage && !infoPage && clickTab(mouseX, mouseY)) {
+            return true;
+        }
+        if (button == 0 && !options && !jobsPage && !infoPage && sortOpen && (sortButton == null || !sortButton.isMouseOver(mouseX, mouseY))) {
             sortOpen = false;
             if (sortButton != null) {
                 sortButton.setPicked(false);
             }
             return true;
         }
-        if (button == 0 && !options && !jobsPage && insideModel(mouseX, mouseY)) {
+        if (button == 0 && !options && !jobsPage && !infoPage && insideModel(mouseX, mouseY)) {
             spinning = true;
             return true;
         }
-        if (button == 0 && !options && !jobsPage && insideList(mouseX, mouseY) && !rows.isEmpty()) {
+        if (button == 0 && !options && !jobsPage && !infoPage && insideList(mouseX, mouseY) && !rows.isEmpty()) {
             int index = scroll + (int) ((mouseY - listY) / ROW);
             if (index >= 0 && index < rows.size()) {
                 BlueprintList.Row entry = rows.get(index);
@@ -1816,15 +1965,22 @@ public class WrightsMenuScreen extends Screen {
             deleteButton.setWidth(otherW + Math.max(0, slack));
         }
         int bottom = panelY + panelH - 26;
-        int importW = Math.max(40, listW - gap - otherW);
+        int moveW = moveButton == null ? 0 : Math.max(48, moveButton.getWidth());
+        int importW = Math.max(40, listW - gap * 2 - otherW - moveW);
         if (importButton != null) {
             importButton.visible = building;
             importButton.setX(listX);
             importButton.setY(bottom);
             importButton.setWidth(importW);
         }
+        if (moveButton != null) {
+            moveButton.visible = building;
+            moveButton.setX(listX + importW + gap);
+            moveButton.setY(bottom);
+            moveButton.setWidth(moveW);
+        }
         if (newButton != null) {
-            newButton.setX(listX + importW + gap);
+            newButton.setX(listX + importW + gap + (moveButton == null ? 0 : moveW + gap));
             newButton.setY(bottom);
             newButton.setWidth(otherW);
         }
@@ -1836,6 +1992,9 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private void newBlueprint() {
+        if (WrightsClientState.libraryGlobal) {
+            WrightsClientState.setLibraryScope(false);
+        }
         if (!requireTool()) {
             return;
         }
@@ -1974,8 +2133,19 @@ public class WrightsMenuScreen extends Screen {
         graphics.drawString(this.font, Component.translatable("screen.wrights.name"), detailX + 4, detailSplit + 42, WrightsUi.MUTED, false);
     }
 
-    private boolean clickTab(double mouseX, double mouseY) {
+    private boolean clickScope(double mouseX, double mouseY) {
         if (mouseY < headingY || mouseY >= headingY + 14 || mouseX < listX || mouseX >= listX + listW) {
+            return false;
+        }
+        boolean global = mouseX >= listX + listW / 2.0D;
+        WrightsClientState.setLibraryScope(global);
+        refresh();
+        return true;
+    }
+
+    private boolean clickTab(double mouseX, double mouseY) {
+        int tabY = headingY + 16;
+        if (mouseY < tabY || mouseY >= tabY + 14 || mouseX < listX || mouseX >= listX + listW) {
             return false;
         }
         int tab = (int) ((mouseX - listX) * 4 / Math.max(1, listW));
@@ -1988,6 +2158,14 @@ public class WrightsMenuScreen extends Screen {
             refresh();
         }
         return true;
+    }
+
+    private void moveSelected() {
+        BlueprintPayloads.Summary summary = selected();
+        if (summary == null) {
+            return;
+        }
+        PacketDistributor.sendToServer(new BlueprintPayloads.LibraryMove(summary.id(), !WrightsClientState.libraryGlobal));
     }
 
     private void placeSortMenu() {

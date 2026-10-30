@@ -23,6 +23,7 @@ import com.wrights.job.JobManager;
 import com.wrights.network.BlueprintNetwork;
 import com.wrights.network.BlueprintPayloads;
 import com.wrights.schematic.BlueprintShelf;
+import com.wrights.schematic.GlobalBlueprintStore;
 import com.wrights.schematic.Requirements;
 import com.wrights.schematic.Schematic;
 import com.wrights.schematic.SchematicLibrary;
@@ -126,6 +127,17 @@ public final class BlueprintActions {
         return blueprintNames(library, null);
     }
 
+    private static List<String> globalBlueprintNames(GlobalBlueprintStore store, UUID except) {
+        List<String> names = new ArrayList<>();
+        for (Schematic schematic : store.schematics()) {
+            if (except != null && except.equals(schematic.id())) {
+                continue;
+            }
+            names.add(schematic.name());
+        }
+        return names;
+    }
+
     private static List<String> blueprintNames(SchematicLibrary library, UUID except) {
         List<String> names = new ArrayList<>();
         for (Schematic schematic : library.schematics()) {
@@ -146,7 +158,19 @@ public final class BlueprintActions {
     }
 
     public static void requestLibrary(ServerPlayer player) {
+        requestLibrary(player, false);
+    }
+
+    public static void requestLibrary(ServerPlayer player, boolean global) {
+        BlueprintSessions.get(player).setLibraryGlobal(global);
+        if (global) {
+            com.wrights.schematic.GlobalBlueprintStore.reload();
+        }
         BlueprintNetwork.syncLibrary(player);
+    }
+
+    private static boolean global(ServerPlayer player) {
+        return BlueprintSessions.get(player).libraryGlobal();
     }
 
     public static void resume(ServerPlayer player, int mode, java.util.UUID buildId) {
@@ -173,6 +197,7 @@ public final class BlueprintActions {
         if (!requireTool(player)) {
             return;
         }
+        BlueprintSessions.get(player).setLibraryGlobal(false);
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
         session.startCapture(player.level().dimension(), suggestName(blueprintNames(SchematicLibrary.get(player.getServer()), null)));
         BlueprintNetwork.syncCapture(player);
@@ -403,6 +428,19 @@ public final class BlueprintActions {
     }
 
     public static void delete(ServerPlayer player, java.util.UUID id) {
+        if (global(player)) {
+            GlobalBlueprintStore store = GlobalBlueprintStore.get();
+            Schematic schematic = store.schematic(id).orElse(null);
+            if (schematic == null) {
+                Messages.actionBar(player, "message.wrights.blueprint_missing");
+                BlueprintNetwork.syncLibrary(player);
+                return;
+            }
+            store.removeSchematic(id);
+            Messages.actionBar(player, "message.wrights.blueprint_deleted", schematic.name());
+            BlueprintNetwork.syncLibrary(player);
+            return;
+        }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         if (library.isInUse(id)) {
             Messages.actionBar(player, "message.wrights.blueprint_in_use");
@@ -425,6 +463,26 @@ public final class BlueprintActions {
     }
 
     public static void rename(ServerPlayer player, java.util.UUID id, String name) {
+        if (global(player)) {
+            GlobalBlueprintStore store = GlobalBlueprintStore.get();
+            Schematic schematic = store.schematic(id).orElse(null);
+            if (schematic == null) {
+                Messages.actionBar(player, "message.wrights.blueprint_missing");
+                BlueprintNetwork.syncLibrary(player);
+                return;
+            }
+            String clean = cleanName(name);
+            String unique = uniqueName(clean, globalBlueprintNames(store, id));
+            if (!unique.equals(clean)) {
+                Messages.actionBar(player, "message.wrights.name_taken");
+                BlueprintNetwork.syncLibrary(player);
+                return;
+            }
+            store.putSchematic(schematic.withName(clean));
+            Messages.actionBar(player, "message.wrights.blueprint_renamed", clean);
+            BlueprintNetwork.syncLibrary(player);
+            return;
+        }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         Schematic schematic = library.schematic(id).orElse(null);
         if (schematic == null) {
@@ -446,6 +504,10 @@ public final class BlueprintActions {
 
     public static void duplicate(ServerPlayer player, UUID id, UUID copyId) {
         if (id == null || copyId == null || id.equals(copyId)) {
+            return;
+        }
+        if (global(player)) {
+            duplicateGlobal(player, id, copyId);
             return;
         }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
@@ -482,6 +544,88 @@ public final class BlueprintActions {
             Messages.actionBar(player, "message.wrights.blueprint_duplicated", name);
         }
         library.setDirty();
+        BlueprintNetwork.syncLibrary(player);
+    }
+
+    private static void duplicateGlobal(ServerPlayer player, UUID id, UUID copyId) {
+        GlobalBlueprintStore store = GlobalBlueprintStore.get();
+        BlueprintShelf shelf = store.shelf();
+        if (shelf.isFolder(copyId) || store.schematic(copyId).isPresent()) {
+            return;
+        }
+        Map<UUID, String> names = globalSchematicNames(store);
+        if (shelf.isFolder(id)) {
+            Messages.actionBar(player, "message.wrights.global_folder_dup");
+            return;
+        }
+        Schematic schematic = store.schematic(id).orElse(null);
+        if (schematic == null || schematic.ephemeral()) {
+            Messages.actionBar(player, "message.wrights.blueprint_missing");
+            BlueprintNetwork.syncLibrary(player);
+            return;
+        }
+        String name = copyName(schematic.name(), globalBlueprintNames(store, null));
+        store.putSchematic(schematic.duplicate(copyId, name));
+        names.put(copyId, name);
+        UUID parent = shelf.parentOf(id);
+        shelf.placeAfter(copyId, false, parent, id, names);
+        if (parent != null) {
+            reveal(shelf, player.getUUID(), parent);
+        }
+        store.markShelfChanged();
+        Messages.actionBar(player, "message.wrights.blueprint_duplicated", name);
+        BlueprintNetwork.syncLibrary(player);
+    }
+
+    /** Copy a blueprint from world↔global. The source is removed after a successful copy. */
+    public static void moveLibrary(ServerPlayer player, UUID id, boolean toGlobal) {
+        if (id == null) {
+            return;
+        }
+        if (toGlobal) {
+            SchematicLibrary library = SchematicLibrary.get(player.getServer());
+            if (library.isInUse(id)) {
+                Messages.actionBar(player, "message.wrights.blueprint_in_use");
+                return;
+            }
+            Schematic schematic = library.schematic(id).orElse(null);
+            if (schematic == null || schematic.ephemeral()) {
+                Messages.actionBar(player, "message.wrights.blueprint_missing");
+                return;
+            }
+            GlobalBlueprintStore store = GlobalBlueprintStore.get();
+            UUID newId = UUID.randomUUID();
+            String name = uniqueName(schematic.name(), globalBlueprintNames(store, null));
+            Schematic copy = schematic.duplicate(newId, name);
+            store.putSchematic(copy);
+            Map<UUID, String> names = globalSchematicNames(store);
+            names.put(newId, name);
+            store.shelf().placeAfter(newId, false, null, null, names);
+            store.markShelfChanged();
+            library.removeSchematic(id);
+            BlueprintSessions.get(player).setLibraryGlobal(true);
+            Messages.actionBar(player, "message.wrights.moved_to_global", name);
+            BlueprintNetwork.syncLibrary(player);
+            return;
+        }
+        GlobalBlueprintStore store = GlobalBlueprintStore.get();
+        Schematic schematic = store.schematic(id).orElse(null);
+        if (schematic == null || schematic.ephemeral()) {
+            Messages.actionBar(player, "message.wrights.blueprint_missing");
+            return;
+        }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        UUID newId = UUID.randomUUID();
+        String name = uniqueName(schematic.name(), blueprintNames(library, null));
+        Schematic copy = schematic.duplicate(newId, name);
+        library.putSchematic(copy);
+        Map<UUID, String> names = schematicNames(library);
+        names.put(newId, name);
+        library.shelf().placeAfter(newId, false, null, null, names);
+        library.setDirty();
+        store.removeSchematic(id);
+        BlueprintSessions.get(player).setLibraryGlobal(false);
+        Messages.actionBar(player, "message.wrights.moved_to_world", name);
         BlueprintNetwork.syncLibrary(player);
     }
 
@@ -937,6 +1081,9 @@ public final class BlueprintActions {
     }
 
     public static List<BlueprintPayloads.Summary> summaries(ServerPlayer player) {
+        if (global(player)) {
+            return globalSummaries(player);
+        }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         List<Schematic> schematics = new ArrayList<>(library.schematics());
         schematics.sort(Comparator.comparing(Schematic::name, String.CASE_INSENSITIVE_ORDER).thenComparing(Schematic::id));
@@ -967,11 +1114,36 @@ public final class BlueprintActions {
         return summaries;
     }
 
+    private static List<BlueprintPayloads.Summary> globalSummaries(ServerPlayer player) {
+        GlobalBlueprintStore store = GlobalBlueprintStore.get();
+        List<Schematic> schematics = new ArrayList<>(store.schematics());
+        schematics.sort(Comparator.comparing(Schematic::name, String.CASE_INSENSITIVE_ORDER).thenComparing(Schematic::id));
+        List<BlueprintPayloads.Summary> summaries = new ArrayList<>(schematics.size());
+        for (Schematic schematic : schematics) {
+            if (schematic.ephemeral()) {
+                continue;
+            }
+            summaries.add(new BlueprintPayloads.Summary(
+                    schematic.id(),
+                    schematic.name(),
+                    schematic.sizeX(),
+                    schematic.sizeY(),
+                    schematic.sizeZ(),
+                    schematic.blockCount(),
+                    "",
+                    store.shelf().parentOf(schematic.id()) == null ? Util.NIL_UUID : store.shelf().parentOf(schematic.id()),
+                    store.shelf().orderOf(schematic.id()),
+                    store.shelf().favorite(player.getUUID(), schematic.id()),
+                    store.shelf().uses(player.getUUID(), schematic.id()),
+                    store.shelf().lastUsed(player.getUUID(), schematic.id())));
+        }
+        return summaries;
+    }
+
     public static List<BlueprintPayloads.FolderLine> folders(ServerPlayer player) {
-        SchematicLibrary library = SchematicLibrary.get(player.getServer());
-        BlueprintShelf shelf = library.shelf();
-        if (shelf.dropFolderFavorites()) {
-            library.setDirty();
+        BlueprintShelf shelf = global(player) ? GlobalBlueprintStore.get().shelf() : SchematicLibrary.get(player.getServer()).shelf();
+        if (!global(player) && shelf.dropFolderFavorites()) {
+            SchematicLibrary.get(player.getServer()).setDirty();
         }
         List<BlueprintPayloads.FolderLine> lines = new ArrayList<>();
         for (BlueprintShelf.Folder folder : shelf.folders()) {
@@ -986,10 +1158,15 @@ public final class BlueprintActions {
     }
 
     public static List<UUID> openFolders(ServerPlayer player) {
-        return new ArrayList<>(SchematicLibrary.get(player.getServer()).shelf().openFolders(player.getUUID()));
+        BlueprintShelf shelf = global(player) ? GlobalBlueprintStore.get().shelf() : SchematicLibrary.get(player.getServer()).shelf();
+        return new ArrayList<>(shelf.openFolders(player.getUUID()));
     }
 
     public static void shelf(ServerPlayer player, BlueprintPayloads.ShelfEdit edit) {
+        if (global(player)) {
+            shelfGlobal(player, edit);
+            return;
+        }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         BlueprintShelf shelf = library.shelf();
         Map<UUID, String> names = schematicNames(library);
@@ -1032,9 +1209,51 @@ public final class BlueprintActions {
         BlueprintNetwork.syncLibrary(player);
     }
 
+    private static void shelfGlobal(ServerPlayer player, BlueprintPayloads.ShelfEdit edit) {
+        GlobalBlueprintStore store = GlobalBlueprintStore.get();
+        BlueprintShelf shelf = store.shelf();
+        Map<UUID, String> names = globalSchematicNames(store);
+        UUID parent = edit.parent() == null || edit.parent().equals(Util.NIL_UUID) ? null : edit.parent();
+        switch (edit.action()) {
+            case BlueprintPayloads.ShelfEdit.CREATE -> {
+                if (shelf.createFolder(edit.id(), parent, edit.name(), names)) {
+                    if (parent != null) {
+                        shelf.setOpen(player.getUUID(), parent, true);
+                    }
+                    Messages.actionBar(player, "message.wrights.folder_created", edit.name());
+                }
+            }
+            case BlueprintPayloads.ShelfEdit.RENAME -> shelf.rename(edit.id(), edit.name());
+            case BlueprintPayloads.ShelfEdit.DELETE -> shelf.deleteFolder(edit.id(), names);
+            case BlueprintPayloads.ShelfEdit.MOVE -> shelf.move(edit.id(), edit.folder(), parent, edit.index(), names);
+            case BlueprintPayloads.ShelfEdit.FAVORITE -> {
+                if (edit.folder() || shelf.isFolder(edit.id()) || store.schematic(edit.id()).isEmpty()) {
+                    return;
+                }
+                shelf.toggleFavorite(player.getUUID(), edit.id());
+            }
+            case BlueprintPayloads.ShelfEdit.OPEN -> shelf.setOpen(player.getUUID(), edit.id(), edit.index() != 0);
+            default -> {
+                return;
+            }
+        }
+        store.markShelfChanged();
+        BlueprintNetwork.syncLibrary(player);
+    }
+
     private static Map<UUID, String> schematicNames(SchematicLibrary library) {
         Map<UUID, String> names = new HashMap<>();
         for (Schematic schematic : library.schematics()) {
+            if (!schematic.ephemeral()) {
+                names.put(schematic.id(), schematic.name());
+            }
+        }
+        return names;
+    }
+
+    private static Map<UUID, String> globalSchematicNames(GlobalBlueprintStore store) {
+        Map<UUID, String> names = new HashMap<>();
+        for (Schematic schematic : store.schematics()) {
             if (!schematic.ephemeral()) {
                 names.put(schematic.id(), schematic.name());
             }

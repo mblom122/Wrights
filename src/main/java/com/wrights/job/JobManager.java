@@ -2932,26 +2932,17 @@ public final class JobManager {
     }
 
     private static boolean hasItem(ServerPlayer player, ServerLevel level, BuildJob job, Item item) {
-        if (holds(player.getInventory(), item)) {
-            return true;
-        }
         Container container = supply(level, player, job);
-        return container != null && holds(container, item);
+        boolean playerFirst = job.supplyPos() == null || job.supplyPlayerFirst();
+        com.wrights.storage.DigitalLink link = com.wrights.storage.ItemSource.linkOf(player);
+        return com.wrights.storage.ItemSource.hasForJob(player, level, item, container, playerFirst, link);
     }
 
     private static void consumeItem(ServerPlayer player, ServerLevel level, BuildJob job, Item item) {
         Container container = supply(level, player, job);
-        boolean chestFirst = job.supplyPos() != null && !job.supplyPlayerFirst();
-        if (chestFirst && container != null && take(container, item)) {
-            container.setChanged();
-            return;
-        }
-        if (take(player.getInventory(), item)) {
-            return;
-        }
-        if (!chestFirst && container != null && take(container, item)) {
-            container.setChanged();
-        }
+        boolean playerFirst = job.supplyPos() == null || job.supplyPlayerFirst();
+        com.wrights.storage.DigitalLink link = com.wrights.storage.ItemSource.linkOf(player);
+        com.wrights.storage.ItemSource.consumeForJob(player, level, item, container, playerFirst, link);
     }
 
     private static boolean holds(Container container, Item item) {

@@ -49,5 +49,6 @@ public class WrightsMod {
         event.enqueueWork(() -> CuriosApi.registerCurioPredicate(
                 ResourceLocation.fromNamespaceAndPath(MOD_ID, "wrightport"),
                 result -> result.stack().is(ModItems.PERSONAL_WRIGHTPORT.get())));
+        event.enqueueWork(() -> com.wrights.schematic.GlobalBlueprintStore.get());
     }
 }

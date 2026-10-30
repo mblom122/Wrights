@@ -58,9 +58,11 @@ public final class BlueprintSessions {
             if (supply != null) {
                 get(player).setSupply(supply.pos(), supply.dimension());
             }
+            get(player).setDigitalLink(library.digital(player.getUUID()));
             com.wrights.network.BlueprintNetwork.syncCapture(player);
             com.wrights.network.BlueprintNetwork.syncJobHolograms(player);
             com.wrights.network.BlueprintNetwork.syncSupply(player);
+            com.wrights.network.BlueprintNetwork.syncDigital(player);
         }
     }
 
@@ -81,9 +83,18 @@ public final class BlueprintSessions {
         private boolean buildAfterSave;
         private int generation;
         private int seq;
+        private boolean libraryGlobal;
 
         public Mode mode() {
             return mode;
+        }
+
+        public boolean libraryGlobal() {
+            return libraryGlobal;
+        }
+
+        public void setLibraryGlobal(boolean libraryGlobal) {
+            this.libraryGlobal = libraryGlobal;
         }
 
         public void setMode(Mode mode) {
@@ -242,6 +253,16 @@ public final class BlueprintSessions {
         public void setSupply(BlockPos supplyPos, ResourceKey<Level> supplyDimension) {
             this.supplyPos = supplyPos == null ? null : supplyPos.immutable();
             this.supplyDimension = supplyPos == null ? null : supplyDimension;
+        }
+
+        private com.wrights.storage.DigitalLink digitalLink = com.wrights.storage.DigitalLink.NONE;
+
+        public com.wrights.storage.DigitalLink digitalLink() {
+            return digitalLink == null ? com.wrights.storage.DigitalLink.NONE : digitalLink;
+        }
+
+        public void setDigitalLink(com.wrights.storage.DigitalLink digitalLink) {
+            this.digitalLink = digitalLink == null ? com.wrights.storage.DigitalLink.NONE : digitalLink;
         }
 
         public void clear() {

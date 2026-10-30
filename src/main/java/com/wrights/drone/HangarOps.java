@@ -13,8 +13,11 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 
 import com.wrights.block.HangarBlockEntity;
+import com.wrights.item.ModItems;
 import com.wrights.item.WrightItem;
 import com.wrights.menu.HangarMenu;
+import com.wrights.storage.DigitalNetworks;
+import com.wrights.storage.ItemSource;
 import com.wrights.util.Messages;
 
 public final class HangarOps {
@@ -177,6 +180,41 @@ public final class HangarOps {
                 tiers.add(tier);
             }
         }
+        var chest = ItemSource.container(player, ItemSource.chestOf(player));
+        if (chest != null) {
+            for (int slot = 0; slot < chest.getContainerSize() && tiers.size() < count; slot++) {
+                ItemStack stack = chest.getItem(slot);
+                if (!(stack.getItem() instanceof WrightItem)) {
+                    continue;
+                }
+                int take = Math.min(stack.getCount(), count - tiers.size());
+                int tier = WrightItem.tier(stack);
+                stack.shrink(take);
+                if (stack.isEmpty()) {
+                    chest.setItem(slot, ItemStack.EMPTY);
+                }
+                for (int i = 0; i < take; i++) {
+                    tiers.add(tier);
+                }
+            }
+            chest.setChanged();
+        }
+        int need = count - tiers.size();
+        if (need > 0) {
+            var link = ItemSource.linkOf(player);
+            var level = DigitalNetworks.levelOf(player, link.pos());
+            if (level != null) {
+                tiers.addAll(DigitalNetworks.extractWrights(player, level, link, need));
+            }
+        }
+        need = count - tiers.size();
+        if (need > 0 && ItemSource.craftable(player, ModItems.WRIGHT.get())) {
+            var link = ItemSource.linkOf(player);
+            var level = DigitalNetworks.levelOf(player, link.pos());
+            if (level != null && DigitalNetworks.requestCraft(player, level, link, ModItems.WRIGHT.get(), need)) {
+                Messages.actionBar(player, "message.wrights.digital_crafting");
+            }
+        }
         if (player.getAbilities().instabuild) {
             while (tiers.size() < count) {
                 tiers.add(WrightTier.COPPER);
@@ -325,7 +363,9 @@ public final class HangarOps {
             if (best < 0) {
                 break;
             }
-            take(player, WrightTier.upgradeItem(bestTier + 1), 1);
+            if (ItemSource.take(player, WrightTier.upgradeItem(bestTier + 1), 1) != ItemSource.Result.OK) {
+                break;
+            }
             next = next.withSpeed(picked[best], bestTier + 1);
             raised[best] = true;
         }
@@ -385,8 +425,8 @@ public final class HangarOps {
         if (target > tier) {
             for (int step = tier + 1; step <= target; step++) {
                 Item upgrade = WrightTier.upgradeItem(step);
-                if (upgrade != null) {
-                    take(player, upgrade, 1);
+                if (upgrade != null && ItemSource.take(player, upgrade, 1) != ItemSource.Result.OK) {
+                    return swarm;
                 }
             }
         } else {
@@ -420,8 +460,8 @@ public final class HangarOps {
         return target;
     }
 
-    private static boolean afford(Player player, Item item, int count) {
-        return player.getAbilities().instabuild || pay(player, item, count);
+    private static boolean afford(ServerPlayer player, Item item, int count) {
+        return player.getAbilities().instabuild || ItemSource.canAfford(player, item, count);
     }
 
     private static int[] unique(Swarm swarm, int[] units) {
@@ -473,18 +513,12 @@ public final class HangarOps {
     }
 
     private static boolean consume(ServerPlayer player, Item item) {
-        if (player.getAbilities().instabuild && player.getInventory().countItem(item) <= 0) {
-            return true;
+        ItemSource.Result result = ItemSource.take(player, item, 1);
+        if (result == ItemSource.Result.CRAFTING) {
+            Messages.actionBar(player, "message.wrights.digital_crafting");
+            return false;
         }
-        Inventory inventory = player.getInventory();
-        for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
-            ItemStack stack = inventory.getItem(slot);
-            if (stack.is(item)) {
-                stack.shrink(1);
-                return true;
-            }
-        }
-        return false;
+        return result == ItemSource.Result.OK;
     }
 
     private static void give(ServerPlayer player, int tier, int count) {
@@ -505,13 +539,23 @@ public final class HangarOps {
             Messages.actionBar(player, "message.wrights.drone_full", Swarm.capacity());
             return swarm;
         }
-        if (!pay(player, Items.IRON_INGOT, IRON) || !pay(player, Items.REDSTONE, REDSTONE) || !pay(player, Items.AMETHYST_SHARD, AMETHYST)) {
+        if (!ItemSource.canAfford(player, Items.IRON_INGOT, IRON)
+                || !ItemSource.canAfford(player, Items.REDSTONE, REDSTONE)
+                || !ItemSource.canAfford(player, Items.AMETHYST_SHARD, AMETHYST)) {
+            if (tryCraftParts(player, Items.IRON_INGOT, IRON)
+                    || tryCraftParts(player, Items.REDSTONE, REDSTONE)
+                    || tryCraftParts(player, Items.AMETHYST_SHARD, AMETHYST)) {
+                Messages.actionBar(player, "message.wrights.digital_crafting");
+                return swarm;
+            }
             Messages.actionBar(player, "message.wrights.drone_parts", IRON, REDSTONE, AMETHYST);
             return swarm;
         }
-        take(player, Items.IRON_INGOT, IRON);
-        take(player, Items.REDSTONE, REDSTONE);
-        take(player, Items.AMETHYST_SHARD, AMETHYST);
+        if (takeOrCraft(player, Items.IRON_INGOT, IRON)
+                || takeOrCraft(player, Items.REDSTONE, REDSTONE)
+                || takeOrCraft(player, Items.AMETHYST_SHARD, AMETHYST)) {
+            return swarm;
+        }
         Messages.actionBar(player, "message.wrights.drone_built", swarm.units().size() + 1);
         return swarm.addUnit();
     }
@@ -527,42 +571,34 @@ public final class HangarOps {
         }
         int gold = speed;
         int redstone = speed;
-        if (!pay(player, Items.GOLD_INGOT, gold) || !pay(player, Items.REDSTONE, redstone)) {
+        if (!ItemSource.canAfford(player, Items.GOLD_INGOT, gold) || !ItemSource.canAfford(player, Items.REDSTONE, redstone)) {
+            if (tryCraftParts(player, Items.GOLD_INGOT, gold) || tryCraftParts(player, Items.REDSTONE, redstone)) {
+                Messages.actionBar(player, "message.wrights.digital_crafting");
+                return swarm;
+            }
             Messages.actionBar(player, "message.wrights.speed_parts", gold, redstone);
             return swarm;
         }
-        take(player, Items.GOLD_INGOT, gold);
-        take(player, Items.REDSTONE, redstone);
+        if (takeOrCraft(player, Items.GOLD_INGOT, gold) || takeOrCraft(player, Items.REDSTONE, redstone)) {
+            return swarm;
+        }
         Messages.actionBar(player, "message.wrights.speed_up", speed + 1);
         return swarm.withSpeed(index, speed + 1);
     }
 
-    private static boolean pay(Player player, Item item, int count) {
-        if (player.getAbilities().instabuild) {
+    /** Returns true when a craft was requested instead of taking items. */
+    private static boolean takeOrCraft(ServerPlayer player, Item item, int count) {
+        ItemSource.Result result = ItemSource.take(player, item, count);
+        if (result == ItemSource.Result.CRAFTING) {
+            Messages.actionBar(player, "message.wrights.digital_crafting");
             return true;
         }
-        int have = 0;
-        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
-            ItemStack stack = player.getInventory().getItem(slot);
-            if (stack.is(item)) {
-                have += stack.getCount();
-            }
-        }
-        return have >= count;
+        return result != ItemSource.Result.OK;
     }
 
-    private static void take(Player player, Item item, int count) {
-        if (player.getAbilities().instabuild) {
-            return;
-        }
-        for (int slot = 0; slot < player.getInventory().getContainerSize() && count > 0; slot++) {
-            ItemStack stack = player.getInventory().getItem(slot);
-            if (!stack.is(item)) {
-                continue;
-            }
-            int used = Math.min(count, stack.getCount());
-            stack.shrink(used);
-            count -= used;
-        }
+    private static boolean tryCraftParts(ServerPlayer player, Item item, int count) {
+        long have = ItemSource.available(player, item);
+        return have < count && ItemSource.craftable(player, item)
+                && ItemSource.take(player, item, count) == ItemSource.Result.CRAFTING;
     }
 }

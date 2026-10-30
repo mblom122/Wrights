@@ -24,6 +24,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
 
 import com.wrights.job.BuildJob;
+import com.wrights.storage.DigitalLink;
 
 public final class SchematicLibrary extends SavedData {
     public static final String DATA_ID = "wrights";
@@ -37,6 +38,7 @@ public final class SchematicLibrary extends SavedData {
     private final Map<UUID, BuildJob> jobs = new HashMap<>();
     private final Map<UUID, List<UUID>> jobsByPlayer = new HashMap<>();
     private final Map<UUID, GlobalPos> supplies = new HashMap<>();
+    private final Map<UUID, DigitalLink> digitalLinks = new HashMap<>();
     private int historyClock;
 
     public static SchematicLibrary get(MinecraftServer server) {
@@ -76,6 +78,19 @@ public final class SchematicLibrary extends SavedData {
                 library.supplies.put(supply.getUUID("player"), GlobalPos.of(ResourceKey.create(Registries.DIMENSION, dimension), pos));
             }
         }
+        if (tag.contains("digitalLinks", Tag.TAG_LIST)) {
+            ListTag links = tag.getList("digitalLinks", Tag.TAG_COMPOUND);
+            for (int i = 0; i < links.size(); i++) {
+                CompoundTag entry = links.getCompound(i);
+                if (!entry.hasUUID("player") || !entry.contains("link", Tag.TAG_COMPOUND)) {
+                    continue;
+                }
+                DigitalLink link = DigitalLink.load(entry.getCompound("link"));
+                if (link.bound()) {
+                    library.digitalLinks.put(entry.getUUID("player"), link);
+                }
+            }
+        }
         return library;
     }
 
@@ -102,6 +117,17 @@ public final class SchematicLibrary extends SavedData {
             supplies.add(supply);
         }
         tag.put("supplies", supplies);
+        ListTag digitalLinks = new ListTag();
+        for (Map.Entry<UUID, DigitalLink> entry : this.digitalLinks.entrySet()) {
+            if (!entry.getValue().bound()) {
+                continue;
+            }
+            CompoundTag link = new CompoundTag();
+            link.putUUID("player", entry.getKey());
+            link.put("link", entry.getValue().save());
+            digitalLinks.add(link);
+        }
+        tag.put("digitalLinks", digitalLinks);
         return tag;
     }
 
@@ -118,6 +144,22 @@ public final class SchematicLibrary extends SavedData {
             return;
         }
         supplies.put(playerId, pos);
+        setDirty();
+    }
+
+    public DigitalLink digital(UUID playerId) {
+        DigitalLink link = digitalLinks.get(playerId);
+        return link == null ? DigitalLink.NONE : link;
+    }
+
+    public void setDigital(UUID playerId, DigitalLink link) {
+        if (link == null || !link.bound()) {
+            if (digitalLinks.remove(playerId) != null) {
+                setDirty();
+            }
+            return;
+        }
+        digitalLinks.put(playerId, link);
         setDirty();
     }
 

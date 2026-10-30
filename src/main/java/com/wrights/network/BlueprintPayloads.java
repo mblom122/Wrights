@@ -17,9 +17,27 @@ public final class BlueprintPayloads {
     private BlueprintPayloads() {
     }
 
-    public record LibraryRequest() implements CustomPacketPayload {
+    public record LibraryRequest(boolean global) implements CustomPacketPayload {
         public static final Type<LibraryRequest> TYPE = payloadType("library_request");
-        public static final StreamCodec<RegistryFriendlyByteBuf, LibraryRequest> STREAM_CODEC = empty(new LibraryRequest());
+        public static final StreamCodec<RegistryFriendlyByteBuf, LibraryRequest> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> buf.writeBoolean(value.global),
+                buf -> new LibraryRequest(buf.readBoolean()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    /** Move a blueprint between the world library and the global AppData library. */
+    public record LibraryMove(UUID id, boolean toGlobal) implements CustomPacketPayload {
+        public static final Type<LibraryMove> TYPE = payloadType("library_move");
+        public static final StreamCodec<RegistryFriendlyByteBuf, LibraryMove> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeUUID(value.id);
+                    buf.writeBoolean(value.toGlobal);
+                },
+                buf -> new LibraryMove(buf.readUUID(), buf.readBoolean()));
 
         @Override
         public Type<? extends CustomPacketPayload> type() {
@@ -82,7 +100,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record LibrarySync(List<Summary> entries, boolean busy, List<FolderLine> folders, List<UUID> open) implements CustomPacketPayload {
+    public record LibrarySync(List<Summary> entries, boolean busy, List<FolderLine> folders, List<UUID> open, boolean global) implements CustomPacketPayload {
         public static final Type<LibrarySync> TYPE = payloadType("library_sync");
         public static final StreamCodec<RegistryFriendlyByteBuf, LibrarySync> STREAM_CODEC = StreamCodec.of((buf, value) -> value.write(buf), LibrarySync::read);
 
@@ -100,6 +118,7 @@ public final class BlueprintPayloads {
             for (UUID id : open) {
                 buf.writeUUID(id);
             }
+            buf.writeBoolean(global);
         }
 
         public static LibrarySync read(RegistryFriendlyByteBuf buf) {
@@ -119,7 +138,8 @@ public final class BlueprintPayloads {
             for (int i = 0; i < openCount; i++) {
                 open.add(buf.readUUID());
             }
-            return new LibrarySync(entries, busy, folderLines, open);
+            boolean global = buf.readBoolean();
+            return new LibrarySync(entries, busy, folderLines, open, global);
         }
 
         @Override
@@ -1266,6 +1286,93 @@ public final class BlueprintPayloads {
                     writeBlob(buf, value.data);
                 },
                 buf -> new ClipboardImport(buf.readByte(), buf.readUtf(48), readBlob(buf)));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record BindDigital(BlockPos pos, boolean clear) implements CustomPacketPayload {
+        public static final Type<BindDigital> TYPE = payloadType("bind_digital");
+        public static final StreamCodec<RegistryFriendlyByteBuf, BindDigital> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeBlockPos(value.pos);
+                    buf.writeBoolean(value.clear);
+                },
+                buf -> new BindDigital(buf.readBlockPos(), buf.readBoolean()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record DigitalSync(int kind, boolean online, BlockPos pos, String dim) implements CustomPacketPayload {
+        public static final Type<DigitalSync> TYPE = payloadType("digital_sync");
+        public static final StreamCodec<RegistryFriendlyByteBuf, DigitalSync> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeByte(value.kind);
+                    buf.writeBoolean(value.online);
+                    buf.writeBlockPos(value.pos == null ? BlockPos.ZERO : value.pos);
+                    buf.writeUtf(value.dim == null ? "" : value.dim, 128);
+                },
+                buf -> new DigitalSync(buf.readByte(), buf.readBoolean(), buf.readBlockPos(), buf.readUtf(128)));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record DigitalInfoRequest() implements CustomPacketPayload {
+        public static final Type<DigitalInfoRequest> TYPE = payloadType("digital_info_request");
+        public static final StreamCodec<RegistryFriendlyByteBuf, DigitalInfoRequest> STREAM_CODEC = empty(new DigitalInfoRequest());
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record DigitalInfoLine(int itemId, long stock, boolean craftable) {
+        public void write(RegistryFriendlyByteBuf buf) {
+            buf.writeVarInt(itemId);
+            buf.writeVarLong(stock);
+            buf.writeBoolean(craftable);
+        }
+
+        public static DigitalInfoLine read(RegistryFriendlyByteBuf buf) {
+            return new DigitalInfoLine(buf.readVarInt(), buf.readVarLong(), buf.readBoolean());
+        }
+    }
+
+    public record DigitalInfoSync(int kind, boolean online, BlockPos pos, String dim, java.util.List<DigitalInfoLine> lines) implements CustomPacketPayload {
+        public static final Type<DigitalInfoSync> TYPE = payloadType("digital_info_sync");
+        public static final StreamCodec<RegistryFriendlyByteBuf, DigitalInfoSync> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeByte(value.kind);
+                    buf.writeBoolean(value.online);
+                    buf.writeBlockPos(value.pos == null ? BlockPos.ZERO : value.pos);
+                    buf.writeUtf(value.dim == null ? "" : value.dim, 128);
+                    java.util.List<DigitalInfoLine> lines = value.lines == null ? java.util.List.of() : value.lines;
+                    buf.writeVarInt(lines.size());
+                    for (DigitalInfoLine line : lines) {
+                        line.write(buf);
+                    }
+                },
+                buf -> {
+                    int kind = buf.readByte();
+                    boolean online = buf.readBoolean();
+                    BlockPos pos = buf.readBlockPos();
+                    String dim = buf.readUtf(128);
+                    int count = buf.readVarInt();
+                    java.util.List<DigitalInfoLine> lines = new java.util.ArrayList<>(count);
+                    for (int i = 0; i < count; i++) {
+                        lines.add(DigitalInfoLine.read(buf));
+                    }
+                    return new DigitalInfoSync(kind, online, pos, dim, lines);
+                });
 
         @Override
         public Type<? extends CustomPacketPayload> type() {
