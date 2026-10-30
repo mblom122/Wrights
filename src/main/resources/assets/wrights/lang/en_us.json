@@ -692,6 +692,7 @@
   "message.wrights.drone_block_cap": "This job has %s blocks, so it can't use more wrights than that.",
   "message.wrights.job_wright_cap": "A job can use at most %s wrights",
   "config.jade.plugin_wrights.wright": "Wright",
+  "config.jade.plugin_wrights.wrightport": "Wrightport",
   "jade.wrights.tier": "%s wright",
   "jade.wrights.building": "Building %s",
   "jade.wrights.paused": "Paused · %s",
