@@ -51,6 +51,11 @@ public class WrightsClient {
     public static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(ModEntities.DRONE.get(), DroneRenderer::new);
         event.registerBlockEntityRenderer(ModBlockEntities.HANGAR.get(), HangarRenderer::new);
+        // Curios copies this map at the end of AddLayers. Registering there is too late, so the back model never draws.
+        CuriosRendererRegistry.register(
+                ModItems.PERSONAL_WRIGHTPORT.get(),
+                () -> new PersonalWrightportRenderer(new PersonalWrightportModel(
+                        Minecraft.getInstance().getEntityModels().bakeLayer(PERSONAL_WRIGHTPORT_LAYER))));
     }
 
     @SubscribeEvent
@@ -63,14 +68,6 @@ public class WrightsClient {
                 ModItems.BLUEPRINT_FOLDER.get(),
                 ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "filled"),
                 (stack, level, entity, seed) -> BlueprintFolderItem.hasData(stack) ? 1.0F : 0.0F));
-    }
-
-    @SubscribeEvent
-    public static void registerCurioRenderers(EntityRenderersEvent.AddLayers event) {
-        CuriosRendererRegistry.register(
-                ModItems.PERSONAL_WRIGHTPORT.get(),
-                () -> new PersonalWrightportRenderer(new PersonalWrightportModel(
-                        Minecraft.getInstance().getEntityModels().bakeLayer(PERSONAL_WRIGHTPORT_LAYER))));
     }
 
     @SubscribeEvent

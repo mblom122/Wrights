@@ -80,14 +80,18 @@ public class PersonalWrightportModel extends Model {
         float slide = eased * 2.8F;
         float tip = eased * 0.7F;
 
-        doorN.z = slide;
-        doorN.xRot = -tip;
-        doorS.z = slide;
-        doorS.xRot = tip;
-        doorW.z = slide;
-        doorW.yRot = tip;
-        doorE.z = slide;
-        doorE.yRot = -tip;
+        doorN.resetPose();
+        doorS.resetPose();
+        doorW.resetPose();
+        doorE.resetPose();
+        doorN.z += slide;
+        doorN.xRot -= tip;
+        doorS.z += slide;
+        doorS.xRot += tip;
+        doorW.z += slide;
+        doorW.yRot += tip;
+        doorE.z += slide;
+        doorE.yRot -= tip;
     }
 
     public void renderPack(PoseStack pose, VertexConsumer buffer, int light, int overlay, int color) {
