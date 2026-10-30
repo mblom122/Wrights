@@ -73,6 +73,9 @@ public class MaterialsScreen extends Screen {
         shortage = payload.shortage();
         loaded = true;
         scroll = 0;
+        if (this.minecraft != null && this.minecraft.screen == this) {
+            rebuildWidgets();
+        }
     }
 
     @Override
@@ -83,7 +86,25 @@ public class MaterialsScreen extends Screen {
         panelY = (this.height - panelH) / 2;
         listY = panelY + 36;
         listH = panelH - 78;
-        addRenderableWidget(new WrightsButton(panelX + 12, panelY + panelH - 28, panelW - 24, 16, Component.translatable("menu.wrights.close"), button -> onClose()));
+        int y = panelY + panelH - 28;
+        if (shortage) {
+            Component anyway = Component.translatable("menu.wrights.build_anyway");
+            Component close = Component.translatable("menu.wrights.close");
+            int closeW = Math.max(72, this.font.width(close) + 16);
+            int buildW = Math.max(96, this.font.width(anyway) + 16);
+            int closeX = panelX + panelW - 12 - closeW;
+            int buildX = Math.max(panelX + 12, closeX - 8 - buildW);
+            addRenderableWidget(new WrightsButton(buildX, y, Math.min(buildW, closeX - 8 - buildX), 16, anyway, button -> buildAnyway()));
+            addRenderableWidget(new WrightsButton(closeX, y, closeW, 16, close, button -> onClose()));
+            return;
+        }
+        addRenderableWidget(new WrightsButton(panelX + 12, y, panelW - 24, 16, Component.translatable("menu.wrights.close"), button -> onClose()));
+    }
+
+    private void buildAnyway() {
+        if (WrightsClientState.tryBuild(true)) {
+            onClose();
+        }
     }
 
     @Override
@@ -99,7 +120,7 @@ public class MaterialsScreen extends Screen {
         Component title = Component.translatable(shortage ? "menu.wrights.need_title" : "menu.wrights.materials_title");
         graphics.drawString(this.font, title, panelX + 14, panelY + 8, WrightsUi.COPPER, false);
         boolean creative = this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild && !this.minecraft.player.isSpectator();
-        Component hint = Component.translatable(creative ? "menu.wrights.materials_creative" : "menu.wrights.materials_hint");
+        Component hint = Component.translatable(creative ? "menu.wrights.materials_creative" : shortage ? "menu.wrights.need_hint" : "menu.wrights.materials_hint");
         graphics.drawString(this.font, this.font.plainSubstrByWidth(hint.getString(), panelW - 28), panelX + 14, panelY + 20, WrightsUi.MUTED, false);
         if (!loaded) {
             graphics.drawString(this.font, Component.translatable("menu.wrights.materials_loading"), panelX + 18, listY + 6, WrightsUi.MUTED, false);
@@ -131,7 +152,7 @@ public class MaterialsScreen extends Screen {
             }
             int y = bodyY + (i - scroll) * ROW;
             ItemStack stack = new ItemStack(item);
-            int have = this.minecraft.player == null ? 0 : this.minecraft.player.getInventory().countItem(item);
+            int have = line.have();
             int color = creative ? WrightsUi.BLUE : (have >= line.count() ? GREEN : RED);
             WrightsUi.slot(graphics, iconX, y, 0xFF31404E);
             graphics.renderItem(stack, iconX + 1, y + 1);

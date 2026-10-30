@@ -110,7 +110,7 @@ public final class BlueprintTransforms {
                 schematic.sourceDimension(),
                 anchorX,
                 anchorY,
-                anchorZ);
+                anchorZ).withPaste(schematic.placeFluids(), schematic.voidBlocks(), schematic.voidFluids(), schematic.voidNbt());
     }
 
     private static Schematic.Entry nearest(Schematic schematic, int x, int y, int z, boolean lowest) {

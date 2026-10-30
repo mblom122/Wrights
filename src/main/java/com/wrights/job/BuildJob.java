@@ -515,6 +515,16 @@ public final class BuildJob {
         this.supplyPos = supplyPos;
     }
 
+    private boolean supplyPlayerFirst = true;
+
+    public boolean supplyPlayerFirst() {
+        return supplyPlayerFirst;
+    }
+
+    public void setSupplyPlayerFirst(boolean supplyPlayerFirst) {
+        this.supplyPlayerFirst = supplyPlayerFirst;
+    }
+
     public List<Refund> refunds() {
         return refunds;
     }
@@ -727,6 +737,7 @@ public final class BuildJob {
         if (supplyPos != null) {
             tag.put("supply", NbtUtils.writeBlockPos(supplyPos));
         }
+        tag.putBoolean("supplyPlayerFirst", supplyPlayerFirst);
         if (anchor != null) {
             tag.put("anchor", NbtUtils.writeBlockPos(anchor));
         }
@@ -848,6 +859,7 @@ public final class BuildJob {
         if (tag.contains("supply")) {
             job.supplyPos = NbtUtils.readBlockPos(tag, "supply").orElse(null);
         }
+        job.supplyPlayerFirst = !tag.contains("supplyPlayerFirst") || tag.getBoolean("supplyPlayerFirst");
         if (tag.contains("anchor")) {
             job.anchor = NbtUtils.readBlockPos(tag, "anchor").orElse(null);
         }

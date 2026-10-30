@@ -556,6 +556,10 @@ public final class JobManager {
     }
 
     public static boolean startBlueprintBuild(ServerPlayer player, UUID schematicId, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt) {
+        return startBlueprintBuild(player, schematicId, origin, sizeX, sizeY, sizeZ, drones, placeFluids, voidBlocks, voidFluids, voidNbt, true);
+    }
+
+    public static boolean startBlueprintBuild(ServerPlayer player, UUID schematicId, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean supplyPlayerFirst) {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         Schematic schematic = library.schematic(schematicId).orElse(null);
         if (schematic == null || schematic.blockCount() == 0) {
@@ -577,6 +581,7 @@ public final class JobManager {
         job.setPasteOptions(placeFluids, voidBlocks, voidFluids, voidNbt);
         job.setAnchor(origin.offset(schematic.anchorX(), schematic.anchorY(), schematic.anchorZ()));
         job.setSupply(com.wrights.blueprint.BlueprintSessions.get(player).supplyPos());
+        job.setSupplyPlayerFirst(supplyPlayerFirst);
         if (!instant(player) && !assignCrew(player, job, schematic, drones)) {
             return false;
         }
@@ -718,8 +723,9 @@ public final class JobManager {
         int anchorX = 0;
         int anchorY = 0;
         int anchorZ = 0;
+        Schematic previous = null;
         if (job.replaceSchematicId() != null) {
-            Schematic previous = library.schematic(job.replaceSchematicId()).orElse(null);
+            previous = library.schematic(job.replaceSchematicId()).orElse(null);
             if (previous != null) {
                 anchorX = previous.anchorX();
                 anchorY = previous.anchorY();
@@ -739,6 +745,9 @@ public final class JobManager {
                 anchorX,
                 anchorY,
                 anchorZ);
+        if (previous != null) {
+            schematic = schematic.withPaste(previous.placeFluids(), previous.voidBlocks(), previous.voidFluids(), previous.voidNbt());
+        }
         library.putSchematic(schematic);
         job.setResultSchematicId(schematic.id());
         job.setPhase(BuildJob.Phase.BINDING);
@@ -2806,14 +2815,10 @@ public final class JobManager {
                 return PlaceResult.DONE;
             }
         } else if (!freePlace(player) && payment != null) {
-            if (job.supplyPos() != null && supply(level, player, job) == null) {
-                if (job.tickMessage()) {
+            if (!hasItem(player, level, job, payment)) {
+                if (job.supplyPos() != null && supply(level, player, job) == null && job.tickMessage()) {
                     Messages.actionBar(player, "message.wrights.supply_missing");
                 }
-                job.skippedOne();
-                return PlaceResult.DONE;
-            }
-            if (!hasItem(player, level, job, payment)) {
                 job.skippedOne();
                 return PlaceResult.DONE;
             }
@@ -2824,7 +2829,6 @@ public final class JobManager {
                 return PlaceResult.WAIT;
             }
         }
-        BlockState previous = existing;
         if (clearFirst) {
             voidCell(level, pos);
             existing = level.getBlockState(pos);
@@ -2834,8 +2838,8 @@ public final class JobManager {
         level.setBlock(pos, state, Block.UPDATE_ALL);
         BlockState after = level.getBlockState(pos);
         if (after.getBlock() != state.getBlock()) {
-            if (!after.equals(previous)) {
-                level.setBlock(pos, previous, Block.UPDATE_ALL);
+            if (!after.equals(existing)) {
+                level.setBlock(pos, existing, Block.UPDATE_ALL);
             }
             job.skippedOne();
             return PlaceResult.DONE;
@@ -2843,7 +2847,7 @@ public final class JobManager {
         BlockEvent.EntityPlaceEvent event = new BlockEvent.EntityPlaceEvent(snapshot, existing, player);
         NeoForge.EVENT_BUS.post(event);
         if (event.isCanceled()) {
-            level.setBlock(pos, previous, Block.UPDATE_ALL);
+            level.setBlock(pos, existing, Block.UPDATE_ALL);
             job.skippedOne();
             return PlaceResult.DONE;
         }
@@ -2868,7 +2872,7 @@ public final class JobManager {
 
     /** Remove a solid block or a fluid that does not match, when that void option is on. */
     private static boolean shouldVoid(BuildJob job, BlockState existing, BlockState target) {
-        if (existing.isAir() || existing.equals(target)) {
+        if (existing.isAir() || existing.equals(target) || existing.canBeReplaced()) {
             return false;
         }
         if (existing.hasBlockEntity() && !job.voidNbt()) {
@@ -2876,9 +2880,6 @@ public final class JobManager {
         }
         if (BlockFilters.isFluid(existing)) {
             return job.voidFluids();
-        }
-        if (existing.canBeReplaced()) {
-            return false;
         }
         return job.voidBlocks();
     }
@@ -2906,54 +2907,50 @@ public final class JobManager {
     }
 
     private static boolean hasItem(ServerPlayer player, ServerLevel level, BuildJob job, Item item) {
-        Container container = supply(level, player, job);
-        if (job.supplyPos() != null) {
-            if (container == null) {
-                return false;
-            }
-            for (int slot = 0; slot < container.getContainerSize(); slot++) {
-                if (container.getItem(slot).is(item)) {
-                    return true;
-                }
-            }
-            return false;
+        if (holds(player.getInventory(), item)) {
+            return true;
         }
-        Inventory inventory = player.getInventory();
-        for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
-            if (inventory.getItem(slot).is(item)) {
+        Container container = supply(level, player, job);
+        return container != null && holds(container, item);
+    }
+
+    private static void consumeItem(ServerPlayer player, ServerLevel level, BuildJob job, Item item) {
+        Container container = supply(level, player, job);
+        boolean chestFirst = job.supplyPos() != null && !job.supplyPlayerFirst();
+        if (chestFirst && container != null && take(container, item)) {
+            container.setChanged();
+            return;
+        }
+        if (take(player.getInventory(), item)) {
+            return;
+        }
+        if (!chestFirst && container != null && take(container, item)) {
+            container.setChanged();
+        }
+    }
+
+    private static boolean holds(Container container, Item item) {
+        for (int slot = 0; slot < container.getContainerSize(); slot++) {
+            if (container.getItem(slot).is(item)) {
                 return true;
             }
         }
         return false;
     }
 
-    private static void consumeItem(ServerPlayer player, ServerLevel level, BuildJob job, Item item) {
-        Container container = supply(level, player, job);
-        if (job.supplyPos() != null && container != null) {
-            for (int slot = 0; slot < container.getContainerSize(); slot++) {
-                ItemStack stack = container.getItem(slot);
-                if (stack.is(item)) {
-                    stack.shrink(1);
-                    if (stack.isEmpty()) {
-                        container.setItem(slot, ItemStack.EMPTY);
-                    }
-                    container.setChanged();
-                    return;
-                }
+    private static boolean take(Container container, Item item) {
+        for (int slot = 0; slot < container.getContainerSize(); slot++) {
+            ItemStack stack = container.getItem(slot);
+            if (!stack.is(item)) {
+                continue;
             }
-            return;
-        }
-        Inventory inventory = player.getInventory();
-        for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
-            ItemStack stack = inventory.getItem(slot);
-            if (stack.is(item)) {
-                stack.shrink(1);
-                if (stack.isEmpty()) {
-                    inventory.setItem(slot, ItemStack.EMPTY);
-                }
-                return;
+            stack.shrink(1);
+            if (stack.isEmpty()) {
+                container.setItem(slot, ItemStack.EMPTY);
             }
+            return true;
         }
+        return false;
     }
 
     private static void giveBack(ServerLevel level, ServerPlayer player, BuildJob job, Item item) {

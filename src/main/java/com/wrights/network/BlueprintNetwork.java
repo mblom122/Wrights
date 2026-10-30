@@ -117,7 +117,7 @@ public final class BlueprintNetwork {
     public static void materials(ServerPlayer player, java.util.UUID id, boolean shortage, java.util.List<Requirements.Cost> costs) {
         java.util.List<BlueprintPayloads.MaterialLine> lines = new java.util.ArrayList<>(costs.size());
         for (Requirements.Cost cost : costs) {
-            lines.add(new BlueprintPayloads.MaterialLine(cost.itemId(), cost.count()));
+            lines.add(new BlueprintPayloads.MaterialLine(cost.itemId(), cost.count(), cost.have()));
         }
         PacketDistributor.sendToPlayer(player, new BlueprintPayloads.Materials(id, shortage, lines));
     }
@@ -233,7 +233,9 @@ public final class BlueprintNetwork {
                 payload.placeFluids(),
                 payload.voidBlocks(),
                 payload.voidFluids(),
-                payload.voidNbt()));
+                payload.voidNbt(),
+                payload.force(),
+                payload.playerFirst()));
     }
 
     private static void editCell(BlueprintPayloads.EditCell payload, IPayloadContext context) {
@@ -271,7 +273,7 @@ public final class BlueprintNetwork {
 
     private static void saveSession(BlueprintPayloads.SaveSession payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
-        context.enqueueWork(() -> BlueprintActions.saveSession(player));
+        context.enqueueWork(() -> BlueprintActions.saveSession(player, payload.placeFluids(), payload.voidBlocks(), payload.voidFluids(), payload.voidNbt()));
     }
 
     private static void control(BlueprintPayloads.JobControl payload, IPayloadContext context) {

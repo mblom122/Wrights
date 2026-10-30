@@ -801,6 +801,10 @@ public final class WrightsClientState {
                 follow = true;
                 anchor = lookTarget();
                 deployChosen = false;
+                WrightsClientConfig.setPlaceFluids(payload.placeFluids());
+                WrightsClientConfig.setVoidBlocks(payload.voidBlocks());
+                WrightsClientConfig.setVoidFluids(payload.voidFluids());
+                WrightsClientConfig.setVoidNbt(payload.voidNbt());
             }
             cornerA = null;
             cornerB = null;
@@ -914,6 +918,10 @@ public final class WrightsClientState {
     }
 
     public static boolean tryBuild() {
+        return tryBuild(false);
+    }
+
+    public static boolean tryBuild(boolean force) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player == null || !ControllerItem.isHeld(minecraft.player)) {
             return false;
@@ -937,7 +945,9 @@ public final class WrightsClientState {
                 WrightsClientConfig.PLACE_FLUIDS.get(),
                 WrightsClientConfig.VOID_BLOCKS.get(),
                 WrightsClientConfig.VOID_FLUIDS.get(),
-                WrightsClientConfig.VOID_NBT.get()));
+                WrightsClientConfig.VOID_NBT.get(),
+                force,
+                WrightsClientConfig.SUPPLY_PLAYER_FIRST.get()));
         return true;
     }
 

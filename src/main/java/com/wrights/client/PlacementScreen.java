@@ -402,7 +402,11 @@ public class PlacementScreen extends Screen implements JeiPreview {
     }
 
     private void saveBlueprint() {
-        PacketDistributor.sendToServer(new BlueprintPayloads.SaveSession());
+        PacketDistributor.sendToServer(new BlueprintPayloads.SaveSession(
+                WrightsClientConfig.PLACE_FLUIDS.get(),
+                WrightsClientConfig.VOID_BLOCKS.get(),
+                WrightsClientConfig.VOID_FLUIDS.get(),
+                WrightsClientConfig.VOID_NBT.get()));
     }
 
     private void transform(BlueprintTransforms.Op operation) {

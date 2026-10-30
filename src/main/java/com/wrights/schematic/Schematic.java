@@ -34,6 +34,10 @@ public final class Schematic {
     public static final Comparator<Entry> BUILD_ORDER = Comparator.comparingInt((Entry entry) -> entry.y()).thenComparing(Entry::secondary);
 
     private final boolean ephemeral;
+    private final boolean placeFluids;
+    private final boolean voidBlocks;
+    private final boolean voidFluids;
+    private final boolean voidNbt;
     private transient Map<Long, Integer> positions;
 
     public Schematic(UUID id, int sizeX, int sizeY, int sizeZ, List<Entry> entries) {
@@ -49,6 +53,10 @@ public final class Schematic {
     }
 
     public Schematic(UUID id, String name, int sizeX, int sizeY, int sizeZ, List<Entry> entries, BlockPos sourceMin, BlockPos sourceMax, String sourceDimension, int anchorX, int anchorY, int anchorZ, boolean ephemeral) {
+        this(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, ephemeral, true, false, false, false);
+    }
+
+    public Schematic(UUID id, String name, int sizeX, int sizeY, int sizeZ, List<Entry> entries, BlockPos sourceMin, BlockPos sourceMax, String sourceDimension, int anchorX, int anchorY, int anchorZ, boolean ephemeral, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt) {
         this.id = id;
         this.name = name == null || name.isBlank() ? "Blueprint" : name;
         this.sizeX = sizeX;
@@ -62,6 +70,10 @@ public final class Schematic {
         this.anchorY = clampAnchor(anchorY, sizeY);
         this.anchorZ = clampAnchor(anchorZ, sizeZ);
         this.ephemeral = ephemeral;
+        this.placeFluids = placeFluids;
+        this.voidBlocks = voidBlocks;
+        this.voidFluids = voidFluids;
+        this.voidNbt = voidNbt;
     }
 
     public UUID id() {
@@ -108,13 +120,41 @@ public final class Schematic {
         return ephemeral;
     }
 
+    public boolean placeFluids() {
+        return placeFluids;
+    }
+
+    public boolean voidBlocks() {
+        return voidBlocks;
+    }
+
+    public boolean voidFluids() {
+        return voidFluids;
+    }
+
+    public boolean voidNbt() {
+        return voidNbt;
+    }
+
+    public boolean samePaste(Schematic other) {
+        return other != null
+                && placeFluids == other.placeFluids
+                && voidBlocks == other.voidBlocks
+                && voidFluids == other.voidFluids
+                && voidNbt == other.voidNbt;
+    }
+
+    public Schematic withPaste(boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt) {
+        return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, ephemeral, placeFluids, voidBlocks, voidFluids, voidNbt);
+    }
+
     public Schematic ephemeralCopy() {
-        return new Schematic(UUID.randomUUID(), name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, true);
+        return new Schematic(UUID.randomUUID(), name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, true).withPaste(placeFluids, voidBlocks, voidFluids, voidNbt);
     }
 
     /** Keeps this blueprint's id and name, and takes the blocks stored on {@code source}. */
     public Schematic withContents(Schematic source) {
-        return new Schematic(id, name, source.sizeX, source.sizeY, source.sizeZ, source.entries, source.sourceMin, source.sourceMax, source.sourceDimension, source.anchorX, source.anchorY, source.anchorZ, ephemeral);
+        return new Schematic(id, name, source.sizeX, source.sizeY, source.sizeZ, source.entries, source.sourceMin, source.sourceMax, source.sourceDimension, source.anchorX, source.anchorY, source.anchorZ, ephemeral).withPaste(source.placeFluids, source.voidBlocks, source.voidFluids, source.voidNbt);
     }
 
     /** True when both blueprints store the same blocks in the same cells. Name and id are ignored. */
@@ -136,24 +176,24 @@ public final class Schematic {
     }
 
     public Schematic withName(String name) {
-        return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, ephemeral);
+        return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, ephemeral).withPaste(placeFluids, voidBlocks, voidFluids, voidNbt);
     }
 
     /** A saved copy with its own id. Use counts and favorites stay with the original. */
     public Schematic duplicate(UUID id, String name) {
-        return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, false);
+        return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, false).withPaste(placeFluids, voidBlocks, voidFluids, voidNbt);
     }
 
     public Schematic withAnchor(int anchorX, int anchorY, int anchorZ) {
-        return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, ephemeral);
+        return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, ephemeral).withPaste(placeFluids, voidBlocks, voidFluids, voidNbt);
     }
 
     public Schematic withEntries(List<Entry> entries) {
-        return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, ephemeral);
+        return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, ephemeral).withPaste(placeFluids, voidBlocks, voidFluids, voidNbt);
     }
 
     public Schematic withLayout(int sizeY, List<Entry> entries, int anchorY) {
-        return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, ephemeral);
+        return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, ephemeral).withPaste(placeFluids, voidBlocks, voidFluids, voidNbt);
     }
 
     public int sizeX() {
@@ -206,6 +246,10 @@ public final class Schematic {
         if (ephemeral) {
             tag.putBoolean("ephemeral", true);
         }
+        tag.putBoolean("placeFluids", placeFluids);
+        tag.putBoolean("voidBlocks", voidBlocks);
+        tag.putBoolean("voidFluids", voidFluids);
+        tag.putBoolean("voidNbt", voidNbt);
         if (!sourceDimension.isEmpty()) {
             tag.putString("sourceDim", sourceDimension);
             tag.put("sourceMin", NbtUtils.writeBlockPos(sourceMin));
@@ -241,7 +285,11 @@ public final class Schematic {
         int anchorX = tag.contains("anchorX") ? tag.getInt("anchorX") : 0;
         int anchorY = tag.contains("anchorY") ? tag.getInt("anchorY") : 0;
         int anchorZ = tag.contains("anchorZ") ? tag.getInt("anchorZ") : 0;
-        return new Schematic(id, name, tag.getInt("sx"), tag.getInt("sy"), tag.getInt("sz"), entries, sourceMin, sourceMax, sourceDim, anchorX, anchorY, anchorZ, tag.getBoolean("ephemeral"));
+        Schematic schematic = new Schematic(id, name, tag.getInt("sx"), tag.getInt("sy"), tag.getInt("sz"), entries, sourceMin, sourceMax, sourceDim, anchorX, anchorY, anchorZ, tag.getBoolean("ephemeral"));
+        if (!tag.contains("placeFluids")) {
+            return schematic;
+        }
+        return schematic.withPaste(tag.getBoolean("placeFluids"), tag.getBoolean("voidBlocks"), tag.getBoolean("voidFluids"), tag.getBoolean("voidNbt"));
     }
 
     private static int clampAnchor(int value, int size) {
