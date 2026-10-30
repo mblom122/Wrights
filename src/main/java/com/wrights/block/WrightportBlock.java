@@ -26,6 +26,7 @@ import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import net.minecraft.world.phys.BlockHitResult;
 
 import com.wrights.drone.Swarm;
+import com.wrights.drone.WrightLedger;
 
 public class WrightportBlock extends BaseEntityBlock {
     public static final MapCodec<WrightportBlock> CODEC = simpleCodec(WrightportBlock::new);
@@ -61,6 +62,9 @@ public class WrightportBlock extends BaseEntityBlock {
     @Override
     public void setPlacedBy(Level level, BlockPos pos, BlockState state, @Nullable LivingEntity placer, ItemStack stack) {
         if (level.getBlockEntity(pos) instanceof WrightportBlockEntity port) {
+            if (placer instanceof Player player) {
+                port.assignOwner(player.getUUID());
+            }
             port.setSwarm(Swarm.from(stack));
         }
     }
@@ -71,6 +75,14 @@ public class WrightportBlock extends BaseEntityBlock {
             server.openMenu(port, buffer -> buffer.writeBlockPos(pos));
         }
         return InteractionResult.sidedSuccess(level.isClientSide);
+    }
+
+    @Override
+    protected void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean movedByPiston) {
+        if (!state.is(newState.getBlock()) && level instanceof net.minecraft.server.level.ServerLevel server) {
+            WrightLedger.get(server.getServer()).forget(server.dimension(), pos);
+        }
+        super.onRemove(state, level, pos, newState, movedByPiston);
     }
 
     @Override

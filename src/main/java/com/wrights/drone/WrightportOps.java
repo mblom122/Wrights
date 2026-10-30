@@ -26,7 +26,10 @@ public final class WrightportOps {
             Messages.actionBar(player, "message.wrights.wright_away");
             return;
         }
-        Swarm next = HangarOps.edit(player, swarm, action, index);
+        if (port.owner() == null) {
+            port.assignOwner(player.getUUID());
+        }
+        Swarm next = HangarOps.editOwned(player, port.owner(), swarm, action, index);
         if (next == swarm) {
             return;
         }
@@ -50,7 +53,12 @@ public final class WrightportOps {
             Messages.actionBar(player, "message.wrights.wright_away");
             return;
         }
-        Swarm next = HangarOps.applyBatch(player, swarm, action, value, home);
+        if (port.owner() == null && action == HangarOps.ADD_COUNT) {
+            port.assignOwner(player.getUUID());
+        }
+        Swarm next = port.owner() == null
+                ? HangarOps.applyBatch(player, swarm, action, value, home)
+                : HangarOps.applyBatchOwned(player, port.owner(), swarm, action, value, home);
         if (next == swarm) {
             return;
         }

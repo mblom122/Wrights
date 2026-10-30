@@ -652,6 +652,8 @@
   "message.wrights.wright_away": "That wright is out",
   "message.wrights.wright_locked": "That wright is being managed",
   "message.wrights.drone_full": "This port already holds %s wrights",
+  "message.wrights.wright_cap": "The limit is %s wrights in total",
+  "message.wrights.wright_cap_added": "Added %s. The limit is %s wrights in total",
   "message.wrights.drone_parts": "A wright needs %s iron, %s redstone, and %s amethyst",
   "message.wrights.drone_built": "Built wright %s",
   "message.wrights.speed_max": "That wright is already at full speed",

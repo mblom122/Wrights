@@ -43,6 +43,8 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
     private int hatchHold;
     /** Corner lamps. Red until the server has looked at the crew. */
     private int lamp = WrightportLamp.RED;
+    /** Player who placed this port. Their stored wrights share one limit. */
+    private UUID owner;
 
     public WrightportBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.WRIGHTPORT.get(), pos, state);
@@ -62,7 +64,27 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
         Swarm.write(stack, swarm);
         items.setChanged();
         refreshLamp();
+        remember();
         sync();
+    }
+
+    public UUID owner() {
+        return owner;
+    }
+
+    public void assignOwner(UUID owner) {
+        if (owner == null) {
+            return;
+        }
+        this.owner = owner;
+        setChanged();
+        remember();
+    }
+
+    private void remember() {
+        if (owner != null && level instanceof ServerLevel server) {
+            com.wrights.drone.WrightLedger.get(server.getServer()).remember(owner, server.dimension(), worldPosition, swarm().units().size());
+        }
     }
 
     public int lampColor() {
@@ -160,6 +182,9 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
         super.saveAdditional(tag, registries);
         tag.put("Wrights", items.createTag(registries));
         tag.putInt("Lamp", lamp);
+        if (owner != null) {
+            tag.putUUID("Owner", owner);
+        }
     }
 
     @Override
@@ -171,6 +196,15 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
         if (tag.contains("Lamp")) {
             lamp = tag.getInt("Lamp");
         }
+        if (tag.hasUUID("Owner")) {
+            owner = tag.getUUID("Owner");
+        }
+    }
+
+    @Override
+    public void onLoad() {
+        super.onLoad();
+        remember();
     }
 
     /** Lamp updates reuse this packet. It has to carry the crew, or the client forgets who is in the port. */

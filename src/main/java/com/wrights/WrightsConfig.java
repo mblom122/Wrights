@@ -22,6 +22,13 @@ public final class WrightsConfig {
                     "Raising this can lag the server when many of those wrights are working at once.")
             .defineInRange("maxWrightsCarried", 64, 1, 1024);
 
+    public static final ModConfigSpec.IntValue MAX_WRIGHTS_OWNED = BUILDER
+            .comment(
+                    "Most wrights one player may store in total.",
+                    "This counts every personal wrightport they carry and every wrightport block they placed.",
+                    "Each port is still limited by maxWrightsCarried.")
+            .defineInRange("maxWrightsOwned", 200, 1, 1_000_000);
+
     public static final ModConfigSpec.IntValue MAX_AXIS = BUILDER
             .comment(
                     "Largest selection length on one axis, in blocks. 512 matches Building Gadgets and RFTools.",
@@ -142,6 +149,10 @@ public final class WrightsConfig {
 
     public static int maxWrightsCarried() {
         return read(MAX_WRIGHTS_CARRIED, 64);
+    }
+
+    public static int maxWrightsOwned() {
+        return read(MAX_WRIGHTS_OWNED, 200);
     }
 
     public static int maxPreviewBlocks() {

@@ -2,6 +2,7 @@ package com.wrights.drone;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -10,6 +11,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
+import com.wrights.WrightsConfig;
 import com.wrights.item.ModItems;
 import com.wrights.item.PersonalWrightportItem;
 import com.wrights.item.WrightItem;
@@ -80,8 +82,12 @@ public final class HangarOps {
     }
 
     static Swarm applyBatch(ServerPlayer player, Swarm swarm, int action, int value, int[] units) {
+        return applyBatchOwned(player, player.getUUID(), swarm, action, value, units);
+    }
+
+    static Swarm applyBatchOwned(ServerPlayer player, UUID owner, Swarm swarm, int action, int value, int[] units) {
         return switch (action) {
-            case ADD_COUNT -> insertCount(player, swarm, value);
+            case ADD_COUNT -> insertCount(player, owner, swarm, value);
             case TO_TIER -> moveMarked(player, swarm, units, WrightTier.clamp(value));
             case MAX_AFFORD -> raiseMarked(player, swarm, units);
             case TAKE_MARKED -> takeMarked(player, swarm, units);
@@ -130,14 +136,18 @@ public final class HangarOps {
     }
 
     public static Swarm edit(ServerPlayer player, Swarm swarm, int action, int index) {
+        return editOwned(player, player.getUUID(), swarm, action, index);
+    }
+
+    public static Swarm editOwned(ServerPlayer player, UUID owner, Swarm swarm, int action, int index) {
         return switch (action) {
-            case BUILD -> build(player, swarm);
+            case BUILD -> build(player, owner, swarm);
             case REMOVE -> swarm.removeUnit(index);
             case SPEED -> speed(player, swarm, index);
             case ASSIGN -> swarm.withAssign(index);
             case UP -> swarm.move(index, -1);
             case DOWN -> swarm.move(index, 1);
-            case INSERT -> insert(player, swarm, index);
+            case INSERT -> insert(player, owner, swarm, index);
             case EXTRACT -> extract(player, swarm, index);
             case UPGRADE -> upgrade(player, swarm, index);
             case TAKE -> take(player, swarm, index);
@@ -156,17 +166,23 @@ public final class HangarOps {
         return Math.min(Math.max(0, available), Math.max(0, ask));
     }
 
-    private static Swarm insert(ServerPlayer player, Swarm swarm, int mode) {
+    private static Swarm insert(ServerPlayer player, UUID owner, Swarm swarm, int mode) {
         int room = Swarm.capacity() - swarm.units().size();
-        return insertCount(player, swarm, wanted(mode, room));
+        return insertCount(player, owner, swarm, wanted(mode, room));
     }
 
-    private static Swarm insertCount(ServerPlayer player, Swarm swarm, int count) {
-        int room = Swarm.capacity() - swarm.units().size();
-        if (room <= 0) {
+    private static Swarm insertCount(ServerPlayer player, UUID owner, Swarm swarm, int count) {
+        int portRoom = Swarm.capacity() - swarm.units().size();
+        if (portRoom <= 0) {
             Messages.actionBar(player, "message.wrights.drone_full", Swarm.capacity());
             return swarm;
         }
+        int capRoom = WrightLedger.room(player.serverLevel().getServer(), owner);
+        if (capRoom <= 0) {
+            Messages.actionBar(player, "message.wrights.wright_cap", WrightsConfig.maxWrightsOwned());
+            return swarm;
+        }
+        int room = Math.min(portRoom, capRoom);
         if (count <= 0) {
             return swarm;
         }
@@ -179,7 +195,11 @@ public final class HangarOps {
         for (int tier : tiers) {
             next = next.addUnit(tier);
         }
-        Messages.actionBar(player, "message.wrights.wrights_added", tiers.size());
+        if (tiers.size() >= capRoom) {
+            Messages.actionBar(player, "message.wrights.wright_cap_added", tiers.size(), WrightsConfig.maxWrightsOwned());
+        } else {
+            Messages.actionBar(player, "message.wrights.wrights_added", tiers.size());
+        }
         return next;
     }
 
@@ -555,9 +575,13 @@ public final class HangarOps {
         }
     }
 
-    private static Swarm build(ServerPlayer player, Swarm swarm) {
+    private static Swarm build(ServerPlayer player, UUID owner, Swarm swarm) {
         if (swarm.units().size() >= Swarm.capacity()) {
             Messages.actionBar(player, "message.wrights.drone_full", Swarm.capacity());
+            return swarm;
+        }
+        if (WrightLedger.room(player.serverLevel().getServer(), owner) <= 0) {
+            Messages.actionBar(player, "message.wrights.wright_cap", WrightsConfig.maxWrightsOwned());
             return swarm;
         }
         if (!ItemSource.canAfford(player, Items.IRON_INGOT, IRON)
