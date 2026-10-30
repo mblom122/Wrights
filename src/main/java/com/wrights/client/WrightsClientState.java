@@ -709,6 +709,9 @@ public final class WrightsClientState {
         cornerA = null;
         cornerB = null;
         clearCapturePreview();
+        // A chosen blueprint is placed from Use template. Bind inventory is a separate tool.
+        bindSupply = false;
+        bindFromMenu = false;
         updateFlags();
     }
 
@@ -854,6 +857,12 @@ public final class WrightsClientState {
         if (payload.forBuild()) {
             boolean same = mode == Mode.BUILD && payload.id().equals(buildId);
             boolean sizeChanged = fullX != editX || fullY != editY || fullZ != editZ;
+            // Saving a new template and choosing Build arrives here while still capturing.
+            // Keep an in-progress Bind inventory selection, which is already in build mode.
+            if (mode != Mode.BUILD) {
+                bindSupply = false;
+                bindFromMenu = false;
+            }
             mode = Mode.BUILD;
             buildId = payload.id();
             buildName = payload.name();
