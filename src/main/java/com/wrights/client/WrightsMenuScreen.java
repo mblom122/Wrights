@@ -460,7 +460,7 @@ public class WrightsMenuScreen extends Screen {
         boolean world = !WrightsClientState.libraryGlobal;
         editButton.active = blueprint && world;
         deleteButton.active = any;
-        buildButton.active = blueprint && tool && world;
+        buildButton.active = blueprint && tool;
         renameButton.active = any;
         deleteButton.setMessage(Component.translatable(any && row.id().equals(confirmDelete) ? "menu.wrights.delete_confirm" : "menu.wrights.delete"));
         if (any && !rename.isFocused()) {

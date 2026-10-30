@@ -936,7 +936,7 @@ public final class BlueprintActions {
     }
 
     public static void previewBlueprint(ServerPlayer player, java.util.UUID id) {
-        Schematic schematic = SchematicLibrary.get(player.getServer()).schematic(id).orElse(null);
+        Schematic schematic = stored(player, id);
         if (schematic == null) {
             return;
         }
@@ -950,7 +950,7 @@ public final class BlueprintActions {
     public static void sendMaterials(ServerPlayer player, java.util.UUID id, int clipX, int clipY, int clipZ, boolean placeFluids) {
         Schematic schematic = workingCopy(player, id);
         if (schematic == null) {
-            schematic = SchematicLibrary.get(player.getServer()).schematic(id).orElse(null);
+            schematic = stored(player, id);
         }
         if (schematic == null) {
             Messages.actionBar(player, "message.wrights.blueprint_missing");
@@ -1001,6 +1001,11 @@ public final class BlueprintActions {
         }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         Schematic schematic = library.schematic(id).orElse(null);
+        boolean fromGlobal = false;
+        if (schematic == null) {
+            schematic = GlobalBlueprintStore.get().schematic(id).orElse(null);
+            fromGlobal = schematic != null;
+        }
         if (schematic == null || schematic.blockCount() == 0) {
             Messages.actionBar(player, "message.wrights.blueprint_missing");
             BlueprintNetwork.syncLibrary(player);
@@ -1013,8 +1018,14 @@ public final class BlueprintActions {
         session.setName(schematic.name());
         session.setDraft(schematic);
         session.setDraftDirty(false);
-        library.shelf().noteUse(player.getUUID(), id);
-        library.setDirty();
+        if (fromGlobal) {
+            GlobalBlueprintStore store = GlobalBlueprintStore.get();
+            store.shelf().noteUse(player.getUUID(), id);
+            store.markShelfChanged();
+        } else {
+            library.shelf().noteUse(player.getUUID(), id);
+            library.setDirty();
+        }
         BlueprintNetwork.preview(player, schematic, true, false);
         BlueprintNetwork.syncSupply(player);
     }
@@ -1075,7 +1086,7 @@ public final class BlueprintActions {
         }
         java.util.UUID buildSchematicId = schematic.id();
         Schematic snapshot = null;
-        if (session.draftDirty()) {
+        if (session.draftDirty() || library.schematic(schematic.id()).isEmpty()) {
             snapshot = schematic.ephemeralCopy();
             library.putSchematic(snapshot);
             buildSchematicId = snapshot.id();
@@ -1328,6 +1339,18 @@ public final class BlueprintActions {
     private static boolean building(ServerPlayer player, java.util.UUID id) {
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
         return session.mode() == BlueprintSessions.Mode.BUILD && id.equals(session.buildId());
+    }
+
+    /** World library first, then the shared global library. */
+    private static Schematic stored(ServerPlayer player, java.util.UUID id) {
+        if (id == null) {
+            return null;
+        }
+        Schematic world = SchematicLibrary.get(player.getServer()).schematic(id).orElse(null);
+        if (world != null) {
+            return world;
+        }
+        return GlobalBlueprintStore.get().schematic(id).orElse(null);
     }
 
     private static Schematic workingCopy(ServerPlayer player, java.util.UUID id) {
