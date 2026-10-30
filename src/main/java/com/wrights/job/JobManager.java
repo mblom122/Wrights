@@ -616,7 +616,7 @@ public final class JobManager {
         com.wrights.blueprint.BlueprintSessions.BlueprintSession session = com.wrights.blueprint.BlueprintSessions.get(player);
         job.setSupply(session.supplyPos(), session.supplyDimension());
         job.setSupplyPlayerFirst(supplyPlayerFirst);
-        if (queue && !instant(player)) {
+        if (queue && !instant(player) && freeUnits(player, library, job, 1).isEmpty()) {
             int blocks = placeableBlocks(schematic, job);
             int room = Math.min(Math.max(0, blocks), WrightsConfig.maxWrightsPerJob());
             int wanted = drones > 0 ? Math.min(drones, room) : room;

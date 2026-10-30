@@ -197,6 +197,10 @@ public class WrightsMenuScreen extends Screen {
     private int droneMinusX;
     private int dronePlusX;
     private int droneHintY;
+    private int queueX;
+    private int queueY;
+    private int queueW;
+    private int queueHintY;
     private int buildMenuX;
     private int buildMenuY;
     private int buildMenuW;
@@ -813,6 +817,13 @@ public class WrightsMenuScreen extends Screen {
         local += 16;
         droneHintY = optionY(local);
         local += 16;
+        Component queueState = Component.translatable(WrightsClientConfig.QUEUE_JOBS.get() ? "menu.wrights.on" : "menu.wrights.off");
+        queueW = Math.max(36, this.font.width(queueState) + 16);
+        queueX = x + 108;
+        queueY = optionY(local - 3);
+        local += 14;
+        queueHintY = optionY(local);
+        local += 16;
         Component youFirst = Component.translatable("menu.wrights.port_player_first");
         Component blockFirst = Component.translatable("menu.wrights.port_block_first");
         portOrderW = Math.max(this.font.width(youFirst), this.font.width(blockFirst)) + 16;
@@ -944,6 +955,13 @@ public class WrightsMenuScreen extends Screen {
                 ? Component.translatable("menu.wrights.drone_max_hint", WrightsConfig.maxWrightsPerJob())
                 : Component.translatable("menu.wrights.drone_fixed_hint");
         graphics.drawString(this.font, this.font.plainSubstrByWidth(droneHint.getString(), optionViewW - 28), x, droneHintY, 0xFF667480, false);
+        boolean queueJobs = WrightsClientConfig.QUEUE_JOBS.get();
+        graphics.drawString(this.font, Component.translatable("menu.wrights.queue_jobs"), x, queueY + 3, WrightsUi.MUTED, false);
+        Component queueState = Component.translatable(queueJobs ? "menu.wrights.on" : "menu.wrights.off");
+        graphics.fill(queueX, queueY, queueX + queueW, queueY + 16, queueJobs ? 0xFF24384A : 0xFF18222C);
+        WrightsUi.border(graphics, queueX, queueY, queueW, 16, queueJobs ? WrightsUi.COPPER : 0xFF3D4E5E);
+        graphics.drawCenteredString(this.font, queueState, queueX + queueW / 2, queueY + 4, WrightsUi.TEXT);
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("menu.wrights.queue_jobs_hint").getString(), optionViewW - 28), x, queueHintY, 0xFF667480, false);
         boolean youFirst = WrightsClientConfig.PORT_PLAYER_FIRST.get();
         graphics.drawString(this.font, Component.translatable("menu.wrights.port_order"), x, portOrderY + 3, WrightsUi.MUTED, false);
         Component portOrder = Component.translatable(youFirst ? "menu.wrights.port_player_first" : "menu.wrights.port_block_first");
@@ -1355,6 +1373,10 @@ public class WrightsMenuScreen extends Screen {
                         WrightsClientState.applyDeploy();
                         return true;
                     }
+                }
+                if (mouseX >= queueX && mouseX < queueX + queueW && mouseY >= queueY && mouseY < queueY + 16) {
+                    WrightsClientConfig.setQueueJobs(!WrightsClientConfig.QUEUE_JOBS.get());
+                    return true;
                 }
                 if (mouseX >= portOrderX && mouseX < portOrderX + portOrderW && mouseY >= portOrderY && mouseY < portOrderY + 16) {
                     boolean next = !WrightsClientConfig.PORT_PLAYER_FIRST.get();

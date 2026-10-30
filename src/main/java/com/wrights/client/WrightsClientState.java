@@ -1152,7 +1152,7 @@ public final class WrightsClientState {
     }
 
     public static boolean tryBuild(boolean force) {
-        return tryBuild(force, false);
+        return tryBuild(force, WrightsClientConfig.QUEUE_JOBS.get());
     }
 
     public static boolean tryBuild(boolean force, boolean queue) {

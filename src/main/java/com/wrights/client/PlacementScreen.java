@@ -182,7 +182,8 @@ public class PlacementScreen extends Screen implements JeiPreview {
             voidNbtButton.setPicked(voiding && WrightsClientConfig.VOID_NBT.get());
         }
         if (buildButton != null) {
-            buildButton.setMessage(Component.translatable(WrightsClientState.queueInstead() ? "menu.wrights.queue" : "menu.wrights.build"));
+            boolean queue = WrightsClientConfig.QUEUE_JOBS.get() && WrightsClientState.queueInstead();
+            buildButton.setMessage(Component.translatable(queue ? "menu.wrights.queue" : "menu.wrights.build"));
         }
         suppress = false;
     }
@@ -227,7 +228,7 @@ public class PlacementScreen extends Screen implements JeiPreview {
             if (WrightsClientState.poolStored < 0) {
                 line = Component.literal("...");
                 color = WrightsUi.MUTED;
-            } else if (WrightsClientState.queueInstead()) {
+            } else if (WrightsClientConfig.QUEUE_JOBS.get() && WrightsClientState.queueInstead()) {
                 int cap = WrightsClientState.requestCap();
                 line = Component.translatable("screen.wrights.drones_queue", Math.min(WrightsClientState.deployCount, cap), cap);
                 color = WrightsUi.BLUE;
@@ -415,7 +416,7 @@ public class PlacementScreen extends Screen implements JeiPreview {
     }
 
     private void send() {
-        if (WrightsClientState.tryBuild(false, WrightsClientState.queueInstead())) {
+        if (WrightsClientState.tryBuild()) {
             WrightsClientState.stepAnchor();
             refresh();
         }
