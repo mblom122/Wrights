@@ -27,7 +27,7 @@ public final class WrightportOps {
             return;
         }
         if (port.owner() == null) {
-            port.assignOwner(player.getUUID());
+            port.assignOwner(player.getUUID(), player.getGameProfile().getName());
         }
         Swarm next = HangarOps.editOwned(player, port.owner(), swarm, action, index);
         if (next == swarm) {
@@ -54,7 +54,7 @@ public final class WrightportOps {
             return;
         }
         if (port.owner() == null && action == HangarOps.ADD_COUNT) {
-            port.assignOwner(player.getUUID());
+            port.assignOwner(player.getUUID(), player.getGameProfile().getName());
         }
         Swarm next = port.owner() == null
                 ? HangarOps.applyBatch(player, swarm, action, value, home)

@@ -585,6 +585,8 @@
   "item.wrights.wright_upgrade_netherite": "Netherite Wright Upgrade",
   "item.wrights.wright_upgrade.hint": "Apply this to a %s wright from the Manage menu.",
   "block.wrights.wrightport": "Wrightport",
+  "block.wrights.wrightport.owner": "Owner: %s",
+  "block.wrights.wrightport.no_owner": "No owner",
   "item.wrights.wrightport.hint": "Place this. Wrights kept here stay with the building.",
   "drone.wrights.speed.0": "Basic",
   "drone.wrights.speed.1": "Copper",

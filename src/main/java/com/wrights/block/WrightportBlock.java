@@ -63,7 +63,7 @@ public class WrightportBlock extends BaseEntityBlock {
     public void setPlacedBy(Level level, BlockPos pos, BlockState state, @Nullable LivingEntity placer, ItemStack stack) {
         if (level.getBlockEntity(pos) instanceof WrightportBlockEntity port) {
             if (placer instanceof Player player) {
-                port.assignOwner(player.getUUID());
+                port.assignOwner(player.getUUID(), player.getGameProfile().getName());
             }
             port.setSwarm(Swarm.from(stack));
         }

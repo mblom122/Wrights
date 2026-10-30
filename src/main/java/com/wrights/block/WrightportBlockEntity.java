@@ -45,6 +45,7 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
     private int lamp = WrightportLamp.RED;
     /** Player who placed this port. Their stored wrights share one limit. */
     private UUID owner;
+    private String ownerName = "";
 
     public WrightportBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.WRIGHTPORT.get(), pos, state);
@@ -72,13 +73,36 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
         return owner;
     }
 
+    public String ownerName() {
+        return ownerName == null ? "" : ownerName;
+    }
+
     public void assignOwner(UUID owner) {
+        assignOwner(owner, null);
+    }
+
+    public void assignOwner(UUID owner, String name) {
         if (owner == null) {
             return;
         }
         this.owner = owner;
+        if (name != null && !name.isBlank()) {
+            this.ownerName = name;
+        }
         setChanged();
         remember();
+        sync();
+    }
+
+    public Component ownerLabel() {
+        if (owner == null) {
+            return Component.translatable("block.wrights.wrightport.no_owner");
+        }
+        String name = ownerName();
+        if (name.isBlank()) {
+            name = owner.toString().substring(0, 8);
+        }
+        return Component.translatable("block.wrights.wrightport.owner", name);
     }
 
     private void remember() {
@@ -184,6 +208,9 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
         tag.putInt("Lamp", lamp);
         if (owner != null) {
             tag.putUUID("Owner", owner);
+            if (!ownerName().isBlank()) {
+                tag.putString("OwnerName", ownerName);
+            }
         }
     }
 
@@ -199,12 +226,32 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
         if (tag.hasUUID("Owner")) {
             owner = tag.getUUID("Owner");
         }
+        if (tag.contains("OwnerName")) {
+            ownerName = tag.getString("OwnerName");
+        }
     }
 
     @Override
     public void onLoad() {
         super.onLoad();
         remember();
+        resolveOwnerName();
+    }
+
+    private void resolveOwnerName() {
+        if (owner == null || !ownerName().isBlank() || !(level instanceof ServerLevel server) || server.getServer() == null) {
+            return;
+        }
+        var online = server.getServer().getPlayerList().getPlayer(owner);
+        if (online != null) {
+            assignOwner(owner, online.getGameProfile().getName());
+            return;
+        }
+        server.getServer().getProfileCache().get(owner).ifPresent(profile -> {
+            if (profile.getName() != null && !profile.getName().isBlank()) {
+                assignOwner(owner, profile.getName());
+            }
+        });
     }
 
     /** Lamp updates reuse this packet. It has to carry the crew, or the client forgets who is in the port. */

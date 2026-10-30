@@ -13,6 +13,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.network.PacketDistributor;
 
+import com.wrights.block.WrightportBlockEntity;
 import com.wrights.drone.Swarm;
 import com.wrights.menu.WrightportMenu;
 import com.wrights.network.BlueprintPayloads;
@@ -43,6 +44,16 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         });
         addRenderableWidget(boundaryButton);
         placeBoundary();
+    }
+
+    private void drawOwner(GuiGraphics graphics) {
+        if (getMinecraft().level == null || !(getMinecraft().level.getBlockEntity(menu.pos()) instanceof WrightportBlockEntity port)) {
+            return;
+        }
+        Component owner = port.ownerLabel();
+        int x = leftPos + 12 + this.font.width(Component.translatable("screen.wrights.manage_wrights")) + 10;
+        int limit = (boundaryButton == null ? leftPos + imageWidth - 16 : boundaryButton.getX()) - x - 6;
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(owner.getString(), Math.max(24, limit)), x, topPos + 12, WrightsUi.MUTED, false);
     }
 
     private void placeBoundary() {
@@ -158,6 +169,7 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         this.renderBackground(graphics, mouseX, mouseY, partialTick);
         renderBg(graphics, partialTick, mouseX, mouseY);
         manage.render(this, graphics, mouseX, mouseY);
+        drawOwner(graphics);
         placeBoundary();
         for (Renderable widget : this.renderables) {
             widget.render(graphics, mouseX, mouseY, partialTick);
