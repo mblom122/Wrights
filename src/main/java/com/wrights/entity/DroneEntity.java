@@ -20,7 +20,9 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
+import com.wrights.WrightsConfig;
 import com.wrights.drone.WrightHomes;
+import com.wrights.drone.WrightTier;
 import com.wrights.job.BuildJob;
 import com.wrights.schematic.SchematicLibrary;
 
@@ -30,6 +32,7 @@ public class DroneEntity extends Entity {
 
     private boolean returning;
     private int returnTicks;
+    private int returnLimit;
     private UUID ownerId;
     /** Null = personal wrightport (player back). Set = placed wrightport block. */
     @Nullable
@@ -93,17 +96,18 @@ public class DroneEntity extends Entity {
         this.ownerId = player.getUUID();
         this.setJobId(null);
         setHomePort(port);
-        int n = Math.max(1, count);
-        double angle = (Math.PI * 2.0D * slot) / n;
-        double radius = n <= 1 ? 0.0D : 0.55D;
-        Vec3 above;
-        if (port != null) {
-            above = WrightHomes.approach(port, slot, count);
-        } else {
-            above = WrightHomes.behindPlayer(player).add(Math.cos(angle) * radius, 4.0D, Math.sin(angle) * radius);
+        if (!WrightsConfig.flyHome()) {
+            int n = Math.max(1, count);
+            double angle = (Math.PI * 2.0D * slot) / n;
+            double radius = n <= 1 ? 0.0D : 0.55D;
+            Vec3 above = port != null
+                    ? WrightHomes.approach(port, slot, count)
+                    : WrightHomes.behindPlayer(player).add(Math.cos(angle) * radius, 4.0D, Math.sin(angle) * radius);
+            this.moveTo(above.x, above.y, above.z, player.getYRot(), 0.0F);
+            this.setYRot(player.getYRot());
         }
-        this.moveTo(above.x, above.y, above.z, player.getYRot(), 0.0F);
-        this.setYRot(player.getYRot());
+        Vec3 dock = port != null ? WrightHomes.hatch(port) : WrightHomes.behindPlayer(player);
+        this.returnLimit = returnBudget(dock);
     }
 
     @Override
@@ -136,6 +140,28 @@ public class DroneEntity extends Entity {
         this.entityData.set(JOB_ID, id == null ? "" : id.toString());
     }
 
+    private int returnBudget(Vec3 dock) {
+        double dist = this.position().distanceTo(dock);
+        int ticks = 160 + (int) Math.ceil(dist / 0.15D);
+        return Math.min(ticks, 12000);
+    }
+
+    /** Cruise like a working wright, then slow for the last few blocks into the hatch. */
+    private double returnStep(Vec3 dock, boolean blockHome) {
+        double distSqr = this.distanceToSqr(dock);
+        if (blockHome && distSqr < 49.0D) {
+            return 0.3D;
+        }
+        if (!blockHome && distSqr < 25.0D) {
+            return 0.5D;
+        }
+        double step = WrightTier.flyClose(this.tier());
+        if (distSqr > 64.0D) {
+            step *= 2.1D;
+        }
+        return step;
+    }
+
     public void moveToward(Vec3 target, double step) {
         Vec3 current = this.position();
         Vec3 delta = target.subtract(current);
@@ -162,17 +188,24 @@ public class DroneEntity extends Entity {
         }
         if (this.returning) {
             ServerPlayer player = this.ownerId == null ? null : serverLevel.getServer().getPlayerList().getPlayer(this.ownerId);
-            if (player == null || player.level() != this.level() || ++this.returnTicks > 200) {
+            if (player == null || player.level() != this.level()) {
                 this.discard();
                 return;
             }
             boolean blockHome = homePort != null && serverLevel.isLoaded(homePort);
             Vec3 dock = blockHome ? WrightHomes.hatch(homePort) : WrightHomes.behindPlayer(player);
+            if (this.returnLimit <= 0) {
+                this.returnLimit = returnBudget(dock);
+            }
+            if (++this.returnTicks > this.returnLimit) {
+                this.discard();
+                return;
+            }
             if (this.distanceToSqr(dock) <= (blockHome ? 0.04D : 1.15D)) {
                 this.discard();
                 return;
             }
-            this.moveToward(dock, blockHome ? 0.3D : 0.5D);
+            this.moveToward(dock, returnStep(dock, blockHome));
             return;
         }
         Optional<UUID> id = jobId();

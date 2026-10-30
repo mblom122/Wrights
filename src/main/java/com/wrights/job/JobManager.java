@@ -3533,6 +3533,13 @@ public final class JobManager {
     }
 
     private static void depart(DroneEntity drone, ServerPlayer player, Vec3 work, int lane, int lanes, BlockPos homePort) {
+        if (!WrightsConfig.flyToJob()) {
+            drone.setHomePort(homePort);
+            float yaw = player == null ? 0.0F : player.getYRot();
+            drone.moveTo(work.x, work.y, work.z, yaw, 0.0F);
+            drone.setYRot(yaw);
+            return;
+        }
         if (homePort != null && player != null && player.level() == drone.level() && player.level().isLoaded(homePort)) {
             drone.departFromBlock(homePort, work, lane, lanes);
             return;

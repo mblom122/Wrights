@@ -50,6 +50,20 @@ public final class WrightsConfig {
             .comment("The job pauses while you are farther than this many blocks from the block it is working on.")
             .defineInRange("maxRange", 96, 8, 4096);
 
+    public static final ModConfigSpec.EnumValue<Travel> TRAVEL_TO_JOB = BUILDER
+            .comment(
+                    "How a wright reaches a job.",
+                    "FLY leaves the wrightport, or your back, and flies to the job.",
+                    "TELEPORT appears at the job.")
+            .defineEnum("travelToJob", Travel.FLY);
+
+    public static final ModConfigSpec.EnumValue<Travel> TRAVEL_HOME = BUILDER
+            .comment(
+                    "How a wright comes home when the job is done.",
+                    "FLY returns from the job to the wrightport, or to your back.",
+                    "TELEPORT appears above the wrightport, or above you, and docks.")
+            .defineEnum("travelHome", Travel.FLY);
+
     public static final ModConfigSpec.IntValue MAX_PREVIEW_BLOCKS = BUILDER
             .comment(
                     "Most solid blocks drawn for one blueprint preview. Larger blueprints still copy and build, but their block models stay hidden.",
@@ -99,6 +113,27 @@ public final class WrightsConfig {
     static final ModConfigSpec SPEC = BUILDER.build();
 
     private WrightsConfig() {
+    }
+
+    public enum Travel {
+        FLY,
+        TELEPORT
+    }
+
+    public static boolean flyToJob() {
+        return travel(TRAVEL_TO_JOB) == Travel.FLY;
+    }
+
+    public static boolean flyHome() {
+        return travel(TRAVEL_HOME) == Travel.FLY;
+    }
+
+    private static Travel travel(ModConfigSpec.EnumValue<Travel> value) {
+        try {
+            return value.get();
+        } catch (IllegalStateException exception) {
+            return Travel.FLY;
+        }
     }
 
     public static int maxWrightsPerJob() {
