@@ -43,12 +43,16 @@ public class MaterialsScreen extends Screen {
     }
 
     public static void request(UUID id, int clipX, int clipY, int clipZ, Screen parent) {
+        request(id, clipX, clipY, clipZ, true, parent);
+    }
+
+    public static void request(UUID id, int clipX, int clipY, int clipZ, boolean placeFluids, Screen parent) {
         if (id == null) {
             return;
         }
         net.minecraft.client.Minecraft minecraft = net.minecraft.client.Minecraft.getInstance();
         minecraft.setScreen(new MaterialsScreen(id, parent));
-        PacketDistributor.sendToServer(new BlueprintPayloads.MaterialsRequest(id, clipX, clipY, clipZ));
+        PacketDistributor.sendToServer(new BlueprintPayloads.MaterialsRequest(id, clipX, clipY, clipZ, placeFluids));
     }
 
     public static void show(BlueprintPayloads.Materials payload) {

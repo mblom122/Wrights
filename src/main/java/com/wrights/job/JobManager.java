@@ -552,6 +552,10 @@ public final class JobManager {
     }
 
     public static boolean startBlueprintBuild(ServerPlayer player, UUID schematicId, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones) {
+        return startBlueprintBuild(player, schematicId, origin, sizeX, sizeY, sizeZ, drones, true, false, false, false);
+    }
+
+    public static boolean startBlueprintBuild(ServerPlayer player, UUID schematicId, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt) {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         Schematic schematic = library.schematic(schematicId).orElse(null);
         if (schematic == null || schematic.blockCount() == 0) {
@@ -570,6 +574,7 @@ public final class JobManager {
                 schematic.id(),
                 schematic.blockCount());
         job.setClip(sizeX, sizeY, sizeZ);
+        job.setPasteOptions(placeFluids, voidBlocks, voidFluids, voidNbt);
         job.setAnchor(origin.offset(schematic.anchorX(), schematic.anchorY(), schematic.anchorZ()));
         job.setSupply(com.wrights.blueprint.BlueprintSessions.get(player).supplyPos());
         if (!instant(player) && !assignCrew(player, job, schematic, drones)) {
@@ -1995,6 +2000,9 @@ public final class JobManager {
         if (!level.isLoaded(pos)) {
             return false;
         }
+        if (!job.placeFluids() && com.wrights.util.BlockFilters.isFluid(entry.state())) {
+            return true;
+        }
         return level.getBlockState(pos).equals(entry.state());
     }
 
@@ -2771,7 +2779,20 @@ public final class JobManager {
         if (existing.equals(state)) {
             return PlaceResult.DONE;
         }
-        if (!existing.isAir() && !existing.canBeReplaced()) {
+        if (!job.placeFluids() && BlockFilters.isFluid(state)) {
+            job.skippedOne();
+            return PlaceResult.DONE;
+        }
+        if (keptStored(job, existing, state)) {
+            job.skippedOne();
+            return PlaceResult.DONE;
+        }
+        boolean clearFirst = shouldVoid(job, existing, state);
+        if (clearFirst && existing.getDestroySpeed(level, pos) < 0.0F) {
+            job.skippedOne();
+            return PlaceResult.DONE;
+        }
+        if (!clearFirst && !existing.isAir() && !existing.canBeReplaced()) {
             job.skippedOne();
             return PlaceResult.DONE;
         }
@@ -2803,13 +2824,18 @@ public final class JobManager {
                 return PlaceResult.WAIT;
             }
         }
+        BlockState previous = existing;
+        if (clearFirst) {
+            voidCell(level, pos);
+            existing = level.getBlockState(pos);
+        }
 
         BlockSnapshot snapshot = BlockSnapshot.create(level.dimension(), level, pos);
         level.setBlock(pos, state, Block.UPDATE_ALL);
         BlockState after = level.getBlockState(pos);
         if (after.getBlock() != state.getBlock()) {
-            if (!after.equals(existing)) {
-                level.setBlock(pos, existing, Block.UPDATE_ALL);
+            if (!after.equals(previous)) {
+                level.setBlock(pos, previous, Block.UPDATE_ALL);
             }
             job.skippedOne();
             return PlaceResult.DONE;
@@ -2817,7 +2843,7 @@ public final class JobManager {
         BlockEvent.EntityPlaceEvent event = new BlockEvent.EntityPlaceEvent(snapshot, existing, player);
         NeoForge.EVENT_BUS.post(event);
         if (event.isCanceled()) {
-            level.setBlock(pos, existing, Block.UPDATE_ALL);
+            level.setBlock(pos, previous, Block.UPDATE_ALL);
             job.skippedOne();
             return PlaceResult.DONE;
         }
@@ -2833,6 +2859,36 @@ public final class JobManager {
         }
         job.placedOne();
         return PlaceResult.DONE;
+    }
+
+    /** A chest or other stored block stays unless voiding those was turned on. */
+    private static boolean keptStored(BuildJob job, BlockState existing, BlockState target) {
+        return existing.hasBlockEntity() && !existing.equals(target) && !job.voidNbt();
+    }
+
+    /** Remove a solid block or a fluid that does not match, when that void option is on. */
+    private static boolean shouldVoid(BuildJob job, BlockState existing, BlockState target) {
+        if (existing.isAir() || existing.equals(target)) {
+            return false;
+        }
+        if (existing.hasBlockEntity() && !job.voidNbt()) {
+            return false;
+        }
+        if (BlockFilters.isFluid(existing)) {
+            return job.voidFluids();
+        }
+        if (existing.canBeReplaced()) {
+            return false;
+        }
+        return job.voidBlocks();
+    }
+
+    private static void voidCell(ServerLevel level, BlockPos pos) {
+        BlockEntity entity = level.getBlockEntity(pos);
+        if (entity instanceof Container container) {
+            container.clearContent();
+        }
+        level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_SUPPRESS_DROPS);
     }
 
     private static boolean canBuild(ServerPlayer player, ServerLevel level, BlockPos pos) {

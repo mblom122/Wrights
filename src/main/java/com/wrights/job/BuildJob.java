@@ -59,6 +59,10 @@ public final class BuildJob {
     private int messageDelay;
     private String blueprintName;
     private boolean copyFluids;
+    private boolean placeFluids = true;
+    private boolean voidBlocks;
+    private boolean voidFluids;
+    private boolean voidNbt;
     private UUID replaceSchematicId;
     private int clipX = Integer.MAX_VALUE;
     private int clipY = Integer.MAX_VALUE;
@@ -356,6 +360,29 @@ public final class BuildJob {
 
     public void setCopyFluids(boolean copyFluids) {
         this.copyFluids = copyFluids;
+    }
+
+    public boolean placeFluids() {
+        return placeFluids;
+    }
+
+    public boolean voidBlocks() {
+        return voidBlocks;
+    }
+
+    public boolean voidFluids() {
+        return voidFluids;
+    }
+
+    public boolean voidNbt() {
+        return voidNbt;
+    }
+
+    public void setPasteOptions(boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt) {
+        this.placeFluids = placeFluids;
+        this.voidBlocks = voidBlocks;
+        this.voidFluids = voidFluids;
+        this.voidNbt = voidNbt;
     }
 
     public UUID replaceSchematicId() {
@@ -690,6 +717,10 @@ public final class BuildJob {
             tag.putString("blueprintName", blueprintName);
         }
         tag.putBoolean("copyFluids", copyFluids);
+        tag.putBoolean("placeFluids", placeFluids);
+        tag.putBoolean("voidBlocks", voidBlocks);
+        tag.putBoolean("voidFluids", voidFluids);
+        tag.putBoolean("voidNbt", voidNbt);
         if (replaceSchematicId != null) {
             tag.putUUID("replace", replaceSchematicId);
         }
@@ -807,6 +838,10 @@ public final class BuildJob {
             job.blueprintName = tag.getString("blueprintName");
         }
         job.copyFluids = tag.getBoolean("copyFluids");
+        job.placeFluids = !tag.contains("placeFluids") || tag.getBoolean("placeFluids");
+        job.voidBlocks = tag.getBoolean("voidBlocks");
+        job.voidFluids = tag.getBoolean("voidFluids");
+        job.voidNbt = tag.getBoolean("voidNbt");
         if (tag.hasUUID("replace")) {
             job.replaceSchematicId = tag.getUUID("replace");
         }

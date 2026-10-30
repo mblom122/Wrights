@@ -334,7 +334,7 @@ public final class BlueprintPayloads {
     public record MaterialLine(int itemId, int count) {
     }
 
-    public record MaterialsRequest(UUID id, int clipX, int clipY, int clipZ) implements CustomPacketPayload {
+    public record MaterialsRequest(UUID id, int clipX, int clipY, int clipZ, boolean placeFluids) implements CustomPacketPayload {
         public static final Type<MaterialsRequest> TYPE = payloadType("materials_request");
         public static final StreamCodec<RegistryFriendlyByteBuf, MaterialsRequest> STREAM_CODEC = StreamCodec.of(
                 (buf, value) -> {
@@ -342,8 +342,9 @@ public final class BlueprintPayloads {
                     buf.writeVarInt(value.clipX);
                     buf.writeVarInt(value.clipY);
                     buf.writeVarInt(value.clipZ);
+                    buf.writeBoolean(value.placeFluids);
                 },
-                buf -> new MaterialsRequest(buf.readUUID(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt()));
+                buf -> new MaterialsRequest(buf.readUUID(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readBoolean()));
 
         @Override
         public Type<? extends CustomPacketPayload> type() {
@@ -483,7 +484,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record LaunchBuild(UUID id, BlockPos origin, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones) implements CustomPacketPayload {
+    public record LaunchBuild(UUID id, BlockPos origin, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt) implements CustomPacketPayload {
         public static final Type<LaunchBuild> TYPE = payloadType("launch_build");
         public static final StreamCodec<RegistryFriendlyByteBuf, LaunchBuild> STREAM_CODEC = StreamCodec.of((buf, value) -> value.write(buf), LaunchBuild::read);
 
@@ -497,10 +498,14 @@ public final class BlueprintPayloads {
             buf.writeVarInt(pivotY);
             buf.writeVarInt(pivotZ);
             buf.writeVarInt(drones);
+            buf.writeBoolean(placeFluids);
+            buf.writeBoolean(voidBlocks);
+            buf.writeBoolean(voidFluids);
+            buf.writeBoolean(voidNbt);
         }
 
         public static LaunchBuild read(RegistryFriendlyByteBuf buf) {
-            return new LaunchBuild(buf.readUUID(), buf.readBlockPos(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt());
+            return new LaunchBuild(buf.readUUID(), buf.readBlockPos(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean());
         }
 
         @Override

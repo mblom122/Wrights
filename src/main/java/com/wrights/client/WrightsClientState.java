@@ -933,7 +933,11 @@ public final class WrightsClientState {
                 pivotX,
                 pivotY,
                 pivotZ,
-                Math.max(0, deployCount)));
+                Math.max(0, deployCount),
+                WrightsClientConfig.PLACE_FLUIDS.get(),
+                WrightsClientConfig.VOID_BLOCKS.get(),
+                WrightsClientConfig.VOID_FLUIDS.get(),
+                WrightsClientConfig.VOID_NBT.get()));
         return true;
     }
 

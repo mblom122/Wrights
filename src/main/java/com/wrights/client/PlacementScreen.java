@@ -25,6 +25,11 @@ public class PlacementScreen extends Screen implements JeiPreview {
     private int panelH;
     private int rotateY;
     private int flipY;
+    private int pasteY;
+    private WrightsButton placeFluidsButton;
+    private WrightsButton voidBlocksButton;
+    private WrightsButton voidFluidsButton;
+    private WrightsButton voidNbtButton;
     private int controlsX;
     private EditBox xBox;
     private EditBox yBox;
@@ -58,7 +63,7 @@ public class PlacementScreen extends Screen implements JeiPreview {
             modelSize = Math.max(map ? openW : 88, this.width - 8 - pad * 2 - gap - controlsW);
         }
         panelW = pad + modelSize + gap + controlsW + pad;
-        panelH = 420;
+        panelH = 476;
         panelX = JeiPreview.left(this.width, panelW);
         panelY = Math.max(4, (this.height - panelH) / 2);
         int modelX = panelX + pad;
@@ -117,7 +122,16 @@ public class PlacementScreen extends Screen implements JeiPreview {
         addRenderableWidget(new WrightsButton(controlsX + 16 + row, flipY, row, 16, Component.translatable("screen.wrights.flip_vertical"), button -> transform(BlueprintTransforms.Op.FLIP_Y)));
         addRenderableWidget(new WrightsButton(controlsX + 12, flipY + 18, row, 16, Component.translatable("screen.wrights.center_short"), button -> transform(BlueprintTransforms.Op.CENTER)));
         addRenderableWidget(new WrightsButton(controlsX + 16 + row, flipY + 18, row, 16, Component.translatable("screen.wrights.ground"), button -> transform(BlueprintTransforms.Op.GROUND)));
-        addRenderableWidget(new WrightsButton(controlsX + 12, foot - 74, controlsW - 24, 16, Component.translatable("menu.wrights.materials"), button -> MaterialsScreen.request(WrightsClientState.buildId, WrightsClientState.viewX, WrightsClientState.viewY, WrightsClientState.viewZ, this)));
+        pasteY = flipY + 48;
+        placeFluidsButton = new WrightsButton(controlsX + 12, pasteY, controlsW - 24, 16, Component.translatable("screen.wrights.place_fluids"), button -> togglePlaceFluids());
+        voidBlocksButton = new WrightsButton(controlsX + 12, pasteY + 18, row, 16, Component.translatable("screen.wrights.void_blocks"), button -> toggleVoidBlocks());
+        voidFluidsButton = new WrightsButton(controlsX + 16 + row, pasteY + 18, row, 16, Component.translatable("screen.wrights.void_fluids"), button -> toggleVoidFluids());
+        voidNbtButton = new WrightsButton(controlsX + 12, pasteY + 36, controlsW - 24, 16, Component.translatable("screen.wrights.void_nbt"), button -> toggleVoidNbt());
+        addRenderableWidget(placeFluidsButton);
+        addRenderableWidget(voidBlocksButton);
+        addRenderableWidget(voidFluidsButton);
+        addRenderableWidget(voidNbtButton);
+        addRenderableWidget(new WrightsButton(controlsX + 12, foot - 74, controlsW - 24, 16, Component.translatable("menu.wrights.materials"), button -> MaterialsScreen.request(WrightsClientState.buildId, WrightsClientState.viewX, WrightsClientState.viewY, WrightsClientState.viewZ, WrightsClientConfig.PLACE_FLUIDS.get(), this)));
         int backW = 68;
         int backX = controlsW - 12 - backW;
         addRenderableWidget(new WrightsButton(controlsX + 12, foot - 48, backX - 16, 18, Component.translatable("screen.wrights.save_blueprint"), button -> saveBlueprint()));
@@ -151,6 +165,14 @@ public class PlacementScreen extends Screen implements JeiPreview {
             chestButton.setPicked(bound || WrightsClientState.bindSupply);
             clearSupplyButton.visible = bound;
             highlightSupplyButton.visible = bound;
+        }
+        if (placeFluidsButton != null) {
+            placeFluidsButton.setPicked(WrightsClientConfig.PLACE_FLUIDS.get());
+            voidBlocksButton.setPicked(WrightsClientConfig.VOID_BLOCKS.get());
+            voidFluidsButton.setPicked(WrightsClientConfig.VOID_FLUIDS.get());
+            boolean voiding = WrightsClientConfig.VOID_BLOCKS.get() || WrightsClientConfig.VOID_FLUIDS.get();
+            voidNbtButton.setShown(voiding);
+            voidNbtButton.setPicked(voiding && WrightsClientConfig.VOID_NBT.get());
         }
         suppress = false;
     }
@@ -200,6 +222,7 @@ public class PlacementScreen extends Screen implements JeiPreview {
         column.render(graphics);
         graphics.drawString(this.font, Component.translatable("screen.wrights.rotate"), controlsX + 12, rotateY - 12, WrightsUi.TEXT, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.flip"), controlsX + 12, flipY - 12, WrightsUi.TEXT, false);
+        graphics.drawString(this.font, Component.translatable("screen.wrights.paste_options"), controlsX + 12, pasteY - 12, WrightsUi.TEXT, false);
     }
 
     @Override
@@ -419,6 +442,26 @@ public class PlacementScreen extends Screen implements JeiPreview {
 
     private void step(int x, int y, String label, Runnable action) {
         addRenderableWidget(new WrightsButton(x, y, 16, 14, Component.literal(label), button -> action.run()));
+    }
+
+    private void togglePlaceFluids() {
+        WrightsClientConfig.setPlaceFluids(!WrightsClientConfig.PLACE_FLUIDS.get());
+        refresh();
+    }
+
+    private void toggleVoidBlocks() {
+        WrightsClientConfig.setVoidBlocks(!WrightsClientConfig.VOID_BLOCKS.get());
+        refresh();
+    }
+
+    private void toggleVoidFluids() {
+        WrightsClientConfig.setVoidFluids(!WrightsClientConfig.VOID_FLUIDS.get());
+        refresh();
+    }
+
+    private void toggleVoidNbt() {
+        WrightsClientConfig.setVoidNbt(!WrightsClientConfig.VOID_NBT.get());
+        refresh();
     }
 
     private void changeAssign(int delta) {

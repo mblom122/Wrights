@@ -58,6 +58,18 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.BooleanValue COPY_FLUIDS = BUILDER
             .comment("When true, a new blueprint also saves water and lava inside the box.")
             .define("copyFluids", false);
+    public static final ModConfigSpec.BooleanValue PLACE_FLUIDS = BUILDER
+            .comment("When true, a build places water and lava saved in the blueprint.")
+            .define("placeFluids", true);
+    public static final ModConfigSpec.BooleanValue VOID_BLOCKS = BUILDER
+            .comment("When true, a build removes a block that does not match the blueprint before placing.")
+            .define("voidBlocks", false);
+    public static final ModConfigSpec.BooleanValue VOID_FLUIDS = BUILDER
+            .comment("When true, a build removes water or lava that does not match the blueprint before placing.")
+            .define("voidFluids", false);
+    public static final ModConfigSpec.BooleanValue VOID_NBT = BUILDER
+            .comment("When true, voiding may also remove chests and other blocks that store contents. Off leaves those blocks alone.")
+            .define("voidNbt", false);
     public static final ModConfigSpec.IntValue PLACE_X = BUILDER
             .comment("Blocks to your right when a paste is not aimed at a block.")
             .defineInRange("placeX", 0, -32, 32);
@@ -175,6 +187,26 @@ public final class WrightsClientConfig {
 
     public static void setCopyFluids(boolean enabled) {
         COPY_FLUIDS.set(enabled);
+        save();
+    }
+
+    public static void setPlaceFluids(boolean enabled) {
+        PLACE_FLUIDS.set(enabled);
+        save();
+    }
+
+    public static void setVoidBlocks(boolean enabled) {
+        VOID_BLOCKS.set(enabled);
+        save();
+    }
+
+    public static void setVoidFluids(boolean enabled) {
+        VOID_FLUIDS.set(enabled);
+        save();
+    }
+
+    public static void setVoidNbt(boolean enabled) {
+        VOID_NBT.set(enabled);
         save();
     }
 

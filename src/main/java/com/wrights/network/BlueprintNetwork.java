@@ -199,7 +199,7 @@ public final class BlueprintNetwork {
 
     private static void materialsRequest(BlueprintPayloads.MaterialsRequest payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
-        context.enqueueWork(() -> BlueprintActions.sendMaterials(player, payload.id(), payload.clipX(), payload.clipY(), payload.clipZ()));
+        context.enqueueWork(() -> BlueprintActions.sendMaterials(player, payload.id(), payload.clipX(), payload.clipY(), payload.clipZ(), payload.placeFluids()));
     }
 
     private static void edit(BlueprintPayloads.BeginEdit payload, IPayloadContext context) {
@@ -229,7 +229,11 @@ public final class BlueprintNetwork {
                 payload.pivotX(),
                 payload.pivotY(),
                 payload.pivotZ(),
-                payload.drones()));
+                payload.drones(),
+                payload.placeFluids(),
+                payload.voidBlocks(),
+                payload.voidFluids(),
+                payload.voidNbt()));
     }
 
     private static void editCell(BlueprintPayloads.EditCell payload, IPayloadContext context) {

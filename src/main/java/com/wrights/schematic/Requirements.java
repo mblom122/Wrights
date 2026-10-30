@@ -19,12 +19,19 @@ public final class Requirements {
     }
 
     public static List<Cost> of(Schematic schematic, int clipX, int clipY, int clipZ) {
+        return of(schematic, clipX, clipY, clipZ, true);
+    }
+
+    public static List<Cost> of(Schematic schematic, int clipX, int clipY, int clipZ, boolean placeFluids) {
         int limitX = clipX <= 0 ? schematic.sizeX() : clipX;
         int limitY = clipY <= 0 ? schematic.sizeY() : clipY;
         int limitZ = clipZ <= 0 ? schematic.sizeZ() : clipZ;
         Map<Item, Integer> counts = new HashMap<>();
         for (Schematic.Entry entry : schematic.entries()) {
             if (entry.secondary() || entry.x() >= limitX || entry.y() >= limitY || entry.z() >= limitZ) {
+                continue;
+            }
+            if (!placeFluids && BlockFilters.isFluid(entry.state())) {
                 continue;
             }
             Item item = BlockFilters.payment(entry.state());

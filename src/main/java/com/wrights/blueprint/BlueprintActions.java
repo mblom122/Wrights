@@ -822,6 +822,10 @@ public final class BlueprintActions {
     }
 
     public static void sendMaterials(ServerPlayer player, java.util.UUID id, int clipX, int clipY, int clipZ) {
+        sendMaterials(player, id, clipX, clipY, clipZ, true);
+    }
+
+    public static void sendMaterials(ServerPlayer player, java.util.UUID id, int clipX, int clipY, int clipZ, boolean placeFluids) {
         if (!held(player)) {
             return;
         }
@@ -833,7 +837,7 @@ public final class BlueprintActions {
             Messages.actionBar(player, "message.wrights.blueprint_missing");
             return;
         }
-        BlueprintNetwork.materials(player, id, false, Requirements.of(schematic, clipX, clipY, clipZ));
+        BlueprintNetwork.materials(player, id, false, Requirements.of(schematic, clipX, clipY, clipZ, placeFluids));
     }
 
     public static void saveSession(ServerPlayer player) {
@@ -905,6 +909,10 @@ public final class BlueprintActions {
     }
 
     public static void launch(ServerPlayer player, java.util.UUID id, BlockPos anchorPoint, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones) {
+        launch(player, id, anchorPoint, sizeX, sizeY, sizeZ, pivotX, pivotY, pivotZ, drones, true, false, false, false);
+    }
+
+    public static void launch(ServerPlayer player, java.util.UUID id, BlockPos anchorPoint, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt) {
         if (!held(player)) {
             return;
         }
@@ -931,7 +939,7 @@ public final class BlueprintActions {
             Messages.actionBar(player, "message.wrights.place_out_of_range");
             return;
         }
-        java.util.List<Requirements.Cost> missing = Requirements.missing(player, Requirements.of(schematic, sx, sy, sz));
+        java.util.List<Requirements.Cost> missing = Requirements.missing(player, Requirements.of(schematic, sx, sy, sz, placeFluids));
         if (!missing.isEmpty()) {
             BlueprintNetwork.materials(player, id, true, missing);
         }
@@ -942,7 +950,7 @@ public final class BlueprintActions {
             library.putSchematic(snapshot);
             buildSchematicId = snapshot.id();
         }
-        if (!JobManager.startBlueprintBuild(player, buildSchematicId, origin, sx, sy, sz, drones) && snapshot != null) {
+        if (!JobManager.startBlueprintBuild(player, buildSchematicId, origin, sx, sy, sz, drones, placeFluids, voidBlocks, voidFluids, voidNbt) && snapshot != null) {
             library.removeSchematic(snapshot.id());
         }
         BlueprintNetwork.syncLibrary(player);
