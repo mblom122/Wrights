@@ -88,27 +88,37 @@ public final class WrightsHud {
             line = Component.translatable("hud.wrights.task_ready_sub");
         }
         GuiGraphics graphics = event.getGuiGraphics();
-        int taskWidth = minecraft.font.width(task);
-        int taskX = (graphics.guiWidth() - taskWidth) / 2;
-        graphics.fill(taskX - 8, 4, taskX + taskWidth + 8, 18, 0xC0101822);
-        graphics.fill(taskX - 8, 4, taskX - 6, 18, WrightsUi.COPPER);
-        graphics.drawString(minecraft.font, task, taskX, 7, WrightsUi.COPPER, false);
+        int taskWidth = minecraft.font.width(task) + 16;
+        int detailWidth = 0;
+        int detailHeight = 0;
+        if (line != null) {
+            detailWidth = minecraft.font.width(line);
+            if (sub != null) {
+                detailWidth = Math.max(detailWidth, minecraft.font.width(sub));
+            }
+            detailWidth += 16;
+            detailHeight = sub == null ? 18 : 30;
+        }
+        int stackWidth = Math.max(taskWidth, detailWidth);
+        int stackHeight = 14 + (detailHeight == 0 ? 0 : 4 + detailHeight);
+        int stackX = HudAnchor.hintX(graphics.guiWidth(), stackWidth);
+        int stackY = HudAnchor.hintY(graphics.guiHeight(), stackHeight);
+        int center = stackX + stackWidth / 2;
+        int taskX = center - taskWidth / 2;
+        graphics.fill(taskX, stackY, taskX + taskWidth, stackY + 14, 0xC0101822);
+        graphics.fill(taskX, stackY, taskX + 2, stackY + 14, WrightsUi.COPPER);
+        graphics.drawString(minecraft.font, task, taskX + 8, stackY + 3, WrightsUi.COPPER, false);
         if (line == null && !showModes(minecraft)) {
             return;
         }
         if (line != null) {
-            int width = minecraft.font.width(line);
+            int top = stackY + 18;
+            int x = center - detailWidth / 2;
+            graphics.fill(x, top, x + detailWidth, top + detailHeight, 0xC0101822);
+            graphics.fill(x, top, x + 2, top + detailHeight, WrightsUi.COPPER);
+            graphics.drawString(minecraft.font, line, x + 8, top + 4, WrightsUi.TEXT, false);
             if (sub != null) {
-                width = Math.max(width, minecraft.font.width(sub));
-            }
-            int x = (graphics.guiWidth() - width) / 2;
-            int height = sub == null ? 18 : 30;
-            int top = 22;
-            graphics.fill(x - 8, top, x + width + 8, top + height, 0xC0101822);
-            graphics.fill(x - 8, top, x - 6, top + height, WrightsUi.COPPER);
-            graphics.drawString(minecraft.font, line, x, top + 4, WrightsUi.TEXT, false);
-            if (sub != null) {
-                graphics.drawString(minecraft.font, sub, x, top + 16, WrightsUi.MUTED, false);
+                graphics.drawString(minecraft.font, sub, x + 8, top + 16, WrightsUi.MUTED, false);
             }
         }
         if (showMainModes(minecraft)) {
@@ -311,17 +321,33 @@ public final class WrightsHud {
         int headerH = 18;
         int bodyH = 28;
         int height = headerH + bodyH;
-        int y = 6;
-        for (WrightsClientState.JobNotice notice : WrightsClientState.jobNotices) {
+        int maxWidth = 0;
+        int[] widths = new int[WrightsClientState.jobNotices.size()];
+        for (int i = 0; i < WrightsClientState.jobNotices.size(); i++) {
+            WrightsClientState.JobNotice notice = WrightsClientState.jobNotices.get(i);
             Component header = Component.translatable("hud.wrights.job_finished");
             Component name = Component.literal(notice.name);
             Component time = notice.seconds < 1
                     ? Component.translatable("hud.wrights.job_time_under")
                     : Component.translatable("hud.wrights.job_time", duration(notice.seconds));
-            int width = Math.min(240, Math.max(
+            widths[i] = Math.min(240, Math.max(
                     minecraft.font.width(header) + 30,
                     Math.max(minecraft.font.width(name), minecraft.font.width(time)) + 18));
-            int x = graphics.guiWidth() - 6 - width;
+            maxWidth = Math.max(maxWidth, widths[i]);
+        }
+        int total = WrightsClientState.jobNotices.size() * height + (WrightsClientState.jobNotices.size() - 1) * 4;
+        int stackX = HudAnchor.toastX(graphics.guiWidth(), maxWidth);
+        int y = HudAnchor.toastY(graphics.guiHeight(), total);
+        int spot = HudAnchor.toastSpot();
+        for (int i = 0; i < WrightsClientState.jobNotices.size(); i++) {
+            WrightsClientState.JobNotice notice = WrightsClientState.jobNotices.get(i);
+            Component header = Component.translatable("hud.wrights.job_finished");
+            Component name = Component.literal(notice.name);
+            Component time = notice.seconds < 1
+                    ? Component.translatable("hud.wrights.job_time_under")
+                    : Component.translatable("hud.wrights.job_time", duration(notice.seconds));
+            int width = widths[i];
+            int x = toastX(spot, stackX, maxWidth, width);
             int alpha = notice.ticks > 20 ? 0xE0 : Math.max(0, 0xE0 * notice.ticks / 20);
             int panel = (alpha << 24) | 0x101822;
             int toolbar = (alpha << 24) | 0x1C2A36;
@@ -341,6 +367,52 @@ public final class WrightsHud {
             graphics.drawString(minecraft.font, minecraft.font.plainSubstrByWidth(time.getString(), width - 16), x + 8, y + headerH + 16, muted, false);
             y += height + 4;
         }
+    }
+
+    private static int toastX(int spot, int stackX, int maxWidth, int width) {
+        if (spot == HudAnchor.RIGHT) {
+            return stackX + maxWidth - width;
+        }
+        if (spot == HudAnchor.LEFT) {
+            return stackX;
+        }
+        return stackX + (maxWidth - width) / 2;
+    }
+
+    static void drawSampleHint(GuiGraphics graphics, Minecraft minecraft, int x, int y, int width) {
+        Component task = Component.translatable("hud.wrights.task_ready");
+        Component line = Component.translatable("hud.wrights.task_ready_sub");
+        graphics.fill(x, y, x + width, y + 14, 0xC0101822);
+        graphics.fill(x, y, x + 2, y + 14, WrightsUi.COPPER);
+        graphics.drawString(minecraft.font, task, x + 8, y + 3, WrightsUi.COPPER, false);
+        graphics.fill(x, y + 18, x + width, y + 36, 0xC0101822);
+        graphics.fill(x, y + 18, x + 2, y + 36, WrightsUi.COPPER);
+        graphics.drawString(minecraft.font, line, x + 8, y + 22, WrightsUi.TEXT, false);
+    }
+
+    static int sampleHintWidth(Minecraft minecraft) {
+        return Math.max(minecraft.font.width(Component.translatable("hud.wrights.task_ready")),
+                minecraft.font.width(Component.translatable("hud.wrights.task_ready_sub"))) + 16;
+    }
+
+    static void drawSampleToast(GuiGraphics graphics, Minecraft minecraft, int x, int y, int width) {
+        Component header = Component.translatable("hud.wrights.job_finished");
+        Component name = Component.translatable("hud.wrights.sample_toast");
+        Component time = Component.translatable("hud.wrights.job_time", "12s");
+        graphics.fill(x, y, x + width, y + 46, 0xE0101822);
+        WrightsUi.border(graphics, x, y, width, 46, 0xFF3A4C5C);
+        graphics.fill(x + 1, y + 1, x + width - 1, y + 18, 0xE01C2A36);
+        graphics.fill(x + 1, y + 1, x + 3, y + 18, WrightsUi.COPPER);
+        graphics.drawString(minecraft.font, header, x + 8, y + 5, WrightsUi.TEXT, false);
+        graphics.drawString(minecraft.font, name, x + 8, y + 23, WrightsUi.MUTED, false);
+        graphics.drawString(minecraft.font, time, x + 8, y + 34, WrightsUi.MUTED, false);
+    }
+
+    static int sampleToastWidth(Minecraft minecraft) {
+        return Math.min(240, Math.max(
+                minecraft.font.width(Component.translatable("hud.wrights.job_finished")) + 30,
+                Math.max(minecraft.font.width(Component.translatable("hud.wrights.sample_toast")),
+                        minecraft.font.width(Component.translatable("hud.wrights.job_time", "12s"))) + 18));
     }
 
     private static void drawInfoBubble(GuiGraphics graphics, int x, int y, int alpha) {

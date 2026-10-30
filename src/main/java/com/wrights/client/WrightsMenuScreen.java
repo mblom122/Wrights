@@ -205,6 +205,10 @@ public class WrightsMenuScreen extends Screen {
     private int optionPlaceY;
     private int optionPlaceHintY;
     private int optionOffsetY;
+    private int hudPlaceX;
+    private int hudPlaceY;
+    private int hudPlaceW;
+    private int hudPlaceHintY;
     private EditBox wallPercent;
     private EditBox edgePercent;
     private EditBox ghostPercent;
@@ -801,8 +805,15 @@ public class WrightsMenuScreen extends Screen {
         placeField(placeX, x + 12, optionOffsetY);
         placeField(placeY, x + 82, optionOffsetY);
         placeField(placeZ, x + 152, optionOffsetY);
+        local += 28;
+        Component moveMessages = Component.translatable("menu.wrights.hud_place");
+        hudPlaceW = Math.max(120, this.font.width(moveMessages) + 16);
+        hudPlaceX = x;
+        hudPlaceY = optionY(local);
+        local += 16;
+        hudPlaceHintY = optionY(local);
         swatchX = x + 110;
-        optionContentH = local + 22;
+        optionContentH = local + 16;
         int maxScroll = Math.max(0, optionContentH - optionViewH);
         int clamped = Mth.clamp(optionScroll, 0, maxScroll);
         if (clamped != optionScroll) {
@@ -907,6 +918,10 @@ public class WrightsMenuScreen extends Screen {
         graphics.drawString(this.font, "X", x, optionOffsetY + 3, WrightsUi.MUTED, false);
         graphics.drawString(this.font, "Y", x + 70, optionOffsetY + 3, WrightsUi.MUTED, false);
         graphics.drawString(this.font, "Z", x + 140, optionOffsetY + 3, WrightsUi.MUTED, false);
+        graphics.fill(hudPlaceX, hudPlaceY, hudPlaceX + hudPlaceW, hudPlaceY + 16, 0xFF24384A);
+        WrightsUi.border(graphics, hudPlaceX, hudPlaceY, hudPlaceW, 16, WrightsUi.COPPER);
+        graphics.drawCenteredString(this.font, Component.translatable("menu.wrights.hud_place"), hudPlaceX + hudPlaceW / 2, hudPlaceY + 4, WrightsUi.TEXT);
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("menu.wrights.hud_place_hint").getString(), hintW), x, hudPlaceHintY, WrightsUi.MUTED, false);
         graphics.disableScissor();
         if (optionContentH > optionViewH) {
             int barX = optionViewX + optionViewW - 5;
@@ -1281,6 +1296,10 @@ public class WrightsMenuScreen extends Screen {
                 }
                 if (mouseX >= supplyOrderX && mouseX < supplyOrderX + supplyOrderW && mouseY >= supplyOrderY && mouseY < supplyOrderY + 16) {
                     WrightsClientConfig.setSupplyPlayerFirst(!WrightsClientConfig.SUPPLY_PLAYER_FIRST.get());
+                    return true;
+                }
+                if (mouseX >= hudPlaceX && mouseX < hudPlaceX + hudPlaceW && mouseY >= hudPlaceY && mouseY < hudPlaceY + 16) {
+                    this.minecraft.setScreen(new HudPlaceScreen());
                     return true;
                 }
                 if (hitSlider(mouseX, mouseY, wallSliderX, wallSliderY, wallSliderW)) {

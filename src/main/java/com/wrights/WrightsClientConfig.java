@@ -109,6 +109,20 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.BooleanValue SUPPLY_PLAYER_FIRST = BUILDER
             .comment("When true, a build takes blocks from your inventory before a bound chest. When false, the chest is used first.")
             .define("supplyPlayerFirst", true);
+    public static final ModConfigSpec.IntValue HUD_HINT = BUILDER
+            .comment("Where controller hints sit. 0 top, 1 above the hotbar, 2 left, 3 right, 4 middle, 5 a dragged spot.")
+            .defineInRange("hudHint", 1, 0, 5);
+    public static final ModConfigSpec.IntValue HUD_HINT_X = BUILDER
+            .defineInRange("hudHintX", 500, 0, 1000);
+    public static final ModConfigSpec.IntValue HUD_HINT_Y = BUILDER
+            .defineInRange("hudHintY", 820, 0, 1000);
+    public static final ModConfigSpec.IntValue HUD_TOAST = BUILDER
+            .comment("Where job toasts sit. Same spots as hudHint.")
+            .defineInRange("hudToast", 3, 0, 5);
+    public static final ModConfigSpec.IntValue HUD_TOAST_X = BUILDER
+            .defineInRange("hudToastX", 900, 0, 1000);
+    public static final ModConfigSpec.IntValue HUD_TOAST_Y = BUILDER
+            .defineInRange("hudToastY", 80, 0, 1000);
 
     static final ModConfigSpec SPEC = BUILDER.build();
 
@@ -256,6 +270,17 @@ public final class WrightsClientConfig {
     public static void setSupplyPlayerFirst(boolean enabled) {
         SUPPLY_PLAYER_FIRST.set(enabled);
         save();
+    }
+
+    public static void setHudSpot(boolean hint, int spot) {
+        (hint ? HUD_HINT : HUD_TOAST).set(clamp(spot, 0, 5));
+        save();
+    }
+
+    public static void setHudCustom(boolean hint, int x, int y) {
+        (hint ? HUD_HINT : HUD_TOAST).set(5);
+        (hint ? HUD_HINT_X : HUD_TOAST_X).set(clamp(x, 0, 1000));
+        (hint ? HUD_HINT_Y : HUD_TOAST_Y).set(clamp(y, 0, 1000));
     }
 
     public static int deployTarget(int freeDrones, int blocks) {
