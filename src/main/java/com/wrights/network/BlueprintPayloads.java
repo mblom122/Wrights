@@ -1085,6 +1085,27 @@ public final class BlueprintPayloads {
         }
     }
 
+    /** mode 0 is the open wrightport block, 1 a carried personal port, 2 a placed port from Manage. */
+    public record RenameWright(int mode, String dimension, BlockPos pos, int kind, int port, int unit, String name) implements CustomPacketPayload {
+        public static final Type<RenameWright> TYPE = payloadType("rename_wright");
+        public static final StreamCodec<RegistryFriendlyByteBuf, RenameWright> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeByte(value.mode);
+                    buf.writeUtf(value.dimension == null ? "" : value.dimension);
+                    buf.writeBlockPos(value.pos == null ? BlockPos.ZERO : value.pos);
+                    buf.writeByte(value.kind);
+                    buf.writeVarInt(value.port);
+                    buf.writeVarInt(value.unit);
+                    buf.writeUtf(value.name == null ? "" : value.name, 32);
+                },
+                buf -> new RenameWright(buf.readByte(), buf.readUtf(), buf.readBlockPos(), buf.readByte(), buf.readVarInt(), buf.readVarInt(), buf.readUtf(32)));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public record PlacedPortsAsk() implements CustomPacketPayload {
         public static final Type<PlacedPortsAsk> TYPE = payloadType("placed_ports_ask");
         public static final StreamCodec<RegistryFriendlyByteBuf, PlacedPortsAsk> STREAM_CODEC = empty(new PlacedPortsAsk());

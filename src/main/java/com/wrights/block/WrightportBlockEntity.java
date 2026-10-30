@@ -123,14 +123,7 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
     }
 
     public static String cleanLabel(String raw) {
-        if (raw == null) {
-            return "";
-        }
-        String text = raw.replace("§", "").replaceAll("[\\p{Cntrl}]", "").trim();
-        if (text.length() > 32) {
-            text = text.substring(0, 32).trim();
-        }
-        return text;
+        return com.wrights.drone.Swarm.cleanName(raw);
     }
 
     public Component ownerLabel() {

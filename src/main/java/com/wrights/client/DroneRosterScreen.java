@@ -144,7 +144,7 @@ public class DroneRosterScreen extends Screen {
         for (int i = 0; i < swarm.units().size(); i++) {
             Swarm.Unit unit = swarm.units().get(i);
             String where = assignment(unit.id());
-            drones.add(new DroneRow(unit.id(), y, Component.translatable("screen.wrights.drone_name", i + 1).getString(), WrightTier.clamp(unit.speed()), where == null ? Component.translatable("screen.wrights.drone_free").getString() : where));
+            drones.add(new DroneRow(unit.id(), y, unit.title(i + 1).getString(), WrightTier.clamp(unit.speed()), where == null ? Component.translatable("screen.wrights.drone_free").getString() : where));
             y += 16;
             if (keep != null && unit.id().equals(keep)) {
                 selected = drones.size() - 1;

@@ -25,6 +25,8 @@ interface ManageHost {
 
     void edit(int action, int index);
 
+    void rename(int unit, String name);
+
     void batch(int action, int value, int[] units);
 
     void addButton(WrightsButton button);

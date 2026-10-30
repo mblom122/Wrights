@@ -141,6 +141,11 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
     }
 
     @Override
+    public void rename(int unit, String name) {
+        PacketDistributor.sendToServer(new BlueprintPayloads.RenameWright(0, "", menu.pos(), 0, 0, unit, name));
+    }
+
+    @Override
     public void batch(int action, int value, int[] units) {
         PacketDistributor.sendToServer(new BlueprintPayloads.HangarBatch(menu.pos(), action, value, units));
     }
@@ -274,6 +279,9 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (manage.keyPressed(this, keyCode)) {
+            return true;
+        }
         if (nameBox != null && nameBox.isFocused() && (keyCode == 257 || keyCode == 335)) {
             commitName();
             setFocused(null);

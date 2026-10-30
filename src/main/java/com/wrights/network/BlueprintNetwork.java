@@ -63,6 +63,7 @@ public final class BlueprintNetwork {
         registrar.playToServer(BlueprintPayloads.PlacedEdit.TYPE, BlueprintPayloads.PlacedEdit.STREAM_CODEC, BlueprintNetwork::placedEdit);
         registrar.playToServer(BlueprintPayloads.PlacedBatch.TYPE, BlueprintPayloads.PlacedBatch.STREAM_CODEC, BlueprintNetwork::placedBatch);
         registrar.playToServer(BlueprintPayloads.RenameWrightport.TYPE, BlueprintPayloads.RenameWrightport.STREAM_CODEC, BlueprintNetwork::renameWrightport);
+        registrar.playToServer(BlueprintPayloads.RenameWright.TYPE, BlueprintPayloads.RenameWright.STREAM_CODEC, BlueprintNetwork::renameWright);
         registrar.playToServer(BlueprintPayloads.BindSupply.TYPE, BlueprintPayloads.BindSupply.STREAM_CODEC, BlueprintNetwork::bindSupply);
         registrar.playToServer(BlueprintPayloads.BindDigital.TYPE, BlueprintPayloads.BindDigital.STREAM_CODEC, BlueprintNetwork::bindDigital);
         registrar.playToServer(BlueprintPayloads.DigitalInfoRequest.TYPE, BlueprintPayloads.DigitalInfoRequest.STREAM_CODEC, BlueprintNetwork::digitalInfo);
@@ -425,6 +426,23 @@ public final class BlueprintNetwork {
     private static void renameWrightport(BlueprintPayloads.RenameWrightport payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
         context.enqueueWork(() -> com.wrights.drone.PlacedPortManage.rename(player, payload.dimension(), payload.pos(), payload.name()));
+    }
+
+    private static void renameWright(BlueprintPayloads.RenameWright payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> {
+            if (payload.mode() == 1) {
+                com.wrights.drone.HangarOps.renamePort(player, payload.kind(), payload.port(), payload.unit(), payload.name());
+                return;
+            }
+            if (payload.mode() == 2) {
+                com.wrights.drone.PlacedPortManage.renameUnit(player, payload.dimension(), payload.pos(), payload.unit(), payload.name());
+                return;
+            }
+            if (player.containerMenu instanceof com.wrights.menu.WrightportMenu menu && menu.pos().equals(payload.pos())) {
+                com.wrights.drone.WrightportOps.rename(player, menu, payload.unit(), payload.name());
+            }
+        });
     }
 
     private static void clientPortGlow(BlueprintPayloads.PortGlow payload, IPayloadContext context) {

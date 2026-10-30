@@ -1621,6 +1621,9 @@ public class WrightsMenuScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (managePage && manage.keyPressed(manageHost, keyCode)) {
+            return true;
+        }
         if (managePage && keyCode == 256) {
             if (portRenamePos != null) {
                 finishPortRename(false);
@@ -3647,6 +3650,23 @@ public class WrightsMenuScreen extends Screen {
                 return;
             }
             PacketDistributor.sendToServer(new BlueprintPayloads.PortEdit(spot.kind(), spot.index(), action, index));
+            sendHold(true);
+        }
+
+        @Override
+        public void rename(int unit, String name) {
+            if (manageTab == 1) {
+                if (placedPick == null) {
+                    return;
+                }
+                PacketDistributor.sendToServer(new BlueprintPayloads.RenameWright(2, placedPick.dimension(), placedPick.pos(), 0, 0, unit, name));
+                return;
+            }
+            WrightportPlaces.Spot spot = currentSpot();
+            if (spot == null) {
+                return;
+            }
+            PacketDistributor.sendToServer(new BlueprintPayloads.RenameWright(1, "", BlockPos.ZERO, spot.kind(), spot.index(), unit, name));
             sendHold(true);
         }
 

@@ -23,7 +23,7 @@ import com.wrights.item.WrightItem;
  */
 final class WrightManagePanel {
     private static final int ROW = 16;
-    private static final int EXPAND = 64;
+    private static final int EXPAND = 82;
     private static final int NONE = 0;
     private static final int ADD = 1;
     private static final int MARKED = 2;
@@ -33,6 +33,9 @@ final class WrightManagePanel {
     private WrightsButton upgradeButton;
     private WrightsButton backButton;
     private EditBox countBox;
+    private EditBox nameBox;
+    private String sentWrightName = "";
+    private int nameFor = -1;
 
     private boolean open;
     private int scroll;
@@ -131,6 +134,11 @@ final class WrightManagePanel {
         countBox.setFilter(text -> text.chars().allMatch(Character::isDigit));
         countBox.setVisible(false);
         screen.addField(countBox);
+        nameBox = new EditBox(screen.font(), 0, 0, 120, 14, Component.translatable("screen.wrights.name"));
+        nameBox.setMaxLength(32);
+        nameBox.setHint(Component.translatable("screen.wrights.name"));
+        nameBox.setVisible(false);
+        screen.addField(nameBox);
         layoutChrome(screen);
     }
 
@@ -226,32 +234,37 @@ final class WrightManagePanel {
                     graphics.fill(panelX + 10, y - 1, panelX + panelW - 10, y + ROW - 1, i == expanded ? 0x553C2A1A : 0x33243340);
                 }
                 drawCheck(graphics, panelX + 12, y + 2, mark, true, mouseX, mouseY);
-                String name = Component.translatable("screen.wrights.drone_name", i + 1).getString();
-                graphics.drawString(screen.font(), name, panelX + 28, y + 3, WrightsUi.TEXT, false);
                 Component tierName = Component.translatable(WrightTier.nameKey(tier));
-                graphics.drawString(screen.font(), tierName, panelX + panelW - 14 - screen.font().width(tierName), y + 3, WrightTier.textColor(tier), false);
+                int tierWidth = screen.font().width(tierName);
+                String name = screen.font().plainSubstrByWidth(unit.title(i + 1).getString(), Math.max(24, panelW - 28 - 18 - tierWidth));
+                graphics.drawString(screen.font(), name, panelX + 28, y + 3, WrightsUi.TEXT, false);
+                graphics.drawString(screen.font(), tierName, panelX + panelW - 14 - tierWidth, y + 3, WrightTier.textColor(tier), false);
             }
             y += ROW;
             if (i == expanded) {
+                placeNameBox(screen, swarm, i, y, listTop, listBottom);
                 if (y + EXPAND > listTop && y < listBottom) {
-                    graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_pace"), panelX + 18, y + 2, WrightsUi.TEXT, false);
+                    graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_pace"), panelX + 18, y + 20, WrightsUi.TEXT, false);
                     boolean canDowngrade = tier > WrightTier.BASE;
                     if (tier < WrightTier.NETHERITE) {
                         Component next = Component.translatable(WrightTier.nameKey(tier + 1));
-                        graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_next", next), panelX + 18, y + 14, WrightsUi.MUTED, false);
+                        graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_next", next), panelX + 18, y + 32, WrightsUi.MUTED, false);
                         boolean have = canAfford(screen, tier, tier + 1);
-                        drawMini(graphics, screen, upX(), y + 28, upW(), Component.translatable("screen.wrights.manage_upgrade", next), have, false, mouseX, mouseY);
-                        drawMini(graphics, screen, downX(), y + 28, downW(), Component.translatable("screen.wrights.manage_remove_upgrade"), canDowngrade, false, mouseX, mouseY);
+                        drawMini(graphics, screen, upX(), y + 46, upW(), Component.translatable("screen.wrights.manage_upgrade", next), have, false, mouseX, mouseY);
+                        drawMini(graphics, screen, downX(), y + 46, downW(), Component.translatable("screen.wrights.manage_remove_upgrade"), canDowngrade, false, mouseX, mouseY);
                     } else {
-                        graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_best"), panelX + 18, y + 14, WrightsUi.MUTED, false);
-                        drawMini(graphics, screen, upX(), y + 28, upW(), Component.translatable("screen.wrights.manage_remove_upgrade"), canDowngrade, false, mouseX, mouseY);
+                        graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_best"), panelX + 18, y + 32, WrightsUi.MUTED, false);
+                        drawMini(graphics, screen, upX(), y + 46, upW(), Component.translatable("screen.wrights.manage_remove_upgrade"), canDowngrade, false, mouseX, mouseY);
                     }
-                    drawTiers(graphics, screen, y + 46, tier, mouseX, mouseY);
+                    drawTiers(graphics, screen, y + 64, tier, mouseX, mouseY);
                 }
                 y += EXPAND;
             }
         }
         graphics.disableScissor();
+        if (nameBox != null && expanded < 0) {
+            nameBox.setVisible(false);
+        }
         if (dialog != NONE) {
             renderDialog(screen, graphics, swarm, mouseX, mouseY);
         }
@@ -259,6 +272,12 @@ final class WrightManagePanel {
 
     boolean mouseClicked(ManageHost screen, double mouseX, double mouseY, int button) {
         if (button != 0 || !open) {
+            return false;
+        }
+        if (nameBox != null && nameBox.isFocused() && !nameBox.isMouseOver(mouseX, mouseY)) {
+            commitName(screen);
+        }
+        if (nameBox != null && nameBox.visible && nameBox.isMouseOver(mouseX, mouseY)) {
             return false;
         }
         place(screen);
@@ -289,6 +308,10 @@ final class WrightManagePanel {
                 if (mouseX >= panelX + 12 && mouseX < panelX + 24) {
                     toggle(swarm.units().get(i).id());
                 } else {
+                    commitName(screen);
+                    if (expanded == i) {
+                        nameFor = -1;
+                    }
                     expanded = expanded == i ? -1 : i;
                 }
                 return true;
@@ -296,7 +319,7 @@ final class WrightManagePanel {
             y += ROW;
             if (expanded == i) {
                 int tier = WrightTier.clamp(swarm.units().get(i).speed());
-                if (local >= y + 28 && local < y + 42) {
+                if (local >= y + 46 && local < y + 60) {
                     if (tier < WrightTier.NETHERITE && mouseX >= upX() && mouseX < upX() + upW()) {
                         screen.edit(HangarOps.UPGRADE, i);
                         return true;
@@ -308,7 +331,7 @@ final class WrightManagePanel {
                         return true;
                     }
                 }
-                if (local >= y + 46 && local < y + 60) {
+                if (local >= y + 64 && local < y + 78) {
                     int picked = tierAt(mouseX);
                     if (picked >= WrightTier.BASE && picked != tier && (picked < tier || canAfford(screen, tier, picked))) {
                         screen.batch(HangarOps.TO_TIER, picked, new int[] { i });
@@ -334,6 +357,7 @@ final class WrightManagePanel {
             return false;
         }
         int max = Math.max(0, contentHeight(screen, screen.swarm()) - (listBottom - listTop));
+        commitName(screen);
         scroll = Mth.clamp(scroll - (int) Math.signum(delta) * ROW, 0, max);
         return true;
     }
@@ -532,6 +556,71 @@ final class WrightManagePanel {
         panelH = Math.min(screen.screenHeight() - 24, 340);
         panelX = (screen.screenWidth() - panelW) / 2;
         panelY = Math.max(8, (screen.screenHeight() - panelH) / 2);
+    }
+
+    boolean keyPressed(ManageHost screen, int keyCode) {
+        if (nameBox == null || !nameBox.isFocused()) {
+            return false;
+        }
+        if (keyCode == 257 || keyCode == 335) {
+            commitName(screen);
+            nameBox.setFocused(false);
+            screen.focus(null);
+            return true;
+        }
+        if (keyCode == 256) {
+            nameBox.setValue(sentWrightName);
+            nameBox.setFocused(false);
+            screen.focus(null);
+            return true;
+        }
+        return false;
+    }
+
+    private void placeNameBox(ManageHost screen, Swarm swarm, int index, int y, int listTop, int listBottom) {
+        if (nameBox == null) {
+            return;
+        }
+        boolean shown = y + 16 > listTop && y + 2 < listBottom;
+        nameBox.setVisible(shown);
+        if (!shown) {
+            return;
+        }
+        nameBox.setX(panelX + 18);
+        nameBox.setY(y + 2);
+        nameBox.setWidth(Math.max(60, panelW - 36));
+        if (nameFor != index && index >= 0 && index < swarm.units().size()) {
+            String current = swarm.units().get(index).name();
+            if (current == null) {
+                current = "";
+            }
+            nameBox.setValue(current);
+            sentWrightName = current;
+            nameFor = index;
+        }
+    }
+
+    private void commitName(ManageHost screen) {
+        if (nameBox == null || expanded < 0) {
+            return;
+        }
+        Swarm swarm = screen.swarm();
+        if (expanded >= swarm.units().size()) {
+            return;
+        }
+        String next = Swarm.cleanName(nameBox.getValue());
+        String current = swarm.units().get(expanded).name();
+        if (current == null) {
+            current = "";
+        }
+        if (!nameBox.getValue().equals(next)) {
+            nameBox.setValue(next);
+        }
+        sentWrightName = next;
+        if (next.equals(current)) {
+            return;
+        }
+        screen.rename(expanded, next);
     }
 
     private int listTop() {

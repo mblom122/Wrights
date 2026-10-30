@@ -8,6 +8,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 
+import com.wrights.drone.Swarm;
 import com.wrights.drone.WrightTier;
 
 public class WrightItem extends Item {
@@ -29,10 +30,30 @@ public class WrightItem extends Item {
         return tier == null ? WrightTier.BASE : WrightTier.clamp(tier);
     }
 
+    public static String nameOf(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return "";
+        }
+        return Swarm.cleanName(stack.get(ModDataComponents.WRIGHT_NAME.get()));
+    }
+
+    public static void writeName(ItemStack stack, String name) {
+        String clean = Swarm.cleanName(name);
+        if (clean.isBlank()) {
+            stack.remove(ModDataComponents.WRIGHT_NAME.get());
+        } else {
+            stack.set(ModDataComponents.WRIGHT_NAME.get(), clean);
+        }
+    }
+
     @Override
     public Component getName(ItemStack stack) {
         int tier = tier(stack);
         int color = WrightTier.textColor(tier) & 0xFFFFFF;
+        String called = nameOf(stack);
+        if (!called.isBlank()) {
+            return Component.translatable("screen.wrights.drone_named", called).withColor(color);
+        }
         if (tier <= WrightTier.BASE) {
             return Component.translatable("item.wrights.wright").withColor(color);
         }

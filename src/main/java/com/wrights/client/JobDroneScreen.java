@@ -152,7 +152,7 @@ public class JobDroneScreen extends Screen {
                 int number = numberOf(swarm, unit);
                 String label = found == null
                         ? Component.translatable("screen.wrights.drone_missing").getString()
-                        : Component.translatable("screen.wrights.drone_name", number).getString();
+                        : found.title(number).getString();
                 rows.add(new Row(unit, y, label, "", "screen.wrights.drone_remove", found == null ? 0 : WrightTier.clamp(found.speed())));
                 y += ROW;
                 shown++;
@@ -172,7 +172,7 @@ public class JobDroneScreen extends Screen {
                 continue;
             }
             String other = otherJob(unit.id());
-            String label = Component.translatable("screen.wrights.drone_name", i + 1).getString();
+            String label = unit.title(i + 1).getString();
             String stat = other == null ? "" : Component.translatable("screen.wrights.drone_on_other", other).getString();
             rows.add(new Row(unit.id(), y, label, stat, other == null ? "screen.wrights.drone_add" : null, other == null ? WrightTier.clamp(unit.speed()) : 0));
             y += ROW;

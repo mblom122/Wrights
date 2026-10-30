@@ -37,6 +37,29 @@ public final class WrightportOps {
         open.broadcastChanges();
     }
 
+    public static void rename(ServerPlayer player, WrightportMenu menu, int index, String name) {
+        if (!(player.level() instanceof Level level)) {
+            return;
+        }
+        if (!(level.getBlockEntity(menu.pos()) instanceof WrightportBlockEntity port)) {
+            return;
+        }
+        if (!(player.containerMenu instanceof WrightportMenu open) || !open.pos().equals(menu.pos())) {
+            return;
+        }
+        if (port.owner() == null) {
+            port.assignOwner(player.getUUID(), player.getGameProfile().getName());
+        } else if (!port.owner().equals(player.getUUID())) {
+            return;
+        }
+        Swarm next = HangarOps.rename(player, port.swarm(), index, name);
+        if (next == port.swarm()) {
+            return;
+        }
+        port.setSwarm(next);
+        open.broadcastChanges();
+    }
+
     public static void batch(ServerPlayer player, WrightportMenu menu, int action, int value, int[] units) {
         if (!(player.level() instanceof Level level)) {
             return;

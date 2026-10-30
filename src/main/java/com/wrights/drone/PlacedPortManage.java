@@ -78,6 +78,24 @@ public final class PlacedPortManage {
         sync(player);
     }
 
+    public static void renameUnit(ServerPlayer player, String dimension, BlockPos pos, int unit, String name) {
+        WrightportBlockEntity port = ownedPort(player, dimension, pos);
+        if (port == null) {
+            sync(player);
+            return;
+        }
+        if (port.owner() == null) {
+            port.assignOwner(player.getUUID(), player.getGameProfile().getName());
+        }
+        Swarm next = HangarOps.rename(player, port.swarm(), unit, name);
+        if (next == port.swarm()) {
+            return;
+        }
+        port.setSwarm(next);
+        sendSwarm(player, dimension, pos, false, next);
+        sync(player);
+    }
+
     public static void rename(ServerPlayer player, String dimension, BlockPos pos, String name) {
         WrightportBlockEntity port = ownedPort(player, dimension, pos);
         if (port == null) {

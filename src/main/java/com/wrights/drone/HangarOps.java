@@ -186,14 +186,14 @@ public final class HangarOps {
         if (count <= 0) {
             return swarm;
         }
-        List<Integer> tiers = pullWrights(player, Math.min(room, count));
+        List<Taken> tiers = pullWrights(player, Math.min(room, count));
         if (tiers.isEmpty()) {
             Messages.actionBar(player, "message.wrights.need_wright_item");
             return swarm;
         }
         Swarm next = swarm;
-        for (int tier : tiers) {
-            next = next.addUnit(tier);
+        for (Taken taken : tiers) {
+            next = next.addUnit(taken.tier(), taken.name());
         }
         if (tiers.size() >= capRoom) {
             Messages.actionBar(player, "message.wrights.wright_cap_added", tiers.size(), WrightsConfig.maxWrightsOwned());
@@ -203,8 +203,8 @@ public final class HangarOps {
         return next;
     }
 
-    private static List<Integer> pullWrights(ServerPlayer player, int count) {
-        List<Integer> tiers = new ArrayList<>();
+    private static List<Taken> pullWrights(ServerPlayer player, int count) {
+        List<Taken> tiers = new ArrayList<>();
         if (count <= 0) {
             return tiers;
         }
@@ -216,9 +216,10 @@ public final class HangarOps {
             }
             int take = Math.min(stack.getCount(), count - tiers.size());
             int tier = WrightItem.tier(stack);
+            String name = WrightItem.nameOf(stack);
             stack.shrink(take);
             for (int i = 0; i < take; i++) {
-                tiers.add(tier);
+                tiers.add(new Taken(tier, name));
             }
         }
         var chest = ItemSource.container(player, ItemSource.chestOf(player));
@@ -230,12 +231,13 @@ public final class HangarOps {
                 }
                 int take = Math.min(stack.getCount(), count - tiers.size());
                 int tier = WrightItem.tier(stack);
+                String name = WrightItem.nameOf(stack);
                 stack.shrink(take);
                 if (stack.isEmpty()) {
                     chest.setItem(slot, ItemStack.EMPTY);
                 }
                 for (int i = 0; i < take; i++) {
-                    tiers.add(tier);
+                    tiers.add(new Taken(tier, name));
                 }
             }
             chest.setChanged();
@@ -245,7 +247,9 @@ public final class HangarOps {
             var link = ItemSource.linkOf(player);
             var level = DigitalNetworks.levelOf(player, link.pos());
             if (level != null) {
-                tiers.addAll(DigitalNetworks.extractWrights(player, level, link, need));
+                for (int tier : DigitalNetworks.extractWrights(player, level, link, need)) {
+                    tiers.add(new Taken(tier, ""));
+                }
             }
         }
         need = count - tiers.size();
@@ -258,10 +262,13 @@ public final class HangarOps {
         }
         if (player.getAbilities().instabuild) {
             while (tiers.size() < count) {
-                tiers.add(WrightTier.BASE);
+                tiers.add(new Taken(WrightTier.BASE, ""));
             }
         }
         return tiers;
+    }
+
+    private record Taken(int tier, String name) {
     }
 
     private static Swarm extract(ServerPlayer player, Swarm swarm, int mode) {
@@ -282,12 +289,12 @@ public final class HangarOps {
         if (backward) {
             for (int i = 0; i < count && !next.units().isEmpty(); i++) {
                 int index = next.units().size() - 1;
-                give(player, WrightTier.clamp(next.units().get(index).speed()), 1);
+                giveUnit(player, next.units().get(index));
                 next = next.removeUnit(index);
                 taken++;
             }
         } else if (start >= 0 && start < next.units().size()) {
-            give(player, WrightTier.clamp(next.units().get(start).speed()), 1);
+            giveUnit(player, next.units().get(start));
             next = next.removeUnit(start);
             taken = 1;
         }
@@ -455,7 +462,7 @@ public final class HangarOps {
         Swarm next = swarm;
         for (int i = order.length - 1; i >= 0; i--) {
             int index = order[i];
-            give(player, WrightTier.clamp(next.units().get(index).speed()), 1);
+            giveUnit(player, next.units().get(index));
             next = next.removeUnit(index);
         }
         Messages.actionBar(player, "message.wrights.wrights_removed", order.length);
@@ -560,6 +567,33 @@ public final class HangarOps {
             return false;
         }
         return result == ItemSource.Result.OK;
+    }
+
+    static Swarm rename(ServerPlayer player, Swarm swarm, int index, String name) {
+        if (index < 0 || index >= swarm.units().size()) {
+            return swarm;
+        }
+        if (ManageLock.away(player, swarm.units().get(index).id())) {
+            Messages.actionBar(player, "message.wrights.wright_away");
+            return swarm;
+        }
+        return swarm.withName(index, name);
+    }
+
+    public static void renamePort(ServerPlayer player, int kind, int index, int unit, String name) {
+        ItemStack stack = WrightportPlaces.stack(player, kind, index);
+        if (!(stack.getItem() instanceof PersonalWrightportItem)) {
+            Messages.actionBar(player, "message.wrights.manage_missing");
+            return;
+        }
+        Swarm swarm = Swarm.from(stack);
+        storePort(player, kind, index, swarm, rename(player, swarm, unit, name));
+    }
+
+    private static void giveUnit(ServerPlayer player, Swarm.Unit unit) {
+        ItemStack stack = WrightItem.stack(WrightTier.clamp(unit.speed()), 1);
+        WrightItem.writeName(stack, unit.name());
+        giveStack(player, stack);
     }
 
     private static void give(ServerPlayer player, int tier, int count) {

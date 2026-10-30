@@ -8,6 +8,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import net.minecraft.core.UUIDUtil;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -30,16 +31,43 @@ public record Swarm(List<Unit> units, int assign) {
     }
     public static final Swarm EMPTY = new Swarm(List.of(), 1);
 
-    public record Unit(UUID id, int speed, int power) {
-        public Unit(UUID id, int speed) {
-            this(id, speed, 0);
+    public record Unit(UUID id, int speed, int power, String name) {
+        public Unit {
+            name = cleanName(name);
         }
+
+        public Unit(UUID id, int speed) {
+            this(id, speed, 0, "");
+        }
+
+        public Unit(UUID id, int speed, int power) {
+            this(id, speed, power, "");
+        }
+
+        public Component title(int number) {
+            if (name == null || name.isBlank()) {
+                return Component.translatable("screen.wrights.drone_name", number);
+            }
+            return Component.translatable("screen.wrights.drone_named", name);
+        }
+    }
+
+    public static String cleanName(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        String text = raw.replace("§", "").replaceAll("[\\p{Cntrl}]", "").trim();
+        if (text.length() > 32) {
+            text = text.substring(0, 32).trim();
+        }
+        return text;
     }
 
     public static final Codec<Unit> UNIT_CODEC = RecordCodecBuilder.create(instance -> instance.group(
             UUIDUtil.CODEC.fieldOf("id").forGetter(Unit::id),
             Codec.INT.optionalFieldOf("speed", 1).forGetter(Unit::speed),
-            Codec.INT.optionalFieldOf("power", 0).forGetter(Unit::power)
+            Codec.INT.optionalFieldOf("power", 0).forGetter(Unit::power),
+            Codec.STRING.optionalFieldOf("name", "").forGetter(Unit::name)
     ).apply(instance, Unit::new));
 
     public static final Codec<Swarm> CODEC = RecordCodecBuilder.create(instance -> instance.group(
@@ -91,13 +119,39 @@ public record Swarm(List<Unit> units, int assign) {
     }
 
     public Swarm addUnit(int speed) {
+        return addUnit(speed, "");
+    }
+
+    public Swarm addUnit(int speed, String name) {
         if (units.size() >= capacity()) {
             return this;
         }
         List<Unit> next = new ArrayList<>(units);
-        next.add(new Unit(UUID.randomUUID(), Mth.clamp(speed, WrightTier.BASE, MAX_SPEED), 0));
+        next.add(new Unit(UUID.randomUUID(), Mth.clamp(speed, WrightTier.BASE, MAX_SPEED), 0, name));
         int keep = assign <= 0 ? 1 : assign;
         return new Swarm(List.copyOf(next), keep);
+    }
+
+    /** Puts this exact wright into the port when there is a free slot. Same swarm if it is full. */
+    public Swarm adopt(Unit unit) {
+        if (unit == null || unit.id() == null || units.size() >= capacity() || contains(unit.id())) {
+            return this;
+        }
+        List<Unit> next = new ArrayList<>(units);
+        next.add(new Unit(unit.id(), Mth.clamp(unit.speed(), WrightTier.BASE, MAX_SPEED), unit.power(), unit.name()));
+        return new Swarm(List.copyOf(next), assign);
+    }
+
+    public boolean contains(UUID id) {
+        if (id == null) {
+            return false;
+        }
+        for (Unit unit : units) {
+            if (id.equals(unit.id())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public Swarm without(java.util.Set<UUID> ids) {
@@ -131,7 +185,21 @@ public record Swarm(List<Unit> units, int assign) {
         }
         List<Unit> next = new ArrayList<>(units);
         Unit unit = next.get(index);
-        next.set(index, new Unit(unit.id(), Mth.clamp(speed, WrightTier.BASE, MAX_SPEED), unit.power()));
+        next.set(index, new Unit(unit.id(), Mth.clamp(speed, WrightTier.BASE, MAX_SPEED), unit.power(), unit.name()));
+        return new Swarm(List.copyOf(next), assign);
+    }
+
+    public Swarm withName(int index, String name) {
+        if (index < 0 || index >= units.size()) {
+            return this;
+        }
+        Unit unit = units.get(index);
+        String nextName = cleanName(name);
+        if (nextName.equals(unit.name())) {
+            return this;
+        }
+        List<Unit> next = new ArrayList<>(units);
+        next.set(index, new Unit(unit.id(), unit.speed(), unit.power(), nextName));
         return new Swarm(List.copyOf(next), assign);
     }
 
