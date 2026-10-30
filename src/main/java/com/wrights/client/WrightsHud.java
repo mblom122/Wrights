@@ -241,10 +241,11 @@ public final class WrightsHud {
         width = Math.max(width, minecraft.font.width(use) + minecraft.font.width(selected) + 36);
         width = Math.max(width, minecraft.font.width(fresh) + minecraft.font.width(selected) + 36);
         width = Math.max(width, minecraft.font.width(bind) + minecraft.font.width(selected) + 36);
+        int nest = 18;
         if (making) {
-            width = Math.max(width, minecraft.font.width(corners) + minecraft.font.width(selected) + 36);
-            width = Math.max(width, minecraft.font.width(box) + minecraft.font.width(selected) + 36);
-            width = Math.max(width, minecraft.font.width(move) + minecraft.font.width(canMove ? selected : need) + 36);
+            width = Math.max(width, minecraft.font.width(corners) + minecraft.font.width(selected) + 36 + nest);
+            width = Math.max(width, minecraft.font.width(box) + minecraft.font.width(selected) + 36 + nest);
+            width = Math.max(width, minecraft.font.width(move) + minecraft.font.width(canMove ? selected : need) + 36 + nest);
         }
         int row = 18;
         int rows = 3 + (making ? 3 : 0);
@@ -257,16 +258,20 @@ public final class WrightsHud {
         graphics.drawString(minecraft.font, title, x + 12, y + 8, WrightsUi.TEXT, false);
         boolean building = WrightsClientState.mode == WrightsClientState.Mode.BUILD;
         int yRow = y + 24;
-        drawToolRow(graphics, minecraft, x, yRow, width, building && !WrightsClientState.bindSupply, use, selected);
-        drawToolRow(graphics, minecraft, x, yRow + row, width, making, fresh, selected);
-        int yAfterNew = yRow + row * 2;
+        drawToolRow(graphics, minecraft, x, yRow, width, making, fresh, selected);
+        int yAfterNew = yRow + row;
         if (making) {
-            drawModeRow(graphics, minecraft, x, yAfterNew, width, WrightsClientState.CaptureStyle.CORNERS, corners, selected, true, null);
-            drawModeRow(graphics, minecraft, x, yAfterNew + row, width, WrightsClientState.CaptureStyle.BOX, box, selected, true, null);
-            drawModeRow(graphics, minecraft, x, yAfterNew + row * 2, width, WrightsClientState.CaptureStyle.MOVE, move, selected, canMove, need);
-            yAfterNew += row * 3;
+            int subY = yAfterNew;
+            int railX = x + 20;
+            graphics.fill(x + 14, subY - 4, x + width - 10, subY + row * 3 - 6, 0x55101822);
+            graphics.fill(railX, subY - 2, railX + 2, subY + row * 2 + 4, WrightsUi.COPPER_DIM);
+            drawModeRow(graphics, minecraft, x, subY, width, nest, WrightsClientState.CaptureStyle.CORNERS, corners, selected, true, null);
+            drawModeRow(graphics, minecraft, x, subY + row, width, nest, WrightsClientState.CaptureStyle.BOX, box, selected, true, null);
+            drawModeRow(graphics, minecraft, x, subY + row * 2, width, nest, WrightsClientState.CaptureStyle.MOVE, move, selected, canMove, need);
+            yAfterNew = subY + row * 3;
         }
-        drawToolRow(graphics, minecraft, x, yAfterNew, width, building && WrightsClientState.bindSupply, bind, selected);
+        drawToolRow(graphics, minecraft, x, yAfterNew, width, building && !WrightsClientState.bindSupply, use, selected);
+        drawToolRow(graphics, minecraft, x, yAfterNew + row, width, building && WrightsClientState.bindSupply, bind, selected);
         int foot = WrightsClientState.styleAnnounce ? 0xFFF2C14E : WrightsUi.MUTED;
         drawFooter(graphics, minecraft, how, x + 12, y + height - footer + 4, textWidth, foot);
     }
@@ -315,12 +320,14 @@ public final class WrightsHud {
                 WrightsClientState.solidSelection());
     }
 
-    private static void drawModeRow(GuiGraphics graphics, Minecraft minecraft, int x, int y, int width, WrightsClientState.CaptureStyle style, Component label, Component selected, boolean enabled, Component locked) {
+    private static void drawModeRow(GuiGraphics graphics, Minecraft minecraft, int x, int y, int width, int inset, WrightsClientState.CaptureStyle style, Component label, Component selected, boolean enabled, Component locked) {
         boolean on = enabled && WrightsClientState.captureStyle == style;
+        int textX = x + 14 + inset;
+        graphics.fill(x + 20, y + 3, textX - 4, y + 5, WrightsUi.COPPER_DIM);
         if (on) {
-            graphics.fill(x + 8, y - 3, x + width - 8, y + 11, 0xA0C47A3A);
+            graphics.fill(textX - 6, y - 3, x + width - 8, y + 11, 0xA0C47A3A);
         }
-        graphics.drawString(minecraft.font, label, x + 14, y, on ? 0xFFFFFFFF : (enabled ? WrightsUi.MUTED : 0xFF5C6A74), false);
+        graphics.drawString(minecraft.font, label, textX, y, on ? 0xFFFFFFFF : (enabled ? WrightsUi.MUTED : 0xFF5C6A74), false);
         Component mark = on ? selected : (!enabled ? locked : null);
         if (mark != null) {
             int markWidth = minecraft.font.width(mark);

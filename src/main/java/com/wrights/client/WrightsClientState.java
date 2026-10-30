@@ -1117,14 +1117,14 @@ public final class WrightsClientState {
             return;
         }
         int styles = styleSteps();
-        int count = 2 + styles;
+        int count = styles + 2;
         int next = Math.floorMod(buildToolSlot() + direction, count);
-        if (next == 0) {
+        if (next < styles) {
+            selectNewStyle(styleAt(next));
+        } else if (next == styles) {
             selectBuildTool(false);
-        } else if (next == count - 1) {
-            selectBuildTool(true);
         } else {
-            selectNewStyle(styleAt(next - 1));
+            selectBuildTool(true);
         }
         styleHudTicks = STYLE_HUD_TICKS;
         styleAnnounce = true;
@@ -1144,7 +1144,7 @@ public final class WrightsClientState {
         return CaptureStyle.MOVE;
     }
 
-    /** Use template, each capture style under New template, then Bind inventory. */
+    /** New template styles first, then Use template, then Bind inventory. */
     private static int buildToolSlot() {
         if (mode == Mode.CAPTURE) {
             int offset = switch (captureStyle) {
@@ -1152,12 +1152,12 @@ public final class WrightsClientState {
                 case MOVE -> hasBox() ? 2 : 0;
                 case CORNERS -> 0;
             };
-            return 1 + Math.min(offset, styleSteps() - 1);
+            return Math.min(offset, styleSteps() - 1);
         }
         if (mode == Mode.BUILD && bindSupply) {
-            return 1 + styleSteps();
+            return styleSteps() + 1;
         }
-        return 0;
+        return styleSteps();
     }
 
     private static void selectBuildTool(boolean bind) {
