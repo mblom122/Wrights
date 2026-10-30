@@ -308,23 +308,48 @@ public final class WrightsHud {
         if (WrightsClientState.jobNotices.isEmpty()) {
             return;
         }
+        int headerH = 18;
+        int bodyH = 28;
+        int height = headerH + bodyH;
         int y = 6;
         for (WrightsClientState.JobNotice notice : WrightsClientState.jobNotices) {
-            Component title = Component.literal(notice.name);
+            Component header = Component.translatable("hud.wrights.job_finished");
+            Component name = Component.literal(notice.name);
             Component time = notice.seconds < 1
                     ? Component.translatable("hud.wrights.job_time_under")
                     : Component.translatable("hud.wrights.job_time", duration(notice.seconds));
-            int width = Math.min(220, Math.max(minecraft.font.width(title), minecraft.font.width(time)) + 18);
+            int width = Math.min(240, Math.max(
+                    minecraft.font.width(header) + 30,
+                    Math.max(minecraft.font.width(name), minecraft.font.width(time)) + 18));
             int x = graphics.guiWidth() - 6 - width;
-            int alpha = notice.ticks > 20 ? 0xC0 : Math.max(0, 0xC0 * notice.ticks / 20);
+            int alpha = notice.ticks > 20 ? 0xE0 : Math.max(0, 0xE0 * notice.ticks / 20);
             int panel = (alpha << 24) | 0x101822;
-            int bar = (alpha << 24) | (WrightsUi.COPPER & 0xFFFFFF);
-            graphics.fill(x, y, x + width, y + 32, panel);
-            graphics.fill(x + width - 2, y, x + width, y + 32, bar);
-            graphics.drawString(minecraft.font, minecraft.font.plainSubstrByWidth(title.getString(), width - 16), x + 8, y + 5, WrightsUi.TEXT, false);
-            graphics.drawString(minecraft.font, minecraft.font.plainSubstrByWidth(time.getString(), width - 16), x + 8, y + 17, WrightsUi.MUTED, false);
-            y += 36;
+            int toolbar = (alpha << 24) | 0x1C2A36;
+            int copper = (alpha << 24) | (WrightsUi.COPPER & 0xFFFFFF);
+            int edge = (alpha << 24) | 0x31404E;
+            int border = (alpha << 24) | 0x3A4C5C;
+            int text = (alpha << 24) | (WrightsUi.TEXT & 0xFFFFFF);
+            int muted = (alpha << 24) | (WrightsUi.MUTED & 0xFFFFFF);
+            graphics.fill(x, y, x + width, y + height, panel);
+            WrightsUi.border(graphics, x, y, width, height, border);
+            graphics.fill(x + 1, y + 1, x + width - 1, y + headerH, toolbar);
+            graphics.fill(x + 1, y + 1, x + 3, y + headerH, copper);
+            graphics.fill(x + 1, y + headerH - 1, x + width - 1, y + headerH, edge);
+            drawInfoBubble(graphics, x + 8, y + 5, alpha);
+            graphics.drawString(minecraft.font, header, x + 20, y + 5, text, false);
+            graphics.drawString(minecraft.font, minecraft.font.plainSubstrByWidth(name.getString(), width - 16), x + 8, y + headerH + 5, muted, false);
+            graphics.drawString(minecraft.font, minecraft.font.plainSubstrByWidth(time.getString(), width - 16), x + 8, y + headerH + 16, muted, false);
+            y += height + 4;
         }
+    }
+
+    private static void drawInfoBubble(GuiGraphics graphics, int x, int y, int alpha) {
+        int fill = (alpha << 24) | (WrightsUi.BLUE & 0xFFFFFF);
+        int ink = (alpha << 24) | 0x101822;
+        graphics.fill(x + 1, y, x + 7, y + 8, fill);
+        graphics.fill(x, y + 1, x + 8, y + 7, fill);
+        graphics.fill(x + 3, y + 1, x + 5, y + 3, ink);
+        graphics.fill(x + 3, y + 4, x + 5, y + 7, ink);
     }
 
     private static String duration(int seconds) {
