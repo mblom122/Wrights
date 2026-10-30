@@ -1,6 +1,7 @@
 package com.wrights.client;
 
 import com.wrights.WrightsMod;
+import com.wrights.block.ModBlockEntities;
 import com.wrights.entity.ModEntities;
 import com.wrights.item.BlueprintFolderItem;
 import com.wrights.item.BlueprintItem;
@@ -32,6 +33,8 @@ public class WrightsClient {
             ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "drone"), "main");
     public static final ModelLayerLocation PERSONAL_WRIGHTPORT_LAYER = new ModelLayerLocation(
             ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "personal_wrightport"), "main");
+    public static final ModelLayerLocation WRIGHTPORT_HATCH_LAYER = new ModelLayerLocation(
+            ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "wrightport_hatch"), "main");
 
     public WrightsClient(ModContainer container) {
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
@@ -41,11 +44,13 @@ public class WrightsClient {
     public static void registerLayers(EntityRenderersEvent.RegisterLayerDefinitions event) {
         event.registerLayerDefinition(DRONE_LAYER, DroneModel::createBodyLayer);
         event.registerLayerDefinition(PERSONAL_WRIGHTPORT_LAYER, PersonalWrightportModel::createBodyLayer);
+        event.registerLayerDefinition(WRIGHTPORT_HATCH_LAYER, WrightportHatchModel::createBodyLayer);
     }
 
     @SubscribeEvent
     public static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(ModEntities.DRONE.get(), DroneRenderer::new);
+        event.registerBlockEntityRenderer(ModBlockEntities.WRIGHTPORT.get(), WrightportRenderer::new);
         // Curios copies this map at the end of AddLayers. Registering there is too late, so the back model never draws.
         CuriosRendererRegistry.register(
                 ModItems.PERSONAL_WRIGHTPORT.get(),

@@ -60,7 +60,7 @@ public class DroneEntity extends Entity {
     /** Leaves a placed wrightport hatch, aimed at the work site. */
     public void departFromBlock(BlockPos port, Vec3 work, int lane, int lanes) {
         setHomePort(port);
-        Vec3 from = WrightHomes.abovePort(port);
+        Vec3 from = WrightHomes.lip(port);
         launchToward(from, work, lane, lanes, 0.0F);
     }
 
@@ -98,7 +98,7 @@ public class DroneEntity extends Entity {
         double radius = n <= 1 ? 0.0D : 0.55D;
         Vec3 above;
         if (port != null) {
-            above = WrightHomes.abovePort(port).add(Math.cos(angle) * radius, 2.5D, Math.sin(angle) * radius);
+            above = WrightHomes.approach(port, slot, count);
         } else {
             above = WrightHomes.behindPlayer(player).add(Math.cos(angle) * radius, 4.0D, Math.sin(angle) * radius);
         }
@@ -166,14 +166,13 @@ public class DroneEntity extends Entity {
                 this.discard();
                 return;
             }
-            Vec3 dock = homePort != null && serverLevel.isLoaded(homePort)
-                    ? WrightHomes.abovePort(homePort)
-                    : WrightHomes.behindPlayer(player);
-            if (this.distanceToSqr(dock) <= 1.15D) {
+            boolean blockHome = homePort != null && serverLevel.isLoaded(homePort);
+            Vec3 dock = blockHome ? WrightHomes.hatch(homePort) : WrightHomes.behindPlayer(player);
+            if (this.distanceToSqr(dock) <= (blockHome ? 0.04D : 1.15D)) {
                 this.discard();
                 return;
             }
-            this.moveToward(dock, homePort != null ? 0.55D : 0.5D);
+            this.moveToward(dock, blockHome ? 0.3D : 0.5D);
             return;
         }
         Optional<UUID> id = jobId();

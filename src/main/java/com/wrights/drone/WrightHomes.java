@@ -40,9 +40,22 @@ public final class WrightHomes {
         return player.position().add(back.scale(-0.85D)).add(0.0D, 0.95D, 0.0D);
     }
 
-    /** Hatch above a placed wrightport. */
-    public static Vec3 abovePort(BlockPos port) {
-        return Vec3.atCenterOf(port).add(0.0D, 1.05D, 0.0D);
+    /** Inside the bay, under the lid, where a returning wright disappears. */
+    public static Vec3 hatch(BlockPos port) {
+        return Vec3.atBottomCenterOf(port).add(0.0D, 0.42D, 0.0D);
+    }
+
+    /** Just above the lid, where a departing wright clears the top. */
+    public static Vec3 lip(BlockPos port) {
+        return Vec3.atBottomCenterOf(port).add(0.0D, 1.05D, 0.0D);
+    }
+
+    /** High ring a returning wright dives into the hatch from. */
+    public static Vec3 approach(BlockPos port, int slot, int count) {
+        int n = Math.max(1, count);
+        double angle = (Math.PI * 2.0D * slot) / n;
+        double radius = n <= 1 ? 0.0D : 0.6D;
+        return lip(port).add(Math.cos(angle) * radius, 5.0D, Math.sin(angle) * radius);
     }
 
     public static List<FreeWright> freeNear(ServerPlayer player, Predicate<UUID> free, int limit) {
