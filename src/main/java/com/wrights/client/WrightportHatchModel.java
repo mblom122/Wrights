@@ -19,6 +19,10 @@ public class WrightportHatchModel extends Model {
     private final ModelPart ne;
     private final ModelPart se;
     private final ModelPart sw;
+    private final ModelPart lampNw;
+    private final ModelPart lampNe;
+    private final ModelPart lampSw;
+    private final ModelPart lampSe;
 
     public WrightportHatchModel(ModelPart root) {
         super(RenderType::entityCutoutNoCull);
@@ -26,6 +30,10 @@ public class WrightportHatchModel extends Model {
         this.ne = root.getChild("hatch_ne");
         this.se = root.getChild("hatch_se");
         this.sw = root.getChild("hatch_sw");
+        this.lampNw = root.getChild("lamp_nw");
+        this.lampNe = root.getChild("lamp_ne");
+        this.lampSw = root.getChild("lamp_sw");
+        this.lampSe = root.getChild("lamp_se");
     }
 
     public static LayerDefinition createBodyLayer() {
@@ -45,7 +53,18 @@ public class WrightportHatchModel extends Model {
         root.addOrReplaceChild("hatch_sw",
                 CubeListBuilder.create().texOffs(8, 8).addBox(-2.0F, -0.2F, 0.0F, 2.0F, 0.4F, 2.0F),
                 pose);
+        // Above the roof corners, clear of the orange frame. Drawn each frame so the color can change.
+        lamp(root, "lamp_nw", 1.15F, 12.2F, 2.15F);
+        lamp(root, "lamp_ne", 13.1F, 12.2F, 2.15F);
+        lamp(root, "lamp_sw", 1.15F, 12.2F, 13.1F);
+        lamp(root, "lamp_se", 13.1F, 12.2F, 13.1F);
         return LayerDefinition.create(mesh, 16, 16);
+    }
+
+    private static void lamp(PartDefinition root, String name, float x, float y, float z) {
+        root.addOrReplaceChild(name,
+                CubeListBuilder.create().texOffs(0, 0).addBox(x, y, z, 1.75F, 1.0F, 1.75F),
+                PartPose.ZERO);
     }
 
     public void setupAnim(float open) {
@@ -79,6 +98,14 @@ public class WrightportHatchModel extends Model {
         ne.render(pose, buffer, light, overlay, color);
         se.render(pose, buffer, light, overlay, color);
         sw.render(pose, buffer, light, overlay, color);
+    }
+
+    public void renderLamps(PoseStack pose, VertexConsumer buffer, int overlay, int color) {
+        int light = 0xF000F0;
+        lampNw.render(pose, buffer, light, overlay, color);
+        lampNe.render(pose, buffer, light, overlay, color);
+        lampSw.render(pose, buffer, light, overlay, color);
+        lampSe.render(pose, buffer, light, overlay, color);
     }
 
     @Override

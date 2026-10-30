@@ -2,6 +2,8 @@ package com.wrights.client;
 
 import com.wrights.WrightsMod;
 import com.wrights.block.WrightportBlockEntity;
+import com.wrights.block.WrightportLamp;
+import com.wrights.drone.Swarm;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -15,6 +17,7 @@ import net.minecraft.resources.ResourceLocation;
 
 public class WrightportRenderer implements BlockEntityRenderer<WrightportBlockEntity> {
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "textures/block/wrightport_copper.png");
+    private static final ResourceLocation LAMP = ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "textures/block/wrightport_lamp.png");
 
     private final WrightportHatchModel model;
 
@@ -29,6 +32,27 @@ public class WrightportRenderer implements BlockEntityRenderer<WrightportBlockEn
         pose.scale(1.0F / 16.0F, 1.0F / 16.0F, 1.0F / 16.0F);
         VertexConsumer consumer = buffers.getBuffer(RenderType.entityCutoutNoCull(TEXTURE));
         model.renderHatch(pose, consumer, light, OverlayTexture.NO_OVERLAY);
+        VertexConsumer lamps = buffers.getBuffer(RenderType.entityCutoutNoCull(LAMP));
+        model.renderLamps(pose, lamps, OverlayTexture.NO_OVERLAY, 0xFF000000 | colorOf(port));
         pose.popPose();
+    }
+
+    /** Red when empty, yellow when every wright is out, green when one is still home. */
+    public static int colorOf(WrightportBlockEntity port) {
+        Swarm swarm = port.swarm();
+        if (swarm.units().isEmpty()) {
+            return port.lampColor();
+        }
+        return WrightportLamp.color(swarm, id -> {
+            for (var job : WrightsClientState.jobs) {
+                if (job.finished() || job.saving()) {
+                    continue;
+                }
+                if (job.crew().contains(id)) {
+                    return true;
+                }
+            }
+            return false;
+        });
     }
 }

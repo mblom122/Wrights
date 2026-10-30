@@ -94,7 +94,7 @@ public class WrightsClient {
             }
             BlockEntity entity = level.getBlockEntity(pos);
             if (entity instanceof WrightportBlockEntity port) {
-                return port.lampColor();
+                return WrightportRenderer.colorOf(port);
             }
             return WrightportLamp.RED;
         }, ModBlocks.WRIGHTPORT.get());
