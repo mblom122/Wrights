@@ -6,7 +6,6 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.geom.PartPose;
-import net.minecraft.client.model.geom.builders.CubeDeformation;
 import net.minecraft.client.model.geom.builders.CubeListBuilder;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
 import net.minecraft.client.model.geom.builders.MeshDefinition;
@@ -14,14 +13,17 @@ import net.minecraft.client.model.geom.builders.PartDefinition;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.util.Mth;
 
-/** Backpack-style personal wrightport worn on the player's back. */
+/**
+ * Worn personal wrightport. Built in Blockbench with Y up and the antenna above the collar,
+ * then flipped into entity space where Y points down the player's back.
+ */
 public class PersonalWrightportModel extends Model {
     private final ModelPart root;
     private final ModelPart pack;
-    private final ModelPart doorN;
-    private final ModelPart doorE;
-    private final ModelPart doorS;
-    private final ModelPart doorW;
+    private final ModelPart doorTl;
+    private final ModelPart doorTr;
+    private final ModelPart doorBl;
+    private final ModelPart doorBr;
     private final ModelPart antenna;
     private final ModelPart lamp;
 
@@ -29,10 +31,10 @@ public class PersonalWrightportModel extends Model {
         super(RenderType::entityCutoutNoCull);
         this.root = root;
         this.pack = root.getChild("pack");
-        this.doorN = root.getChild("door_n");
-        this.doorE = root.getChild("door_e");
-        this.doorS = root.getChild("door_s");
-        this.doorW = root.getChild("door_w");
+        this.doorTl = root.getChild("door_tl");
+        this.doorTr = root.getChild("door_tr");
+        this.doorBl = root.getChild("door_bl");
+        this.doorBr = root.getChild("door_br");
         this.antenna = root.getChild("antenna");
         this.lamp = root.getChild("lamp");
     }
@@ -40,58 +42,60 @@ public class PersonalWrightportModel extends Model {
     public static LayerDefinition createBodyLayer() {
         MeshDefinition mesh = new MeshDefinition();
         PartDefinition root = mesh.getRoot();
-        CubeDeformation none = CubeDeformation.NONE;
 
-        // Chassis on the upper back. Local +Z faces away from the player after body attach.
-        root.addOrReplaceChild("pack",
-                CubeListBuilder.create()
-                        .texOffs(0, 0).addBox(-4.0F, 0.0F, 0.0F, 8.0F, 10.0F, 3.5F, none)
-                        .texOffs(0, 14).addBox(-3.5F, 1.0F, -0.6F, 7.0F, 8.0F, 0.6F, none),
-                PartPose.offset(0.0F, 1.0F, 2.2F));
+        root.addOrReplaceChild("pack", CubeListBuilder.create()
+                        .texOffs(0, 0).addBox(-5.0F, 1.0F, 2.0F, 10.0F, 10.0F, 4.0F)
+                        .texOffs(0, 16).addBox(-4.0F, 2.0F, 1.0F, 8.0F, 8.0F, 1.0F)
+                        .texOffs(32, 0).addBox(-4.0F, -1.0F, 2.0F, 8.0F, 2.0F, 4.0F)
+                        .texOffs(32, 16).addBox(-3.0F, 2.0F, 5.0F, 6.0F, 7.0F, 1.0F)
+                        .texOffs(0, 30).addBox(-3.0F, 1.0F, 5.0F, 6.0F, 1.0F, 2.0F)
+                        .texOffs(20, 30).addBox(-3.0F, 9.0F, 5.0F, 6.0F, 1.0F, 2.0F)
+                        .texOffs(0, 48).addBox(-4.0F, 2.0F, 5.0F, 1.0F, 7.0F, 2.0F)
+                        .texOffs(8, 48).addBox(3.0F, 2.0F, 5.0F, 1.0F, 7.0F, 2.0F)
+                        .texOffs(56, 0).addBox(-6.0F, 2.0F, 3.0F, 1.0F, 8.0F, 2.0F)
+                        .texOffs(56, 14).addBox(5.0F, 2.0F, 3.0F, 1.0F, 8.0F, 2.0F)
+                        .texOffs(0, 36).addBox(-3.0F, -1.0F, 5.0F, 1.0F, 1.0F, 1.0F)
+                        .texOffs(6, 36).addBox(2.0F, -1.0F, 5.0F, 1.0F, 1.0F, 1.0F),
+                PartPose.ZERO);
 
-        // Four hatch slices on the outward face (+Z).
-        root.addOrReplaceChild("door_n",
-                CubeListBuilder.create().texOffs(24, 0).addBox(-2.5F, -0.35F, -0.35F, 5.0F, 0.7F, 2.5F, none),
-                PartPose.offset(0.0F, 4.0F, 5.6F));
-        root.addOrReplaceChild("door_s",
-                CubeListBuilder.create().texOffs(24, 4).addBox(-2.5F, -0.35F, -2.15F, 5.0F, 0.7F, 2.5F, none),
-                PartPose.offset(0.0F, 8.0F, 5.6F));
-        root.addOrReplaceChild("door_w",
-                CubeListBuilder.create().texOffs(24, 8).addBox(-0.35F, -2.0F, -2.15F, 0.7F, 4.0F, 2.5F, none),
-                PartPose.offset(-2.5F, 6.0F, 5.6F));
-        root.addOrReplaceChild("door_e",
-                CubeListBuilder.create().texOffs(32, 8).addBox(-0.35F, -2.0F, -2.15F, 0.7F, 4.0F, 2.5F, none),
-                PartPose.offset(2.5F, 6.0F, 5.6F));
+        // Hinges sit on the outer edge of each hatch panel. +Z is away from the player.
+        root.addOrReplaceChild("door_tl",
+                CubeListBuilder.create().texOffs(0, 42).addBox(-1.5F, 0.0F, -0.5F, 3.0F, 3.0F, 1.0F),
+                PartPose.offset(-1.5F, 2.0F, 6.5F));
+        root.addOrReplaceChild("door_tr",
+                CubeListBuilder.create().texOffs(10, 42).addBox(-1.5F, 0.0F, -0.5F, 3.0F, 3.0F, 1.0F),
+                PartPose.offset(1.5F, 2.0F, 6.5F));
+        root.addOrReplaceChild("door_bl",
+                CubeListBuilder.create().texOffs(20, 42).addBox(-1.5F, -4.0F, -0.5F, 3.0F, 4.0F, 1.0F),
+                PartPose.offset(-1.5F, 9.0F, 6.5F));
+        root.addOrReplaceChild("door_br",
+                CubeListBuilder.create().texOffs(30, 42).addBox(-1.5F, -4.0F, -0.5F, 3.0F, 4.0F, 1.0F),
+                PartPose.offset(1.5F, 9.0F, 6.5F));
 
-        // Thin antenna mast on top of the pack.
         root.addOrReplaceChild("antenna",
-                CubeListBuilder.create().texOffs(40, 0).addBox(-0.35F, 0.0F, -0.35F, 0.7F, 3.5F, 0.7F, none),
-                PartPose.offset(0.0F, 11.0F, 3.6F));
+                CubeListBuilder.create().texOffs(40, 28).addBox(-1.0F, -3.0F, -1.0F, 2.0F, 3.0F, 2.0F),
+                PartPose.offset(0.0F, -1.0F, 4.0F));
         root.addOrReplaceChild("lamp",
-                CubeListBuilder.create().texOffs(44, 0).addBox(-0.5F, 0.0F, -0.5F, 1.0F, 1.0F, 1.0F, none),
-                PartPose.offset(0.0F, 14.5F, 3.6F));
+                CubeListBuilder.create().texOffs(48, 28).addBox(-1.0F, -2.0F, -1.0F, 2.0F, 2.0F, 2.0F),
+                PartPose.offset(0.0F, -4.0F, 4.0F));
 
-        return LayerDefinition.create(mesh, 64, 32);
+        return LayerDefinition.create(mesh, 64, 64);
     }
 
+    /** Top pair swings up, bottom pair swings down, both toward +Z. */
     public void setupAnim(float open) {
         float t = Mth.clamp(open, 0.0F, 1.0F);
         float eased = t * t * (3.0F - 2.0F * t);
-        float slide = eased * 2.8F;
-        float tip = eased * 0.7F;
+        float swing = eased * 2.1F;
 
-        doorN.resetPose();
-        doorS.resetPose();
-        doorW.resetPose();
-        doorE.resetPose();
-        doorN.z += slide;
-        doorN.xRot -= tip;
-        doorS.z += slide;
-        doorS.xRot += tip;
-        doorW.z += slide;
-        doorW.yRot += tip;
-        doorE.z += slide;
-        doorE.yRot -= tip;
+        doorTl.resetPose();
+        doorTr.resetPose();
+        doorBl.resetPose();
+        doorBr.resetPose();
+        doorTl.xRot += swing;
+        doorTr.xRot += swing;
+        doorBl.xRot -= swing;
+        doorBr.xRot -= swing;
     }
 
     public void renderPack(PoseStack pose, VertexConsumer buffer, int light, int overlay, int color) {
@@ -99,15 +103,15 @@ public class PersonalWrightportModel extends Model {
     }
 
     public void renderDoors(PoseStack pose, VertexConsumer buffer, int light, int overlay, int color) {
-        doorN.render(pose, buffer, light, overlay, color);
-        doorE.render(pose, buffer, light, overlay, color);
-        doorS.render(pose, buffer, light, overlay, color);
-        doorW.render(pose, buffer, light, overlay, color);
+        doorTl.render(pose, buffer, light, overlay, color);
+        doorTr.render(pose, buffer, light, overlay, color);
+        doorBl.render(pose, buffer, light, overlay, color);
+        doorBr.render(pose, buffer, light, overlay, color);
     }
 
     public void renderAntenna(PoseStack pose, VertexConsumer buffer, int light, int overlay, int mastColor, int lampColor) {
         antenna.render(pose, buffer, light, overlay, mastColor);
-        lamp.render(pose, buffer, light, overlay, lampColor);
+        lamp.render(pose, buffer, 0xF000F0, overlay, lampColor);
     }
 
     @Override

@@ -1,7 +1,6 @@
 package com.wrights.client;
 
 import com.wrights.WrightsMod;
-import com.wrights.block.HangarSignal;
 import com.wrights.drone.Swarm;
 import com.wrights.entity.DroneEntity;
 
@@ -26,9 +25,10 @@ import top.theillusivec4.curios.api.client.ICurioRenderer;
 
 public class PersonalWrightportRenderer implements ICurioRenderer {
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "textures/entity/personal_wrightport.png");
-    private static final int PACK = 0xFF8A96A4;
-    private static final int DOOR = 0xFFC0C8D0;
-    private static final int MAST = 0xFF1A1E24;
+    private static final int TEXTURE_WHITE = 0xFFFFFFFF;
+    private static final int BULB_RED = 0xFFFF3B3B;
+    private static final int BULB_YELLOW = 0xFFFFC030;
+    private static final int BULB_BLUE = 0xFF3D8BFF;
 
     private final PersonalWrightportModel model;
     private float doorOpen;
@@ -74,28 +74,33 @@ public class PersonalWrightportRenderer implements ICurioRenderer {
         if (parent instanceof HumanoidModel<?> humanoid) {
             humanoid.body.translateAndRotate(poseStack);
         }
-        // Sit on the upper back; local +Z faces outward after body transform.
-        poseStack.translate(0.0F, -0.05F, 0.0F);
-        poseStack.scale(0.85F, 0.85F, 0.85F);
+        // Shell starts on the body back face; nudge it out so the plate clears the torso.
+        poseStack.translate(0.0F, 0.0F, 0.0625F);
 
         VertexConsumer consumer = buffer.getBuffer(RenderType.entityCutoutNoCull(TEXTURE));
-        model.renderPack(poseStack, consumer, light, OverlayTexture.NO_OVERLAY, PACK);
-        model.renderDoors(poseStack, consumer, light, OverlayTexture.NO_OVERLAY, DOOR);
-
-        HangarSignal signal = signalFor(stack, open);
-        model.renderAntenna(poseStack, consumer, 0xF000F0, OverlayTexture.NO_OVERLAY, MAST, signal.tint());
+        model.renderPack(poseStack, consumer, light, OverlayTexture.NO_OVERLAY, TEXTURE_WHITE);
+        model.renderDoors(poseStack, consumer, light, OverlayTexture.NO_OVERLAY, TEXTURE_WHITE);
+        model.renderAntenna(poseStack, consumer, light, OverlayTexture.NO_OVERLAY, TEXTURE_WHITE, bulbTint(stack));
         poseStack.popPose();
     }
 
-    private static HangarSignal signalFor(ItemStack stack, float open) {
+    /** Red when the pack is empty, yellow while any stored wright is on a job, blue when all are idle. */
+    private static int bulbTint(ItemStack stack) {
         Swarm swarm = Swarm.from(stack);
         if (swarm.units().isEmpty()) {
-            return HangarSignal.RED;
+            return BULB_RED;
         }
-        if (open > 0.05F) {
-            return HangarSignal.YELLOW;
+        for (var job : WrightsClientState.jobs) {
+            if (job.finished() || job.saving()) {
+                continue;
+            }
+            for (Swarm.Unit unit : swarm.units()) {
+                if (job.crew().contains(unit.id())) {
+                    return BULB_YELLOW;
+                }
+            }
         }
-        return HangarSignal.GREEN;
+        return BULB_BLUE;
     }
 
     private static boolean trafficOpen(LivingEntity entity) {
