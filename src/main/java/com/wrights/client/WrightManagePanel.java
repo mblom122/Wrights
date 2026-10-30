@@ -180,6 +180,7 @@ final class WrightManagePanel {
         }
         if (addButton != null) {
             addButton.setShown(open && chrome);
+            addButton.active = open && chrome && roomLeft(swarm) > 0;
         }
         if (backButton != null) {
             backButton.setShown(open && chrome && !screen.embedded());
@@ -385,16 +386,18 @@ final class WrightManagePanel {
             int[] quick = { 1, 8, 16, 64 };
             int gap = 4;
             int width = (dw - 24 - gap * 3) / 4;
+            int fit = allThatFit(screen);
             for (int i = 0; i < quick.length; i++) {
                 int x = dx + 12 + i * (width + gap);
                 if (hit(mouseX, mouseY, x, dy + 48, width, 16)) {
-                    screen.batch(HangarOps.ADD_COUNT, quick[i], new int[0]);
-                    closeTop();
+                    if (quick[i] <= fit) {
+                        screen.batch(HangarOps.ADD_COUNT, quick[i], new int[0]);
+                        closeTop();
+                    }
                     return true;
                 }
             }
             if (hit(mouseX, mouseY, dx + 12, dy + 70, dw - 24, 16)) {
-                int fit = allThatFit(screen);
                 if (fit > 0) {
                     screen.batch(HangarOps.ADD_COUNT, fit, new int[0]);
                     closeTop();
@@ -403,7 +406,7 @@ final class WrightManagePanel {
             }
             if (hit(mouseX, mouseY, dx + dw - 108, dy + 98, 96, 16)) {
                 int count = typedCount();
-                if (count > 0) {
+                if (count > 0 && count <= fit) {
                     screen.batch(HangarOps.ADD_COUNT, count, new int[0]);
                     closeTop();
                 }
@@ -439,15 +442,16 @@ final class WrightManagePanel {
         WrightsUi.panel(graphics, dx, dy, dw, dh);
         if (dialog == ADD) {
             graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_add_title"), dx + 12, dy + 12, WrightsUi.COPPER, false);
-            int room = Math.max(0, Swarm.capacity() - swarm.units().size());
+            int room = roomLeft(swarm);
+            int fit = allThatFit(screen);
             graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_add_room", room, held(screen)), dx + 12, dy + 28, WrightsUi.MUTED, false);
             int[] quick = { 1, 8, 16, 64 };
             int gap = 4;
             int width = (dw - 24 - gap * 3) / 4;
             for (int i = 0; i < quick.length; i++) {
-                drawMini(graphics, screen, dx + 12 + i * (width + gap), dy + 48, width, Component.literal(Integer.toString(quick[i])), true, false, mouseX, mouseY);
+                drawMini(graphics, screen, dx + 12 + i * (width + gap), dy + 48, width, Component.literal(Integer.toString(quick[i])), quick[i] <= fit, false, mouseX, mouseY);
             }
-            drawMini(graphics, screen, dx + 12, dy + 70, dw - 24, Component.translatable("screen.wrights.manage_add_all"), room > 0, false, mouseX, mouseY);
+            drawMini(graphics, screen, dx + 12, dy + 70, dw - 24, Component.translatable("screen.wrights.manage_add_all"), fit > 0, false, mouseX, mouseY);
             boxX = dx + 12;
             boxY = dy + 98;
             boxW = dw - 128;
@@ -457,7 +461,8 @@ final class WrightManagePanel {
                 countBox.setY(boxY);
                 countBox.setWidth(boxW);
             }
-            drawMini(graphics, screen, dx + dw - 108, dy + 98, 96, Component.translatable("screen.wrights.manage_add_count"), typedCount() > 0, false, mouseX, mouseY);
+            int typed = typedCount();
+            drawMini(graphics, screen, dx + dw - 108, dy + 98, 96, Component.translatable("screen.wrights.manage_add_count"), typed > 0 && typed <= fit, false, mouseX, mouseY);
         } else {
             graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_marked_title"), dx + 12, dy + 12, WrightsUi.COPPER, false);
             graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_marked_count", markedCount(screen, swarm)), dx + 12, dy + 28, WrightsUi.TEXT, false);
@@ -627,8 +632,12 @@ final class WrightManagePanel {
         }
     }
 
+    private static int roomLeft(Swarm swarm) {
+        return Math.max(0, Swarm.capacity() - swarm.units().size());
+    }
+
     private int allThatFit(ManageHost screen) {
-        int room = Math.max(0, Swarm.capacity() - screen.swarm().units().size());
+        int room = roomLeft(screen.swarm());
         if (screen.minecraft().player != null && screen.minecraft().player.getAbilities().instabuild) {
             return room;
         }
