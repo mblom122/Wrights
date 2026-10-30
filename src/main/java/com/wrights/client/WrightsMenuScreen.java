@@ -792,7 +792,7 @@ public class WrightsMenuScreen extends Screen {
         optionHintY = optionY(local);
         local += 20;
         boolean droneMax = WrightsClientConfig.DRONE_MAX.get();
-        Component droneMode = Component.translatable(droneMax ? "menu.wrights.drone_max" : "menu.wrights.drone_fixed");
+        Component droneMode = droneModeLabel(droneMax);
         droneW = Math.max(52, this.font.width(droneMode) + 16);
         droneX = x + 108;
         droneY = optionY(local - 3);
@@ -863,6 +863,13 @@ public class WrightsMenuScreen extends Screen {
         }
     }
 
+    private static Component droneModeLabel(boolean max) {
+        if (max) {
+            return Component.translatable("menu.wrights.drone_max", WrightsConfig.maxWrightsPerJob());
+        }
+        return Component.translatable("menu.wrights.drone_fixed");
+    }
+
     private void showOptionBox(EditBox box) {
         int top = box.getY();
         int bottom = top + box.getHeight();
@@ -907,7 +914,7 @@ public class WrightsMenuScreen extends Screen {
         graphics.drawString(this.font, this.font.plainSubstrByWidth(hint.getString(), optionViewW - 28), x, optionHintY, 0xFF667480, false);
         boolean droneMax = WrightsClientConfig.DRONE_MAX.get();
         graphics.drawString(this.font, Component.translatable("menu.wrights.drone_deploy"), x, droneY + 3, WrightsUi.MUTED, false);
-        Component droneMode = Component.translatable(droneMax ? "menu.wrights.drone_max" : "menu.wrights.drone_fixed");
+        Component droneMode = droneModeLabel(droneMax);
         graphics.fill(droneX, droneY, droneX + droneW, droneY + 16, droneMax ? 0xFF24384A : 0xFF18222C);
         WrightsUi.border(graphics, droneX, droneY, droneW, 16, droneMax ? WrightsUi.COPPER : 0xFF3D4E5E);
         graphics.drawCenteredString(this.font, droneMode, droneX + droneW / 2, droneY + 4, WrightsUi.TEXT);
@@ -921,7 +928,9 @@ public class WrightsMenuScreen extends Screen {
             WrightsUi.border(graphics, dronePlusX, droneY, 16, 16, 0xFF3D4E5E);
             graphics.drawCenteredString(this.font, "+", dronePlusX + 8, droneY + 4, WrightsUi.TEXT);
         }
-        Component droneHint = Component.translatable(droneMax ? "menu.wrights.drone_max_hint" : "menu.wrights.drone_fixed_hint");
+        Component droneHint = droneMax
+                ? Component.translatable("menu.wrights.drone_max_hint", WrightsConfig.maxWrightsPerJob())
+                : Component.translatable("menu.wrights.drone_fixed_hint");
         graphics.drawString(this.font, this.font.plainSubstrByWidth(droneHint.getString(), optionViewW - 28), x, droneHintY, 0xFF667480, false);
         boolean youFirst = WrightsClientConfig.PORT_PLAYER_FIRST.get();
         graphics.drawString(this.font, Component.translatable("menu.wrights.port_order"), x, portOrderY + 3, WrightsUi.MUTED, false);
