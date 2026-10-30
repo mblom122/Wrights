@@ -2,6 +2,7 @@ package com.wrights.client;
 
 import com.wrights.WrightsMod;
 import com.wrights.WrightsConfig;
+import com.wrights.block.WrightportBlockEntity;
 import com.wrights.item.ControllerItem;
 import com.wrights.network.BlueprintPayloads;
 
@@ -59,12 +60,16 @@ public final class SelectionRenderer {
         }
         Minecraft minecraft = Minecraft.getInstance();
         LocalPlayer player = minecraft.player;
-        if (player == null || !ControllerItem.isHeld(player)) {
+        if (player == null) {
             return;
         }
         PoseStack pose = event.getPoseStack();
         Vec3 camera = event.getCamera().getPosition();
         MultiBufferSource.BufferSource buffers = minecraft.renderBuffers().bufferSource();
+        drawPortBounds(pose, buffers, camera, minecraft);
+        if (!ControllerItem.isHeld(player)) {
+            return;
+        }
         boolean placing = minecraft.screen instanceof PlacementScreen;
         boolean adjust = minecraft.screen instanceof BlueprintAdjustScreen;
         boolean gui = minecraft.screen != null;
@@ -102,6 +107,30 @@ public final class SelectionRenderer {
         }
         BlockEntity entity = level.getBlockEntity(pos);
         return entity instanceof Container;
+    }
+
+    private static void drawPortBounds(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
+        Level level = minecraft.level;
+        if (level == null) {
+            return;
+        }
+        java.util.List<BlockPos> ports = WrightportBounds.visible(level.dimension());
+        if (ports.isEmpty()) {
+            return;
+        }
+        VertexConsumer lines = buffers.getBuffer(RenderType.lines());
+        boolean any = false;
+        for (BlockPos pos : ports) {
+            if (level.isLoaded(pos) && !(level.getBlockEntity(pos) instanceof WrightportBlockEntity)) {
+                WrightportBounds.forget(pos);
+                continue;
+            }
+            drawBox(pose, lines, WrightportBounds.cube(pos), camera, 0.77F, 0.48F, 0.23F, 1.0F);
+            any = true;
+        }
+        if (any) {
+            buffers.endBatch(RenderType.lines());
+        }
     }
 
     private static void drawSupplyMarkers(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {

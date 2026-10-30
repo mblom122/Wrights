@@ -20,6 +20,7 @@ import com.wrights.network.BlueprintPayloads;
 /** The placed wrightport. Same wright list as Manage, for this block alone. */
 public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> implements ManageHost {
     private final WrightManagePanel manage = new WrightManagePanel();
+    private WrightsButton boundaryButton;
 
     public WrightportScreen(WrightportMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
@@ -35,6 +36,22 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         manage.setActive(true);
         clearWidgets();
         manage.addWidgets(this);
+        boundaryButton = new WrightsButton(0, 0, 88, 16, Component.translatable("screen.wrights.boundary"), button -> {
+            if (getMinecraft().level != null) {
+                WrightportBounds.toggle(getMinecraft().level.dimension(), menu.pos());
+            }
+        });
+        addRenderableWidget(boundaryButton);
+        placeBoundary();
+    }
+
+    private void placeBoundary() {
+        if (boundaryButton == null) {
+            return;
+        }
+        boundaryButton.setX(leftPos + imageWidth - 16 - boundaryButton.getWidth());
+        boundaryButton.setY(topPos + 8);
+        boundaryButton.setPicked(WrightportBounds.showing(menu.pos()));
     }
 
     @Override
@@ -141,6 +158,7 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         this.renderBackground(graphics, mouseX, mouseY, partialTick);
         renderBg(graphics, partialTick, mouseX, mouseY);
         manage.render(this, graphics, mouseX, mouseY);
+        placeBoundary();
         for (Renderable widget : this.renderables) {
             widget.render(graphics, mouseX, mouseY, partialTick);
         }
