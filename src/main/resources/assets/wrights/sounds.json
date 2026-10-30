@@ -1,0 +1,12 @@
+{
+  "entity.drone.loop": {
+    "subtitle": "subtitles.wrights.drone.loop",
+    "sounds": [
+      {
+        "name": "wrights:entity/drone_loop",
+        "stream": false,
+        "attenuation_distance": 28
+      }
+    ]
+  }
+}

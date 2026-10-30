@@ -2,6 +2,7 @@
   "itemGroup.wrights": "Wrights",
   "item.wrights.controller": "Wright Controller",
   "entity.wrights.drone": "Wright",
+  "subtitles.wrights.drone.loop": "Wright whirrs",
   "item.wrights.controller.hint.corners": "Press B, then New, to start a blueprint",
   "item.wrights.controller.hint.copy": "While making one, right-click sets the box",
   "item.wrights.controller.hint.paste": "While building, right-click places it",

@@ -17,6 +17,7 @@ import com.wrights.item.ModItems;
 import com.wrights.entity.ModEntities;
 import com.wrights.menu.ModMenus;
 import com.wrights.network.BlueprintNetwork;
+import com.wrights.sound.ModSounds;
 
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
@@ -35,6 +36,7 @@ public class WrightsMod {
         ModBlockEntities.TYPES.register(modBus);
         ModMenus.MENUS.register(modBus);
         ModEntities.ENTITIES.register(modBus);
+        ModSounds.SOUNDS.register(modBus);
         ModCreativeTabs.TABS.register(modBus);
         modBus.addListener(BlueprintNetwork::register);
         modBus.addListener(WrightsMod::commonSetup);
