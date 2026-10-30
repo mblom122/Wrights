@@ -197,9 +197,8 @@ public final class BlueprintActions {
         if (!requireTool(player)) {
             return;
         }
-        BlueprintSessions.get(player).setLibraryGlobal(false);
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
-        session.startCapture(player.level().dimension(), suggestName(blueprintNames(SchematicLibrary.get(player.getServer()), null)));
+        session.startCapture(player.level().dimension(), suggestName(libraryNames(player, null)));
         BlueprintNetwork.syncCapture(player);
         Messages.actionBar(player, "message.wrights.capture_first");
     }
@@ -378,7 +377,7 @@ public final class BlueprintActions {
             BlueprintNetwork.syncCapture(player);
             return;
         }
-        String clean = uniqueName(name, blueprintNames(SchematicLibrary.get(player.getServer()), session.editingId()));
+        String clean = uniqueName(name, libraryNames(player, session.editingId()));
         session.setName(clean);
         session.setBuildAfterSave(buildAfter);
         session.setMode(BlueprintSessions.Mode.SAVING);
@@ -423,6 +422,9 @@ public final class BlueprintActions {
         }
         if (saved && id != null) {
             session.setEditingId(id);
+            if (session.libraryGlobal()) {
+                keepGlobal(player, id);
+            }
         }
         session.setMode(BlueprintSessions.Mode.CAPTURE);
         BlueprintNetwork.syncLibrary(player);
@@ -694,7 +696,6 @@ public final class BlueprintActions {
         if (baseline == null) {
             return;
         }
-        SchematicLibrary library = SchematicLibrary.get(player.getServer());
         if (wasDraft && session.mode() == BlueprintSessions.Mode.BUILD && baseline.id().equals(session.buildId())) {
             if (!keep) {
                 session.setDraft(baseline);
@@ -704,7 +705,7 @@ public final class BlueprintActions {
                 return;
             }
             Schematic saved = draft != null ? draft : baseline;
-            library.putSchematic(saved);
+            storeSaved(player, saved);
             session.setDraft(saved);
             session.setDraftDirty(false);
             BlueprintNetwork.syncLibrary(player);
@@ -716,7 +717,7 @@ public final class BlueprintActions {
             }
             return;
         }
-        Schematic current = library.schematic(baseline.id()).orElse(null);
+        Schematic current = held(player, baseline.id());
         if (keep) {
             if (current != null) {
                 BlueprintNetwork.syncLibrary(player);
@@ -730,7 +731,7 @@ public final class BlueprintActions {
             return;
         }
         if (current != baseline) {
-            library.putSchematic(baseline);
+            storeSaved(player, baseline);
             BlueprintNetwork.syncLibrary(player);
             BlueprintNetwork.preview(player, baseline, false, false);
             Messages.actionBar(player, "message.wrights.edit_discarded");
@@ -742,13 +743,13 @@ public final class BlueprintActions {
             return;
         }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
-        Schematic schematic = library.schematic(id).orElse(null);
+        Schematic schematic = stored(player, id);
         if (schematic == null) {
             Messages.actionBar(player, "message.wrights.blueprint_missing");
             BlueprintNetwork.syncLibrary(player);
             return;
         }
-        if (library.isInUse(id)) {
+        if (library.schematic(id).isPresent() && library.isInUse(id)) {
             Messages.actionBar(player, "message.wrights.blueprint_in_use");
             return;
         }
@@ -976,12 +977,12 @@ public final class BlueprintActions {
             return;
         }
         Schematic next = draft.withPaste(placeFluids, voidBlocks, voidFluids, voidNbt);
-        Schematic stored = library.schematic(session.buildId()).orElse(null);
+        Schematic stored = held(player, session.buildId());
         if (!session.draftDirty() && stored != null && stored.samePaste(next)) {
             Messages.actionBar(player, "message.wrights.session_clean");
             return;
         }
-        library.putSchematic(next);
+        storeSaved(player, next);
         session.setDraft(next);
         session.setDraftDirty(false);
         BlueprintNetwork.syncLibrary(player);
@@ -1368,7 +1369,7 @@ public final class BlueprintActions {
             BlueprintNetwork.preview(player, updated, true, false);
             return;
         }
-        SchematicLibrary.get(player.getServer()).putSchematic(updated);
+        storeSaved(player, updated);
         BlueprintNetwork.syncLibrary(player);
         BlueprintNetwork.preview(player, updated, false, false);
     }
@@ -1379,17 +1380,62 @@ public final class BlueprintActions {
             return draft;
         }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
-        Schematic schematic = library.schematic(id).orElse(null);
+        Schematic schematic = stored(player, id);
         if (schematic == null) {
             Messages.actionBar(player, "message.wrights.blueprint_missing");
             BlueprintNetwork.syncLibrary(player);
             return null;
         }
-        if (changing && library.isInUse(id)) {
+        if (changing && library.schematic(id).isPresent() && library.isInUse(id)) {
             Messages.actionBar(player, "message.wrights.blueprint_in_use");
             return null;
         }
         return schematic;
+    }
+
+    private static List<String> libraryNames(ServerPlayer player, UUID except) {
+        if (global(player)) {
+            return globalBlueprintNames(GlobalBlueprintStore.get(), except);
+        }
+        return blueprintNames(SchematicLibrary.get(player.getServer()), except);
+    }
+
+    private static Schematic held(ServerPlayer player, UUID id) {
+        return stored(player, id);
+    }
+
+    /** Writes a blueprint back to the library that already holds it. */
+    private static void storeSaved(ServerPlayer player, Schematic schematic) {
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        if (library.schematic(schematic.id()).isPresent()) {
+            library.putSchematic(schematic);
+            return;
+        }
+        GlobalBlueprintStore store = GlobalBlueprintStore.get();
+        if (store.schematic(schematic.id()).isPresent() || global(player)) {
+            store.putSchematic(schematic);
+            return;
+        }
+        library.putSchematic(schematic);
+    }
+
+    /** A finished capture was written into the world library. Keep it in the global library instead. */
+    private static void keepGlobal(ServerPlayer player, UUID id) {
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        Schematic schematic = library.schematic(id).orElse(null);
+        if (schematic == null || schematic.ephemeral()) {
+            return;
+        }
+        GlobalBlueprintStore store = GlobalBlueprintStore.get();
+        boolean fresh = store.schematic(id).isEmpty();
+        store.putSchematic(schematic);
+        if (fresh) {
+            Map<UUID, String> names = globalSchematicNames(store);
+            names.put(id, schematic.name());
+            store.shelf().placeAfter(id, false, null, null, names);
+            store.markShelfChanged();
+        }
+        library.removeSchematic(id);
     }
 
     private static double rangeSqr() {

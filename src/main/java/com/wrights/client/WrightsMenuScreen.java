@@ -458,7 +458,7 @@ public class WrightsMenuScreen extends Screen {
         boolean any = row != null;
         boolean tool = toolHeld();
         boolean world = !WrightsClientState.libraryGlobal;
-        editButton.active = blueprint && world;
+        editButton.active = blueprint;
         deleteButton.active = any;
         buildButton.active = blueprint && tool;
         renameButton.active = any;
@@ -514,7 +514,7 @@ public class WrightsMenuScreen extends Screen {
             stopButton.setWidth(Math.max(40, detailW - 8));
         }
         if (newButton != null) {
-            newButton.active = tool && world;
+            newButton.active = tool;
         }
         if (moveButton != null) {
             moveButton.active = blueprint;
@@ -2121,9 +2121,6 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private void newBlueprint() {
-        if (WrightsClientState.libraryGlobal) {
-            WrightsClientState.setLibraryScope(false);
-        }
         if (!requireTool()) {
             return;
         }

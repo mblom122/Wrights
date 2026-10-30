@@ -751,6 +751,9 @@ public final class JobManager {
         Schematic previous = null;
         if (job.replaceSchematicId() != null) {
             previous = library.schematic(job.replaceSchematicId()).orElse(null);
+            if (previous == null) {
+                previous = com.wrights.schematic.GlobalBlueprintStore.get().schematic(job.replaceSchematicId()).orElse(null);
+            }
             if (previous != null) {
                 anchorX = previous.anchorX();
                 anchorY = previous.anchorY();
