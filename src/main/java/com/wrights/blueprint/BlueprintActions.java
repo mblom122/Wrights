@@ -331,7 +331,7 @@ public final class BlueprintActions {
         BlueprintNetwork.syncCapture(player);
     }
 
-    public static void confirm(ServerPlayer player, String name, boolean copyFluids, boolean buildAfter) {
+    public static void confirm(ServerPlayer player, String name, boolean copyFluids, boolean copyNbtBlocks, boolean copyNbtSettings, boolean buildAfter) {
         if (!requireTool(player)) {
             return;
         }
@@ -365,7 +365,9 @@ public final class BlueprintActions {
                 session.dimension(),
                 session.cornerA(),
                 session.cornerB(),
-                copyFluids);
+                copyFluids,
+                copyNbtBlocks,
+                copyNbtSettings);
         if (!started) {
             session.setBuildAfterSave(false);
             session.setMode(BlueprintSessions.Mode.CAPTURE);
@@ -685,7 +687,7 @@ public final class BlueprintActions {
                     continue;
                 }
                 int y = entry.y() > source ? entry.y() - 1 : entry.y();
-                entries.add(new Schematic.Entry(entry.x(), (short) y, entry.z(), entry.state(), entry.secondary()));
+                entries.add(entry.moved(entry.x(), (short) y, entry.z()));
             }
             if (anchorY == source) {
                 anchorY = Math.max(0, source - 1);
@@ -715,7 +717,7 @@ public final class BlueprintActions {
             }
             for (Schematic.Entry entry : schematic.entries()) {
                 int y = movedY(entry.y(), source, dest);
-                entries.add(new Schematic.Entry(entry.x(), (short) y, entry.z(), entry.state(), entry.secondary()));
+                entries.add(entry.moved(entry.x(), (short) y, entry.z()));
             }
             storeLayout(player, id, schematic, height, entries, movedY(anchorY, source, dest));
             return;
@@ -737,7 +739,7 @@ public final class BlueprintActions {
                 if (entry.y() != source) {
                     continue;
                 }
-                entries.add(new Schematic.Entry(entry.x(), (short) dest, entry.z(), entry.state(), entry.secondary()));
+                entries.add(entry.moved(entry.x(), (short) dest, entry.z()));
             }
             entries.sort(Schematic.BUILD_ORDER);
             if (anchorY >= dest) {
@@ -750,7 +752,7 @@ public final class BlueprintActions {
     private static void shiftUp(Schematic schematic, java.util.List<Schematic.Entry> into, int at) {
         for (Schematic.Entry entry : schematic.entries()) {
             int y = entry.y() >= at ? entry.y() + 1 : entry.y();
-            into.add(new Schematic.Entry(entry.x(), (short) y, entry.z(), entry.state(), entry.secondary()));
+            into.add(entry.moved(entry.x(), (short) y, entry.z()));
         }
     }
 

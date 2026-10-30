@@ -10,7 +10,6 @@ import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.core.Direction;
 
 import com.wrights.schematic.Schematic;
-import com.wrights.util.BlockFilters;
 
 public final class BlueprintTransforms {
     public enum Op {
@@ -64,7 +63,7 @@ public final class BlueprintTransforms {
             int nextX = clockwise ? sizeZ - 1 - z : z;
             int nextZ = clockwise ? x : sizeX - 1 - x;
             BlockState state = entry.state().rotate(clockwise ? Rotation.CLOCKWISE_90 : Rotation.COUNTERCLOCKWISE_90);
-            entries.add(new Schematic.Entry((short) nextX, entry.y(), (short) nextZ, state, BlockFilters.isSecondary(state)));
+            entries.add(entry.withState(state).moved((short) nextX, entry.y(), (short) nextZ));
         }
         int anchorX = clockwise ? sizeZ - 1 - schematic.anchorZ() : schematic.anchorZ();
         int anchorZ = clockwise ? schematic.anchorX() : sizeX - 1 - schematic.anchorX();
@@ -78,7 +77,7 @@ public final class BlueprintTransforms {
             int x = alongX ? schematic.sizeX() - 1 - entry.x() : entry.x();
             int z = alongX ? entry.z() : schematic.sizeZ() - 1 - entry.z();
             BlockState state = entry.state().mirror(mirror);
-            entries.add(new Schematic.Entry((short) x, entry.y(), (short) z, state, BlockFilters.isSecondary(state)));
+            entries.add(entry.withState(state).moved((short) x, entry.y(), (short) z));
         }
         int anchorX = alongX ? schematic.sizeX() - 1 - schematic.anchorX() : schematic.anchorX();
         int anchorZ = alongX ? schematic.anchorZ() : schematic.sizeZ() - 1 - schematic.anchorZ();
@@ -91,7 +90,7 @@ public final class BlueprintTransforms {
         for (Schematic.Entry entry : schematic.entries()) {
             int y = sizeY - 1 - entry.y();
             BlockState state = flipState(entry.state());
-            entries.add(new Schematic.Entry(entry.x(), (short) y, entry.z(), state, BlockFilters.isSecondary(state)));
+            entries.add(entry.withState(state).moved(entry.x(), (short) y, entry.z()));
         }
         return finish(schematic, schematic.sizeX(), sizeY, schematic.sizeZ(), entries, schematic.anchorX(), sizeY - 1 - schematic.anchorY(), schematic.anchorZ());
     }

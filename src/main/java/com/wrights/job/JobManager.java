@@ -526,7 +526,7 @@ public final class JobManager {
         launched(player, job);
     }
 
-    public static boolean startBlueprintSave(ServerPlayer player, String name, UUID replaceId, ResourceKey<Level> dimension, BlockPos cornerA, BlockPos cornerB, boolean copyFluids) {
+    public static boolean startBlueprintSave(ServerPlayer player, String name, UUID replaceId, ResourceKey<Level> dimension, BlockPos cornerA, BlockPos cornerB, boolean copyFluids, boolean copyNbtBlocks, boolean copyNbtSettings) {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         if (hasCopy(library, player.getUUID())) {
             Messages.actionBar(player, "message.wrights.busy");
@@ -547,6 +547,7 @@ public final class JobManager {
         BuildJob job = BuildJob.copy(player.getUUID(), player.getUUID(), dimension, min, max);
         job.setBlueprintName(name);
         job.setCopyFluids(copyFluids);
+        job.setCopyNbt(copyNbtBlocks, copyNbtSettings);
         job.setReplaceSchematicId(replaceId);
         library.addJob(job);
         Messages.actionBar(player, "message.wrights.saving");
@@ -682,12 +683,20 @@ public final class JobManager {
                 if (!canStore(level, job, pos, state)) {
                     job.skippedSpecialOne();
                 } else {
+                    net.minecraft.nbt.CompoundTag nbt = null;
+                    if (state.hasBlockEntity() && job.copyNbtSettings()) {
+                        BlockEntity be = level.getBlockEntity(pos);
+                        if (be != null) {
+                            nbt = com.wrights.util.BlockEntityNbt.settings(be.saveWithoutMetadata(level.registryAccess()));
+                        }
+                    }
                     job.partial().add(new Schematic.Entry(
                             (short) (pos.getX() - job.min().getX()),
                             (short) (pos.getY() - job.min().getY()),
                             (short) (pos.getZ() - job.min().getZ()),
                             state,
-                            BlockFilters.isSecondary(state)));
+                            BlockFilters.isSecondary(state),
+                            nbt));
                 }
             }
             job.advance();
@@ -704,14 +713,14 @@ public final class JobManager {
     }
 
     private static boolean canStore(ServerLevel level, BuildJob job, BlockPos pos, BlockState state) {
-        if (!BlockFilters.canCopy(level, pos, state, job.copyFluids())) {
+        if (!BlockFilters.canCopy(level, pos, state, job.copyFluids(), job.copyNbtBlocks())) {
             return false;
         }
         if (!BlockFilters.isSecondary(state)) {
             return true;
         }
         BlockPos below = pos.below();
-        return job.contains(below) && BlockFilters.canCopy(level, below, level.getBlockState(below));
+        return job.contains(below) && BlockFilters.canCopy(level, below, level.getBlockState(below), job.copyFluids(), job.copyNbtBlocks());
     }
 
     private static void finishCopy(SchematicLibrary library, BuildJob job) {
@@ -2784,6 +2793,7 @@ public final class JobManager {
         Item payment = BlockFilters.payment(state);
         BlockState existing = level.getBlockState(pos);
         if (existing.equals(state)) {
+            applyEntryNbt(level, pos, entry);
             return PlaceResult.DONE;
         }
         if (!job.placeFluids() && BlockFilters.isFluid(state)) {
@@ -2853,6 +2863,7 @@ public final class JobManager {
         if (paid) {
             consumeItem(player, level, job, payment);
         }
+        applyEntryNbt(level, pos, entry);
         job.recordPlaced(entry.x(), entry.y(), entry.z(), after, paid);
         if (!quiet) {
             level.gameEvent(player, GameEvent.BLOCK_PLACE, pos);
@@ -2861,6 +2872,22 @@ public final class JobManager {
         }
         job.placedOne();
         return PlaceResult.DONE;
+    }
+
+    private static void applyEntryNbt(ServerLevel level, BlockPos pos, Schematic.Entry entry) {
+        if (entry.nbt() == null) {
+            return;
+        }
+        BlockEntity be = level.getBlockEntity(pos);
+        if (be == null) {
+            return;
+        }
+        try {
+            be.loadWithComponents(entry.nbt().copy(), level.registryAccess());
+            be.setChanged();
+        } catch (RuntimeException ignored) {
+            // Bad or version-mismatched settings NBT must not break the place.
+        }
     }
 
     /** A chest or other stored block stays unless voiding those was turned on. */

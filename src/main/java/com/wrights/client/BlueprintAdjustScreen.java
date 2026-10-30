@@ -36,12 +36,17 @@ public class BlueprintAdjustScreen extends Screen {
     private int modelH;
     private int fluidX;
     private int fluidY;
+    private int nbtX;
+    private int nbtY;
+    private int settingsX;
+    private int settingsY;
     private boolean spinning;
     private float yaw = 35.0F;
     private float pitch = 28.0F;
     private BlockPos previewA;
     private BlockPos previewB;
     private boolean previewFluids;
+    private boolean previewNbt;
     private boolean previewReady;
     private SelectionPreview.Shot preview = SelectionPreview.Shot.empty();
 
@@ -52,9 +57,9 @@ public class BlueprintAdjustScreen extends Screen {
     @Override
     protected void init() {
         panelW = 392;
-        panelH = 268;
+        panelH = 332;
         panelX = Math.max(8, (this.width - panelW) / 2);
-        panelY = Math.max(6, (this.height - panelH) / 2);
+        panelY = Math.max(4, (this.height - panelH) / 2);
         nameBox = box(panelX + 12, panelY + 28, 190, 16, 48, false);
         xBox = number(panelX + 32, panelY + 64, true);
         yBox = number(panelX + 32, panelY + 82, true);
@@ -74,13 +79,13 @@ public class BlueprintAdjustScreen extends Screen {
         step(panelX + 114, panelY + 154, "+", () -> grow(1, 1));
         step(panelX + 12, panelY + 172, "-", () -> grow(2, -1));
         step(panelX + 114, panelY + 172, "+", () -> grow(2, 1));
-        resetButton = new WrightsButton(panelX + 12, panelY + 208, 190, 16, Component.translatable(resetKey()), button -> reset());
+        resetButton = new WrightsButton(panelX + 12, panelY + 248, 190, 16, Component.translatable(resetKey()), button -> reset());
         addRenderableWidget(resetButton);
-        saveButton = new WrightsButton(panelX + 12, panelY + 230, 60, 18, Component.translatable("screen.wrights.save"), button -> save(false));
+        saveButton = new WrightsButton(panelX + 12, panelY + 274, 60, 18, Component.translatable("screen.wrights.save"), button -> save(false));
         addRenderableWidget(saveButton);
-        buildButton = new WrightsButton(panelX + 76, panelY + 230, 60, 18, Component.translatable("screen.wrights.send"), button -> build());
+        buildButton = new WrightsButton(panelX + 76, panelY + 274, 60, 18, Component.translatable("screen.wrights.send"), button -> build());
         addRenderableWidget(buildButton);
-        addRenderableWidget(new WrightsButton(panelX + 140, panelY + 230, 66, 18, Component.translatable("screen.wrights.cancel"), button -> cancel(), true));
+        addRenderableWidget(new WrightsButton(panelX + 140, panelY + 274, 66, 18, Component.translatable("screen.wrights.cancel"), button -> cancel(), true));
         refresh();
     }
 
@@ -276,7 +281,12 @@ public class BlueprintAdjustScreen extends Screen {
         WrightsClientState.name = nameBox.getValue();
         WrightsClientState.markSaving();
         updateSaveButton();
-        PacketDistributor.sendToServer(new BlueprintPayloads.CaptureConfirm(nameBox.getValue(), WrightsClientConfig.COPY_FLUIDS.get(), buildAfter));
+        PacketDistributor.sendToServer(new BlueprintPayloads.CaptureConfirm(
+                nameBox.getValue(),
+                WrightsClientConfig.COPY_FLUIDS.get(),
+                WrightsClientConfig.COPY_NBT_BLOCKS.get(),
+                WrightsClientConfig.COPY_NBT_SETTINGS.get(),
+                buildAfter));
     }
 
     private void build() {
@@ -296,7 +306,10 @@ public class BlueprintAdjustScreen extends Screen {
 
     private String fingerprint() {
         String label = nameBox == null ? "" : nameBox.getValue();
-        return label + "\n" + WrightsClientConfig.COPY_FLUIDS.get() + "\n" + WrightsClientState.cornerA + "\n" + WrightsClientState.cornerB;
+        return label + "\n" + WrightsClientConfig.COPY_FLUIDS.get()
+                + "\n" + WrightsClientConfig.COPY_NBT_BLOCKS.get()
+                + "\n" + WrightsClientConfig.COPY_NBT_SETTINGS.get()
+                + "\n" + WrightsClientState.cornerA + "\n" + WrightsClientState.cornerB;
     }
 
     private void updateSaveButton() {
@@ -392,7 +405,11 @@ public class BlueprintAdjustScreen extends Screen {
         modelW = panelW - 234;
         modelH = 176;
         fluidX = modelX;
-        fluidY = modelY + modelH + 14;
+        fluidY = modelY + modelH + 8;
+        nbtX = modelX;
+        nbtY = fluidY + 32;
+        settingsX = modelX;
+        settingsY = nbtY + 32;
         WrightsUi.inset(graphics, modelX - 4, modelY - 4, modelW + 8, modelH + 8);
         ensurePreview();
         if (!spinning) {
@@ -406,30 +423,40 @@ public class BlueprintAdjustScreen extends Screen {
         } else if (WrightsClientState.cornerA != null && WrightsClientState.cornerB != null) {
             graphics.drawCenteredString(this.font, Component.translatable("message.wrights.copy_empty"), modelX + modelW / 2, modelY + modelH / 2, WrightsUi.MUTED);
         }
-        boolean fluids = WrightsClientConfig.COPY_FLUIDS.get();
-        graphics.fill(fluidX, fluidY, fluidX + 12, fluidY + 12, 0xFF18222C);
-        WrightsUi.border(graphics, fluidX, fluidY, 12, 12, fluids ? WrightsUi.COPPER : 0xFF3D4E5E);
-        if (fluids) {
-            graphics.fill(fluidX + 3, fluidY + 3, fluidX + 9, fluidY + 9, WrightsUi.COPPER);
+        drawToggle(graphics, fluidX, fluidY, WrightsClientConfig.COPY_FLUIDS.get(), "screen.wrights.copy_fluids", "screen.wrights.copy_fluids_hint", true);
+        drawToggle(graphics, nbtX, nbtY, WrightsClientConfig.COPY_NBT_BLOCKS.get(), "screen.wrights.copy_nbt_blocks", "screen.wrights.copy_nbt_blocks_hint", true);
+        drawToggle(graphics, settingsX, settingsY, WrightsClientConfig.COPY_NBT_SETTINGS.get(), "screen.wrights.copy_nbt_settings", "screen.wrights.copy_nbt_settings_hint", WrightsClientConfig.COPY_NBT_BLOCKS.get());
+    }
+
+    private void drawToggle(GuiGraphics graphics, int x, int y, boolean on, String label, String hint, boolean enabled) {
+        int box = enabled ? 0xFF18222C : 0xFF12171C;
+        int border = !enabled ? 0xFF2A343C : on ? WrightsUi.COPPER : 0xFF3D4E5E;
+        graphics.fill(x, y, x + 12, y + 12, box);
+        WrightsUi.border(graphics, x, y, 12, 12, border);
+        if (on && enabled) {
+            graphics.fill(x + 3, y + 3, x + 9, y + 9, WrightsUi.COPPER);
         }
-        graphics.drawString(this.font, Component.translatable("screen.wrights.copy_fluids"), fluidX + 16, fluidY + 2, WrightsUi.TEXT, false);
-        graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("screen.wrights.copy_fluids_hint").getString(), modelW - 4), fluidX, fluidY + 16, WrightsUi.MUTED, false);
+        int text = enabled ? WrightsUi.TEXT : WrightsUi.MUTED;
+        graphics.drawString(this.font, Component.translatable(label), x + 16, y + 2, text, false);
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable(hint).getString(), modelW - 4), x, y + 16, WrightsUi.MUTED, false);
     }
 
     private void ensurePreview() {
         BlockPos first = WrightsClientState.cornerA;
         BlockPos second = WrightsClientState.cornerB;
         boolean fluids = WrightsClientConfig.COPY_FLUIDS.get();
-        if (previewReady && same(previewA, first) && same(previewB, second) && previewFluids == fluids) {
+        boolean nbt = WrightsClientConfig.COPY_NBT_BLOCKS.get();
+        if (previewReady && same(previewA, first) && same(previewB, second) && previewFluids == fluids && previewNbt == nbt) {
             return;
         }
         previewA = first;
         previewB = second;
         previewFluids = fluids;
+        previewNbt = nbt;
         previewReady = true;
         preview = this.minecraft == null
                 ? SelectionPreview.Shot.empty()
-                : SelectionPreview.capture(this.minecraft.level, first, second, fluids);
+                : SelectionPreview.capture(this.minecraft.level, first, second, fluids, nbt);
         WrightsClientState.showCapturePreview(preview.ghosts(), preview.concealed());
     }
 
@@ -441,15 +468,37 @@ public class BlueprintAdjustScreen extends Screen {
         return mouseX >= modelX && mouseX < modelX + modelW && mouseY >= modelY && mouseY < modelY + modelH;
     }
 
+    private boolean hitToggle(double mouseX, double mouseY, int x, int y) {
+        return mouseX >= x && mouseX < x + modelW && mouseY >= y && mouseY < y + 28;
+    }
+
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 0 && mouseX >= fluidX && mouseX < fluidX + modelW && mouseY >= fluidY && mouseY < fluidY + 28) {
+        if (button == 0 && hitToggle(mouseX, mouseY, fluidX, fluidY)) {
             if (saving()) {
                 return true;
             }
             WrightsClientConfig.setCopyFluids(!WrightsClientConfig.COPY_FLUIDS.get());
             previewReady = false;
             ensurePreview();
+            updateSaveButton();
+            return true;
+        }
+        if (button == 0 && hitToggle(mouseX, mouseY, nbtX, nbtY)) {
+            if (saving()) {
+                return true;
+            }
+            WrightsClientConfig.setCopyNbtBlocks(!WrightsClientConfig.COPY_NBT_BLOCKS.get());
+            previewReady = false;
+            ensurePreview();
+            updateSaveButton();
+            return true;
+        }
+        if (button == 0 && hitToggle(mouseX, mouseY, settingsX, settingsY)) {
+            if (saving() || !WrightsClientConfig.COPY_NBT_BLOCKS.get()) {
+                return true;
+            }
+            WrightsClientConfig.setCopyNbtSettings(!WrightsClientConfig.COPY_NBT_SETTINGS.get());
             updateSaveButton();
             return true;
         }

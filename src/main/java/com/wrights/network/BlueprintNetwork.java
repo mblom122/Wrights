@@ -164,7 +164,13 @@ public final class BlueprintNetwork {
 
     private static void confirm(BlueprintPayloads.CaptureConfirm payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
-        context.enqueueWork(() -> BlueprintActions.confirm(player, payload.name(), payload.fluids(), payload.buildAfter()));
+        context.enqueueWork(() -> BlueprintActions.confirm(
+                player,
+                payload.name(),
+                payload.fluids(),
+                payload.nbtBlocks(),
+                payload.nbtSettings(),
+                payload.buildAfter()));
     }
 
     private static void cancel(BlueprintPayloads.CaptureCancel payload, IPayloadContext context) {

@@ -24,6 +24,10 @@ public final class SelectionPreview {
     }
 
     public static Shot capture(BlockGetter level, BlockPos first, BlockPos second, boolean fluids) {
+        return capture(level, first, second, fluids, false);
+    }
+
+    public static Shot capture(BlockGetter level, BlockPos first, BlockPos second, boolean fluids, boolean nbtBlocks) {
         if (level == null || first == null || second == null) {
             return Shot.empty();
         }
@@ -39,7 +43,7 @@ public final class SelectionPreview {
             for (int z = low.getZ(); z <= high.getZ(); z++) {
                 for (int x = low.getX(); x <= high.getX(); x++) {
                     BlockState state = level.getBlockState(cursor.set(x, y, z));
-                    if (!BlockFilters.canCopy(level, cursor, state, fluids)) {
+                    if (!BlockFilters.canCopy(level, cursor, state, fluids, nbtBlocks)) {
                         continue;
                     }
                     ghosts.add(new WrightsClientState.Ghost(

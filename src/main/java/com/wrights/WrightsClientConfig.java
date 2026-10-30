@@ -58,6 +58,12 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.BooleanValue COPY_FLUIDS = BUILDER
             .comment("When true, a new blueprint also saves water and lava inside the box.")
             .define("copyFluids", false);
+    public static final ModConfigSpec.BooleanValue COPY_NBT_BLOCKS = BUILDER
+            .comment("When true, a new blueprint also saves chests and machines as empty / freshly placed blocks (no inventory contents).")
+            .define("copyNbtBlocks", false);
+    public static final ModConfigSpec.BooleanValue COPY_NBT_SETTINGS = BUILDER
+            .comment("When true with copyNbtBlocks, also saves machine settings (sides, modes, filters) but never items, fluids, energy, or upgrades.")
+            .define("copyNbtSettings", false);
     public static final ModConfigSpec.BooleanValue PLACE_FLUIDS = BUILDER
             .comment("When true, a build places water and lava saved in the blueprint.")
             .define("placeFluids", true);
@@ -190,6 +196,22 @@ public final class WrightsClientConfig {
 
     public static void setCopyFluids(boolean enabled) {
         COPY_FLUIDS.set(enabled);
+        save();
+    }
+
+    public static void setCopyNbtBlocks(boolean enabled) {
+        COPY_NBT_BLOCKS.set(enabled);
+        if (!enabled) {
+            COPY_NBT_SETTINGS.set(false);
+        }
+        save();
+    }
+
+    public static void setCopyNbtSettings(boolean enabled) {
+        if (enabled && !COPY_NBT_BLOCKS.get()) {
+            COPY_NBT_BLOCKS.set(true);
+        }
+        COPY_NBT_SETTINGS.set(enabled);
         save();
     }
 

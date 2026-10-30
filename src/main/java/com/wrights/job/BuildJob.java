@@ -59,6 +59,8 @@ public final class BuildJob {
     private int messageDelay;
     private String blueprintName;
     private boolean copyFluids;
+    private boolean copyNbtBlocks;
+    private boolean copyNbtSettings;
     private boolean placeFluids = true;
     private boolean voidBlocks;
     private boolean voidFluids;
@@ -360,6 +362,19 @@ public final class BuildJob {
 
     public void setCopyFluids(boolean copyFluids) {
         this.copyFluids = copyFluids;
+    }
+
+    public boolean copyNbtBlocks() {
+        return copyNbtBlocks;
+    }
+
+    public boolean copyNbtSettings() {
+        return copyNbtSettings;
+    }
+
+    public void setCopyNbt(boolean copyNbtBlocks, boolean copyNbtSettings) {
+        this.copyNbtBlocks = copyNbtBlocks;
+        this.copyNbtSettings = copyNbtBlocks && copyNbtSettings;
     }
 
     public boolean placeFluids() {
@@ -737,6 +752,8 @@ public final class BuildJob {
             tag.putString("blueprintName", blueprintName);
         }
         tag.putBoolean("copyFluids", copyFluids);
+        tag.putBoolean("copyNbtBlocks", copyNbtBlocks);
+        tag.putBoolean("copyNbtSettings", copyNbtSettings);
         tag.putBoolean("placeFluids", placeFluids);
         tag.putBoolean("voidBlocks", voidBlocks);
         tag.putBoolean("voidFluids", voidFluids);
@@ -865,6 +882,8 @@ public final class BuildJob {
             job.blueprintName = tag.getString("blueprintName");
         }
         job.copyFluids = tag.getBoolean("copyFluids");
+        job.copyNbtBlocks = tag.getBoolean("copyNbtBlocks");
+        job.copyNbtSettings = job.copyNbtBlocks && tag.getBoolean("copyNbtSettings");
         job.placeFluids = !tag.contains("placeFluids") || tag.getBoolean("placeFluids");
         job.voidBlocks = tag.getBoolean("voidBlocks");
         job.voidFluids = tag.getBoolean("voidFluids");

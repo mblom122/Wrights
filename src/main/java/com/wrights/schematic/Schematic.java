@@ -168,7 +168,9 @@ public final class Schematic {
                 return false;
             }
             Entry theirs = other.entry(index);
-            if (entry.secondary() != theirs.secondary() || !entry.state().equals(theirs.state())) {
+            if (entry.secondary() != theirs.secondary()
+                    || !entry.state().equals(theirs.state())
+                    || !java.util.Objects.equals(entry.nbt(), theirs.nbt())) {
                 return false;
             }
         }
@@ -303,7 +305,23 @@ public final class Schematic {
         return registries.lookupOrThrow(Registries.BLOCK);
     }
 
-    public record Entry(short x, short y, short z, BlockState state, boolean secondary) {
+    public record Entry(short x, short y, short z, BlockState state, boolean secondary, @javax.annotation.Nullable CompoundTag nbt) {
+        public Entry(short x, short y, short z, BlockState state, boolean secondary) {
+            this(x, y, z, state, secondary, null);
+        }
+
+        public Entry {
+            nbt = nbt == null || nbt.isEmpty() ? null : nbt;
+        }
+
+        public Entry moved(short nextX, short nextY, short nextZ) {
+            return new Entry(nextX, nextY, nextZ, state, secondary, nbt);
+        }
+
+        public Entry withState(BlockState next) {
+            return new Entry(x, y, z, next, com.wrights.util.BlockFilters.isSecondary(next), nbt);
+        }
+
         public CompoundTag save() {
             CompoundTag tag = new CompoundTag();
             tag.putShort("x", x);
@@ -311,12 +329,16 @@ public final class Schematic {
             tag.putShort("z", z);
             tag.putBoolean("s", secondary);
             tag.put("state", NbtUtils.writeBlockState(state));
+            if (nbt != null) {
+                tag.put("nbt", nbt.copy());
+            }
             return tag;
         }
 
         public static Entry load(CompoundTag tag, HolderGetter<Block> blocks) {
             BlockState state = NbtUtils.readBlockState(blocks, tag.getCompound("state"));
-            return new Entry(tag.getShort("x"), tag.getShort("y"), tag.getShort("z"), state, tag.getBoolean("s"));
+            CompoundTag data = tag.contains("nbt") ? tag.getCompound("nbt") : null;
+            return new Entry(tag.getShort("x"), tag.getShort("y"), tag.getShort("z"), state, tag.getBoolean("s"), data);
         }
     }
 }

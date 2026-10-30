@@ -34,15 +34,26 @@ public final class BlockFilters {
 
     /**
      * Blocks we can remember and later pay for with one item.
-     * Block entities are refused so chests and machines cannot duplicate their contents.
+     * Block entities are refused unless {@code nbtBlocks} is on (contents are stripped separately).
      */
     public static boolean canCopy(BlockGetter level, BlockPos pos, BlockState state) {
-        return canCopy(level, pos, state, false);
+        return canCopy(level, pos, state, false, false);
     }
 
     /** {@code fluids} also keeps water and lava. A source is paid for with one bucket. */
     public static boolean canCopy(BlockGetter level, BlockPos pos, BlockState state, boolean fluids) {
-        if (state.isAir() || state.hasBlockEntity()) {
+        return canCopy(level, pos, state, fluids, false);
+    }
+
+    /**
+     * {@code fluids} also keeps water and lava. {@code nbtBlocks} also keeps chests and machines
+     * (as empty blocks, or with settings NBT when the save job asked for that).
+     */
+    public static boolean canCopy(BlockGetter level, BlockPos pos, BlockState state, boolean fluids, boolean nbtBlocks) {
+        if (state.isAir()) {
+            return false;
+        }
+        if (state.hasBlockEntity() && !nbtBlocks) {
             return false;
         }
         var block = state.getBlock();
