@@ -70,17 +70,31 @@ public final class Requirements {
         return stocked;
     }
 
-    public static List<Cost> missing(ServerPlayer player, List<Cost> costs, BlockPos supply, ResourceKey<Level> dimension) {
-        if (player.getAbilities().instabuild || player.isSpectator()) {
-            return List.of();
-        }
-        List<Cost> missing = new ArrayList<>();
-        for (Cost cost : stocked(player, costs, supply, dimension)) {
-            if (cost.player() + cost.supply() < cost.count()) {
-                missing.add(cost);
+    /**
+     * Every required item, with stock filled in. Items the player is short on come first,
+     * then items they already have enough of.
+     */
+    public static List<Cost> ordered(ServerPlayer player, List<Cost> costs, BlockPos supply, ResourceKey<Level> dimension) {
+        List<Cost> stocked = stocked(player, costs, supply, dimension);
+        stocked.sort(Comparator.comparingInt(Requirements::shortFirst).thenComparing(Comparator.comparingInt(Cost::count).reversed()).thenComparingInt(Cost::itemId));
+        return stocked;
+    }
+
+    public static boolean anyShort(List<Cost> costs) {
+        for (Cost cost : costs) {
+            if (shortOf(cost)) {
+                return true;
             }
         }
-        return missing;
+        return false;
+    }
+
+    private static int shortFirst(Cost cost) {
+        return shortOf(cost) ? 0 : 1;
+    }
+
+    private static boolean shortOf(Cost cost) {
+        return cost.player() + cost.supply() < cost.count();
     }
 
     public static int playerCount(ServerPlayer player, Item item) {

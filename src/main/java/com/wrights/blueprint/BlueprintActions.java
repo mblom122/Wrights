@@ -1060,10 +1060,10 @@ public final class BlueprintActions {
             Messages.actionBar(player, "message.wrights.place_out_of_range");
             return;
         }
-        if (!force) {
-            java.util.List<Requirements.Cost> missing = Requirements.missing(player, Requirements.of(schematic, sx, sy, sz, placeFluids), session.supplyPos(), session.supplyDimension());
-            if (!missing.isEmpty()) {
-                BlueprintNetwork.materials(player, id, true, missing);
+        if (!force && !player.getAbilities().instabuild && !player.isSpectator()) {
+            java.util.List<Requirements.Cost> listed = Requirements.ordered(player, Requirements.of(schematic, sx, sy, sz, placeFluids), session.supplyPos(), session.supplyDimension());
+            if (Requirements.anyShort(listed)) {
+                BlueprintNetwork.materials(player, id, true, listed);
                 return;
             }
         }
