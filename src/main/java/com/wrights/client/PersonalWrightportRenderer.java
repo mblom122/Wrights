@@ -27,9 +27,6 @@ import top.theillusivec4.curios.api.client.ICurioRenderer;
 public class PersonalWrightportRenderer implements ICurioRenderer {
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "textures/entity/personal_wrightport.png");
     private static final int TEXTURE_WHITE = 0xFFFFFFFF;
-    private static final int BULB_RED = 0xFF000000 | WrightportLamp.RED;
-    private static final int BULB_YELLOW = 0xFF000000 | WrightportLamp.YELLOW;
-    private static final int BULB_BLUE = 0xFF000000 | WrightportLamp.BLUE;
 
     private final PersonalWrightportModel model;
     private float doorOpen;
@@ -85,23 +82,19 @@ public class PersonalWrightportRenderer implements ICurioRenderer {
         poseStack.popPose();
     }
 
-    /** Red when the pack is empty, yellow while any stored wright is on a job, blue when all are idle. */
+    /** Same three colors as the placed wrightport lamps. */
     private static int bulbTint(ItemStack stack) {
-        Swarm swarm = Swarm.from(stack);
-        if (swarm.units().isEmpty()) {
-            return BULB_RED;
-        }
-        for (var job : WrightsClientState.jobs) {
-            if (job.finished() || job.saving()) {
-                continue;
-            }
-            for (Swarm.Unit unit : swarm.units()) {
-                if (job.crew().contains(unit.id())) {
-                    return BULB_YELLOW;
+        return 0xFF000000 | WrightportLamp.color(Swarm.from(stack), id -> {
+            for (var job : WrightsClientState.jobs) {
+                if (job.finished() || job.saving()) {
+                    continue;
+                }
+                if (job.crew().contains(id)) {
+                    return true;
                 }
             }
-        }
-        return BULB_BLUE;
+            return false;
+        });
     }
 
     private static boolean trafficOpen(LivingEntity entity) {
