@@ -21,6 +21,7 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.FallingBlock;
@@ -2884,16 +2885,32 @@ public final class JobManager {
         return PlaceResult.DONE;
     }
 
+    /**
+     * A placed machine should start like a hand-placed one. Item components carry the default
+     * side config; copied settings, if any, are applied on top and never include stored contents.
+     */
     private static void applyEntryNbt(ServerLevel level, BlockPos pos, Schematic.Entry entry) {
-        if (entry.nbt() == null) {
-            return;
-        }
         BlockEntity be = level.getBlockEntity(pos);
         if (be == null) {
             return;
         }
+        Item item = be.getBlockState().getBlock().asItem();
+        if (item != Items.AIR) {
+            try {
+                be.applyComponentsFromItemStack(new ItemStack(item));
+            } catch (RuntimeException ignored) {
+                // A mod item with a broken default component must not abort the place.
+            }
+        }
+        if (entry.nbt() == null) {
+            return;
+        }
+        net.minecraft.nbt.CompoundTag settings = com.wrights.util.BlockEntityNbt.settings(entry.nbt());
+        if (settings == null) {
+            return;
+        }
         try {
-            be.loadWithComponents(entry.nbt().copy(), level.registryAccess());
+            be.loadWithComponents(settings, level.registryAccess());
             be.setChanged();
         } catch (RuntimeException ignored) {
             // Bad or version-mismatched settings NBT must not break the place.

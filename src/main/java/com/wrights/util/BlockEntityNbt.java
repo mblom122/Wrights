@@ -34,6 +34,16 @@ public final class BlockEntityNbt {
             "ForgeData", "forgeData", "ForgeCaps", "forgeCaps",
             "neoforge:attachments", "neoForgeData", "NeoForgeData");
 
+    /**
+     * Stored contents, including namespaced data components such as {@code mekanism:energy}.
+     * Side config ({@code side_config}, {@code component_config}) is not in this set.
+     */
+    private static final Set<String> CONTENTS = Set.of(
+            "energy", "energy_containers", "items", "item", "fluids", "fluid", "fluid_tanks",
+            "chemicals", "chemical", "chemical_tanks", "heat_data", "heat_capacitors",
+            "upgrades", "gases", "gas", "infuse_types", "pigments", "slurries",
+            "drive_contents", "module_container", "gas_tanks");
+
     private BlockEntityNbt() {
     }
 
@@ -94,6 +104,10 @@ public final class BlockEntityNbt {
             return true;
         }
         String lower = key.toLowerCase(Locale.ROOT);
+        if (CONTENTS.contains(path(lower))) {
+            return true;
+        }
+        String flat = lower.replace("_", "");
         return looksLikeItemListKey(key)
                 || lower.contains("inventory")
                 || lower.contains("itemstack")
@@ -102,10 +116,13 @@ public final class BlockEntityNbt {
                 || lower.contains("upgrade")
                 || lower.contains("module")
                 || lower.contains("energystorage")
-                || lower.contains("energycontainer")
+                || flat.contains("energycontainer")
                 || lower.contains("fluidtank")
+                || flat.contains("fluidtank")
                 || lower.contains("gastank")
                 || lower.contains("chemicaltank")
+                || flat.contains("chemicaltank")
+                || flat.contains("heatcapacitor")
                 || lower.contains("tankcontent")
                 || lower.equals("buffer")
                 || lower.contains("storedenergy")
@@ -113,6 +130,12 @@ public final class BlockEntityNbt {
                 || lower.contains("storedgas")
                 || lower.contains("storedchemical")
                 || lower.contains("loot");
+    }
+
+    /** {@code mekanism:energy} and {@code energy} both count as the contents id {@code energy}. */
+    private static String path(String key) {
+        int colon = key.lastIndexOf(':');
+        return colon >= 0 && colon < key.length() - 1 ? key.substring(colon + 1) : key;
     }
 
     private static boolean looksLikeItemListKey(String key) {
