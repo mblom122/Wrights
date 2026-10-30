@@ -78,7 +78,9 @@ public final class SelectionRenderer {
         if ((!gui || placing) && WrightsClientState.mode == WrightsClientState.Mode.BUILD && (WrightsClientState.bindSupply || WrightsClientState.supplyBound)) {
             drawSupplyMarkers(pose, buffers, camera, minecraft);
         }
-        drawActiveBuilds(pose, buffers, camera, minecraft, !gui);
+        if (!capture) {
+            drawActiveBuilds(pose, buffers, camera, minecraft, !gui);
+        }
         drawMarkedJobs(pose, buffers, camera, minecraft);
     }
 
