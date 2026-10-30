@@ -2050,7 +2050,7 @@ public final class JobManager {
             job.noteHold(BuildJob.HOLD_NO_WRIGHTS, null);
             job.setPaused(true);
             dirty = true;
-            Messages.actionBar(player, "message.wrights.paused_no_drones");
+            Messages.actionBar(player, noCrewMessage(player, job, true));
             BlueprintNetwork.syncJobs(player);
         }
         if (dirty) {
@@ -2059,24 +2059,34 @@ public final class JobManager {
         return true;
     }
 
-    private static boolean crewReady(ServerPlayer player, ResourceKey<net.minecraft.world.level.Level> dimension, BlockPos site) {
-        ServerLevel level = player.getServer().getLevel(dimension);
-        boolean playerNear = WrightHomes.playerCovers(player, dimension, site);
-        boolean worn = !Wrightports.swarm(player).units().isEmpty();
-        int ports = level == null ? 0 : WrightHomes.coveringPortCount(level, site);
-        if ((playerNear && worn) || ports > 0) {
-            return true;
+    /** Why a build cannot take a wright right now. Queue mode never asks. */
+    private enum CrewGap {
+        OUT_OF_RANGE,
+        NONE_AVAILABLE,
+        PORT_EMPTY
+    }
+
+    private static String noCrewMessage(ServerPlayer player, BuildJob job, boolean paused) {
+        return switch (crewGap(player, job)) {
+            case NONE_AVAILABLE -> paused ? "message.wrights.paused_none_available" : "message.wrights.none_available";
+            case PORT_EMPTY -> paused ? "message.wrights.paused_port_empty" : "message.wrights.port_empty";
+            case OUT_OF_RANGE -> paused ? "message.wrights.paused_none_in_range" : "message.wrights.none_in_range";
+        };
+    }
+
+    private static CrewGap crewGap(ServerPlayer player, BuildJob job) {
+        ServerLevel level = player.getServer().getLevel(job.dimension());
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        WrightHomes.Reach reach = WrightHomes.reach(player, level, job.min(), id -> !claimedByOther(library, player.getUUID(), job.id(), id));
+        int owned = (reach.playerNear() ? reach.personal() : 0) + reach.portWrights();
+        int free = (reach.playerNear() ? reach.personalFree() : 0) + reach.portFree();
+        if (owned > 0 && free == 0) {
+            return CrewGap.NONE_AVAILABLE;
         }
-        if (!playerNear && ports == 0) {
-            Messages.actionBar(player, "message.wrights.no_cover");
-            return false;
+        if (reach.ports() > 0 && reach.portWrights() == 0 && reach.personal() == 0) {
+            return CrewGap.PORT_EMPTY;
         }
-        if (Wrightports.worn(player).isEmpty() && ports == 0) {
-            Messages.actionBar(player, "message.wrights.need_wrightport");
-            return false;
-        }
-        Messages.actionBar(player, "message.wrights.need_drone");
-        return false;
+        return CrewGap.OUT_OF_RANGE;
     }
 
     private static boolean assignCrew(ServerPlayer player, BuildJob job, Schematic schematic) {
@@ -2084,9 +2094,6 @@ public final class JobManager {
     }
 
     private static boolean assignCrew(ServerPlayer player, BuildJob job, Schematic schematic, int requested) {
-        if (!crewReady(player, job.dimension(), job.min())) {
-            return false;
-        }
         int sizeX = schematic.sizeX();
         int sizeY = schematic.sizeY();
         int sizeZ = schematic.sizeZ();
@@ -2106,13 +2113,7 @@ public final class JobManager {
         int wanted = requested > 0 ? Math.min(requested, room) : room;
         List<WrightHomes.FreeWright> units = freeUnits(player, library, job, wanted);
         if (units.isEmpty()) {
-            ServerLevel level = player.getServer().getLevel(job.dimension());
-            int ports = level == null ? 0 : WrightHomes.coveringPortCount(level, job.min());
-            if (!WrightHomes.playerCovers(player, job.dimension(), job.min()) && ports == 0) {
-                Messages.actionBar(player, "message.wrights.no_cover");
-            } else {
-                Messages.actionBar(player, "message.wrights.drones_busy");
-            }
+            Messages.actionBar(player, noCrewMessage(player, job, false));
             return false;
         }
         List<Integer> speeds = new ArrayList<>();

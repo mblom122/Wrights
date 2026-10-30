@@ -85,6 +85,57 @@ public final class WrightHomes {
         return dx <= PORT_CHUNKS && dz <= PORT_CHUNKS;
     }
 
+    /**
+     * What can reach a build. Personal wrights only count as reachable while the player is near the site.
+     * A placed port counts while its 7 by 7 chunk square contains the site.
+     */
+    public record Reach(boolean playerNear, int personal, int personalFree, int ports, int portWrights, int portFree) {
+    }
+
+    public static Reach reach(ServerPlayer player, ServerLevel level, BlockPos site, Predicate<UUID> free) {
+        boolean near = playerCovers(player, level == null ? null : level.dimension(), site);
+        int personal = 0;
+        int personalFree = 0;
+        if (player != null) {
+            for (Swarm.Unit unit : Wrightports.swarm(player).units()) {
+                personal++;
+                if (free.test(unit.id()) && !ManageLock.blocks(player, unit.id())) {
+                    personalFree++;
+                }
+            }
+        }
+        int ports = 0;
+        int portWrights = 0;
+        int portFree = 0;
+        if (level != null && site != null) {
+            int centerX = SectionPos.blockToSectionCoord(site.getX());
+            int centerZ = SectionPos.blockToSectionCoord(site.getZ());
+            for (int chunkX = centerX - PORT_CHUNKS; chunkX <= centerX + PORT_CHUNKS; chunkX++) {
+                for (int chunkZ = centerZ - PORT_CHUNKS; chunkZ <= centerZ + PORT_CHUNKS; chunkZ++) {
+                    if (!level.hasChunk(chunkX, chunkZ)) {
+                        continue;
+                    }
+                    for (BlockEntity entity : level.getChunk(chunkX, chunkZ).getBlockEntities().values()) {
+                        if (!(entity instanceof WrightportBlockEntity)) {
+                            continue;
+                        }
+                        if (!portCovers(level.dimension(), entity.getBlockPos(), level.dimension(), site)) {
+                            continue;
+                        }
+                        ports++;
+                        for (Swarm.Unit unit : port.swarm().units()) {
+                            portWrights++;
+                            if (free.test(unit.id())) {
+                                portFree++;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return new Reach(near, personal, personalFree, ports, portWrights, portFree);
+    }
+
     public static int coveringPortCount(ServerLevel level, BlockPos site) {
         if (level == null || site == null) {
             return 0;
