@@ -425,7 +425,7 @@ public final class BlueprintNetwork {
         if (FMLEnvironment.dist != Dist.CLIENT) {
             return;
         }
-        context.enqueueWork(() -> com.wrights.client.WrightsClientState.glowPort(payload.dimension(), payload.pos()));
+        context.enqueueWork(() -> com.wrights.client.WrightsClientState.glowPort(payload.dimension(), payload.pos(), payload.line(), payload.anchor()));
     }
 
     private static void clientPlacedPorts(BlueprintPayloads.PlacedPorts payload, IPayloadContext context) {

@@ -1049,14 +1049,16 @@ public final class BlueprintPayloads {
     }
 
     /** Blink a wrightport in the world for a few seconds. */
-    public record PortGlow(String dimension, BlockPos pos) implements CustomPacketPayload {
+    public record PortGlow(String dimension, BlockPos pos, boolean line, BlockPos anchor) implements CustomPacketPayload {
         public static final Type<PortGlow> TYPE = payloadType("port_glow");
         public static final StreamCodec<RegistryFriendlyByteBuf, PortGlow> STREAM_CODEC = StreamCodec.of(
                 (buf, value) -> {
                     buf.writeUtf(value.dimension);
                     buf.writeBlockPos(value.pos);
+                    buf.writeBoolean(value.line);
+                    buf.writeBlockPos(value.anchor == null ? BlockPos.ZERO : value.anchor);
                 },
-                buf -> new PortGlow(buf.readUtf(), buf.readBlockPos()));
+                buf -> new PortGlow(buf.readUtf(), buf.readBlockPos(), buf.readBoolean(), buf.readBlockPos()));
 
         @Override
         public Type<? extends CustomPacketPayload> type() {

@@ -2110,11 +2110,21 @@ public final class JobManager {
 
     /** Points at the nearest wrightport for ten seconds when a build cannot take one. */
     private static void glowClosestPort(ServerPlayer player, ServerLevel level, BlockPos site) {
-        BlockPos pos = WrightHomes.closestPort(level, site);
-        if (pos == null || level == null) {
+        if (level == null || site == null) {
             return;
         }
-        PacketDistributor.sendToPlayer(player, new com.wrights.network.BlueprintPayloads.PortGlow(level.dimension().location().toString(), pos));
+        BlockPos covered = WrightHomes.closestPort(level, site, true);
+        if (covered != null) {
+            PacketDistributor.sendToPlayer(player, new com.wrights.network.BlueprintPayloads.PortGlow(
+                    level.dimension().location().toString(), covered, true, site));
+            return;
+        }
+        BlockPos near = WrightHomes.closestPort(level, site, false);
+        if (near == null) {
+            return;
+        }
+        PacketDistributor.sendToPlayer(player, new com.wrights.network.BlueprintPayloads.PortGlow(
+                level.dimension().location().toString(), near, false, BlockPos.ZERO));
     }
 
     private static boolean assignCrew(ServerPlayer player, BuildJob job, Schematic schematic) {

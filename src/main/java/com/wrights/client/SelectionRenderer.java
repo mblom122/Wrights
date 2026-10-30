@@ -20,6 +20,7 @@ import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.core.BlockPos;
+import net.minecraft.util.Mth;
 import net.minecraft.world.Container;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -245,6 +246,11 @@ public final class SelectionRenderer {
         VertexConsumer lines = buffers.getBuffer(RenderType.lines());
         drawBox(pose, lines, box, camera, 1.0F, 0.78F, 0.2F, alpha);
         drawBox(pose, lines, box.inflate(0.06D), camera, 1.0F, 0.92F, 0.45F, alpha * 0.7F);
+        if (WrightsClientState.portGlowLine && WrightsClientState.portGlowAnchor != null) {
+            Vec3 from = Vec3.atCenterOf(WrightsClientState.portGlowAnchor).add(0.0D, 0.55D, 0.0D);
+            Vec3 to = Vec3.atCenterOf(WrightsClientState.portGlowPos).add(0.0D, 0.65D, 0.0D);
+            drawLine(pose, lines, camera, from, to, 1.0F, 0.78F, 0.2F, alpha);
+        }
         buffers.endBatch(RenderType.lines());
     }
 
@@ -551,6 +557,28 @@ public final class SelectionRenderer {
 
     private static void drawBox(PoseStack pose, VertexConsumer lines, AABB box, Vec3 camera, float red, float green, float blue, float alpha) {
         LevelRenderer.renderLineBox(pose, lines, box.move(-camera.x, -camera.y, -camera.z), red, green, blue, alpha);
+    }
+
+    private static void drawLine(PoseStack pose, VertexConsumer lines, Vec3 camera, Vec3 from, Vec3 to, float red, float green, float blue, float alpha) {
+        float x1 = (float) (from.x - camera.x);
+        float y1 = (float) (from.y - camera.y);
+        float z1 = (float) (from.z - camera.z);
+        float x2 = (float) (to.x - camera.x);
+        float y2 = (float) (to.y - camera.y);
+        float z2 = (float) (to.z - camera.z);
+        float dx = x2 - x1;
+        float dy = y2 - y1;
+        float dz = z2 - z1;
+        float length = Mth.sqrt(dx * dx + dy * dy + dz * dz);
+        if (length < 1.0E-4F) {
+            return;
+        }
+        dx /= length;
+        dy /= length;
+        dz /= length;
+        PoseStack.Pose last = pose.last();
+        lines.addVertex(last, x1, y1, z1).setColor(red, green, blue, alpha).setNormal(last, dx, dy, dz);
+        lines.addVertex(last, x2, y2, z2).setColor(red, green, blue, alpha).setNormal(last, dx, dy, dz);
     }
 
     private static void drawGhost(PoseStack pose, MultiBufferSource buffers, BlockRenderDispatcher renderer, Vec3 camera, double x, double y, double z, BlockState state) {

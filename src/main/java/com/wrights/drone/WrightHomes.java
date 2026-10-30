@@ -163,7 +163,7 @@ public final class WrightHomes {
      * sitting just outside still gets pointed out.
      */
     @Nullable
-    public static BlockPos closestPort(ServerLevel level, BlockPos site) {
+    public static BlockPos closestPort(ServerLevel level, BlockPos site, boolean inRangeOnly) {
         if (level == null || site == null) {
             return null;
         }
@@ -172,7 +172,7 @@ public final class WrightHomes {
         Vec3 from = Vec3.atCenterOf(site);
         int centerX = SectionPos.blockToSectionCoord(site.getX());
         int centerZ = SectionPos.blockToSectionCoord(site.getZ());
-        int reach = PORT_CHUNKS + 6;
+        int reach = inRangeOnly ? PORT_CHUNKS : PORT_CHUNKS + 6;
         for (int chunkX = centerX - reach; chunkX <= centerX + reach; chunkX++) {
             for (int chunkZ = centerZ - reach; chunkZ <= centerZ + reach; chunkZ++) {
                 if (!level.hasChunk(chunkX, chunkZ)) {
@@ -183,6 +183,9 @@ public final class WrightHomes {
                         continue;
                     }
                     BlockPos pos = entity.getBlockPos();
+                    if (inRangeOnly && !portCovers(level.dimension(), pos, level.dimension(), site)) {
+                        continue;
+                    }
                     double distance = from.distanceToSqr(Vec3.atCenterOf(pos));
                     if (distance < bestDistance) {
                         bestDistance = distance;

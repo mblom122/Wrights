@@ -87,6 +87,8 @@ public final class WrightsClientState {
     public static long supplyHighlightUntil;
     public static String portGlowDim = "";
     public static BlockPos portGlowPos;
+    public static BlockPos portGlowAnchor;
+    public static boolean portGlowLine;
     public static long portGlowUntil;
     public static int digitalKind;
     public static boolean digitalOnline;
@@ -1356,9 +1358,11 @@ public final class WrightsClientState {
         return supplyPos != null && System.currentTimeMillis() < supplyHighlightUntil;
     }
 
-    public static void glowPort(String dimension, BlockPos pos) {
+    public static void glowPort(String dimension, BlockPos pos, boolean line, BlockPos anchor) {
         portGlowDim = dimension == null ? "" : dimension;
         portGlowPos = pos;
+        portGlowLine = line && anchor != null;
+        portGlowAnchor = portGlowLine ? anchor : null;
         portGlowUntil = System.currentTimeMillis() + 10_000L;
     }
 
