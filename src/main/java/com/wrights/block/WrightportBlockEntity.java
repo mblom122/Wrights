@@ -165,10 +165,20 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
     @Override
     protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
-        items.fromTag(tag.getList("Wrights", Tag.TAG_COMPOUND), registries);
+        if (tag.contains("Wrights")) {
+            items.fromTag(tag.getList("Wrights", Tag.TAG_COMPOUND), registries);
+        }
         if (tag.contains("Lamp")) {
             lamp = tag.getInt("Lamp");
         }
+    }
+
+    /** Lamp updates reuse this packet. It has to carry the crew, or the client forgets who is in the port. */
+    @Override
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+        CompoundTag tag = new CompoundTag();
+        saveAdditional(tag, registries);
+        return tag;
     }
 
     @Override
