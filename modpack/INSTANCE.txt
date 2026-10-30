@@ -7,8 +7,9 @@ Fastest way to play that instance:
 
     gradlew runClient
 
-That downloads Minecraft 1.21.1, NeoForge, Curios, JEI, and Jade, then opens the game.
+That downloads Minecraft 1.21.1, NeoForge, Curios, JEI, Jade, Applied Energistics 2, GuideME, and Mekanism, then opens the game.
 Jade is the tooltip that names whatever you look at. On a wright it also shows the tier and the build in progress.
+AE2 19.2.18 needs GuideME 21.1.22. Mekanism is 10.7.19.85. None of those three are required to play Wrights.
 Do not copy All the Mods into the run folder while you are still testing.
 
 Launcher instance:
@@ -18,4 +19,5 @@ Launcher instance:
 3. Run: gradlew isolatedPack
 4. Copy modpack/mods/wrights-0.1.0.jar into that instance's mods folder.
 5. Install Curios (required) and Jade 15.10.6 for NeoForge 1.21.1 beside it, so the wright tooltip can be tested.
-6. Leave every other mod out. Jade is not inside the Wrights jar.
+6. To test storage and machinery, also install Applied Energistics 2 19.2.18, GuideME 21.1.22, and Mekanism 10.7.19.85 for NeoForge 1.21.1.
+7. Leave every other mod out. Jade, AE2, GuideME, and Mekanism are not inside the Wrights jar.

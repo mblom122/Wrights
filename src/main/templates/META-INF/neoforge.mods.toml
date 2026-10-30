@@ -119,6 +119,14 @@ First tested in an otherwise empty NeoForge 1.21.1 instance.
     ordering="AFTER"
     side="BOTH"
 
+# Mekanism is optional. The dev client has it so machinery interaction can be tested.
+[[dependencies.${mod_id}]]
+    modId="mekanism"
+    type="optional"
+    versionRange="[10.7,)"
+    ordering="AFTER"
+    side="BOTH"
+
 # Refined Storage 2 is optional. Shift-right-click an RS controller with the Wrights controller to bind.
 [[dependencies.${mod_id}]]
     modId="refinedstorage"
