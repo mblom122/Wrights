@@ -129,7 +129,8 @@ public final class RsDigitalAccess implements DigitalAccess {
         }
         Actor actor = new PlayerActor(player);
         AutocraftingNetworkComponent.EnsureResult result = crafting.ensureTask(key, amount, actor, CancellationToken.NONE);
-        return result != AutocraftingNetworkComponent.EnsureResult.TASK_NOT_CREATED;
+        return result == AutocraftingNetworkComponent.EnsureResult.TASK_CREATED
+                || result == AutocraftingNetworkComponent.EnsureResult.TASK_ALREADY_RUNNING;
     }
 
     @Override
