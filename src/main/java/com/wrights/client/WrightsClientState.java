@@ -115,6 +115,8 @@ public final class WrightsClientState {
     public static CaptureStyle captureStyle = CaptureStyle.CORNERS;
     public static boolean boxDragging;
     public static boolean moveGrabbed;
+    /** Ticks the mode list stays up after a change. One second. */
+    public static final int STYLE_HUD_TICKS = 20;
     public static int styleHudTicks;
     public static boolean styleAnnounce;
     public static boolean mainPicker;
@@ -479,7 +481,7 @@ public final class WrightsClientState {
         moveOriginB = null;
         captureDirty = false;
         clearedGeneration = generation;
-        styleHudTicks = 70;
+        styleHudTicks = STYLE_HUD_TICKS;
         updateFlags();
     }
 
@@ -572,7 +574,7 @@ public final class WrightsClientState {
             enterInfo();
         }
         mainPicker = true;
-        styleHudTicks = 70;
+        styleHudTicks = STYLE_HUD_TICKS;
         styleAnnounce = true;
     }
 
@@ -782,7 +784,7 @@ public final class WrightsClientState {
             if (incoming != Mode.CAPTURE) {
                 boxDragging = false;
             } else if (previous != Mode.CAPTURE) {
-                styleHudTicks = Math.max(styleHudTicks, 70);
+                styleHudTicks = Math.max(styleHudTicks, STYLE_HUD_TICKS);
             }
             if (incoming != Mode.BUILD) {
                 buildId = null;
@@ -1083,7 +1085,7 @@ public final class WrightsClientState {
             }
         }
         if (values[next] == captureStyle) {
-            styleHudTicks = 70;
+            styleHudTicks = STYLE_HUD_TICKS;
             styleAnnounce = true;
             return;
         }
@@ -1093,7 +1095,7 @@ public final class WrightsClientState {
         }
         releaseBoxDrag();
         captureStyle = values[next];
-        styleHudTicks = 70;
+        styleHudTicks = STYLE_HUD_TICKS;
         styleAnnounce = true;
         rememberMode();
     }
@@ -1101,7 +1103,7 @@ public final class WrightsClientState {
     public static void cycleBuildTool(int direction) {
         mainPicker = false;
         if (mode == Mode.SAVING) {
-            styleHudTicks = 70;
+            styleHudTicks = STYLE_HUD_TICKS;
             styleAnnounce = true;
             return;
         }
@@ -1115,7 +1117,7 @@ public final class WrightsClientState {
         } else {
             selectNewStyle(styleAt(next - 1));
         }
-        styleHudTicks = 70;
+        styleHudTicks = STYLE_HUD_TICKS;
         styleAnnounce = true;
     }
 

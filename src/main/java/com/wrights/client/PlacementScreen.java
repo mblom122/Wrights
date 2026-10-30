@@ -385,7 +385,7 @@ public class PlacementScreen extends Screen implements JeiPreview {
     private void bindChest() {
         WrightsClientState.bindFromMenu = true;
         WrightsClientState.bindSupply = true;
-        WrightsClientState.styleHudTicks = 70;
+        WrightsClientState.styleHudTicks = WrightsClientState.STYLE_HUD_TICKS;
         WrightsClientState.styleAnnounce = true;
         this.minecraft.setScreen(null);
     }
