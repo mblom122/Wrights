@@ -1843,7 +1843,7 @@ public final class JobManager {
             }
         }
         boolean playerNear = WrightHomes.playerCovers(player, job.dimension(), job.min());
-        int ports = level == null ? 0 : WrightHomes.coveringPortCount(level, job.min());
+        int ports = level == null ? 0 : WrightHomes.coveringPortCount(level, job.min(), player.getUUID());
         if (fromBlock && origin != null && level != null && !level.isLoaded(origin)) {
             Messages.actionBar(player, "message.wrights.paused_chunk");
         } else if (fromBlock && origin != null && !WrightHomes.portCovers(job.dimension(), origin, job.dimension(), job.min()) && !playerNear) {
@@ -2113,13 +2113,13 @@ public final class JobManager {
         if (level == null || site == null) {
             return;
         }
-        BlockPos covered = WrightHomes.closestPort(level, site, true);
+        BlockPos covered = WrightHomes.closestPort(level, site, player.getUUID(), true);
         if (covered != null) {
             PacketDistributor.sendToPlayer(player, new com.wrights.network.BlueprintPayloads.PortGlow(
                     level.dimension().location().toString(), covered, true, site));
             return;
         }
-        BlockPos near = WrightHomes.closestPort(level, site, false);
+        BlockPos near = WrightHomes.closestPort(level, site, player.getUUID(), false);
         if (near == null) {
             return;
         }

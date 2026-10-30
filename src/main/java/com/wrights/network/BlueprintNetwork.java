@@ -725,7 +725,7 @@ public final class BlueprintNetwork {
 
     private static boolean labelPort(ServerPlayer player, BuildJob job) {
         net.minecraft.server.level.ServerLevel level = player.getServer().getLevel(job.dimension());
-        return level != null && com.wrights.drone.WrightHomes.coveringPortCount(level, job.min()) > 1;
+        return level != null && com.wrights.drone.WrightHomes.coveringPortCount(level, job.min(), player.getUUID()) > 1;
     }
 
     public static void syncSupply(ServerPlayer player) {

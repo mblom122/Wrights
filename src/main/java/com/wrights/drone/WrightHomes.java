@@ -64,6 +64,15 @@ public final class WrightHomes {
         return lip(port).add(Math.cos(angle) * radius, 5.0D, Math.sin(angle) * radius);
     }
 
+    /** A placed port can send wrights only for the player who owns it. Ports from before owners existed do not. */
+    private static boolean ownedBy(WrightportBlockEntity port, Player player) {
+        return player != null && ownedBy(port, player.getUUID());
+    }
+
+    private static boolean ownedBy(WrightportBlockEntity port, UUID owner) {
+        return owner != null && owner.equals(port.owner());
+    }
+
     /** Chunks of reach around a placed wrightport, so the area is 7 by 7 chunks with the port in the middle. */
     public static final int PORT_CHUNKS = 3;
 
@@ -116,7 +125,7 @@ public final class WrightHomes {
                         continue;
                     }
                     for (BlockEntity entity : level.getChunk(chunkX, chunkZ).getBlockEntities().values()) {
-                        if (!(entity instanceof WrightportBlockEntity port)) {
+                        if (!(entity instanceof WrightportBlockEntity port) || !ownedBy(port, player)) {
                             continue;
                         }
                         if (!portCovers(level.dimension(), entity.getBlockPos(), level.dimension(), site)) {
@@ -136,7 +145,7 @@ public final class WrightHomes {
         return new Reach(near, personal, personalFree, ports, portWrights, portFree);
     }
 
-    public static int coveringPortCount(ServerLevel level, BlockPos site) {
+    public static int coveringPortCount(ServerLevel level, BlockPos site, UUID owner) {
         if (level == null || site == null) {
             return 0;
         }
@@ -149,7 +158,8 @@ public final class WrightHomes {
                     continue;
                 }
                 for (BlockEntity entity : level.getChunk(chunkX, chunkZ).getBlockEntities().values()) {
-                    if (entity instanceof WrightportBlockEntity && portCovers(level.dimension(), entity.getBlockPos(), level.dimension(), site)) {
+                    if (entity instanceof WrightportBlockEntity port && ownedBy(port, owner)
+                            && portCovers(level.dimension(), entity.getBlockPos(), level.dimension(), site)) {
                         count++;
                     }
                 }
@@ -163,7 +173,7 @@ public final class WrightHomes {
      * sitting just outside still gets pointed out.
      */
     @Nullable
-    public static BlockPos closestPort(ServerLevel level, BlockPos site, boolean inRangeOnly) {
+    public static BlockPos closestPort(ServerLevel level, BlockPos site, UUID owner, boolean inRangeOnly) {
         if (level == null || site == null) {
             return null;
         }
@@ -179,7 +189,7 @@ public final class WrightHomes {
                     continue;
                 }
                 for (BlockEntity entity : level.getChunk(chunkX, chunkZ).getBlockEntities().values()) {
-                    if (!(entity instanceof WrightportBlockEntity)) {
+                    if (!(entity instanceof WrightportBlockEntity port) || !ownedBy(port, owner)) {
                         continue;
                     }
                     BlockPos pos = entity.getBlockPos();
@@ -223,7 +233,7 @@ public final class WrightHomes {
                     continue;
                 }
                 for (BlockEntity entity : level.getChunk(chunkX, chunkZ).getBlockEntities().values()) {
-                    if (!(entity instanceof WrightportBlockEntity port)) {
+                    if (!(entity instanceof WrightportBlockEntity port) || !ownedBy(port, player)) {
                         continue;
                     }
                     BlockPos home = entity.getBlockPos();
@@ -270,7 +280,7 @@ public final class WrightHomes {
             return true;
         }
         BlockEntity entity = level.getBlockEntity(home);
-        if (!(entity instanceof WrightportBlockEntity port)) {
+        if (!(entity instanceof WrightportBlockEntity port) || !ownedBy(port, player)) {
             return false;
         }
         for (Swarm.Unit unit : port.swarm().units()) {
@@ -334,7 +344,7 @@ public final class WrightHomes {
                 }
                 LevelChunk chunk = level.getChunk(chunkX, chunkZ);
                 for (BlockEntity entity : chunk.getBlockEntities().values()) {
-                    if (!(entity instanceof WrightportBlockEntity port)) {
+                    if (!(entity instanceof WrightportBlockEntity port) || !ownedBy(port, player)) {
                         continue;
                     }
                     BlockPos pos = entity.getBlockPos();
@@ -374,7 +384,7 @@ public final class WrightHomes {
                 break;
             }
             BlockEntity entity = level.getBlockEntity(pos);
-            if (!(entity instanceof WrightportBlockEntity port)) {
+            if (!(entity instanceof WrightportBlockEntity port) || !ownedBy(port, player)) {
                 continue;
             }
             BlockPos home = pos.immutable();
@@ -400,7 +410,7 @@ public final class WrightHomes {
         int r = BLOCK_RANGE;
         for (BlockPos pos : BlockPos.betweenClosed(center.offset(-r, -8, -r), center.offset(r, 8, r))) {
             BlockEntity entity = level.getBlockEntity(pos);
-            if (entity instanceof WrightportBlockEntity port && !port.swarm().units().isEmpty()) {
+            if (entity instanceof WrightportBlockEntity port && ownedBy(port, player) && !port.swarm().units().isEmpty()) {
                 return true;
             }
         }
@@ -419,7 +429,7 @@ public final class WrightHomes {
         int r = BLOCK_RANGE;
         for (BlockPos pos : BlockPos.betweenClosed(center.offset(-r, -8, -r), center.offset(r, 8, r))) {
             BlockEntity entity = level.getBlockEntity(pos);
-            if (!(entity instanceof WrightportBlockEntity port)) {
+            if (!(entity instanceof WrightportBlockEntity port) || !ownedBy(port, player)) {
                 continue;
             }
             for (Swarm.Unit unit : port.swarm().units()) {
@@ -443,7 +453,7 @@ public final class WrightHomes {
         int r = BLOCK_RANGE;
         for (BlockPos pos : BlockPos.betweenClosed(center.offset(-r, -8, -r), center.offset(r, 8, r))) {
             BlockEntity entity = level.getBlockEntity(pos);
-            if (!(entity instanceof WrightportBlockEntity port)) {
+            if (!(entity instanceof WrightportBlockEntity port) || !ownedBy(port, player)) {
                 continue;
             }
             for (Swarm.Unit unit : port.swarm().units()) {
