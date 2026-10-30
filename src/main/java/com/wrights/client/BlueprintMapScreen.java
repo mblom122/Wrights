@@ -10,6 +10,8 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.block.state.BlockState;
 
+import com.wrights.blueprint.LayerAxis;
+
 public class BlueprintMapScreen extends Screen implements JeiPreview {
     public interface Pick {
         void selectCell(int x, int y, int z);
@@ -24,6 +26,7 @@ public class BlueprintMapScreen extends Screen implements JeiPreview {
     private final int sizeY;
     private final int sizeZ;
     private final int layer;
+    private final int axis;
     private final int anchorX;
     private final int anchorY;
     private final int anchorZ;
@@ -37,7 +40,7 @@ public class BlueprintMapScreen extends Screen implements JeiPreview {
     private boolean chosen;
     private WrightsButton okButton;
 
-    public BlueprintMapScreen(Screen parent, Pick pick, Supplier<List<WrightsClientState.Ghost>> ghosts, UUID id, int sizeX, int sizeY, int sizeZ, int layer, int anchorX, int anchorY, int anchorZ, int selectedX, int selectedY, int selectedZ) {
+    public BlueprintMapScreen(Screen parent, Pick pick, Supplier<List<WrightsClientState.Ghost>> ghosts, UUID id, int sizeX, int sizeY, int sizeZ, int layer, int axis, int anchorX, int anchorY, int anchorZ, int selectedX, int selectedY, int selectedZ) {
         super(Component.translatable("screen.wrights.map"));
         this.parent = parent;
         this.pick = pick;
@@ -47,10 +50,13 @@ public class BlueprintMapScreen extends Screen implements JeiPreview {
         this.sizeY = Math.max(1, sizeY);
         this.sizeZ = Math.max(1, sizeZ);
         this.layer = layer;
+        this.axis = LayerAxis.clamp(axis);
         this.anchorX = anchorX;
         this.anchorY = anchorY;
         this.anchorZ = anchorZ;
-        if (selectedY == layer && selectedX >= 0 && selectedZ >= 0 && selectedX < this.sizeX && selectedZ < this.sizeZ) {
+        int selectedH = LayerAxis.horizontal(this.axis, selectedX, selectedY, selectedZ);
+        int selectedV = LayerAxis.vertical(this.axis, selectedX, selectedY, selectedZ);
+        if (LayerAxis.of(selectedX, selectedY, selectedZ, this.axis) == layer && selectedH >= 0 && selectedV >= 0 && selectedH < planeH() && selectedV < planeV()) {
             pendingX = selectedX;
             pendingY = selectedY;
             pendingZ = selectedZ;
@@ -76,16 +82,17 @@ public class BlueprintMapScreen extends Screen implements JeiPreview {
         }
         window = Math.max(1, pixel / 8);
         gridY = 28;
-        int focusX = chosen ? pendingX : anchorX;
-        int focusZ = chosen ? pendingZ : anchorZ;
-        grid.layout(gridX, gridY, pixel, sizeX, sizeZ, focusX, focusZ, window);
+        int focusH = LayerAxis.horizontal(axis, chosen ? pendingX : anchorX, chosen ? pendingY : anchorY, chosen ? pendingZ : anchorZ);
+        int focusV = LayerAxis.vertical(axis, chosen ? pendingX : anchorX, chosen ? pendingY : anchorY, chosen ? pendingZ : anchorZ);
+        grid.setAxis(axis);
+        grid.layout(gridX, gridY, pixel, planeH(), planeV(), focusH, focusV, window);
         int sliderY = gridY + pixel + 8;
         int sliderW = Math.max(80, (pixel - 8) / 2);
-        if (sizeX > grid.spanX()) {
-            addRenderableWidget(new AxisSlider(gridX, sliderY, sliderW, sizeX - grid.spanX(), grid.fromX(), true));
+        if (planeH() > grid.spanX()) {
+            addRenderableWidget(new AxisSlider(gridX, sliderY, sliderW, planeH() - grid.spanX(), grid.fromX(), true));
         }
-        if (sizeZ > grid.spanZ()) {
-            addRenderableWidget(new AxisSlider(gridX + pixel - sliderW, sliderY, sliderW, sizeZ - grid.spanZ(), grid.fromZ(), false));
+        if (planeV() > grid.spanZ()) {
+            addRenderableWidget(new AxisSlider(gridX + pixel - sliderW, sliderY, sliderW, planeV() - grid.spanZ(), grid.fromZ(), false));
         }
         int buttonsY = this.height - 28;
         okButton = new WrightsButton(this.width / 2 - 104, buttonsY, 100, 18, Component.translatable("screen.wrights.map_ok"), button -> confirm());
@@ -103,9 +110,10 @@ public class BlueprintMapScreen extends Screen implements JeiPreview {
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, this.title, gridX, 10, WrightsUi.COPPER, false);
-        graphics.drawString(this.font, Component.translatable("screen.wrights.layer", layer + 1, sizeY), gridX + pixel - 80, 10, WrightsUi.MUTED, false);
+        Component layerLine = Component.translatable("screen.wrights.layer", LayerAxis.letter(axis), layer + 1, LayerAxis.of(sizeX, sizeY, sizeZ, axis));
+        graphics.drawString(this.font, layerLine, gridX + pixel - this.font.width(layerLine), 10, WrightsUi.MUTED, false);
         List<WrightsClientState.Ghost> shown = ghosts.get();
-        grid.render(graphics, shown == null ? List.of() : shown, sizeX, sizeZ, layer, anchorX, anchorY, anchorZ, pendingX, pendingY, pendingZ);
+        grid.render(graphics, shown == null ? List.of() : shown, sizeX, sizeY, sizeZ, layer, axis, anchorX, anchorY, anchorZ, pendingX, pendingY, pendingZ);
     }
 
     @Override
@@ -116,7 +124,7 @@ public class BlueprintMapScreen extends Screen implements JeiPreview {
         if (button != 0) {
             return false;
         }
-        int[] hit = grid.hit(mouseX, mouseY, sizeX, sizeZ, layer);
+        int[] hit = grid.hit(mouseX, mouseY, sizeX, sizeY, sizeZ, layer);
         if (hit == null) {
             return false;
         }
@@ -172,7 +180,7 @@ public class BlueprintMapScreen extends Screen implements JeiPreview {
 
     @Override
     public List<StructureGrid.Spot> dropSpots() {
-        return grid.spots(sizeX, sizeZ, layer);
+        return grid.spots(sizeX, sizeY, sizeZ, layer);
     }
 
     @Override
@@ -203,6 +211,14 @@ public class BlueprintMapScreen extends Screen implements JeiPreview {
         }
     }
 
+    private int planeH() {
+        return Math.max(1, LayerAxis.horizontal(axis, sizeX, sizeY, sizeZ));
+    }
+
+    private int planeV() {
+        return Math.max(1, LayerAxis.vertical(axis, sizeX, sizeY, sizeZ));
+    }
+
     private void close() {
         if (this.minecraft != null) {
             this.minecraft.setScreen(parent);
@@ -223,15 +239,16 @@ public class BlueprintMapScreen extends Screen implements JeiPreview {
         @Override
         protected void updateMessage() {
             int shown = position() + 1;
-            setMessage(Component.translatable(horizontal ? "screen.wrights.map_x" : "screen.wrights.map_z", shown));
+            int shownAxis = horizontal ? LayerAxis.horizontalAxis(axis) : LayerAxis.verticalAxis(axis);
+            setMessage(Component.translatable("screen.wrights.map_axis", LayerAxis.letter(shownAxis), shown));
         }
 
         @Override
         protected void applyValue() {
             if (horizontal) {
-                grid.pan(position(), grid.fromZ(), sizeX, sizeZ);
+                grid.pan(position(), grid.fromZ(), planeH(), planeV());
             } else {
-                grid.pan(grid.fromX(), position(), sizeX, sizeZ);
+                grid.pan(grid.fromX(), position(), planeH(), planeV());
             }
         }
 

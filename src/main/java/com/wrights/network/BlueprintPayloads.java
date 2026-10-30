@@ -609,7 +609,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record EditLayer(UUID id, int operation, int from, int to) implements CustomPacketPayload {
+    public record EditLayer(UUID id, int operation, int from, int to, int axis) implements CustomPacketPayload {
         public static final int REMOVE = 0;
         public static final int INSERT = 1;
         public static final int MOVE = 2;
@@ -621,8 +621,9 @@ public final class BlueprintPayloads {
                     buf.writeByte(value.operation);
                     buf.writeVarInt(value.from);
                     buf.writeVarInt(value.to);
+                    buf.writeByte(value.axis);
                 },
-                buf -> new EditLayer(buf.readUUID(), buf.readByte(), buf.readVarInt(), buf.readVarInt()));
+                buf -> new EditLayer(buf.readUUID(), buf.readByte(), buf.readVarInt(), buf.readVarInt(), buf.readByte()));
 
         @Override
         public Type<? extends CustomPacketPayload> type() {

@@ -268,7 +268,7 @@ public final class BlueprintNetwork {
 
     private static void editLayer(BlueprintPayloads.EditLayer payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
-        context.enqueueWork(() -> BlueprintActions.editLayer(player, payload.id(), payload.operation(), payload.from(), payload.to()));
+        context.enqueueWork(() -> BlueprintActions.editLayer(player, payload.id(), payload.operation(), payload.from(), payload.to(), payload.axis()));
     }
 
     private static void anchor(BlueprintPayloads.SetAnchor payload, IPayloadContext context) {

@@ -17,6 +17,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.neoforged.neoforge.network.PacketDistributor;
 
+import com.wrights.blueprint.LayerAxis;
 import com.wrights.network.BlueprintPayloads;
 
 /**
@@ -152,8 +153,13 @@ public final class LayerColumn {
     private int modelY;
     private int gridY;
     private int modelSize;
+    private int axis = LayerAxis.Y;
     private int layer;
     private int layerY;
+    private WrightsButton axisX;
+    private WrightsButton axisY;
+    private WrightsButton axisZ;
+    private WrightsButton mapButton;
     private int selectionY;
     private int layersY;
     private int selX = -1;
@@ -184,10 +190,11 @@ public final class LayerColumn {
         this.modelY = y;
         this.gridY = y;
         this.modelSize = size;
-        boolean map = !view.concealed() && StructureGrid.oversized(view.sizeX(), view.sizeZ());
+        boolean map = needsMap();
         this.layerY = y + size + 16;
+        int stepY = layerY + 18;
         int mapShift = map ? 18 : 0;
-        this.selectionY = layerY + 36 + mapShift;
+        this.selectionY = stepY + 18 + mapShift;
         this.layersY = selectionY + 80;
         if (!started) {
             this.layer = Mth.clamp(view.pivotY(), 0, Math.max(0, view.sizeY() - 1));
@@ -210,10 +217,19 @@ public final class LayerColumn {
         add.widget(promptOk);
         add.widget(promptCancel);
         hidePrompt();
-        add.widget(new WrightsButton(x, layerY, 22, 16, Component.literal("-"), button -> changeLayer(-1)));
-        add.widget(new WrightsButton(x + size - 22, layerY, 22, 16, Component.literal("+"), button -> changeLayer(1)));
+        int axisGap = 4;
+        int axisW = Math.max(16, (size - axisGap * 2) / 3);
+        axisX = new WrightsButton(x, layerY, axisW, 16, Component.literal("X"), button -> chooseAxis(LayerAxis.X));
+        axisY = new WrightsButton(x + axisW + axisGap, layerY, axisW, 16, Component.literal("Y"), button -> chooseAxis(LayerAxis.Y));
+        axisZ = new WrightsButton(x + (axisW + axisGap) * 2, layerY, size - (axisW + axisGap) * 2, 16, Component.literal("Z"), button -> chooseAxis(LayerAxis.Z));
+        add.widget(axisX);
+        add.widget(axisY);
+        add.widget(axisZ);
+        add.widget(new WrightsButton(x, stepY, 22, 16, Component.literal("-"), button -> changeLayer(-1)));
+        add.widget(new WrightsButton(x + size - 22, stepY, 22, 16, Component.literal("+"), button -> changeLayer(1)));
         if (map) {
-            add.widget(new WrightsButton(x, layerY + 18, size, 16, Component.translatable("screen.wrights.open_map"), button -> openMap()));
+            mapButton = new WrightsButton(x, stepY + 18, size, 16, Component.translatable("screen.wrights.open_map"), button -> openMap());
+            add.widget(mapButton);
         }
         anchorButton = new WrightsButton(x, selectionY, size, 16, Component.translatable("screen.wrights.set_anchor"), button -> setSelectedAnchor());
         removeButton = new WrightsButton(x, selectionY + 18, half, 16, Component.translatable("screen.wrights.remove_block"), button -> removeSelected());
@@ -224,7 +240,7 @@ public final class LayerColumn {
     }
 
     public void refresh() {
-        int limit = Math.max(0, view.sizeY() - 1);
+        int limit = Math.max(0, depth() - 1);
         if (awaitTaller && layer > limit) {
             limit = layer;
         } else {
@@ -245,9 +261,17 @@ public final class LayerColumn {
             graphics.drawCenteredString(font, Component.translatable("screen.wrights.preview_hidden"), modelX + modelSize / 2, gridY + modelSize / 2, WrightsUi.MUTED);
         } else {
             layoutGrid();
-            grid.render(graphics, view.ghosts(), view.sizeX(), view.sizeZ(), layer, view.pivotX(), view.pivotY(), view.pivotZ(), selX, selY, selZ);
+            grid.render(graphics, view.ghosts(), view.sizeX(), view.sizeY(), view.sizeZ(), layer, axis, view.pivotX(), view.pivotY(), view.pivotZ(), selX, selY, selZ);
         }
-        graphics.drawCenteredString(font, Component.translatable("screen.wrights.layer", layer + 1, view.sizeY()), modelX + modelSize / 2, layerY - 12, WrightsUi.MUTED);
+        if (axisX != null) {
+            axisX.setPicked(axis == LayerAxis.X);
+            axisY.setPicked(axis == LayerAxis.Y);
+            axisZ.setPicked(axis == LayerAxis.Z);
+        }
+        if (mapButton != null) {
+            mapButton.setShown(StructureGrid.oversized(planeH(), planeV()));
+        }
+        graphics.drawCenteredString(font, Component.translatable("screen.wrights.layer", LayerAxis.letter(axis), layer + 1, depth()), modelX + modelSize / 2, layerY - 12, WrightsUi.MUTED);
         graphics.drawString(font, Component.translatable("screen.wrights.selection"), modelX, selectionY - 12, WrightsUi.TEXT, false);
         graphics.drawString(font, font.plainSubstrByWidth(Component.translatable("screen.wrights.hint_selected").getString(), modelSize), modelX, selectionY + 40, 0xFFF2D48A, false);
         graphics.drawString(font, font.plainSubstrByWidth(Component.translatable("screen.wrights.hint_anchor").getString(), modelSize), modelX, selectionY + 52, WrightsUi.BLUE, false);
@@ -272,7 +296,7 @@ public final class LayerColumn {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0 && view.id() != null && !view.concealed()) {
             layoutGrid();
-            int[] hit = grid.hit(mouseX, mouseY, view.sizeX(), view.sizeZ(), layer);
+            int[] hit = grid.hit(mouseX, mouseY, view.sizeX(), view.sizeY(), view.sizeZ(), layer);
             if (hit != null) {
                 selX = hit[0];
                 selY = hit[1];
@@ -296,7 +320,7 @@ public final class LayerColumn {
         selX = x;
         selY = y;
         selZ = z;
-        layer = Mth.clamp(y, 0, Math.max(0, view.sizeY() - 1));
+        layer = Mth.clamp(LayerAxis.of(x, y, z, axis), 0, Math.max(0, depth() - 1));
         frameSelection = true;
         syncSelection();
     }
@@ -321,6 +345,7 @@ public final class LayerColumn {
                 view.sizeY(),
                 view.sizeZ(),
                 layer,
+                axis,
                 view.pivotX(),
                 view.pivotY(),
                 view.pivotZ(),
@@ -334,19 +359,59 @@ public final class LayerColumn {
             return List.of();
         }
         layoutGrid();
-        return grid.spots(view.sizeX(), view.sizeZ(), layer);
+        return grid.spots(view.sizeX(), view.sizeY(), view.sizeZ(), layer);
     }
 
     private void layoutGrid() {
-        grid.layout(modelX + 12, gridY + 14, Math.max(32, modelSize - 28), view.sizeX(), view.sizeZ(), view.pivotX(), view.pivotZ(), StructureGrid.INLINE);
-        if (selY == layer && selX >= 0 && selZ >= 0) {
+        grid.setAxis(axis);
+        int focusH = LayerAxis.horizontal(axis, view.pivotX(), view.pivotY(), view.pivotZ());
+        int focusV = LayerAxis.vertical(axis, view.pivotX(), view.pivotY(), view.pivotZ());
+        grid.layout(modelX + 12, gridY + 14, Math.max(32, modelSize - 28), planeH(), planeV(), focusH, focusV, StructureGrid.INLINE);
+        if (inside(selX, selY, selZ) && LayerAxis.of(selX, selY, selZ, axis) == layer) {
+            int selH = LayerAxis.horizontal(axis, selX, selY, selZ);
+            int selV = LayerAxis.vertical(axis, selX, selY, selZ);
             if (frameSelection) {
-                grid.centerOn(selX, selZ, view.sizeX(), view.sizeZ());
+                grid.centerOn(selH, selV, planeH(), planeV());
                 frameSelection = false;
             } else {
-                grid.ensureVisible(selX, selZ, view.sizeX(), view.sizeZ());
+                grid.ensureVisible(selH, selV, planeH(), planeV());
             }
         }
+    }
+
+    private void chooseAxis(int next) {
+        next = LayerAxis.clamp(next);
+        if (next == axis) {
+            return;
+        }
+        axis = next;
+        int along = inside(selX, selY, selZ)
+                ? LayerAxis.of(selX, selY, selZ, axis)
+                : LayerAxis.of(view.pivotX(), view.pivotY(), view.pivotZ(), axis);
+        layer = Mth.clamp(along, 0, Math.max(0, depth() - 1));
+        frameSelection = inside(selX, selY, selZ);
+        hidePrompt();
+    }
+
+    private int depth() {
+        return Math.max(1, LayerAxis.of(view.sizeX(), view.sizeY(), view.sizeZ(), axis));
+    }
+
+    private int planeH() {
+        return Math.max(1, LayerAxis.horizontal(axis, view.sizeX(), view.sizeY(), view.sizeZ()));
+    }
+
+    private int planeV() {
+        return Math.max(1, LayerAxis.vertical(axis, view.sizeX(), view.sizeY(), view.sizeZ()));
+    }
+
+    private boolean needsMap() {
+        if (view.concealed()) {
+            return false;
+        }
+        return StructureGrid.oversized(view.sizeX(), view.sizeZ())
+                || StructureGrid.oversized(view.sizeZ(), view.sizeY())
+                || StructureGrid.oversized(view.sizeX(), view.sizeY());
     }
 
     private void editLayer(int operation, int target) {
@@ -354,7 +419,7 @@ public final class LayerColumn {
             return;
         }
         int from = layer;
-        int height = Math.max(1, view.sizeY());
+        int height = depth();
         if (operation == BlueprintPayloads.EditLayer.REMOVE) {
             awaitTaller = false;
             layer = Math.min(from, Math.max(0, height - 2));
@@ -364,7 +429,7 @@ public final class LayerColumn {
         }
         clearSelection();
         int to = operation == BlueprintPayloads.EditLayer.REMOVE ? from : target;
-        PacketDistributor.sendToServer(new BlueprintPayloads.EditLayer(view.id(), operation, from, to));
+        PacketDistributor.sendToServer(new BlueprintPayloads.EditLayer(view.id(), operation, from, to, axis));
     }
 
     private void showPrompt(boolean move) {
@@ -392,7 +457,7 @@ public final class LayerColumn {
         if (!promptOpen || promptBox == null) {
             return;
         }
-        int height = Math.max(1, view.sizeY());
+        int height = depth();
         int max = movePrompt ? height : height + 1;
         int number = -1;
         try {
@@ -451,6 +516,6 @@ public final class LayerColumn {
     }
 
     private void changeLayer(int delta) {
-        layer = Mth.clamp(layer + delta, 0, Math.max(0, view.sizeY() - 1));
+        layer = Mth.clamp(layer + delta, 0, Math.max(0, depth() - 1));
     }
 }

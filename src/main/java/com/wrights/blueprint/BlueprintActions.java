@@ -815,114 +815,116 @@ public final class BlueprintActions {
         remember(player, id, schematic.withEntries(next));
     }
 
-    public static void editLayer(ServerPlayer player, java.util.UUID id, int operation, int from, int to) {
+    public static void editLayer(ServerPlayer player, java.util.UUID id, int operation, int from, int to, int axis) {
         Schematic schematic = editable(player, id, true);
         if (schematic == null) {
             return;
         }
-        int height = Math.max(1, schematic.sizeY());
-        int source = Math.max(0, Math.min(height - 1, from));
+        axis = LayerAxis.clamp(axis);
+        int length = Math.max(1, LayerAxis.size(schematic, axis));
+        int source = Math.max(0, Math.min(length - 1, from));
         java.util.ArrayList<Schematic.Entry> entries = new java.util.ArrayList<>();
-        int anchorY = schematic.anchorY();
+        int anchor = LayerAxis.anchor(schematic, axis);
         if (operation == BlueprintPayloads.EditLayer.REMOVE) {
-            if (height == 1) {
+            if (length == 1) {
                 for (Schematic.Entry entry : schematic.entries()) {
-                    if (entry.y() != source) {
+                    if (LayerAxis.get(entry, axis) != source) {
                         entries.add(entry);
                     }
                 }
-                storeLayout(player, id, schematic, 1, entries, 0);
+                storeLayout(player, id, schematic, axis, 1, entries, 0);
                 return;
             }
             for (Schematic.Entry entry : schematic.entries()) {
-                if (entry.y() == source) {
+                int coord = LayerAxis.get(entry, axis);
+                if (coord == source) {
                     continue;
                 }
-                int y = entry.y() > source ? entry.y() - 1 : entry.y();
-                entries.add(entry.moved(entry.x(), (short) y, entry.z()));
+                int next = coord > source ? coord - 1 : coord;
+                entries.add(LayerAxis.set(entry, axis, next));
             }
-            if (anchorY == source) {
-                anchorY = Math.max(0, source - 1);
-            } else if (anchorY > source) {
-                anchorY--;
+            if (anchor == source) {
+                anchor = Math.max(0, source - 1);
+            } else if (anchor > source) {
+                anchor--;
             }
-            storeLayout(player, id, schematic, height - 1, entries, anchorY);
+            storeLayout(player, id, schematic, axis, length - 1, entries, anchor);
             return;
         }
         if (operation == BlueprintPayloads.EditLayer.INSERT) {
-            if (height >= WrightsConfig.MAX_AXIS.getAsInt()) {
+            if (length >= WrightsConfig.MAX_AXIS.getAsInt()) {
                 Messages.actionBar(player, "message.wrights.too_big", WrightsConfig.MAX_AXIS.getAsInt(), WrightsConfig.MAX_BLOCKS.getAsInt());
                 return;
             }
-            int at = Math.max(0, Math.min(height, to));
-            shiftUp(schematic, entries, at);
-            if (anchorY >= at) {
-                anchorY++;
+            int at = Math.max(0, Math.min(length, to));
+            shiftAlong(schematic, entries, axis, at);
+            if (anchor >= at) {
+                anchor++;
             }
-            storeLayout(player, id, schematic, height + 1, entries, anchorY);
+            storeLayout(player, id, schematic, axis, length + 1, entries, anchor);
             return;
         }
         if (operation == BlueprintPayloads.EditLayer.MOVE) {
-            int dest = Math.max(0, Math.min(height - 1, to));
+            int dest = Math.max(0, Math.min(length - 1, to));
             if (dest == source) {
                 return;
             }
             for (Schematic.Entry entry : schematic.entries()) {
-                int y = movedY(entry.y(), source, dest);
-                entries.add(entry.moved(entry.x(), (short) y, entry.z()));
+                int next = movedAlong(LayerAxis.get(entry, axis), source, dest);
+                entries.add(LayerAxis.set(entry, axis, next));
             }
-            storeLayout(player, id, schematic, height, entries, movedY(anchorY, source, dest));
+            storeLayout(player, id, schematic, axis, length, entries, movedAlong(anchor, source, dest));
             return;
         }
         if (operation == BlueprintPayloads.EditLayer.COPY) {
-            int dest = Math.max(0, Math.min(height, to));
+            int dest = Math.max(0, Math.min(length, to));
             int added = 0;
             for (Schematic.Entry entry : schematic.entries()) {
-                if (entry.y() == source) {
+                if (LayerAxis.get(entry, axis) == source) {
                     added++;
                 }
             }
-            if (height >= WrightsConfig.MAX_AXIS.getAsInt() || schematic.blockCount() + added > WrightsConfig.MAX_BLOCKS.getAsInt()) {
+            if (length >= WrightsConfig.MAX_AXIS.getAsInt() || schematic.blockCount() + added > WrightsConfig.MAX_BLOCKS.getAsInt()) {
                 Messages.actionBar(player, "message.wrights.too_big", WrightsConfig.MAX_AXIS.getAsInt(), WrightsConfig.MAX_BLOCKS.getAsInt());
                 return;
             }
-            shiftUp(schematic, entries, dest);
+            shiftAlong(schematic, entries, axis, dest);
             for (Schematic.Entry entry : schematic.entries()) {
-                if (entry.y() != source) {
+                if (LayerAxis.get(entry, axis) != source) {
                     continue;
                 }
-                entries.add(entry.moved(entry.x(), (short) dest, entry.z()));
+                entries.add(LayerAxis.set(entry, axis, dest));
             }
             entries.sort(Schematic.BUILD_ORDER);
-            if (anchorY >= dest) {
-                anchorY++;
+            if (anchor >= dest) {
+                anchor++;
             }
-            storeLayout(player, id, schematic, height + 1, entries, anchorY);
+            storeLayout(player, id, schematic, axis, length + 1, entries, anchor);
         }
     }
 
-    private static void shiftUp(Schematic schematic, java.util.List<Schematic.Entry> into, int at) {
+    private static void shiftAlong(Schematic schematic, java.util.List<Schematic.Entry> into, int axis, int at) {
         for (Schematic.Entry entry : schematic.entries()) {
-            int y = entry.y() >= at ? entry.y() + 1 : entry.y();
-            into.add(entry.moved(entry.x(), (short) y, entry.z()));
+            int coord = LayerAxis.get(entry, axis);
+            into.add(LayerAxis.set(entry, axis, coord >= at ? coord + 1 : coord));
         }
     }
 
-    private static int movedY(int y, int from, int dest) {
-        if (y == from) {
+    private static int movedAlong(int coord, int from, int dest) {
+        if (coord == from) {
             return dest;
         }
-        if (from < dest && y > from && y <= dest) {
-            return y - 1;
+        if (from < dest && coord > from && coord <= dest) {
+            return coord - 1;
         }
-        if (dest < from && y >= dest && y < from) {
-            return y + 1;
+        if (dest < from && coord >= dest && coord < from) {
+            return coord + 1;
         }
-        return y;
+        return coord;
     }
 
-    private static void storeLayout(ServerPlayer player, java.util.UUID id, Schematic schematic, int sizeY, java.util.List<Schematic.Entry> entries, int anchorY) {
-        remember(player, id, schematic.withLayout(sizeY, entries, anchorY));
+    private static void storeLayout(ServerPlayer player, java.util.UUID id, Schematic schematic, int axis, int size, java.util.List<Schematic.Entry> entries, int anchor) {
+        remember(player, id, schematic.withLayout(axis, size, entries, anchor));
     }
 
     public static void transform(ServerPlayer player, java.util.UUID id, int operation) {

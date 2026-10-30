@@ -196,7 +196,27 @@ public final class Schematic {
     }
 
     public Schematic withLayout(int sizeY, List<Entry> entries, int anchorY) {
-        return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, ephemeral).withPaste(placeFluids, voidBlocks, voidFluids, voidNbt);
+        return withLayout(com.wrights.blueprint.LayerAxis.Y, sizeY, entries, anchorY);
+    }
+
+    public Schematic withLayout(int axis, int size, List<Entry> entries, int anchor) {
+        int sx = sizeX;
+        int sy = sizeY;
+        int sz = sizeZ;
+        int ax = anchorX;
+        int ay = anchorY;
+        int az = anchorZ;
+        if (axis == com.wrights.blueprint.LayerAxis.X) {
+            sx = size;
+            ax = anchor;
+        } else if (axis == com.wrights.blueprint.LayerAxis.Z) {
+            sz = size;
+            az = anchor;
+        } else {
+            sy = size;
+            ay = anchor;
+        }
+        return new Schematic(id, name, sx, sy, sz, entries, sourceMin, sourceMax, sourceDimension, ax, ay, az, ephemeral).withPaste(placeFluids, voidBlocks, voidFluids, voidNbt);
     }
 
     public int sizeX() {

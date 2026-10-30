@@ -9,6 +9,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
+import com.wrights.blueprint.LayerAxis;
 import com.wrights.util.BlockFilters;
 
 public final class StructureGrid {
@@ -23,6 +24,18 @@ public final class StructureGrid {
     private int spanZ = 1;
     private int sizedX = -1;
     private int sizedZ = -1;
+    private int axis = LayerAxis.Y;
+    private boolean flipV;
+
+    public void setAxis(int axis) {
+        int next = LayerAxis.clamp(axis);
+        if (next != this.axis) {
+            this.axis = next;
+            sizedX = -1;
+            sizedZ = -1;
+        }
+        flipV = LayerAxis.flipVertical(this.axis);
+    }
 
     public void layout(int x, int y, int pixelSize, int sizeX, int sizeZ, int focusX, int focusZ, int window) {
         spanX = Math.max(1, Math.min(Math.max(1, window), Math.max(1, sizeX)));
@@ -100,19 +113,27 @@ public final class StructureGrid {
         return sizeX > INLINE || sizeZ > INLINE;
     }
 
-    public void render(GuiGraphics graphics, List<WrightsClientState.Ghost> ghosts, int sizeX, int sizeZ, int layer, int anchorX, int anchorY, int anchorZ, int selectedX, int selectedY, int selectedZ) {
+    public void render(GuiGraphics graphics, List<WrightsClientState.Ghost> ghosts, int sizeX, int sizeY, int sizeZ, int layer, int axis, int anchorX, int anchorY, int anchorZ, int selectedX, int selectedY, int selectedZ) {
+        setAxis(axis);
         int width = spanX * cell;
         int height = spanZ * cell;
         graphics.fill(originX - 4, originY - 4, originX + width + 4, originY + height + 4, 0xFF0C141C);
         WrightsUi.border(graphics, originX - 4, originY - 4, width + 8, height + 8, 0xFF31404E);
         boolean[] filled = new boolean[Math.max(1, spanX * spanZ)];
         if (ghosts != null) {
+            int planeH = LayerAxis.horizontal(this.axis, sizeX, sizeY, sizeZ);
+            int planeV = LayerAxis.vertical(this.axis, sizeX, sizeY, sizeZ);
             for (WrightsClientState.Ghost ghost : ghosts) {
-                if (ghost.y() != layer || !inside(ghost.x(), ghost.z(), sizeX, sizeZ)) {
+                if (LayerAxis.of(ghost.x(), ghost.y(), ghost.z(), this.axis) != layer) {
                     continue;
                 }
-                int localX = ghost.x() - fromX;
-                int localZ = ghost.z() - fromZ;
+                int worldH = LayerAxis.horizontal(this.axis, ghost.x(), ghost.y(), ghost.z());
+                int worldV = LayerAxis.vertical(this.axis, ghost.x(), ghost.y(), ghost.z());
+                if (!inside(worldH, worldV, planeH, planeV)) {
+                    continue;
+                }
+                int localX = worldH - fromX;
+                int localZ = localV(worldV);
                 filled[localX + localZ * spanX] = true;
                 int cellX = originX + localX * cell;
                 int cellY = originY + localZ * cell;
@@ -138,14 +159,18 @@ public final class StructureGrid {
                 }
             }
         }
-        markCell(graphics, filled, anchorX, anchorZ, anchorY == layer ? WrightsUi.BLUE : 0xFF3A5A8A, 0x667EB6FF);
-        boolean selectedHere = selectedX >= 0 && selectedY == layer;
+        int anchorH = LayerAxis.horizontal(this.axis, anchorX, anchorY, anchorZ);
+        int anchorV = LayerAxis.vertical(this.axis, anchorX, anchorY, anchorZ);
+        int planeH = LayerAxis.horizontal(this.axis, sizeX, sizeY, sizeZ);
+        int planeV = LayerAxis.vertical(this.axis, sizeX, sizeY, sizeZ);
+        markCell(graphics, filled, anchorH, anchorV, LayerAxis.of(anchorX, anchorY, anchorZ, this.axis) == layer ? WrightsUi.BLUE : 0xFF3A5A8A, 0x667EB6FF);
+        boolean selectedHere = selectedX >= 0 && LayerAxis.of(selectedX, selectedY, selectedZ, this.axis) == layer;
         boolean same = selectedHere && selectedX == anchorX && selectedY == anchorY && selectedZ == anchorZ;
         if (selectedHere && !same) {
-            markCell(graphics, filled, selectedX, selectedZ, 0xFFF2D48A, 0x66F0C420);
-        } else if (same && inside(anchorX, anchorZ, sizeX, sizeZ)) {
-            int cellX = originX + (anchorX - fromX) * cell;
-            int cellY = originY + (anchorZ - fromZ) * cell;
+            markCell(graphics, filled, LayerAxis.horizontal(this.axis, selectedX, selectedY, selectedZ), LayerAxis.vertical(this.axis, selectedX, selectedY, selectedZ), 0xFFF2D48A, 0x66F0C420);
+        } else if (same && inside(anchorH, anchorV, planeH, planeV)) {
+            int cellX = originX + (anchorH - fromX) * cell;
+            int cellY = originY + localV(anchorV) * cell;
             int inset = cell <= 6 ? 1 : Math.max(1, blockSize() / 5);
             int inner = Math.max(1, blockSize() - inset * 2);
             if (cell <= 6) {
@@ -157,10 +182,37 @@ public final class StructureGrid {
         var font = Minecraft.getInstance().font;
         int north = originX + width / 2;
         int middle = originY + height / 2 - 4;
-        graphics.drawCenteredString(font, "N", north, originY - 12, WrightsUi.TEXT);
-        graphics.drawCenteredString(font, "S", north, originY + height + 3, WrightsUi.TEXT);
-        graphics.drawString(font, "W", originX - 10, middle, WrightsUi.TEXT, false);
-        graphics.drawString(font, "E", originX + width + 4, middle, WrightsUi.TEXT, false);
+        String top;
+        String bottom;
+        String left;
+        String right;
+        if (this.axis == LayerAxis.X) {
+            top = "U";
+            bottom = "D";
+            left = "N";
+            right = "S";
+        } else if (this.axis == LayerAxis.Z) {
+            top = "U";
+            bottom = "D";
+            left = "W";
+            right = "E";
+        } else {
+            top = "N";
+            bottom = "S";
+            left = "W";
+            right = "E";
+        }
+        graphics.drawCenteredString(font, top, north, originY - 12, WrightsUi.TEXT);
+        graphics.drawCenteredString(font, bottom, north, originY + height + 3, WrightsUi.TEXT);
+        graphics.drawString(font, left, originX - 10, middle, WrightsUi.TEXT, false);
+        graphics.drawString(font, right, originX + width + 4, middle, WrightsUi.TEXT, false);
+    }
+
+    private int localV(int worldV) {
+        if (flipV) {
+            return fromZ + spanZ - 1 - worldV;
+        }
+        return worldV - fromZ;
     }
 
     private boolean inside(int x, int z, int sizeX, int sizeZ) {
@@ -172,7 +224,7 @@ public final class StructureGrid {
             return;
         }
         int localX = x - fromX;
-        int localZ = z - fromZ;
+        int localZ = localV(z);
         int cellX = originX + localX * cell;
         int cellY = originY + localZ * cell;
         int block = blockSize();
@@ -205,31 +257,41 @@ public final class StructureGrid {
     }
 
     /** Every visible cell, including empty ones, so a drop can place or replace. */
-    public List<Spot> spots(int sizeX, int sizeZ, int layer) {
+    public List<Spot> spots(int sizeX, int sizeY, int sizeZ, int layer) {
         List<Spot> spots = new ArrayList<>();
         int drawn = blockSize();
+        int planeH = LayerAxis.horizontal(axis, sizeX, sizeY, sizeZ);
+        int planeV = LayerAxis.vertical(axis, sizeX, sizeY, sizeZ);
         for (int z = 0; z < spanZ; z++) {
             for (int x = 0; x < spanX; x++) {
-                int worldX = fromX + x;
-                int worldZ = fromZ + z;
-                if (!inside(worldX, worldZ, sizeX, sizeZ)) {
+                int worldH = fromX + x;
+                int worldV = flipV ? fromZ + spanZ - 1 - z : fromZ + z;
+                if (!inside(worldH, worldV, planeH, planeV)) {
                     continue;
                 }
-                spots.add(new Spot(worldX, layer, worldZ, originX + x * cell, originY + z * cell, drawn));
+                int[] cell = LayerAxis.cell(axis, layer, worldH, worldV);
+                spots.add(new Spot(cell[0], cell[1], cell[2], originX + x * this.cell, originY + z * this.cell, drawn));
             }
         }
         return spots;
     }
 
-    public int[] hit(double mouseX, double mouseY, int sizeX, int sizeZ, int layer) {
+    public int[] hit(double mouseX, double mouseY, int sizeX, int sizeY, int sizeZ, int layer) {
         if (cell <= 0) {
             return null;
         }
-        int localX = fromX + (int) ((mouseX - originX) / cell);
-        int localZ = fromZ + (int) ((mouseY - originY) / cell);
-        if (!inside(localX, localZ, sizeX, sizeZ)) {
+        int localX = (int) ((mouseX - originX) / cell);
+        int localZ = (int) ((mouseY - originY) / cell);
+        if (localX < 0 || localZ < 0 || localX >= spanX || localZ >= spanZ) {
             return null;
         }
-        return new int[] {localX, layer, localZ};
+        int worldH = fromX + localX;
+        int worldV = flipV ? fromZ + spanZ - 1 - localZ : fromZ + localZ;
+        int planeH = LayerAxis.horizontal(axis, sizeX, sizeY, sizeZ);
+        int planeV = LayerAxis.vertical(axis, sizeX, sizeY, sizeZ);
+        if (!inside(worldH, worldV, planeH, planeV)) {
+            return null;
+        }
+        return LayerAxis.cell(axis, layer, worldH, worldV);
     }
 }

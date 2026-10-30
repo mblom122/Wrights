@@ -52,12 +52,14 @@ public class PlacementScreen extends Screen implements JeiPreview {
 
     @Override
     protected void init() {
-        boolean map = !WrightsClientState.concealed && StructureGrid.oversized(WrightsClientState.fullX, WrightsClientState.fullZ);
+        boolean map = !WrightsClientState.concealed && (StructureGrid.oversized(WrightsClientState.fullX, WrightsClientState.fullZ)
+                || StructureGrid.oversized(WrightsClientState.fullX, WrightsClientState.fullY)
+                || StructureGrid.oversized(WrightsClientState.fullZ, WrightsClientState.fullY));
         int controlsW = 240;
         int gap = 14;
         int pad = 12;
         int openW = this.font.width(Component.translatable("screen.wrights.open_map")) + 12;
-        int leftChrome = 130 + (map ? 18 : 0);
+        int leftChrome = 148 + (map ? 18 : 0);
         int modelSize = Math.min(140, Math.max(map ? openW : 88, this.height - leftChrome - 36));
         if (pad + modelSize + gap + controlsW + pad > this.width - 8) {
             modelSize = Math.max(map ? openW : 88, this.width - 8 - pad * 2 - gap - controlsW);

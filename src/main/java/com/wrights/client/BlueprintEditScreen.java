@@ -31,18 +31,20 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
 
     @Override
     protected void init() {
-        boolean map = !WrightsClientState.previewConcealed && StructureGrid.oversized(WrightsClientState.editX, WrightsClientState.editZ);
+        boolean map = !WrightsClientState.previewConcealed && (StructureGrid.oversized(WrightsClientState.editX, WrightsClientState.editZ)
+                || StructureGrid.oversized(WrightsClientState.editX, WrightsClientState.editY)
+                || StructureGrid.oversized(WrightsClientState.editZ, WrightsClientState.editY));
         controlsW = 240;
         int gap = 14;
         int pad = 12;
         int openW = this.font.width(Component.translatable("screen.wrights.open_map")) + 12;
-        int leftChrome = 130 + (map ? 18 : 0);
+        int leftChrome = 148 + (map ? 18 : 0);
         int modelSize = Math.min(140, Math.max(map ? openW : 88, this.height - leftChrome - 36));
         if (pad + modelSize + gap + controlsW + pad > this.width - 8) {
             modelSize = Math.max(map ? openW : 88, this.width - 8 - pad * 2 - gap - controlsW);
         }
         panelW = pad + modelSize + gap + controlsW + pad;
-        panelH = 420;
+        panelH = 476;
         panelX = JeiPreview.left(this.width, panelW);
         panelY = Math.max(4, (this.height - panelH) / 2);
         int modelX = panelX + pad;
