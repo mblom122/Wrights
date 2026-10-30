@@ -17,7 +17,7 @@ import com.wrights.blueprint.BlueprintSessions;
 import com.wrights.schematic.SchematicLibrary;
 
 /**
- * Shared resolve order for hangar ops and build jobs:
+ * Shared resolve order for wright management and build jobs:
  * player inventory → bound chest → digital extract → autocraft request.
  */
 public final class ItemSource {

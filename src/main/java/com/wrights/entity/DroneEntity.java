@@ -20,7 +20,6 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
-import com.wrights.block.Hangars;
 import com.wrights.drone.WrightHomes;
 import com.wrights.job.BuildJob;
 import com.wrights.schematic.SchematicLibrary;
@@ -56,8 +55,6 @@ public class DroneEntity extends Entity {
         setHomePort(null);
         Vec3 from = WrightHomes.behindPlayer(player);
         launchToward(from, work, lane, lanes, player.getYRot());
-        Hangars.pulseTraffic(player.level(), from, 8.0D);
-        Hangars.pulseTraffic(player.level(), player.position(), 12.0D);
     }
 
     /** Leaves a placed wrightport hatch, aimed at the work site. */
@@ -65,8 +62,6 @@ public class DroneEntity extends Entity {
         setHomePort(port);
         Vec3 from = WrightHomes.abovePort(port);
         launchToward(from, work, lane, lanes, 0.0F);
-        Hangars.pulseTraffic(level(), from, 8.0D);
-        Hangars.pulseTraffic(level(), port, 8.0D);
     }
 
     private void launchToward(Vec3 from, Vec3 work, int lane, int lanes, float fallbackYaw) {
@@ -104,10 +99,8 @@ public class DroneEntity extends Entity {
         Vec3 above;
         if (port != null) {
             above = WrightHomes.abovePort(port).add(Math.cos(angle) * radius, 2.5D, Math.sin(angle) * radius);
-            Hangars.pulseTraffic(player.level(), port, 10.0D);
         } else {
             above = WrightHomes.behindPlayer(player).add(Math.cos(angle) * radius, 4.0D, Math.sin(angle) * radius);
-            Hangars.pulseTraffic(player.level(), player.position(), 12.0D);
         }
         this.moveTo(above.x, above.y, above.z, player.getYRot(), 0.0F);
         this.setYRot(player.getYRot());

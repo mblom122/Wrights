@@ -18,7 +18,7 @@ public final class WrightsConfig {
 
     public static final ModConfigSpec.IntValue MAX_WRIGHTS_CARRIED = BUILDER
             .comment(
-                    "Most wrights one wrightport can hold, worn or stored in a hangar.",
+                    "Most wrights one wrightport can hold, worn or placed.",
                     "Raising this can lag the server when many of those wrights are working at once.")
             .defineInRange("maxWrightsCarried", 64, 1, 1024);
 

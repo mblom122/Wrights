@@ -16,9 +16,6 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 public final class ModBlocks {
     public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(WrightsMod.MOD_ID);
 
-    public static final DeferredBlock<HangarBlock> HANGAR = BLOCKS.register("hangar", () -> new HangarBlock(BlockBehaviour.Properties.of()));
-    public static final DeferredItem<BlockItem> HANGAR_ITEM = ModItems.ITEMS.registerSimpleBlockItem(HANGAR);
-
     public static final DeferredBlock<WrightportBlock> WRIGHTPORT = BLOCKS.register("wrightport", () -> new WrightportBlock(BlockBehaviour.Properties.of()));
     public static final DeferredItem<BlockItem> WRIGHTPORT_ITEM = ModItems.ITEMS.register("wrightport",
             () -> new WrightportBlockItem(WRIGHTPORT.get(), new Item.Properties().stacksTo(64).component(ModDataComponents.SWARM.get(), Swarm.EMPTY)));

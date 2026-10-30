@@ -147,79 +147,6 @@ def make_wrightport_copper() -> None:
     save(img, "block/wrightport_copper.png")
 
 
-def make_hangar_textures() -> None:
-    # side panel with vents
-    side = new()
-    panel_plate(side)
-    fill(side, 5, 4, 11, 12, INK)
-    for y in range(5, 12, 2):
-        fill(side, 6, y, 10, y + 1, STEEL_L)
-    fill(side, 2, 13, 14, 15, COPPER_D)
-    fill(side, 3, 13, 13, 14, COPPER)
-    save(side, "block/hangar_side.png")
-
-    front = new()
-    panel_plate(front)
-    # screen
-    fill(front, 3, 3, 13, 10, INK)
-    rect(front, 3, 3, 13, 10, CYAN_D)
-    fill(front, 4, 4, 12, 9, CYAN_D)
-    # blueprint grid
-    for x in range(5, 12, 2):
-        for y in range(5, 9):
-            px(front, x, y, CYAN)
-    px(front, 6, 5, CYAN_L)
-    px(front, 7, 6, WHITE)
-    # status LEDs
-    px(front, 4, 11, AMBER_L)
-    px(front, 6, 11, CYAN_L)
-    px(front, 8, 11, STEEL_L)
-    px(front, 10, 11, AMBER)
-    # hazard stripe
-    for x in range(2, 14):
-        px(front, x, 13, HAZARD if (x // 2) % 2 == 0 else INK)
-        px(front, x, 14, HAZARD if (x // 2) % 2 == 0 else INK)
-    save(front, "block/hangar_front.png")
-
-    top = new()
-    panel_plate(top)
-    # circular hangar hatch opening
-    fill(top, 4, 4, 12, 12, STEEL_D)
-    rect(top, 4, 4, 12, 12, COPPER)
-    fill(top, 5, 5, 11, 11, INK)
-    # ring highlights
-    for x, y in ((5, 6), (6, 5), (9, 5), (10, 6), (5, 9), (6, 10), (9, 10), (10, 9)):
-        px(top, x, y, STEEL_L)
-    # north antenna pad mark
-    fill(top, 7, 1, 9, 3, INK)
-    px(top, 7, 1, STEEL_L)
-    px(top, 8, 1, STEEL_L)
-    # rail
-    fill(top, 1, 1, 15, 2, COPPER)
-    fill(top, 1, 14, 15, 15, COPPER)
-    fill(top, 1, 1, 2, 15, COPPER)
-    fill(top, 14, 1, 15, 15, COPPER)
-    save(top, "block/hangar_top.png")
-
-    bottom = new()
-    fill(bottom, 0, 0, 16, 16, STEEL_D)
-    fill(bottom, 1, 1, 15, 15, PANEL)
-    rivets(bottom, [(2, 2), (13, 2), (2, 13), (13, 13), (8, 8)])
-    save(bottom, "block/hangar_bottom.png")
-
-    trim = new()
-    fill(trim, 0, 0, 16, 16, COPPER_D)
-    fill(trim, 1, 1, 15, 15, COPPER)
-    fill(trim, 3, 3, 13, 13, COPPER_L)
-    save(trim, "block/hangar_trim.png")
-
-    light = new()
-    fill(light, 0, 0, 16, 16, AMBER)
-    fill(light, 4, 4, 12, 12, AMBER_L)
-    fill(light, 6, 6, 10, 10, WHITE)
-    save(light, "block/hangar_light.png")
-
-
 def make_controller() -> None:
     img = new()
     # body
@@ -447,23 +374,6 @@ def make_personal_wrightport_entity() -> None:
     save(img, "entity/personal_wrightport.png")
 
 
-def make_hangar_door() -> None:
-    img = new(32, 32)
-    fill(img, 0, 0, 32, 32, STEEL_D)
-    fill(img, 1, 1, 31, 31, STEEL)
-    for y in range(2, 30, 3):
-        fill(img, 2, y, 30, y + 1, STEEL_L if y % 6 == 0 else PANEL)
-    # circular hatch hint
-    for x, y in ((8, 8), (23, 8), (8, 23), (23, 23), (16, 6), (16, 25), (6, 16), (25, 16)):
-        px(img, x, y, COPPER)
-    rivets(img, [(3, 3), (28, 3), (3, 28), (28, 28), (16, 16)])
-    # antenna / lamp pixels
-    fill(img, 0, 20, 4, 28, INK)
-    fill(img, 4, 20, 8, 24, AMBER_L)
-    fill(img, 5, 21, 7, 23, WHITE)
-    save(img, "block/hangar_door.png")
-
-
 def make_drone() -> None:
     img = new(64, 64)
     # body 8x3x6 at (0,0)
@@ -579,8 +489,6 @@ def main() -> None:
     make_wrightport_core()
     make_wrightport_light()
     make_wrightport_copper()
-    make_hangar_textures()
-    make_hangar_door()
     make_personal_wrightport_entity()
     make_controller()
     make_wright_item()

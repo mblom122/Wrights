@@ -336,9 +336,7 @@ public final class BlueprintNetwork {
     private static void hangarBatch(BlueprintPayloads.HangarBatch payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
         context.enqueueWork(() -> {
-            if (player.containerMenu instanceof com.wrights.menu.HangarMenu menu && menu.pos().equals(payload.pos())) {
-                com.wrights.drone.HangarOps.batch(player, menu, payload.action(), payload.value(), payload.units());
-            } else if (player.containerMenu instanceof com.wrights.menu.WrightportMenu menu && menu.pos().equals(payload.pos())) {
+            if (player.containerMenu instanceof com.wrights.menu.WrightportMenu menu && menu.pos().equals(payload.pos())) {
                 com.wrights.drone.WrightportOps.batch(player, menu, payload.action(), payload.value(), payload.units());
             }
         });
@@ -373,9 +371,7 @@ public final class BlueprintNetwork {
     private static void hangar(BlueprintPayloads.HangarEdit payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
         context.enqueueWork(() -> {
-            if (player.containerMenu instanceof com.wrights.menu.HangarMenu menu && menu.pos().equals(payload.pos())) {
-                com.wrights.drone.HangarOps.apply(player, menu, payload.action(), payload.index());
-            } else if (player.containerMenu instanceof com.wrights.menu.WrightportMenu menu && menu.pos().equals(payload.pos())) {
+            if (player.containerMenu instanceof com.wrights.menu.WrightportMenu menu && menu.pos().equals(payload.pos())) {
                 com.wrights.drone.WrightportOps.apply(player, menu, payload.action(), payload.index());
             }
         });

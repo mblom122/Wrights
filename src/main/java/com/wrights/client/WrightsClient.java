@@ -1,7 +1,6 @@
 package com.wrights.client;
 
 import com.wrights.WrightsMod;
-import com.wrights.block.ModBlockEntities;
 import com.wrights.entity.ModEntities;
 import com.wrights.item.BlueprintFolderItem;
 import com.wrights.item.BlueprintItem;
@@ -31,8 +30,6 @@ import top.theillusivec4.curios.api.client.CuriosRendererRegistry;
 public class WrightsClient {
     public static final ModelLayerLocation DRONE_LAYER = new ModelLayerLocation(
             ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "drone"), "main");
-    public static final ModelLayerLocation HANGAR_LAYER = new ModelLayerLocation(
-            ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "hangar"), "main");
     public static final ModelLayerLocation PERSONAL_WRIGHTPORT_LAYER = new ModelLayerLocation(
             ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "personal_wrightport"), "main");
 
@@ -43,14 +40,12 @@ public class WrightsClient {
     @SubscribeEvent
     public static void registerLayers(EntityRenderersEvent.RegisterLayerDefinitions event) {
         event.registerLayerDefinition(DRONE_LAYER, DroneModel::createBodyLayer);
-        event.registerLayerDefinition(HANGAR_LAYER, HangarExtrasModel::createBodyLayer);
         event.registerLayerDefinition(PERSONAL_WRIGHTPORT_LAYER, PersonalWrightportModel::createBodyLayer);
     }
 
     @SubscribeEvent
     public static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(ModEntities.DRONE.get(), DroneRenderer::new);
-        event.registerBlockEntityRenderer(ModBlockEntities.HANGAR.get(), HangarRenderer::new);
         // Curios copies this map at the end of AddLayers. Registering there is too late, so the back model never draws.
         CuriosRendererRegistry.register(
                 ModItems.PERSONAL_WRIGHTPORT.get(),
@@ -77,7 +72,6 @@ public class WrightsClient {
 
     @SubscribeEvent
     public static void registerScreens(RegisterMenuScreensEvent event) {
-        event.register(ModMenus.HANGAR.get(), HangarScreen::new);
         event.register(ModMenus.WRIGHTPORT.get(), WrightportScreen::new);
     }
 }

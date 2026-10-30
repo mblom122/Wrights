@@ -6,17 +6,13 @@ import java.util.List;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.level.Level;
 
-import com.wrights.block.HangarBlockEntity;
 import com.wrights.item.ModItems;
 import com.wrights.item.PersonalWrightportItem;
 import com.wrights.item.WrightItem;
-import com.wrights.menu.HangarMenu;
 import com.wrights.storage.DigitalNetworks;
 import com.wrights.storage.ItemSource;
 import com.wrights.util.Messages;
@@ -50,56 +46,6 @@ public final class HangarOps {
     public static final int AMETHYST = 1;
 
     private HangarOps() {
-    }
-
-    public static void apply(ServerPlayer player, HangarMenu menu, int action, int index) {
-        if (!(player.level() instanceof Level level)) {
-            return;
-        }
-        if (!(level.getBlockEntity(menu.pos()) instanceof HangarBlockEntity hangar)) {
-            return;
-        }
-        if (!(player.containerMenu instanceof HangarMenu open) || !open.pos().equals(menu.pos())) {
-            return;
-        }
-        ItemStack worn = hangar.items().getItem(0);
-        if (worn.isEmpty()) {
-            Messages.actionBar(player, "message.wrights.dock_wrightport");
-            return;
-        }
-        Swarm swarm = Swarm.from(worn);
-        Swarm next = edit(player, swarm, action, index);
-        if (next == swarm) {
-            return;
-        }
-        Swarm.write(worn, next);
-        hangar.setChanged();
-        open.broadcastChanges();
-    }
-
-    public static void batch(ServerPlayer player, HangarMenu menu, int action, int value, int[] units) {
-        if (!(player.level() instanceof Level level)) {
-            return;
-        }
-        if (!(level.getBlockEntity(menu.pos()) instanceof HangarBlockEntity hangar)) {
-            return;
-        }
-        if (!(player.containerMenu instanceof HangarMenu open) || !open.pos().equals(menu.pos())) {
-            return;
-        }
-        ItemStack worn = hangar.items().getItem(0);
-        if (worn.isEmpty()) {
-            Messages.actionBar(player, "message.wrights.dock_wrightport");
-            return;
-        }
-        Swarm swarm = Swarm.from(worn);
-        Swarm next = applyBatch(player, swarm, action, value, units);
-        if (next == swarm) {
-            return;
-        }
-        Swarm.write(worn, next);
-        hangar.setChanged();
-        open.broadcastChanges();
     }
 
     public static void editPort(ServerPlayer player, int kind, int index, int action, int unit) {
