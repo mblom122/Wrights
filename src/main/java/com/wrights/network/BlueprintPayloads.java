@@ -863,6 +863,31 @@ public final class BlueprintPayloads {
         }
     }
 
+    public record DeployAsk() implements CustomPacketPayload {
+        public static final Type<DeployAsk> TYPE = payloadType("deploy_ask");
+        public static final StreamCodec<RegistryFriendlyByteBuf, DeployAsk> STREAM_CODEC = empty(new DeployAsk());
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record DeployPool(int free, int stored) implements CustomPacketPayload {
+        public static final Type<DeployPool> TYPE = payloadType("deploy_pool");
+        public static final StreamCodec<RegistryFriendlyByteBuf, DeployPool> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeVarInt(value.free);
+                    buf.writeVarInt(value.stored);
+                },
+                buf -> new DeployPool(buf.readVarInt(), buf.readVarInt()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public record HangarBatch(BlockPos pos, int action, int value, int[] units) implements CustomPacketPayload {
         public static final Type<HangarBatch> TYPE = payloadType("hangar_batch");
         public static final StreamCodec<RegistryFriendlyByteBuf, HangarBatch> STREAM_CODEC = StreamCodec.of(

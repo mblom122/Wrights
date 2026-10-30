@@ -70,6 +70,10 @@ public final class WrightsClientState {
     public static int blockCount;
     public static boolean deployChosen;
     public static int deployCount = 1;
+    /** Free wrights the server can see. -1 until the build screen has asked. */
+    public static int poolFree = -1;
+    /** Wrights stored nearby, including ones already out. -1 until the build screen has asked. */
+    public static int poolStored = -1;
     public static boolean bindFromMenu;
     public static final List<JobNotice> jobNotices = new ArrayList<>();
     public static boolean sampled;
@@ -951,6 +955,16 @@ public final class WrightsClientState {
         PacketDistributor.sendToServer(new BlueprintPayloads.SetAssign(next));
     }
 
+    public static void applyPool(int free, int stored) {
+        poolFree = Math.max(0, free);
+        poolStored = Math.max(0, stored);
+        clampDeploy();
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.screen instanceof PlacementScreen screen) {
+            screen.refresh();
+        }
+    }
+
     public static int deployCap() {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player == null) {
@@ -960,11 +974,11 @@ public final class WrightsClientState {
         if (blocks <= 0) {
             return 0;
         }
-        int stored = com.wrights.drone.WrightHomes.countUnits(minecraft.player, id -> true);
+        int stored = knownStored();
         if (stored <= 0) {
             return 0;
         }
-        int free = freeWrights();
+        int free = knownFree();
         if (free <= 0) {
             return 0;
         }
@@ -977,11 +991,29 @@ public final class WrightsClientState {
 
     /** Wrights that can leave a worn port or a nearby placed wrightport. */
     public static int freeWrights() {
+        return knownFree();
+    }
+
+    private static int knownFree() {
+        if (poolFree >= 0) {
+            return poolFree;
+        }
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player == null) {
             return 0;
         }
         return com.wrights.drone.WrightHomes.countUnits(minecraft.player, WrightsClientState::wrightFree);
+    }
+
+    private static int knownStored() {
+        if (poolStored >= 0) {
+            return poolStored;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null) {
+            return 0;
+        }
+        return com.wrights.drone.WrightHomes.countUnits(minecraft.player, id -> true);
     }
 
     private static boolean wrightFree(java.util.UUID id) {

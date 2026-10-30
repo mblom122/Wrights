@@ -1592,6 +1592,17 @@ public final class JobManager {
         return WrightHomes.freeNear(player, id -> !claimedByOther(library, player.getUUID(), exceptJob, id), limit);
     }
 
+    /** Wrights near the player that are not already out on a job. */
+    public static int freeWrightCount(ServerPlayer player) {
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        return WrightHomes.countUnits(player, id -> !claimedByOther(library, player.getUUID(), null, id));
+    }
+
+    /** Wrights in the worn port and in nearby placed wrightports, including ones already out. */
+    public static int storedWrightCount(ServerPlayer player) {
+        return WrightHomes.countUnits(player, id -> true);
+    }
+
     private static void fitCrew(ServerPlayer player, SchematicLibrary library, BuildJob job, List<UUID> ids) {
         List<Integer> speeds = new ArrayList<>();
         List<UUID> kept = new ArrayList<>();

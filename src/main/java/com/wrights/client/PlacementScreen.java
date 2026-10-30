@@ -26,6 +26,7 @@ public class PlacementScreen extends Screen implements JeiPreview {
     private int rotateY;
     private int flipY;
     private int pasteY;
+    private int deployY;
     private WrightsButton placeFluidsButton;
     private WrightsButton voidBlocksButton;
     private WrightsButton voidFluidsButton;
@@ -45,6 +46,7 @@ public class PlacementScreen extends Screen implements JeiPreview {
     private WrightsButton highlightSupplyButton;
     private boolean suppress;
     private boolean edited;
+    private int poolTick;
 
     public PlacementScreen() {
         super(Component.translatable("screen.wrights.place"));
@@ -71,7 +73,7 @@ public class PlacementScreen extends Screen implements JeiPreview {
         int modelX = panelX + pad;
         int modelY = panelY + 28;
         controlsX = modelX + modelSize + gap;
-        rotateY = panelY + 154;
+        rotateY = panelY + 128;
         flipY = rotateY + 36;
         if (WrightsClientState.anchor == null) {
             WrightsClientState.anchor = WrightsClientState.lookTarget();
@@ -112,11 +114,12 @@ public class PlacementScreen extends Screen implements JeiPreview {
         clearSupplyButton = new WrightsButton(controlsX + controlsW - 12 - clearW, foot - 96, clearW, 16, Component.translatable("screen.wrights.supply_clear"), button -> useInventory());
         addRenderableWidget(highlightSupplyButton);
         addRenderableWidget(clearSupplyButton);
+        deployY = foot - 156;
         boolean paceInstant = this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild && !this.minecraft.player.isSpectator() && WrightsClientConfig.INSTANT_JOBS.get();
         if (!paceInstant) {
             WrightsClientState.clampDeploy();
-            step(controlsX + 12, panelY + 118, "-", () -> changeAssign(-1));
-            step(controlsX + controlsW - 28, panelY + 118, "+", () -> changeAssign(1));
+            step(controlsX + 12, deployY, "-", () -> changeAssign(-1));
+            step(controlsX + controlsW - 28, deployY, "+", () -> changeAssign(1));
         }
         addRenderableWidget(new WrightsButton(controlsX + 12, rotateY, row, 16, Component.translatable("screen.wrights.rotate_left"), button -> transform(BlueprintTransforms.Op.ROTATE_CCW)));
         addRenderableWidget(new WrightsButton(controlsX + 16 + row, rotateY, row, 16, Component.translatable("screen.wrights.rotate_right"), button -> transform(BlueprintTransforms.Op.ROTATE)));
@@ -200,6 +203,7 @@ public class PlacementScreen extends Screen implements JeiPreview {
         axis(graphics, controlsX + 222, panelY + 56, "Y");
         axis(graphics, controlsX + 222, panelY + 72, "Z");
         int foot = panelY + panelH;
+        graphics.drawString(this.font, Component.translatable("screen.wrights.deploy_on_job"), controlsX + 12, deployY - 14, WrightsUi.TEXT, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.use_items_from"), controlsX + 12, foot - 132, WrightsUi.MUTED, false);
         boolean bound = WrightsClientState.supplyBound && WrightsClientState.supplyPos != null;
         if (bound) {
@@ -211,15 +215,21 @@ public class PlacementScreen extends Screen implements JeiPreview {
         }
         boolean paceInstant = this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild && !this.minecraft.player.isSpectator() && WrightsClientConfig.INSTANT_JOBS.get();
         if (paceInstant) {
-            graphics.drawString(this.font, Component.translatable("screen.wrights.drones_instant"), controlsX + 12, panelY + 122, WrightsUi.MUTED, false);
+            graphics.drawString(this.font, Component.translatable("screen.wrights.drones_instant"), controlsX + 12, deployY + 4, WrightsUi.MUTED, false);
         } else if (this.minecraft.player != null) {
-            int cap = WrightsClientState.deployCap();
-            int stored = com.wrights.drone.WrightHomes.countUnits(this.minecraft.player, id -> true);
-            Component line = cap <= 0
-                    ? Component.translatable(stored <= 0 && com.wrights.drone.Wrightports.worn(this.minecraft.player).isEmpty() ? "screen.wrights.need_wrightport" : "screen.wrights.need_drone")
-                    : Component.translatable("screen.wrights.drones_send", Math.min(WrightsClientState.deployCount, cap), cap);
-            int color = cap <= 0 ? 0xFFE07A7A : WrightsUi.BLUE;
-            graphics.drawString(this.font, this.font.plainSubstrByWidth(line.getString(), 168), controlsX + 32, panelY + 122, color, false);
+            Component line;
+            int color;
+            if (WrightsClientState.poolStored < 0) {
+                line = Component.literal("...");
+                color = WrightsUi.MUTED;
+            } else {
+                int cap = WrightsClientState.deployCap();
+                line = cap <= 0
+                        ? Component.translatable(WrightsClientState.poolStored <= 0 ? "screen.wrights.need_wrightport" : "screen.wrights.need_drone")
+                        : Component.translatable("screen.wrights.drones_send", Math.min(WrightsClientState.deployCount, cap), cap);
+                color = cap <= 0 ? 0xFFE07A7A : WrightsUi.BLUE;
+            }
+            graphics.drawString(this.font, this.font.plainSubstrByWidth(line.getString(), 168), controlsX + 32, deployY + 4, color, false);
         }
         column.render(graphics);
         graphics.drawString(this.font, Component.translatable("screen.wrights.rotate"), controlsX + 12, rotateY - 12, WrightsUi.TEXT, false);
@@ -243,6 +253,9 @@ public class PlacementScreen extends Screen implements JeiPreview {
     @Override
     public void tick() {
         super.tick();
+        if (poolTick++ % 20 == 0) {
+            PacketDistributor.sendToServer(new BlueprintPayloads.DeployAsk());
+        }
         if (!WrightsClientState.follow || xBox == null || xBox.isFocused() || yBox.isFocused() || zBox.isFocused()) {
             return;
         }

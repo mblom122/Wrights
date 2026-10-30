@@ -48,6 +48,7 @@ public final class BlueprintNetwork {
         registrar.playToServer(BlueprintPayloads.JobControl.TYPE, BlueprintPayloads.JobControl.STREAM_CODEC, BlueprintNetwork::control);
         registrar.playToServer(BlueprintPayloads.SetPace.TYPE, BlueprintPayloads.SetPace.STREAM_CODEC, BlueprintNetwork::pace);
         registrar.playToServer(BlueprintPayloads.SetAssign.TYPE, BlueprintPayloads.SetAssign.STREAM_CODEC, BlueprintNetwork::assign);
+        registrar.playToServer(BlueprintPayloads.DeployAsk.TYPE, BlueprintPayloads.DeployAsk.STREAM_CODEC, BlueprintNetwork::deployAsk);
         registrar.playToServer(BlueprintPayloads.SetJobDrones.TYPE, BlueprintPayloads.SetJobDrones.STREAM_CODEC, BlueprintNetwork::jobDrones);
         registrar.playToServer(BlueprintPayloads.MoveDrone.TYPE, BlueprintPayloads.MoveDrone.STREAM_CODEC, BlueprintNetwork::moveDrone);
         registrar.playToServer(BlueprintPayloads.HangarEdit.TYPE, BlueprintPayloads.HangarEdit.STREAM_CODEC, BlueprintNetwork::hangar);
@@ -81,6 +82,7 @@ public final class BlueprintNetwork {
         registrar.playToClient(BlueprintPayloads.CaptureFinished.TYPE, BlueprintPayloads.CaptureFinished.STREAM_CODEC, BlueprintNetwork::clientFinished);
         registrar.playToClient(BlueprintPayloads.JobHologram.TYPE, BlueprintPayloads.JobHologram.STREAM_CODEC, BlueprintNetwork::clientJobHologram);
         registrar.playToClient(BlueprintPayloads.JobSync.TYPE, BlueprintPayloads.JobSync.STREAM_CODEC, BlueprintNetwork::clientJobs);
+        registrar.playToClient(BlueprintPayloads.DeployPool.TYPE, BlueprintPayloads.DeployPool.STREAM_CODEC, BlueprintNetwork::clientDeployPool);
         registrar.playToClient(BlueprintPayloads.SupplySync.TYPE, BlueprintPayloads.SupplySync.STREAM_CODEC, BlueprintNetwork::clientSupply);
         registrar.playToClient(BlueprintPayloads.DigitalSync.TYPE, BlueprintPayloads.DigitalSync.STREAM_CODEC, BlueprintNetwork::clientDigital);
         registrar.playToClient(BlueprintPayloads.DigitalInfoSync.TYPE, BlueprintPayloads.DigitalInfoSync.STREAM_CODEC, BlueprintNetwork::clientDigitalInfo);
@@ -331,6 +333,17 @@ public final class BlueprintNetwork {
             com.wrights.drone.Swarm swarm = com.wrights.drone.Wrightports.swarm(player);
             com.wrights.drone.Wrightports.replaceWorn(player, swarm.withAssign(payload.count()));
         });
+    }
+
+    private static void deployAsk(BlueprintPayloads.DeployAsk payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> PacketDistributor.sendToPlayer(player, new BlueprintPayloads.DeployPool(
+                com.wrights.job.JobManager.freeWrightCount(player),
+                com.wrights.job.JobManager.storedWrightCount(player))));
+    }
+
+    private static void clientDeployPool(BlueprintPayloads.DeployPool payload, IPayloadContext context) {
+        context.enqueueWork(() -> com.wrights.client.WrightsClientState.applyPool(payload.free(), payload.stored()));
     }
 
     private static void hangarBatch(BlueprintPayloads.HangarBatch payload, IPayloadContext context) {
