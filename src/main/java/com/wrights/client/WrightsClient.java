@@ -1,6 +1,7 @@
 package com.wrights.client;
 
 import com.wrights.WrightsMod;
+import com.wrights.block.ModBlockEntities;
 import com.wrights.entity.ModEntities;
 import com.wrights.item.BlueprintFolderItem;
 import com.wrights.item.BlueprintItem;
@@ -27,6 +28,8 @@ import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 public class WrightsClient {
     public static final ModelLayerLocation DRONE_LAYER = new ModelLayerLocation(
             ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "drone"), "main");
+    public static final ModelLayerLocation HANGAR_LAYER = new ModelLayerLocation(
+            ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "hangar"), "main");
 
     public WrightsClient(ModContainer container) {
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
@@ -35,11 +38,13 @@ public class WrightsClient {
     @SubscribeEvent
     public static void registerLayers(EntityRenderersEvent.RegisterLayerDefinitions event) {
         event.registerLayerDefinition(DRONE_LAYER, DroneModel::createBodyLayer);
+        event.registerLayerDefinition(HANGAR_LAYER, HangarExtrasModel::createBodyLayer);
     }
 
     @SubscribeEvent
     public static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(ModEntities.DRONE.get(), DroneRenderer::new);
+        event.registerBlockEntityRenderer(ModBlockEntities.HANGAR.get(), HangarRenderer::new);
     }
 
     @SubscribeEvent

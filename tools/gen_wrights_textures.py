@@ -183,10 +183,17 @@ def make_hangar_textures() -> None:
 
     top = new()
     panel_plate(top)
-    rect(top, 4, 4, 12, 12, COPPER_D)
-    fill(top, 5, 5, 11, 11, STEEL_D)
-    rect(top, 6, 6, 10, 10, CYAN)
-    fill(top, 7, 7, 9, 9, CYAN_L)
+    # circular hangar hatch opening
+    fill(top, 4, 4, 12, 12, STEEL_D)
+    rect(top, 4, 4, 12, 12, COPPER)
+    fill(top, 5, 5, 11, 11, INK)
+    # ring highlights
+    for x, y in ((5, 6), (6, 5), (9, 5), (10, 6), (5, 9), (6, 10), (9, 10), (10, 9)):
+        px(top, x, y, STEEL_L)
+    # north antenna pad mark
+    fill(top, 7, 1, 9, 3, INK)
+    px(top, 7, 1, STEEL_L)
+    px(top, 8, 1, STEEL_L)
     # rail
     fill(top, 1, 1, 15, 2, COPPER)
     fill(top, 1, 14, 15, 15, COPPER)
@@ -414,6 +421,23 @@ def paint_box(img: Image.Image, u: int, v: int, w: int, h: int, d: int, faces: d
             rect(img, x0, y0, x0 + fw, y0 + fh, STEEL_D)
 
 
+def make_hangar_door() -> None:
+    img = new(32, 32)
+    fill(img, 0, 0, 32, 32, STEEL_D)
+    fill(img, 1, 1, 31, 31, STEEL)
+    for y in range(2, 30, 3):
+        fill(img, 2, y, 30, y + 1, STEEL_L if y % 6 == 0 else PANEL)
+    # circular hatch hint
+    for x, y in ((8, 8), (23, 8), (8, 23), (23, 23), (16, 6), (16, 25), (6, 16), (25, 16)):
+        px(img, x, y, COPPER)
+    rivets(img, [(3, 3), (28, 3), (3, 28), (28, 28), (16, 16)])
+    # antenna / lamp pixels
+    fill(img, 0, 20, 4, 28, INK)
+    fill(img, 4, 20, 8, 24, AMBER_L)
+    fill(img, 5, 21, 7, 23, WHITE)
+    save(img, "block/hangar_door.png")
+
+
 def make_drone() -> None:
     img = new(64, 64)
     # body 8x3x6 at (0,0)
@@ -530,6 +554,7 @@ def main() -> None:
     make_wrightport_light()
     make_wrightport_copper()
     make_hangar_textures()
+    make_hangar_door()
     make_controller()
     make_wright_item()
     make_upgrade("iron", IRON, WHITE)

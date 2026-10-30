@@ -102,31 +102,81 @@
       }
     },
     {
-      "name": "dock_pad",
-      "from": [5, 12, 5],
-      "to": [11, 13, 11],
-      "shade": false,
+      "name": "dock_rail_w",
+      "from": [3, 12, 4],
+      "to": [4, 13, 12],
       "faces": {
-        "down": {"uv": [0, 0, 16, 16], "texture": "#top"},
-        "up": {"uv": [0, 0, 16, 16], "texture": "#top"},
-        "north": {"uv": [0, 0, 16, 2], "texture": "#top"},
-        "south": {"uv": [0, 0, 16, 2], "texture": "#top"},
-        "west": {"uv": [0, 0, 2, 16], "texture": "#top"},
-        "east": {"uv": [0, 0, 2, 16], "texture": "#top"}
+        "down": {"uv": [0, 0, 2, 16], "texture": "#trim"},
+        "up": {"uv": [0, 0, 2, 16], "texture": "#trim"},
+        "north": {"uv": [0, 0, 2, 2], "texture": "#trim"},
+        "south": {"uv": [0, 0, 2, 2], "texture": "#trim"},
+        "west": {"uv": [0, 0, 16, 2], "texture": "#trim"},
+        "east": {"uv": [0, 0, 16, 2], "texture": "#trim"}
       }
     },
     {
-      "name": "beacon",
-      "from": [7, 13, 7],
-      "to": [9, 16, 9],
-      "shade": false,
+      "name": "dock_rail_e",
+      "from": [12, 12, 4],
+      "to": [13, 13, 12],
       "faces": {
-        "down": {"uv": [0, 0, 16, 16], "texture": "#light"},
-        "up": {"uv": [0, 0, 16, 16], "texture": "#light"},
-        "north": {"uv": [0, 0, 16, 16], "texture": "#light"},
-        "south": {"uv": [0, 0, 16, 16], "texture": "#light"},
-        "west": {"uv": [0, 0, 16, 16], "texture": "#light"},
-        "east": {"uv": [0, 0, 16, 16], "texture": "#light"}
+        "down": {"uv": [0, 0, 2, 16], "texture": "#trim"},
+        "up": {"uv": [0, 0, 2, 16], "texture": "#trim"},
+        "north": {"uv": [0, 0, 2, 2], "texture": "#trim"},
+        "south": {"uv": [0, 0, 2, 2], "texture": "#trim"},
+        "west": {"uv": [0, 0, 16, 2], "texture": "#trim"},
+        "east": {"uv": [0, 0, 16, 2], "texture": "#trim"}
+      }
+    },
+    {
+      "name": "hatch_ring_n",
+      "from": [5, 12, 5],
+      "to": [11, 12.5, 6],
+      "faces": {
+        "down": {"uv": [0, 0, 16, 2], "texture": "#trim"},
+        "up": {"uv": [0, 0, 16, 2], "texture": "#trim"},
+        "north": {"uv": [0, 0, 16, 2], "texture": "#trim"},
+        "south": {"uv": [0, 0, 16, 2], "texture": "#trim"},
+        "west": {"uv": [0, 0, 2, 2], "texture": "#trim"},
+        "east": {"uv": [0, 0, 2, 2], "texture": "#trim"}
+      }
+    },
+    {
+      "name": "hatch_ring_s",
+      "from": [5, 12, 10],
+      "to": [11, 12.5, 11],
+      "faces": {
+        "down": {"uv": [0, 0, 16, 2], "texture": "#trim"},
+        "up": {"uv": [0, 0, 16, 2], "texture": "#trim"},
+        "north": {"uv": [0, 0, 16, 2], "texture": "#trim"},
+        "south": {"uv": [0, 0, 16, 2], "texture": "#trim"},
+        "west": {"uv": [0, 0, 2, 2], "texture": "#trim"},
+        "east": {"uv": [0, 0, 2, 2], "texture": "#trim"}
+      }
+    },
+    {
+      "name": "hatch_ring_w",
+      "from": [5, 12, 6],
+      "to": [6, 12.5, 10],
+      "faces": {
+        "down": {"uv": [0, 0, 2, 16], "texture": "#trim"},
+        "up": {"uv": [0, 0, 2, 16], "texture": "#trim"},
+        "north": {"uv": [0, 0, 2, 2], "texture": "#trim"},
+        "south": {"uv": [0, 0, 2, 2], "texture": "#trim"},
+        "west": {"uv": [0, 0, 16, 2], "texture": "#trim"},
+        "east": {"uv": [0, 0, 16, 2], "texture": "#trim"}
+      }
+    },
+    {
+      "name": "hatch_ring_e",
+      "from": [10, 12, 6],
+      "to": [11, 12.5, 10],
+      "faces": {
+        "down": {"uv": [0, 0, 2, 16], "texture": "#trim"},
+        "up": {"uv": [0, 0, 2, 16], "texture": "#trim"},
+        "north": {"uv": [0, 0, 2, 2], "texture": "#trim"},
+        "south": {"uv": [0, 0, 2, 2], "texture": "#trim"},
+        "west": {"uv": [0, 0, 16, 2], "texture": "#trim"},
+        "east": {"uv": [0, 0, 16, 2], "texture": "#trim"}
       }
     },
     {

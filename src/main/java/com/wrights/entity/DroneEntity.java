@@ -15,6 +15,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
+import com.wrights.block.Hangars;
 import com.wrights.job.BuildJob;
 import com.wrights.schematic.SchematicLibrary;
 
@@ -51,6 +52,8 @@ public class DroneEntity extends Entity {
         float yaw = (float) (Mth.atan2(toward.z, toward.x) * Mth.RAD_TO_DEG) - 90.0F;
         this.moveTo(start.x, start.y, start.z, yaw, 0.0F);
         this.setYRot(yaw);
+        Hangars.pulseTraffic(player.level(), player.position(), 12.0D);
+        Hangars.pulseTraffic(player.level(), start, 8.0D);
     }
 
     /** Appears above the player, then flies down into them. */
@@ -65,6 +68,8 @@ public class DroneEntity extends Entity {
         Vec3 above = player.position().add(Math.cos(angle) * radius, 5.0D, Math.sin(angle) * radius);
         this.moveTo(above.x, above.y, above.z, player.getYRot(), 0.0F);
         this.setYRot(player.getYRot());
+        Hangars.pulseTraffic(player.level(), player.position(), 12.0D);
+        Hangars.pulseTraffic(player.level(), above, 8.0D);
     }
 
     @Override
