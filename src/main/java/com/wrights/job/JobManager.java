@@ -2089,6 +2089,7 @@ public final class JobManager {
             }
         }
         shareWithIdle(job, schematic);
+        releaseIdle(level, player, job, schematic);
         if (!working && !scanning) {
             for (BuildJob.Hand hand : job.hands()) {
                 int peek = nextInLane(level, schematic, job, hand);
@@ -2306,8 +2307,8 @@ public final class JobManager {
         int start = Math.max(slice.cursor, slice.probe);
         java.util.function.Predicate<Schematic.Entry> include = entry -> slice.contains(entry.x(), entry.y(), entry.z());
         int found = scan(level, schematic, job, slice.cursor, start, include);
-        // Waiting on a floor is not an empty scan. Rewinding here finds the same block again and never returns.
-        if (found == -1 && start > slice.cursor) {
+        // A falling block can sit ahead of the floor it needs. Look back once so that floor is still placed.
+        if ((found == -1 || found == SUPPORT_WAIT) && start > slice.cursor) {
             slice.probe = slice.cursor;
             found = scan(level, schematic, job, slice.cursor, slice.cursor, include);
         }
@@ -2447,7 +2448,7 @@ public final class JobManager {
     private static int nextSolo(ServerLevel level, Schematic schematic, BuildJob job) {
         int start = Math.max(job.cursor(), job.pasteProbe());
         int found = scan(level, schematic, job, job.cursor(), start, entry -> true);
-        if (found == -1 && start > job.cursor()) {
+        if ((found == -1 || found == SUPPORT_WAIT) && start > job.cursor()) {
             job.setPasteProbe(job.cursor());
             found = scan(level, schematic, job, job.cursor(), job.cursor(), entry -> true);
         }
@@ -2647,15 +2648,37 @@ public final class JobManager {
             BuildJob.Slice donor = fullestPaste(job, schematic, receiver);
             BuildJob.Slice half = donor == null ? null : splitPaste(schematic, donor);
             if (half == null) {
-                for (BuildJob.Hand hand : job.hands()) {
-                    if (countPaste(schematic, hand) == 0) {
-                        hand.idle = false;
-                    }
-                }
                 return;
             }
             receiver.slices.add(half);
             receiver.idle = false;
+        }
+    }
+
+    /** A wright with nothing left to place goes home. The ones still on their last blocks stay. */
+    private static void releaseIdle(ServerLevel level, ServerPlayer player, BuildJob job, Schematic schematic) {
+        if (schematic == null || job.hands().size() < 2) {
+            return;
+        }
+        boolean busy = false;
+        int going = 0;
+        for (BuildJob.Hand hand : job.hands()) {
+            if (hand.idle && countPaste(schematic, hand) == 0) {
+                going++;
+            } else if (!hand.idle) {
+                busy = true;
+            }
+        }
+        if (!busy || going == 0) {
+            return;
+        }
+        int slot = 0;
+        for (BuildJob.Hand hand : job.hands()) {
+            if (!hand.idle || countPaste(schematic, hand) > 0 || hand.entityId == null) {
+                continue;
+            }
+            recall(level, player, hand.entityId, slot++, going, hand.homePort);
+            hand.entityId = null;
         }
     }
 
