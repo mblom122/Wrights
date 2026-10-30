@@ -543,7 +543,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record LaunchBuild(UUID id, BlockPos origin, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean force, boolean playerFirst) implements CustomPacketPayload {
+    public record LaunchBuild(UUID id, BlockPos origin, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean force, boolean playerFirst, boolean queue) implements CustomPacketPayload {
         public static final Type<LaunchBuild> TYPE = payloadType("launch_build");
         public static final StreamCodec<RegistryFriendlyByteBuf, LaunchBuild> STREAM_CODEC = StreamCodec.of((buf, value) -> value.write(buf), LaunchBuild::read);
 
@@ -563,10 +563,11 @@ public final class BlueprintPayloads {
             buf.writeBoolean(voidNbt);
             buf.writeBoolean(force);
             buf.writeBoolean(playerFirst);
+            buf.writeBoolean(queue);
         }
 
         public static LaunchBuild read(RegistryFriendlyByteBuf buf) {
-            return new LaunchBuild(buf.readUUID(), buf.readBlockPos(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean());
+            return new LaunchBuild(buf.readUUID(), buf.readBlockPos(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean());
         }
 
         @Override
@@ -678,7 +679,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record JobLine(UUID id, String name, int done, int total, int skipped, boolean paused, boolean saving, boolean finished, boolean canUndo, boolean undoing, boolean stopped, boolean undone, String dimension, BlockPos anchor, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, List<UUID> crew, int workedTicks, int hold, int waitKind, int source, BlockPos sourcePort, boolean labelPort) {
+    public record JobLine(UUID id, String name, int done, int total, int skipped, boolean paused, boolean saving, boolean finished, boolean canUndo, boolean undoing, boolean stopped, boolean undone, String dimension, BlockPos anchor, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, List<UUID> crew, int workedTicks, int hold, int waitKind, int source, BlockPos sourcePort, boolean labelPort, boolean queued, int quota) {
         public void write(RegistryFriendlyByteBuf buf) {
             buf.writeUUID(id);
             buf.writeUtf(name, 48);
@@ -709,6 +710,8 @@ public final class BlueprintPayloads {
             buf.writeVarInt(source);
             buf.writeBlockPos(sourcePort);
             buf.writeBoolean(labelPort);
+            buf.writeBoolean(queued);
+            buf.writeVarInt(quota);
         }
 
         public static JobLine read(RegistryFriendlyByteBuf buf) {
@@ -738,7 +741,9 @@ public final class BlueprintPayloads {
                     buf.readVarInt(),
                     buf.readVarInt(),
                     buf.readBlockPos(),
-                    buf.readBoolean());
+                    buf.readBoolean(),
+                    buf.readBoolean(),
+                    buf.readVarInt());
         }
 
         private static List<UUID> readCrew(RegistryFriendlyByteBuf buf) {

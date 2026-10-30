@@ -1047,14 +1047,14 @@ public final class BlueprintActions {
     }
 
     public static void launch(ServerPlayer player, java.util.UUID id, BlockPos anchorPoint, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones) {
-        launch(player, id, anchorPoint, sizeX, sizeY, sizeZ, pivotX, pivotY, pivotZ, drones, true, false, false, false, false, true);
+        launch(player, id, anchorPoint, sizeX, sizeY, sizeZ, pivotX, pivotY, pivotZ, drones, true, false, false, false, false, true, false);
     }
 
     public static void launch(ServerPlayer player, java.util.UUID id, BlockPos anchorPoint, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt) {
-        launch(player, id, anchorPoint, sizeX, sizeY, sizeZ, pivotX, pivotY, pivotZ, drones, placeFluids, voidBlocks, voidFluids, voidNbt, false, true);
+        launch(player, id, anchorPoint, sizeX, sizeY, sizeZ, pivotX, pivotY, pivotZ, drones, placeFluids, voidBlocks, voidFluids, voidNbt, false, true, false);
     }
 
-    public static void launch(ServerPlayer player, java.util.UUID id, BlockPos anchorPoint, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean force, boolean playerFirst) {
+    public static void launch(ServerPlayer player, java.util.UUID id, BlockPos anchorPoint, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean force, boolean playerFirst, boolean queue) {
         if (!requireTool(player)) {
             return;
         }
@@ -1095,7 +1095,7 @@ public final class BlueprintActions {
             library.putSchematic(snapshot);
             buildSchematicId = snapshot.id();
         }
-        if (!JobManager.startBlueprintBuild(player, buildSchematicId, origin, sx, sy, sz, drones, placeFluids, voidBlocks, voidFluids, voidNbt, playerFirst) && snapshot != null) {
+        if (!JobManager.startBlueprintBuild(player, buildSchematicId, origin, sx, sy, sz, drones, placeFluids, voidBlocks, voidFluids, voidNbt, playerFirst, queue) && snapshot != null) {
             library.removeSchematic(snapshot.id());
         }
         BlueprintNetwork.syncLibrary(player);

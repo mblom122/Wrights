@@ -1795,7 +1795,7 @@ public class WrightsMenuScreen extends Screen {
         drawProgress(graphics, x + 6, y + 37, Math.max(40, width - 12), job);
         int right = x + width - 4;
         if (working) {
-            String count = Component.translatable("menu.wrights.job_drone_count", job.crew().size()).getString();
+            String count = crewCountText(job);
             graphics.drawString(this.font, count, x + 6, buttonY + 4, WrightsUi.MUTED, false);
             int manageW = jobButtonWidth("menu.wrights.manage_drones");
             drawJobButton(graphics, x + 6 + this.font.width(count) + 6 + manageW, buttonY, "menu.wrights.manage_drones", mouseX, mouseY, manageW);
@@ -1836,6 +1836,13 @@ public class WrightsMenuScreen extends Screen {
         graphics.renderTooltip(this.font, lines, mouseX, mouseY);
     }
 
+    private String crewCountText(BlueprintPayloads.JobLine job) {
+        if (job.queued()) {
+            return Component.translatable("menu.wrights.job_drone_queued", job.crew().size(), Math.max(job.crew().size(), job.quota())).getString();
+        }
+        return Component.translatable("menu.wrights.job_drone_count", job.crew().size()).getString();
+    }
+
     private String jobStatus(BlueprintPayloads.JobLine job) {
         if (job.undoing()) {
             return "menu.wrights.undoing";
@@ -1854,6 +1861,9 @@ public class WrightsMenuScreen extends Screen {
         }
         if (job.paused()) {
             return holdStatus(job.hold(), true);
+        }
+        if (job.queued()) {
+            return "menu.wrights.queued";
         }
         if (job.hold() != com.wrights.job.BuildJob.HOLD_NONE && job.hold() != com.wrights.job.BuildJob.HOLD_MANUAL) {
             return holdStatus(job.hold(), false);
@@ -1896,6 +1906,9 @@ public class WrightsMenuScreen extends Screen {
         }
         if (job.paused()) {
             return 0xFFE0B060;
+        }
+        if (job.queued()) {
+            return 0xFF7EB6FF;
         }
         return job.finished() ? WrightsUi.MUTED : WrightsUi.COPPER;
     }
@@ -2016,7 +2029,7 @@ public class WrightsMenuScreen extends Screen {
         int rowX = jobX + 4;
         int rowW = jobW - 8;
         if (working) {
-            String count = Component.translatable("menu.wrights.job_drone_count", job.crew().size()).getString();
+            String count = crewCountText(job);
             int manageW = jobButtonWidth("menu.wrights.manage_drones");
             int manageRight = rowX + 6 + this.font.width(count) + 6 + manageW;
             if (mouseX >= manageRight - manageW && mouseX < manageRight) {

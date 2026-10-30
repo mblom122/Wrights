@@ -1080,15 +1080,43 @@ public final class WrightsClientState {
         return true;
     }
 
+    /** How many wrights this build can ask for. With nobody free, that is still the job's own limit. */
+    public static int requestCap() {
+        int blocks = Math.max(0, placeableBlocks());
+        if (blocks <= 0) {
+            return 0;
+        }
+        int ceiling = Math.min(blocks, WrightsConfig.maxWrightsPerJob());
+        int freeCap = deployCap();
+        return freeCap > 0 ? freeCap : ceiling;
+    }
+
+    /** True when a new build should wait, because no wright is free to send right now. */
+    public static boolean queueInstead() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null) {
+            return false;
+        }
+        if (minecraft.player.getAbilities().instabuild && !minecraft.player.isSpectator() && WrightsClientConfig.INSTANT_JOBS.get()) {
+            return false;
+        }
+        return deployCap() <= 0 && requestCap() > 0;
+    }
+
     /** Keeps this job's wright count inside what the port and the blueprint can use. */
     public static void clampDeploy() {
-        int cap = deployCap();
+        int cap = requestCap();
         if (cap <= 0) {
             deployCount = 0;
             return;
         }
         if (!deployChosen) {
-            deployCount = WrightsClientConfig.deployTarget(freeWrights(), placeableBlocks());
+            if (deployCap() > 0) {
+                deployCount = WrightsClientConfig.deployTarget(freeWrights(), placeableBlocks());
+            } else {
+                int wanted = WrightsClientConfig.DRONE_MAX.get() ? cap : WrightsClientConfig.DRONE_COUNT.get();
+                deployCount = Math.max(1, wanted);
+            }
         }
         deployCount = Mth.clamp(Math.max(1, deployCount), 1, cap);
     }
@@ -1124,6 +1152,10 @@ public final class WrightsClientState {
     }
 
     public static boolean tryBuild(boolean force) {
+        return tryBuild(force, false);
+    }
+
+    public static boolean tryBuild(boolean force, boolean queue) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player == null || !ControllerItem.isHeld(minecraft.player)) {
             return false;
@@ -1149,7 +1181,8 @@ public final class WrightsClientState {
                 WrightsClientConfig.VOID_FLUIDS.get(),
                 WrightsClientConfig.VOID_NBT.get(),
                 force,
-                WrightsClientConfig.SUPPLY_PLAYER_FIRST.get()));
+                WrightsClientConfig.SUPPLY_PLAYER_FIRST.get(),
+                queue));
         return true;
     }
 

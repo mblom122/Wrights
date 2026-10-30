@@ -268,7 +268,8 @@ public final class BlueprintNetwork {
                 payload.voidFluids(),
                 payload.voidNbt(),
                 payload.force(),
-                payload.playerFirst()));
+                payload.playerFirst(),
+                payload.queue()));
     }
 
     private static void editCell(BlueprintPayloads.EditCell payload, IPayloadContext context) {
@@ -679,7 +680,9 @@ public final class BlueprintNetwork {
                     job.waitKind(),
                     jobSource(job),
                     jobSourcePort(job),
-                    labelPort(player, job)));
+                    labelPort(player, job),
+                    job.queued(),
+                    job.crewQuota()));
         }
         PacketDistributor.sendToPlayer(player, new BlueprintPayloads.JobSync(lines));
     }

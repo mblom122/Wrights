@@ -261,6 +261,14 @@ public final class BuildJob {
         this.crewQuota = Math.max(0, crewQuota);
     }
 
+    public boolean queued() {
+        return queued;
+    }
+
+    public void setQueued(boolean queued) {
+        this.queued = queued;
+    }
+
     /** Keeps the largest crew this job was given, so a later resume can refill it. */
     public boolean rememberCrewQuota(int count) {
         if (count > crewQuota) {
@@ -499,6 +507,8 @@ public final class BuildJob {
     private BlockPos holdPort;
     private boolean awaitDrones;
     private int crewQuota;
+    /** Waiting for wrights. It only accepts homes that can reach the build. */
+    private boolean queued;
     private boolean finished;
     private boolean stopped;
     private boolean undone;
@@ -698,6 +708,7 @@ public final class BuildJob {
         undoing = false;
         paused = false;
         awaitDrones = false;
+        queued = false;
         cursor = 0;
         pasteProbe = 0;
         placed = 0;
@@ -846,6 +857,7 @@ public final class BuildJob {
         }
         tag.putBoolean("awaitDrones", awaitDrones);
         tag.putInt("crewQuota", crewQuota);
+        tag.putBoolean("queued", queued);
         tag.putBoolean("finished", finished);
         tag.putBoolean("stopped", stopped);
         tag.putBoolean("undone", undone);
@@ -989,6 +1001,7 @@ public final class BuildJob {
         }
         job.awaitDrones = tag.getBoolean("awaitDrones");
         job.crewQuota = Math.max(0, tag.getInt("crewQuota"));
+        job.queued = tag.getBoolean("queued");
         job.finished = tag.getBoolean("finished");
         job.stopped = tag.getBoolean("stopped");
         job.undone = tag.getBoolean("undone");

@@ -169,13 +169,19 @@ public final class JobManager {
             job.setPaused(true);
             library.setDirty();
         } else if (action == com.wrights.network.BlueprintPayloads.JobControl.RESUME && !job.finished()) {
-            bindCrewIds(player, library);
-            if (job.paused() && !restorePausedCrew(player, library, job)) {
-                explainResume(player, job);
-            } else if (job.paused()) {
+            if (job.queued()) {
                 job.setPaused(false);
                 job.clearHold();
                 library.setDirty();
+            } else {
+                bindCrewIds(player, library);
+                if (job.paused() && !restorePausedCrew(player, library, job)) {
+                    explainResume(player, job);
+                } else if (job.paused()) {
+                    job.setPaused(false);
+                    job.clearHold();
+                    library.setDirty();
+                }
             }
         } else if (action == com.wrights.network.BlueprintPayloads.JobControl.REDO) {
             redo(player, library, job);
@@ -321,6 +327,12 @@ public final class JobManager {
         }
         for (BuildJob job : library.jobsFor(player.getUUID())) {
             if (!job.finished() && job.paused() != paused) {
+                if (!paused && job.queued()) {
+                    job.setPaused(false);
+                    job.clearHold();
+                    changed = true;
+                    continue;
+                }
                 if (!paused && !restorePausedCrew(player, library, job)) {
                     blocked++;
                     continue;
@@ -573,10 +585,14 @@ public final class JobManager {
     }
 
     public static boolean startBlueprintBuild(ServerPlayer player, UUID schematicId, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt) {
-        return startBlueprintBuild(player, schematicId, origin, sizeX, sizeY, sizeZ, drones, placeFluids, voidBlocks, voidFluids, voidNbt, true);
+        return startBlueprintBuild(player, schematicId, origin, sizeX, sizeY, sizeZ, drones, placeFluids, voidBlocks, voidFluids, voidNbt, true, false);
     }
 
     public static boolean startBlueprintBuild(ServerPlayer player, UUID schematicId, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean supplyPlayerFirst) {
+        return startBlueprintBuild(player, schematicId, origin, sizeX, sizeY, sizeZ, drones, placeFluids, voidBlocks, voidFluids, voidNbt, supplyPlayerFirst, false);
+    }
+
+    public static boolean startBlueprintBuild(ServerPlayer player, UUID schematicId, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean supplyPlayerFirst, boolean queue) {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         Schematic schematic = library.schematic(schematicId).orElse(null);
         if (schematic == null || schematic.blockCount() == 0) {
@@ -600,6 +616,22 @@ public final class JobManager {
         com.wrights.blueprint.BlueprintSessions.BlueprintSession session = com.wrights.blueprint.BlueprintSessions.get(player);
         job.setSupply(session.supplyPos(), session.supplyDimension());
         job.setSupplyPlayerFirst(supplyPlayerFirst);
+        if (queue && !instant(player)) {
+            int blocks = placeableBlocks(schematic, job);
+            int room = Math.min(Math.max(0, blocks), WrightsConfig.maxWrightsPerJob());
+            int wanted = drones > 0 ? Math.min(drones, room) : room;
+            if (wanted <= 0) {
+                Messages.actionBar(player, "message.wrights.drone_block_cap", 0);
+                return false;
+            }
+            job.setCrewQuota(wanted);
+            job.setQueued(true);
+            library.addJob(job);
+            Messages.actionBar(player, "message.wrights.queued", wanted);
+            BlueprintNetwork.showJobHologram(player, job, schematic);
+            BlueprintNetwork.syncJobs(player);
+            return true;
+        }
         if (!instant(player) && !assignCrew(player, job, schematic, drones)) {
             return false;
         }
@@ -891,6 +923,13 @@ public final class JobManager {
         if (instant(player)) {
             placeAll(level, player, library, job, schematic);
             return;
+        }
+        if (job.queued()) {
+            topUpQueued(player, library, job);
+            if (!job.hasCrew()) {
+                job.setWaitKind(BuildJob.WAIT_NONE);
+                return;
+            }
         }
         if (holdWithoutDrones(player, library, job)) {
             job.setWaitKind(BuildJob.WAIT_NONE);
@@ -1641,6 +1680,79 @@ public final class JobManager {
             }
         }
         return false;
+    }
+
+    /** A worn port counts while you are in range. A block port counts while its area covers the build. */
+    private static boolean coversJob(ServerPlayer player, BuildJob job, BlockPos home) {
+        if (home == null) {
+            return WrightHomes.playerCovers(player, job.dimension(), job.min());
+        }
+        return WrightHomes.portCovers(job.dimension(), home, job.dimension(), job.min());
+    }
+
+    /**
+     * Adds free wrights until the queued count is met.
+     * Homes that cannot reach the build are left alone, and ones already reserved from out of range are sent back.
+     */
+    private static void topUpQueued(ServerPlayer player, SchematicLibrary library, BuildJob job) {
+        if (job.paused() || !job.queued()) {
+            return;
+        }
+        int quota = job.crewQuota();
+        if (quota <= 0) {
+            job.setQueued(false);
+            return;
+        }
+        ServerLevel level = player.getServer().getLevel(job.dimension());
+        List<UUID> ids = new ArrayList<>();
+        boolean changed = false;
+        for (UUID id : job.crewUnits()) {
+            BlockPos home = homeOfCrew(job, id);
+            if (!coversJob(player, job, home) || !WrightHomes.stillThere(level, player, home, id)) {
+                changed = true;
+                continue;
+            }
+            ids.add(id);
+        }
+        int need = quota - ids.size();
+        if (need > 0 && level != null) {
+            for (WrightHomes.FreeWright free : freeUnits(player, library, job, need)) {
+                UUID id = free.unit().id();
+                if (ids.contains(id) || !coversJob(player, job, free.homePort())) {
+                    continue;
+                }
+                ids.add(id);
+                changed = true;
+                if (ids.size() >= quota) {
+                    break;
+                }
+            }
+        }
+        if (ids.isEmpty()) {
+            if (job.hasCrew() || !job.crewUnits().isEmpty()) {
+                sendHome(player.getServer(), player, job);
+                job.clearAssigned();
+                job.setQueued(true);
+                job.setPaused(false);
+                job.clearHold();
+                library.setDirty();
+            }
+            return;
+        }
+        if (changed) {
+            fitCrew(player, library, job, ids);
+            if (job.paused() && !job.hasCrew()) {
+                job.setPaused(false);
+                job.clearHold();
+                job.setQueued(true);
+            }
+            library.setDirty();
+        }
+        if (job.queued() && job.hasCrew() && job.crewUnits().size() >= quota) {
+            job.setQueued(false);
+            library.setDirty();
+            Messages.actionBar(player, "message.wrights.queue_ready", job.crewUnits().size());
+        }
     }
 
     private static List<WrightHomes.FreeWright> freeUnits(ServerPlayer player, SchematicLibrary library, BuildJob job, int limit) {
