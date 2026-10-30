@@ -22,7 +22,7 @@ import com.wrights.network.BlueprintPayloads;
 
 /**
  * Left column shared by the build editor and the blueprint editor: layer grid,
- * selection, anchor, and layer operations.
+ * layer operations, then the selection.
  */
 public final class LayerColumn {
     public interface View {
@@ -194,8 +194,8 @@ public final class LayerColumn {
         this.layerY = y + size + 16;
         int stepY = layerY + 18;
         int mapShift = map ? 18 : 0;
-        this.selectionY = stepY + 18 + mapShift;
-        this.layersY = selectionY + 80;
+        this.layersY = stepY + 32 + mapShift;
+        this.selectionY = layersY + 52;
         if (!started) {
             this.layer = Mth.clamp(view.pivotY(), 0, Math.max(0, view.sizeY() - 1));
             started = true;
@@ -205,7 +205,7 @@ public final class LayerColumn {
         add.widget(new WrightsButton(x + half + 4, layersY, half, 16, Component.translatable("screen.wrights.duplicate_layer"), button -> editLayer(BlueprintPayloads.EditLayer.COPY, layer + 1)));
         add.widget(new WrightsButton(x, layersY + 18, half, 16, Component.translatable("screen.wrights.remove_layer"), button -> editLayer(BlueprintPayloads.EditLayer.REMOVE, layer)));
         add.widget(new WrightsButton(x + half + 4, layersY + 18, half, 16, Component.translatable("screen.wrights.add_layer"), button -> showPrompt(false)));
-        promptY = layersY + 40;
+        promptY = selectionY + 66;
         int boxW = Math.min(42, Math.max(28, size / 3));
         int actionW = Math.max(24, (size - boxW - 8) / 2);
         promptBox = new EditBox(font, x, promptY + 14, boxW, 16, Component.translatable("screen.wrights.layer_at"));
