@@ -361,8 +361,6 @@ public class WrightsMenuScreen extends Screen {
         }
     }
 
-    private boolean preserveMode;
-
     @Override
     public void removed() {
         savedPage = managePage ? PAGE_MANAGE : jobsPage ? PAGE_JOBS : options ? PAGE_OPTIONS : infoPage ? PAGE_INFO : PAGE_BUILDING;
@@ -373,20 +371,6 @@ public class WrightsMenuScreen extends Screen {
         savedOptionScroll = optionScroll;
         savedInfoScroll = infoScroll;
         savedSearch = searchText == null ? "" : searchText;
-        if (!preserveMode && toolHeld()) {
-            if (jobsPage) {
-                WrightsClientState.enterJobs();
-            } else if (managePage) {
-                WrightsClientState.enterManage();
-            } else if (infoPage) {
-                WrightsClientState.enterInfo();
-            } else if (!options && !infoPage
-                    && WrightsClientState.mode != WrightsClientState.Mode.CAPTURE
-                    && WrightsClientState.mode != WrightsClientState.Mode.SAVING
-                    && WrightsClientState.mode != WrightsClientState.Mode.BUILD) {
-                WrightsClientState.enterBuildFromLast();
-            }
-        }
         super.removed();
     }
 
@@ -2263,7 +2247,6 @@ public class WrightsMenuScreen extends Screen {
         if (!requireTool()) {
             return;
         }
-        preserveMode = true;
         this.minecraft.setScreen(null);
     }
 
@@ -2336,7 +2319,6 @@ public class WrightsMenuScreen extends Screen {
         if (!requireTool()) {
             return;
         }
-        preserveMode = true;
         WrightsClientState.beginCaptureLocal();
         PacketDistributor.sendToServer(new BlueprintPayloads.StartCapture());
         this.minecraft.setScreen(null);
@@ -2357,7 +2339,6 @@ public class WrightsMenuScreen extends Screen {
         }
         WrightsClientState.armBuild(summary);
         PacketDistributor.sendToServer(new BlueprintPayloads.BeginBuild(summary.id()));
-        preserveMode = true;
         this.minecraft.setScreen(null);
     }
 
