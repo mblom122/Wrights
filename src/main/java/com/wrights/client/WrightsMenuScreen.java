@@ -50,6 +50,7 @@ public class WrightsMenuScreen extends Screen {
     private int listY;
     private int listW;
     private int listH;
+    private int detailH;
     private int headingY;
     private int searchY;
     private int detailX;
@@ -402,7 +403,8 @@ public class WrightsMenuScreen extends Screen {
         if (listW < 120) {
             listW = Math.max(100, (panelW - 150) / 2);
         }
-        listH = Math.max(ROW, panelH - 128);
+        detailH = Math.max(ROW, panelH - 128);
+        listH = Math.max(ROW, detailH - 16);
         detailX = listX + listW + 8;
         detailY = listY;
         detailW = panelX + panelW - 12 - detailX;
@@ -411,7 +413,7 @@ public class WrightsMenuScreen extends Screen {
             detailX = listX + listW + 8;
             detailW = panelX + panelW - 12 - detailX;
         }
-        detailSplit = detailY + listH / 2;
+        detailSplit = detailY + detailH / 2;
     }
 
     public void refresh() {
@@ -609,7 +611,7 @@ public class WrightsMenuScreen extends Screen {
             return;
         }
         WrightsUi.inset(graphics, listX - 2, listY - 2, listW + 4, listH + 4);
-        WrightsUi.inset(graphics, detailX - 2, detailY - 2, detailW + 4, listH + 4);
+        WrightsUi.inset(graphics, detailX - 2, detailY - 2, detailW + 4, detailH + 4);
     }
 
     @Override
