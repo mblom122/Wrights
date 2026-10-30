@@ -8,6 +8,7 @@ import com.wrights.item.BlueprintItem;
 import com.wrights.item.ModItems;
 import com.wrights.menu.ModMenus;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelLayerLocation;
 import net.minecraft.client.renderer.item.ItemProperties;
 import net.minecraft.resources.ResourceLocation;
@@ -23,6 +24,8 @@ import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 
+import top.theillusivec4.curios.api.client.CuriosRendererRegistry;
+
 @Mod(value = WrightsMod.MOD_ID, dist = Dist.CLIENT)
 @EventBusSubscriber(modid = WrightsMod.MOD_ID, value = Dist.CLIENT)
 public class WrightsClient {
@@ -30,6 +33,8 @@ public class WrightsClient {
             ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "drone"), "main");
     public static final ModelLayerLocation HANGAR_LAYER = new ModelLayerLocation(
             ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "hangar"), "main");
+    public static final ModelLayerLocation PERSONAL_WRIGHTPORT_LAYER = new ModelLayerLocation(
+            ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "personal_wrightport"), "main");
 
     public WrightsClient(ModContainer container) {
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
@@ -39,6 +44,7 @@ public class WrightsClient {
     public static void registerLayers(EntityRenderersEvent.RegisterLayerDefinitions event) {
         event.registerLayerDefinition(DRONE_LAYER, DroneModel::createBodyLayer);
         event.registerLayerDefinition(HANGAR_LAYER, HangarExtrasModel::createBodyLayer);
+        event.registerLayerDefinition(PERSONAL_WRIGHTPORT_LAYER, PersonalWrightportModel::createBodyLayer);
     }
 
     @SubscribeEvent
@@ -57,6 +63,14 @@ public class WrightsClient {
                 ModItems.BLUEPRINT_FOLDER.get(),
                 ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "filled"),
                 (stack, level, entity, seed) -> BlueprintFolderItem.hasData(stack) ? 1.0F : 0.0F));
+    }
+
+    @SubscribeEvent
+    public static void registerCurioRenderers(EntityRenderersEvent.AddLayers event) {
+        CuriosRendererRegistry.register(
+                ModItems.PERSONAL_WRIGHTPORT.get(),
+                () -> new PersonalWrightportRenderer(new PersonalWrightportModel(
+                        Minecraft.getInstance().getEntityModels().bakeLayer(PERSONAL_WRIGHTPORT_LAYER))));
     }
 
     @SubscribeEvent

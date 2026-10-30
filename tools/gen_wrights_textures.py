@@ -421,6 +421,32 @@ def paint_box(img: Image.Image, u: int, v: int, w: int, h: int, d: int, faces: d
             rect(img, x0, y0, x0 + fw, y0 + fh, STEEL_D)
 
 
+def make_personal_wrightport_entity() -> None:
+    img = new(64, 32)
+    # pack body
+    fill(img, 0, 0, 16, 14, STEEL_D)
+    fill(img, 1, 1, 15, 13, STEEL)
+    fill(img, 2, 2, 14, 12, PANEL)
+    rivets(img, [(2, 2), (13, 2), (2, 11), (13, 11)])
+    fill(img, 5, 4, 11, 10, INK)
+    rect(img, 5, 4, 11, 10, CYAN_D)
+    px(img, 7, 6, CYAN_L)
+    px(img, 8, 7, CYAN)
+    # strap strip
+    fill(img, 0, 14, 16, 22, COPPER_D)
+    fill(img, 1, 15, 15, 21, COPPER)
+    # doors
+    fill(img, 24, 0, 40, 16, STEEL_L)
+    fill(img, 25, 1, 39, 15, STEEL)
+    for y in range(2, 14, 3):
+        fill(img, 26, y, 38, y + 1, PANEL)
+    # antenna / lamp
+    fill(img, 40, 0, 44, 8, INK)
+    fill(img, 44, 0, 48, 4, AMBER_L)
+    fill(img, 45, 1, 47, 3, WHITE)
+    save(img, "entity/personal_wrightport.png")
+
+
 def make_hangar_door() -> None:
     img = new(32, 32)
     fill(img, 0, 0, 32, 32, STEEL_D)
@@ -555,6 +581,7 @@ def main() -> None:
     make_wrightport_copper()
     make_hangar_textures()
     make_hangar_door()
+    make_personal_wrightport_entity()
     make_controller()
     make_wright_item()
     make_upgrade("iron", IRON, WHITE)
