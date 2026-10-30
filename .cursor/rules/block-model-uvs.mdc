@@ -1,0 +1,23 @@
+---
+description: Use full-face UVs on Wrights block models
+globs: src/main/resources/assets/wrights/models/**/*.json
+alwaysApply: false
+---
+
+# Block model UV mapping
+
+When writing or editing Minecraft Java block/item element models for Wrights:
+
+- Prefer mapping each visible face with the **full texture**, starting at `[0, 0]`.
+- For a normal 16×16 panel face, use `"uv": [0, 0, 16, 16]`.
+- Do **not** crop UVs to the cube’s world position (for example `[1, 4, 15, 14]` or `[2, 5, 14, 13]`) just because the element is inset. That only shows a slice of the art and looks wrong on factory panel textures.
+- Thin edge faces may stretch a strip from the top-left of the texture (for example `[0, 0, 16, 2]`), still starting at `0, 0`.
+- Keep separate texture keys (`#front`, `#side`, `#top`, …) when the art differs per face; full UV does not mean one shared atlas crop.
+
+```json
+// BAD — cropped mid-texture
+"north": {"uv": [1, 4, 15, 14], "texture": "#front"}
+
+// GOOD — full texture on the face
+"north": {"uv": [0, 0, 16, 16], "texture": "#front"}
+```
