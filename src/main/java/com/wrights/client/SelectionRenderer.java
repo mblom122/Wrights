@@ -24,6 +24,7 @@ import net.minecraft.world.Container;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -365,7 +366,7 @@ public final class SelectionRenderer {
                 continue;
             }
             BlockState state = Block.stateById(ghost.stateId());
-            if (state.isAir() || state.getRenderShape() == RenderShape.INVISIBLE) {
+            if (!ghostVisible(state)) {
                 continue;
             }
             order[count] = i;
@@ -414,7 +415,7 @@ public final class SelectionRenderer {
                 continue;
             }
             BlockState state = Block.stateById(ghost.stateId());
-            if (state.isAir() || state.getRenderShape() == RenderShape.INVISIBLE) {
+            if (!ghostVisible(state)) {
                 continue;
             }
             order[count] = i;
@@ -487,7 +488,7 @@ public final class SelectionRenderer {
                 for (int n = 0; n < keep; n++) {
                     WrightsClientState.Ghost ghost = ghosts.get(order[n]);
                     BlockState state = Block.stateById(ghost.stateId());
-                    if (state.isAir() || state.getRenderShape() == RenderShape.INVISIBLE) {
+                    if (!ghostVisible(state)) {
                         continue;
                     }
                     BlockPos world = build.origin().offset(ghost.x(), ghost.y(), ghost.z());
@@ -564,8 +565,23 @@ public final class SelectionRenderer {
             int packed = Math.round(alpha * 255.0F);
             output = type -> new GhostConsumer(source.getBuffer(ghostLayer(type)), packed);
         }
-        renderer.renderSingleBlock(state, pose, output, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
+        if (state.getBlock() instanceof LiquidBlock) {
+            BlueprintModelView.renderFluid(pose, output, state);
+        } else {
+            renderer.renderSingleBlock(state, pose, output, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
+        }
         pose.popPose();
+    }
+
+    /** Source water and lava have no block model, but the preview still draws them. */
+    private static boolean ghostVisible(BlockState state) {
+        if (state.isAir()) {
+            return false;
+        }
+        if (state.getBlock() instanceof LiquidBlock) {
+            return true;
+        }
+        return state.getRenderShape() != RenderShape.INVISIBLE;
     }
 
     private static void prepare(int needed) {

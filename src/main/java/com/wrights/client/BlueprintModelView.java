@@ -81,7 +81,7 @@ public final class BlueprintModelView {
     }
 
     /** Water and lava have no block model, so the preview draws the fluid texture as a cube. */
-    private static void renderFluid(PoseStack pose, MultiBufferSource buffer, BlockState state) {
+    static void renderFluid(PoseStack pose, MultiBufferSource buffer, BlockState state) {
         FluidState fluid = state.getFluidState();
         if (fluid.isEmpty()) {
             return;
