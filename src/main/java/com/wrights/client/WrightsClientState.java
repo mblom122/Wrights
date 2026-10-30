@@ -1043,10 +1043,7 @@ public final class WrightsClientState {
             return 0;
         }
         int ceiling = Math.min(blocks, WrightsConfig.maxWrightsPerJob());
-        if (WrightsClientConfig.DRONE_MAX.get()) {
-            return Math.min(free, ceiling);
-        }
-        return Math.min(Math.max(1, WrightsClientConfig.DRONE_COUNT.get()), Math.min(free, ceiling));
+        return Math.min(Math.max(1, WrightsClientConfig.droneCount()), Math.min(free, ceiling));
     }
 
     /** Wrights that can leave a worn port or a nearby placed wrightport. */
@@ -1119,7 +1116,7 @@ public final class WrightsClientState {
             if (deployCap() > 0) {
                 deployCount = WrightsClientConfig.deployTarget(freeWrights(), placeableBlocks());
             } else {
-                int wanted = WrightsClientConfig.DRONE_MAX.get() ? cap : WrightsClientConfig.DRONE_COUNT.get();
+                int wanted = WrightsClientConfig.droneCount();
                 deployCount = Math.max(1, wanted);
             }
         }

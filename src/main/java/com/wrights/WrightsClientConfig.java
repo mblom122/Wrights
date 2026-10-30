@@ -228,8 +228,18 @@ public final class WrightsClientConfig {
     }
 
     public static void setDroneCount(int count) {
+        DRONE_MAX.set(false);
         DRONE_COUNT.set(clamp(count, 1, Math.min(512, WrightsConfig.maxWrightsPerJob())));
         save();
+    }
+
+    /** The amount a new job asks for. Max in the options sets this to the job cap. */
+    public static int droneCount() {
+        int cap = Math.min(512, WrightsConfig.maxWrightsPerJob());
+        if (DRONE_MAX.get()) {
+            return cap;
+        }
+        return clamp(DRONE_COUNT.get(), 1, cap);
     }
 
     public static void setBuildMenu(boolean enabled) {
@@ -323,7 +333,7 @@ public final class WrightsClientConfig {
         if (freeDrones <= 0 || blocks <= 0) {
             return 0;
         }
-        int wanted = DRONE_MAX.get() ? freeDrones : DRONE_COUNT.get();
+        int wanted = droneCount();
         return Math.max(1, Math.min(wanted, Math.min(freeDrones, Math.min(blocks, WrightsConfig.maxWrightsPerJob()))));
     }
 
