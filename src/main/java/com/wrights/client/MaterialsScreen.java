@@ -80,7 +80,7 @@ public class MaterialsScreen extends Screen {
 
     @Override
     protected void init() {
-        panelW = Math.min(420, this.width - 16);
+        panelW = Math.min(480, this.width - 16);
         panelH = Math.min(240, this.height - 16);
         panelX = (this.width - panelW) / 2;
         panelY = (this.height - panelH) / 2;
@@ -131,14 +131,17 @@ public class MaterialsScreen extends Screen {
             return;
         }
         int right = panelX + panelW - 18;
-        int needX = right - COUNT_W;
-        int haveX = needX - 8 - COUNT_W;
+        int inventoryW = Math.max(COUNT_W, this.font.width(Component.translatable("menu.wrights.column_inventory").getString()));
+        int inventoryX = right - inventoryW;
+        int needX = inventoryX - 8 - COUNT_W;
+        int playerX = needX - 8 - COUNT_W;
         int iconX = panelX + 16;
         int nameX = iconX + 22;
-        int nameW = Math.max(16, haveX - nameX - 6);
-        drawColumn(graphics, Component.translatable("menu.wrights.column_material"), iconX, listY + 2, false);
-        drawColumn(graphics, Component.translatable("menu.wrights.column_have"), haveX, listY + 2, true);
-        drawColumn(graphics, Component.translatable("menu.wrights.column_need"), needX, listY + 2, true);
+        int nameW = Math.max(16, playerX - nameX - 6);
+        drawColumn(graphics, Component.translatable("menu.wrights.column_material"), iconX, listY + 2, COUNT_W, false);
+        drawColumn(graphics, Component.translatable("menu.wrights.column_player"), playerX, listY + 2, COUNT_W, true);
+        drawColumn(graphics, Component.translatable("menu.wrights.column_need"), needX, listY + 2, COUNT_W, true);
+        drawColumn(graphics, Component.translatable("menu.wrights.column_inventory"), inventoryX, listY + 2, inventoryW, true);
         graphics.fill(panelX + 16, listY + HEADER - 2, right, listY + HEADER - 1, 0xFF31404E);
         int rows = Math.max(1, (listH - HEADER) / ROW);
         int bodyY = listY + HEADER;
@@ -152,14 +155,14 @@ public class MaterialsScreen extends Screen {
             }
             int y = bodyY + (i - scroll) * ROW;
             ItemStack stack = new ItemStack(item);
-            int have = line.have();
-            int color = creative ? WrightsUi.BLUE : (have >= line.count() ? GREEN : RED);
+            int color = creative ? WrightsUi.BLUE : (line.player() + line.supply() >= line.count() ? GREEN : RED);
             WrightsUi.slot(graphics, iconX, y, 0xFF31404E);
             graphics.renderItem(stack, iconX + 1, y + 1);
             String name = this.font.plainSubstrByWidth(stack.getHoverName().getString(), nameW);
             graphics.drawString(this.font, name, nameX, y + 5, WrightsUi.TEXT, false);
-            drawCount(graphics, Integer.toString(have), haveX, y + 5, color);
-            drawCount(graphics, Integer.toString(line.count()), needX, y + 5, WrightsUi.TEXT);
+            drawCount(graphics, Integer.toString(line.player()), playerX, y + 5, COUNT_W, color);
+            drawCount(graphics, Integer.toString(line.count()), needX, y + 5, COUNT_W, WrightsUi.TEXT);
+            drawCount(graphics, Integer.toString(line.supply()), inventoryX, y + 5, inventoryW, color);
             if (mouseX >= iconX && mouseX < right && mouseY >= y && mouseY < y + ROW) {
                 hovered = stack;
             }
@@ -170,14 +173,14 @@ public class MaterialsScreen extends Screen {
         }
     }
 
-    private void drawColumn(GuiGraphics graphics, Component label, int x, int y, boolean count) {
+    private void drawColumn(GuiGraphics graphics, Component label, int x, int y, int width, boolean count) {
         String text = label.getString();
-        int drawX = count ? x + COUNT_W - this.font.width(text) : x;
+        int drawX = count ? x + width - this.font.width(text) : x;
         graphics.drawString(this.font, text, drawX, y, WrightsUi.MUTED, false);
     }
 
-    private void drawCount(GuiGraphics graphics, String text, int x, int y, int color) {
-        graphics.drawString(this.font, text, x + COUNT_W - this.font.width(text), y, color, false);
+    private void drawCount(GuiGraphics graphics, String text, int x, int y, int width, int color) {
+        graphics.drawString(this.font, text, x + width - this.font.width(text), y, color, false);
     }
 
     @Override

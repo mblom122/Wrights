@@ -19,9 +19,9 @@ import net.minecraft.world.level.block.state.BlockState;
 import com.wrights.util.BlockFilters;
 
 public final class Requirements {
-    public record Cost(int itemId, int count, int have) {
+    public record Cost(int itemId, int count, int player, int supply) {
         public Cost(int itemId, int count) {
-            this(itemId, count, 0);
+            this(itemId, count, 0, 0);
         }
     }
 
@@ -62,7 +62,8 @@ public final class Requirements {
     public static List<Cost> stocked(ServerPlayer player, List<Cost> costs, BlockPos supply) {
         List<Cost> stocked = new ArrayList<>(costs.size());
         for (Cost cost : costs) {
-            stocked.add(new Cost(cost.itemId(), cost.count(), available(player, supply, Item.byId(cost.itemId()))));
+            Item item = Item.byId(cost.itemId());
+            stocked.add(new Cost(cost.itemId(), cost.count(), playerCount(player, item), supplyCount(player, supply, item)));
         }
         return stocked;
     }
@@ -73,29 +74,33 @@ public final class Requirements {
         }
         List<Cost> missing = new ArrayList<>();
         for (Cost cost : stocked(player, costs, supply)) {
-            if (cost.have() < cost.count()) {
+            if (cost.player() + cost.supply() < cost.count()) {
                 missing.add(cost);
             }
         }
         return missing;
     }
 
-    public static int available(ServerPlayer player, BlockPos supply, Item item) {
-        int have = player.getInventory().countItem(item);
+    public static int playerCount(ServerPlayer player, Item item) {
+        return player.getInventory().countItem(item);
+    }
+
+    public static int supplyCount(ServerPlayer player, BlockPos supply, Item item) {
         if (!(player.level() instanceof ServerLevel level) || supply == null || !level.mayInteract(player, supply)) {
-            return have;
+            return 0;
         }
         Container container = containerAt(level, supply);
         if (container == null) {
-            return have;
+            return 0;
         }
+        int stored = 0;
         for (int slot = 0; slot < container.getContainerSize(); slot++) {
             ItemStack stack = container.getItem(slot);
             if (stack.is(item)) {
-                have += stack.getCount();
+                stored += stack.getCount();
             }
         }
-        return have;
+        return stored;
     }
 
     private static Container containerAt(ServerLevel level, BlockPos pos) {

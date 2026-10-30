@@ -331,7 +331,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record MaterialLine(int itemId, int count, int have) {
+    public record MaterialLine(int itemId, int count, int player, int supply) {
     }
 
     public record MaterialsRequest(UUID id, int clipX, int clipY, int clipZ, boolean placeFluids) implements CustomPacketPayload {
@@ -363,7 +363,8 @@ public final class BlueprintPayloads {
             for (MaterialLine line : lines) {
                 buf.writeVarInt(line.itemId());
                 buf.writeVarInt(line.count());
-                buf.writeVarInt(line.have());
+                buf.writeVarInt(line.player());
+                buf.writeVarInt(line.supply());
             }
         }
 
@@ -373,7 +374,7 @@ public final class BlueprintPayloads {
             int count = buf.readVarInt();
             List<MaterialLine> lines = new ArrayList<>(count);
             for (int i = 0; i < count; i++) {
-                lines.add(new MaterialLine(buf.readVarInt(), buf.readVarInt(), buf.readVarInt()));
+                lines.add(new MaterialLine(buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt()));
             }
             return new Materials(id, shortage, lines);
         }

@@ -117,7 +117,7 @@ public final class BlueprintNetwork {
     public static void materials(ServerPlayer player, java.util.UUID id, boolean shortage, java.util.List<Requirements.Cost> costs) {
         java.util.List<BlueprintPayloads.MaterialLine> lines = new java.util.ArrayList<>(costs.size());
         for (Requirements.Cost cost : costs) {
-            lines.add(new BlueprintPayloads.MaterialLine(cost.itemId(), cost.count(), cost.have()));
+            lines.add(new BlueprintPayloads.MaterialLine(cost.itemId(), cost.count(), cost.player(), cost.supply()));
         }
         PacketDistributor.sendToPlayer(player, new BlueprintPayloads.Materials(id, shortage, lines));
     }
