@@ -2354,6 +2354,24 @@ public class WrightsMenuScreen extends Screen {
         refresh();
     }
 
+    /** The row under the one being removed, or the one above it when it was last. */
+    private UUID neighborAfterDelete(UUID id) {
+        for (int i = 0; i < rows.size(); i++) {
+            if (!rows.get(i).id().equals(id)) {
+                continue;
+            }
+            if (i + 1 < rows.size()) {
+                return rows.get(i + 1).id();
+            }
+            if (i > 0) {
+                scroll = Math.min(scroll, i - 1);
+                return rows.get(i - 1).id();
+            }
+            return null;
+        }
+        return null;
+    }
+
     private void delete() {
         BlueprintList.Row row = selectedRow();
         if (row == null) {
@@ -2366,9 +2384,7 @@ public class WrightsMenuScreen extends Screen {
                 PacketDistributor.sendToServer(new BlueprintPayloads.DeleteBlueprint(row.id()));
             }
             confirmDelete = null;
-            if (row.id().equals(WrightsClientState.selected)) {
-                WrightsClientState.selected = null;
-            }
+            WrightsClientState.selected = neighborAfterDelete(row.id());
         } else {
             confirmDelete = row.id();
         }
