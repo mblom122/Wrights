@@ -14,8 +14,10 @@ import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.Sheets;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.Container;
 import net.minecraft.world.level.Level;
@@ -469,7 +471,7 @@ public final class SelectionRenderer {
         MultiBufferSource output = buffers;
         if (alpha < 0.996F && buffers instanceof MultiBufferSource.BufferSource source) {
             int packed = Math.round(alpha * 255.0F);
-            output = type -> new GhostConsumer(source.getBuffer(RenderType.translucent()), packed);
+            output = type -> new GhostConsumer(source.getBuffer(ghostLayer(type)), packed);
         }
         renderer.renderSingleBlock(state, pose, output, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
         pose.popPose();
@@ -527,6 +529,48 @@ public final class SelectionRenderer {
         double distance = distanceSq[first];
         distanceSq[first] = distanceSq[second];
         distanceSq[second] = distance;
+    }
+
+    /**
+     * Ordinary blocks share the block atlas, so they can fade on the translucent layer.
+     * Chests, shulkers, beds, banners and pots use their own atlas; drawing those UVs on the block atlas shows a collage of item sprites.
+     */
+    private static RenderType ghostLayer(RenderType type) {
+        if (usesBlockAtlas(type)) {
+            return RenderType.translucent();
+        }
+        if (type == Sheets.chestSheet()) {
+            return RenderType.entityTranslucentCull(Sheets.CHEST_SHEET);
+        }
+        if (type == Sheets.shulkerBoxSheet()) {
+            return RenderType.entityTranslucent(Sheets.SHULKER_SHEET);
+        }
+        if (type == Sheets.signSheet()) {
+            return RenderType.entityTranslucent(Sheets.SIGN_SHEET);
+        }
+        if (type == Sheets.bedSheet()) {
+            return RenderType.entityTranslucentCull(Sheets.BED_SHEET);
+        }
+        if (type == Sheets.bannerSheet() || type == RenderType.entitySolid(Sheets.BANNER_SHEET)) {
+            return RenderType.entityTranslucent(Sheets.BANNER_SHEET);
+        }
+        if (type == RenderType.entitySolid(Sheets.DECORATED_POT_SHEET)) {
+            return RenderType.entityTranslucentCull(Sheets.DECORATED_POT_SHEET);
+        }
+        return type;
+    }
+
+    private static boolean usesBlockAtlas(RenderType type) {
+        return type == RenderType.solid()
+                || type == RenderType.cutout()
+                || type == RenderType.cutoutMipped()
+                || type == RenderType.translucent()
+                || type == RenderType.tripwire()
+                || type == Sheets.solidBlockSheet()
+                || type == Sheets.cutoutBlockSheet()
+                || type == Sheets.translucentCullBlockSheet()
+                || type == Sheets.translucentItemSheet()
+                || type == RenderType.entityCutoutNoCull(TextureAtlas.LOCATION_BLOCKS);
     }
 
     private static final class GhostConsumer implements VertexConsumer {
