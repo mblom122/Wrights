@@ -33,6 +33,11 @@ public final class ModDataComponents {
                     .persistent(CompoundTag.CODEC)
                     .networkSynchronized(ByteBufCodecs.TRUSTED_COMPOUND_TAG));
 
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<String>> PORT_NAME =
+            DATA_COMPONENTS.registerComponentType("port_name", builder -> builder
+                    .persistent(Codec.STRING)
+                    .networkSynchronized(ByteBufCodecs.stringUtf8(32)));
+
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> WRIGHT_TIER =
             DATA_COMPONENTS.registerComponentType("wright_tier", builder -> builder
                     .persistent(Codec.INT)

@@ -65,6 +65,10 @@ public class WrightportBlock extends BaseEntityBlock {
             if (placer instanceof Player player) {
                 port.assignOwner(player.getUUID(), player.getGameProfile().getName());
             }
+            String carried = com.wrights.item.WrightportBlockItem.labelOf(stack);
+            if (!carried.isBlank()) {
+                port.setLabel(carried);
+            }
             port.setSwarm(Swarm.from(stack));
         }
     }
@@ -98,6 +102,7 @@ public class WrightportBlock extends BaseEntityBlock {
             if (!swarm.units().isEmpty()) {
                 Swarm.write(stack, swarm);
             }
+            com.wrights.item.WrightportBlockItem.writeLabel(stack, port.label());
         }
         return List.of(stack);
     }

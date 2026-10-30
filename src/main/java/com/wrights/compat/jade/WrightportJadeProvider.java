@@ -20,6 +20,9 @@ public enum WrightportJadeProvider implements IBlockComponentProvider {
     @Override
     public void appendTooltip(ITooltip tooltip, BlockAccessor accessor, IPluginConfig config) {
         if (accessor.getBlockEntity() instanceof WrightportBlockEntity port) {
+            if (!port.label().isBlank()) {
+                tooltip.add(port.title());
+            }
             tooltip.add(port.ownerLabel());
             tooltip.add(Component.translatable("item.wrights.personal_wrightport.drones", port.swarm().units().size(), Swarm.capacity()));
         }

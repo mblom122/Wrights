@@ -45,6 +45,7 @@ import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import com.wrights.WrightsConfig;
+import com.wrights.block.WrightportBlockEntity;
 import com.wrights.blueprint.BlueprintActions;
 import com.wrights.blueprint.BlueprintSessions;
 import com.wrights.blueprint.BoxEdits;
@@ -1356,7 +1357,7 @@ public final class JobManager {
             job.setPaused(true);
             changed = true;
             if (shown != null) {
-                Messages.actionBar(player, message, shown.getX(), shown.getY(), shown.getZ());
+                tellPortAt(player, player.getServer().getLevel(job.dimension()), shown, message, "message.wrights.paused_port_range_named");
             }
             BlueprintNetwork.syncJobs(player);
         } else if (job.tickMessage()) {
@@ -1847,7 +1848,7 @@ public final class JobManager {
         if (fromBlock && origin != null && level != null && !level.isLoaded(origin)) {
             Messages.actionBar(player, "message.wrights.paused_chunk");
         } else if (fromBlock && origin != null && !WrightHomes.portCovers(job.dimension(), origin, job.dimension(), job.min()) && !playerNear) {
-            Messages.actionBar(player, "message.wrights.resume_port_far", origin.getX(), origin.getY(), origin.getZ());
+            tellPortAt(player, level, origin, "message.wrights.resume_port_far", "message.wrights.resume_port_far_named");
         } else if (!fromBlock && !playerNear && ports == 0) {
             Messages.actionBar(player, "message.wrights.resume_player_far");
         } else {
@@ -2051,7 +2052,7 @@ public final class JobManager {
             job.noteHold(BuildJob.HOLD_NO_WRIGHTS, null);
             job.setPaused(true);
             dirty = true;
-            Messages.actionBar(player, noCrewMessage(player, job, true));
+            tellNoCrew(player, job, true);
             if (crewGap(player, job) != CrewGap.NONE_AVAILABLE) {
                 glowClosestPort(player, player.getServer().getLevel(job.dimension()), job.min());
             }
@@ -2070,6 +2071,47 @@ public final class JobManager {
         PORT_EMPTY
     }
 
+    private static void tellNoCrew(ServerPlayer player, BuildJob job, boolean paused) {
+        if (crewGap(player, job) == CrewGap.PORT_EMPTY) {
+            ServerLevel level = player.getServer().getLevel(job.dimension());
+            tellEmptyPort(player, level, job.min(), paused);
+            return;
+        }
+        Messages.actionBar(player, noCrewMessage(player, job, paused));
+    }
+
+    private static void tellEmptyPort(ServerPlayer player, ServerLevel level, BlockPos site, boolean paused) {
+        BlockPos covered = level == null || site == null ? null : WrightHomes.closestPort(level, site, player.getUUID(), true);
+        String name = portLabel(player, level, covered);
+        if (name.isBlank()) {
+            Messages.actionBar(player, paused ? "message.wrights.paused_port_empty" : "message.wrights.port_empty");
+        } else {
+            Messages.actionBar(player, paused ? "message.wrights.paused_port_empty_named" : "message.wrights.port_empty_named", name);
+        }
+    }
+
+    private static void tellPortAt(ServerPlayer player, ServerLevel level, BlockPos pos, String plainKey, String namedKey) {
+        String name = portLabel(player, level, pos);
+        if (name.isBlank() || pos == null) {
+            Messages.actionBar(player, plainKey, pos == null ? 0 : pos.getX(), pos == null ? 0 : pos.getY(), pos == null ? 0 : pos.getZ());
+        } else {
+            Messages.actionBar(player, namedKey, name, pos.getX(), pos.getY(), pos.getZ());
+        }
+    }
+
+    private static String portLabel(ServerPlayer player, ServerLevel level, BlockPos pos) {
+        if (pos == null) {
+            return "";
+        }
+        if (level != null && level.getBlockEntity(pos) instanceof WrightportBlockEntity port && !port.label().isBlank()) {
+            return port.label();
+        }
+        if (player.getServer() == null || level == null) {
+            return "";
+        }
+        return com.wrights.drone.WrightLedger.get(player.getServer()).label(level.dimension().location().toString(), pos);
+    }
+
     private static String noCrewMessage(ServerPlayer player, BuildJob job, boolean paused) {
         return switch (crewGap(player, job)) {
             case NONE_AVAILABLE -> paused ? "message.wrights.paused_none_available" : "message.wrights.none_available";
@@ -2086,9 +2128,11 @@ public final class JobManager {
         if (owned > 0) {
             return true;
         }
-        Messages.actionBar(player, reach.ports() > 0 && reach.personal() == 0
-                ? "message.wrights.port_empty"
-                : "message.wrights.none_in_range");
+        if (reach.ports() > 0 && reach.personal() == 0) {
+            tellEmptyPort(player, level, site, false);
+        } else {
+            Messages.actionBar(player, "message.wrights.none_in_range");
+        }
         glowClosestPort(player, level, site);
         return false;
     }
@@ -2151,7 +2195,7 @@ public final class JobManager {
         int wanted = requested > 0 ? Math.min(requested, room) : room;
         List<WrightHomes.FreeWright> units = freeUnits(player, library, job, wanted);
         if (units.isEmpty()) {
-            Messages.actionBar(player, noCrewMessage(player, job, false));
+            tellNoCrew(player, job, false);
             if (crewGap(player, job) != CrewGap.NONE_AVAILABLE) {
                 glowClosestPort(player, player.getServer().getLevel(job.dimension()), job.min());
             }

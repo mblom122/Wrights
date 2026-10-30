@@ -19,6 +19,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.Util;
 import net.neoforged.neoforge.network.PacketDistributor;
 
+import com.wrights.block.WrightportBlockEntity;
 import com.wrights.WrightsClientConfig;
 import com.wrights.WrightsConfig;
 import com.wrights.drone.Swarm;
@@ -64,6 +65,9 @@ public class WrightsMenuScreen extends Screen {
     private long lastClick;
     private EditBox search;
     private EditBox rename;
+    private EditBox portRename;
+    private String portRenameDim = "";
+    private BlockPos portRenamePos;
     private WrightsButton newButton;
     private WrightsButton folderButton;
     private WrightsButton sortButton;
@@ -293,6 +297,11 @@ public class WrightsMenuScreen extends Screen {
         rename = new EditBox(this.font, detailX + 4, detailSplit + 52, Math.max(40, detailW - 86), 14, Component.translatable("screen.wrights.name"));
         rename.setMaxLength(48);
         addRenderableWidget(rename);
+        portRename = new EditBox(this.font, 0, 0, 80, 14, Component.translatable("screen.wrights.name"));
+        portRename.setMaxLength(32);
+        portRename.setHint(Component.translatable("screen.wrights.name"));
+        portRename.visible = false;
+        addRenderableWidget(portRename);
 
         int y = panelY + panelH - 48;
         int gap = 4;
@@ -366,6 +375,7 @@ public class WrightsMenuScreen extends Screen {
         savedOptionScroll = optionScroll;
         savedInfoScroll = infoScroll;
         savedSearch = searchText == null ? "" : searchText;
+        finishPortRename(true);
         super.removed();
     }
 
@@ -498,6 +508,9 @@ public class WrightsMenuScreen extends Screen {
             sortOpen = false;
         }
         rename.visible = building;
+        if (portRename != null) {
+            portRename.visible = managePage && manageTab == 1 && portRenamePos != null;
+        }
         newButton.visible = building;
         if (folderButton != null) {
             folderButton.visible = building;
@@ -761,6 +774,7 @@ public class WrightsMenuScreen extends Screen {
         optionViewW = panelX + panelW - 16 - optionViewX;
         optionViewH = panelH - 76;
         int x = optionViewX + 10;
+        int controls = optionControlsX(x);
         int local = 2;
         hologramHeadY = optionY(local);
         optionPreviewX = x + 220;
@@ -768,29 +782,30 @@ public class WrightsMenuScreen extends Screen {
         local = 22;
         wallSwatchY = optionY(local - 2);
         local += 20;
-        wallSliderX = x + 108;
+        int sliderW = Mth.clamp(optionViewX + optionViewW - 18 - controls - 42, 48, 120);
+        wallSliderX = controls;
         wallSliderY = optionY(local);
-        wallSliderW = 120;
+        wallSliderW = sliderW;
         placeField(wallPercent, wallSliderX + wallSliderW + 8, wallSliderY - 4);
         local += 22;
         edgeSwatchY = optionY(local - 2);
         local += 20;
-        edgeSliderX = x + 108;
+        edgeSliderX = controls;
         edgeSliderY = optionY(local);
-        edgeSliderW = 120;
+        edgeSliderW = sliderW;
         placeField(edgePercent, edgeSliderX + edgeSliderW + 8, edgeSliderY - 4);
         local += 22;
         queueEdgeSwatchY = optionY(local - 2);
         local += 20;
-        ghostSliderX = x + 108;
+        ghostSliderX = controls;
         ghostSliderY = optionY(local);
-        ghostSliderW = 120;
+        ghostSliderW = sliderW;
         placeField(ghostPercent, ghostSliderX + ghostSliderW + 8, ghostSliderY - 4);
         local += 24;
         boolean marks = WrightsClientConfig.CORNER_MARKERS.get();
         Component state = Component.translatable(marks ? "menu.wrights.on" : "menu.wrights.off");
         markerW = Math.max(36, this.font.width(state) + 16);
-        markerX = x + 108;
+        markerX = controls;
         markerY = optionY(local - 3);
         local += 28;
         buildHeadY = optionY(local);
@@ -799,31 +814,30 @@ public class WrightsMenuScreen extends Screen {
         boolean instant = paceChoice && WrightsClientConfig.INSTANT_JOBS.get();
         Component pace = Component.translatable(instant ? "menu.wrights.instant" : "menu.wrights.drone_pace");
         instantW = Math.max(52, this.font.width(pace) + 16);
-        instantX = x + 108;
+        instantX = controls;
         instantY = optionY(local - 3);
         local += 24;
-        boolean droneMax = WrightsClientConfig.DRONE_MAX.get();
-        Component droneMode = droneModeLabel(droneMax);
-        droneW = Math.max(52, this.font.width(droneMode) + 16);
-        droneX = x + 108;
         droneY = optionY(local - 3);
-        droneMinusX = droneX + droneW + 8;
+        droneMinusX = controls;
         dronePlusX = droneMinusX + 36;
+        Component maxLabel = Component.translatable("menu.wrights.drone_max", WrightsConfig.maxWrightsPerJob());
+        droneW = this.font.width(maxLabel) + 12;
+        droneX = dronePlusX + 22;
         local += 24;
         Component queueState = Component.translatable(WrightsClientConfig.QUEUE_JOBS.get() ? "menu.wrights.on" : "menu.wrights.off");
         queueW = Math.max(36, this.font.width(queueState) + 16);
-        queueX = x + 108;
+        queueX = controls;
         queueY = optionY(local - 3);
         local += 24;
         Component youFirst = Component.translatable("menu.wrights.port_player_first");
         Component blockFirst = Component.translatable("menu.wrights.port_block_first");
         portOrderW = Math.max(this.font.width(youFirst), this.font.width(blockFirst)) + 16;
-        portOrderX = x + 108;
+        portOrderX = controls;
         portOrderY = optionY(local - 3);
         local += 24;
         Component menuState = Component.translatable(WrightsClientConfig.BUILD_MENU.get() ? "menu.wrights.on" : "menu.wrights.off");
         buildMenuW = Math.max(36, this.font.width(menuState) + 16);
-        buildMenuX = x + 108;
+        buildMenuX = controls;
         buildMenuY = optionY(local - 3);
         local += 24;
         optionPlaceY = optionY(local);
@@ -838,7 +852,7 @@ public class WrightsMenuScreen extends Screen {
         Component playerFirst = Component.translatable("menu.wrights.supply_player_first");
         Component chestFirst = Component.translatable("menu.wrights.supply_chest_first");
         supplyOrderW = Math.max(this.font.width(playerFirst), this.font.width(chestFirst)) + 16;
-        supplyOrderX = x + 108;
+        supplyOrderX = controls;
         supplyOrderY = optionY(local - 3);
         local += 28;
         messageHeadY = optionY(local);
@@ -847,7 +861,7 @@ public class WrightsMenuScreen extends Screen {
         hudPlaceW = Math.max(120, this.font.width(moveMessages) + 16);
         hudPlaceX = x;
         hudPlaceY = optionY(local);
-        swatchX = x + 110;
+        swatchX = controls;
         optionContentH = local + 28;
         int maxScroll = Math.max(0, optionContentH - optionViewH);
         int clamped = Mth.clamp(optionScroll, 0, maxScroll);
@@ -871,11 +885,30 @@ public class WrightsMenuScreen extends Screen {
         }
     }
 
-    private static Component droneModeLabel(boolean max) {
-        if (max) {
-            return Component.translatable("menu.wrights.drone_max", WrightsConfig.maxWrightsPerJob());
+    /** Shared left edge for the option controls, past the longest label and its help mark. */
+    private int optionControlsX(int labelX) {
+        String[] keys = {
+                "menu.wrights.wall_color",
+                "menu.wrights.wall_transparency",
+                "menu.wrights.edge_color",
+                "menu.wrights.queue_edge",
+                "menu.wrights.edge_opacity",
+                "menu.wrights.ghost_transparency",
+                "menu.wrights.corner_markers",
+                "menu.wrights.build_speed",
+                "menu.wrights.drone_deploy",
+                "menu.wrights.queue_jobs",
+                "menu.wrights.port_order",
+                "menu.wrights.open_build_menu",
+                "menu.wrights.supply_order"
+        };
+        int widest = 0;
+        for (String key : keys) {
+            widest = Math.max(widest, this.font.width(Component.translatable(key)));
         }
-        return Component.translatable("menu.wrights.drone_fixed");
+        int wanted = labelX + widest + 22;
+        int limit = optionViewX + optionViewW - 16 - 168;
+        return Math.max(labelX + 108, Math.min(wanted, Math.max(labelX + 108, limit)));
     }
 
     private void showOptionBox(EditBox box) {
@@ -927,28 +960,21 @@ public class WrightsMenuScreen extends Screen {
         WrightsUi.border(graphics, instantX, instantY, instantW, 16, edge);
         graphics.drawCenteredString(this.font, pace, instantX + instantW / 2, instantY + 4, text);
         drawOptionHelp(graphics, mouseX, mouseY, x, instantY + 3, speedLabel, instantX, instantX + instantW, Component.translatable(paceChoice ? "menu.wrights.build_speed_hint" : "menu.wrights.build_speed_locked"));
-        boolean droneMax = WrightsClientConfig.DRONE_MAX.get();
         Component droneLabel = Component.translatable("menu.wrights.drone_deploy");
         graphics.drawString(this.font, droneLabel, x, droneY + 3, WrightsUi.MUTED, false);
-        Component droneMode = droneModeLabel(droneMax);
-        graphics.fill(droneX, droneY, droneX + droneW, droneY + 16, droneMax ? 0xFF24384A : 0xFF18222C);
-        WrightsUi.border(graphics, droneX, droneY, droneW, 16, droneMax ? WrightsUi.COPPER : 0xFF3D4E5E);
-        graphics.drawCenteredString(this.font, droneMode, droneX + droneW / 2, droneY + 4, WrightsUi.TEXT);
-        if (!droneMax) {
-            graphics.fill(droneMinusX, droneY, droneMinusX + 16, droneY + 16, 0xFF18222C);
-            WrightsUi.border(graphics, droneMinusX, droneY, 16, 16, 0xFF3D4E5E);
-            graphics.drawCenteredString(this.font, "-", droneMinusX + 8, droneY + 4, WrightsUi.TEXT);
-            String count = Integer.toString(Math.min(WrightsClientConfig.DRONE_COUNT.get(), WrightsConfig.maxWrightsPerJob()));
-            graphics.drawCenteredString(this.font, count, droneMinusX + 26, droneY + 4, WrightsUi.TEXT);
-            graphics.fill(dronePlusX, droneY, dronePlusX + 16, droneY + 16, 0xFF18222C);
-            WrightsUi.border(graphics, dronePlusX, droneY, 16, 16, 0xFF3D4E5E);
-            graphics.drawCenteredString(this.font, "+", dronePlusX + 8, droneY + 4, WrightsUi.TEXT);
-        }
-        int droneRight = droneMax ? droneX + droneW : dronePlusX + 16;
-        Component droneHint = droneMax
-                ? Component.translatable("menu.wrights.drone_max_hint", WrightsConfig.maxWrightsPerJob())
-                : Component.translatable("menu.wrights.drone_fixed_hint");
-        drawOptionHelp(graphics, mouseX, mouseY, x, droneY + 3, droneLabel, droneX, droneRight, droneHint);
+        graphics.fill(droneMinusX, droneY, droneMinusX + 16, droneY + 16, 0xFF18222C);
+        WrightsUi.border(graphics, droneMinusX, droneY, 16, 16, 0xFF3D4E5E);
+        graphics.drawCenteredString(this.font, "-", droneMinusX + 8, droneY + 4, WrightsUi.TEXT);
+        String count = Integer.toString(WrightsClientConfig.droneCount());
+        graphics.drawCenteredString(this.font, count, droneMinusX + 26, droneY + 4, WrightsUi.TEXT);
+        graphics.fill(dronePlusX, droneY, dronePlusX + 16, droneY + 16, 0xFF18222C);
+        WrightsUi.border(graphics, dronePlusX, droneY, 16, 16, 0xFF3D4E5E);
+        graphics.drawCenteredString(this.font, "+", dronePlusX + 8, droneY + 4, WrightsUi.TEXT);
+        boolean atMax = WrightsClientConfig.droneCount() >= WrightsConfig.maxWrightsPerJob();
+        graphics.fill(droneX, droneY, droneX + droneW, droneY + 16, atMax ? 0xFF24384A : 0xFF18222C);
+        WrightsUi.border(graphics, droneX, droneY, droneW, 16, atMax ? WrightsUi.COPPER : 0xFF3D4E5E);
+        graphics.drawCenteredString(this.font, Component.translatable("menu.wrights.drone_max", WrightsConfig.maxWrightsPerJob()), droneX + droneW / 2, droneY + 4, WrightsUi.TEXT);
+        drawOptionHelp(graphics, mouseX, mouseY, x, droneY + 3, droneLabel, droneMinusX, droneX + droneW, Component.translatable("menu.wrights.drone_fixed_hint"));
         boolean queueJobs = WrightsClientConfig.QUEUE_JOBS.get();
         Component queueLabel = Component.translatable("menu.wrights.queue_jobs");
         graphics.drawString(this.font, queueLabel, x, queueY + 3, WrightsUi.MUTED, false);
@@ -1407,13 +1433,13 @@ public class WrightsMenuScreen extends Screen {
                     }
                     return true;
                 }
-                if (mouseX >= droneX && mouseX < droneX + droneW && mouseY >= droneY && mouseY < droneY + 16) {
-                    WrightsClientState.deployChosen = false;
-                    WrightsClientConfig.setDroneMax(!WrightsClientConfig.DRONE_MAX.get());
-                    WrightsClientState.applyDeploy();
-                    return true;
-                }
-                if (!WrightsClientConfig.DRONE_MAX.get() && mouseY >= droneY && mouseY < droneY + 16) {
+                if (mouseY >= droneY && mouseY < droneY + 16) {
+                    if (mouseX >= droneX && mouseX < droneX + droneW) {
+                        WrightsClientState.deployChosen = false;
+                        WrightsClientConfig.setDroneCount(WrightsConfig.maxWrightsPerJob());
+                        WrightsClientState.applyDeploy();
+                        return true;
+                    }
                     int step = 0;
                     if (mouseX >= droneMinusX && mouseX < droneMinusX + 16) {
                         step = -1;
@@ -1422,7 +1448,7 @@ public class WrightsMenuScreen extends Screen {
                     }
                     if (step != 0) {
                         WrightsClientState.deployChosen = false;
-                        WrightsClientConfig.setDroneCount(WrightsClientState.stepped(WrightsClientConfig.DRONE_COUNT.get(), step, 1, WrightsConfig.maxWrightsPerJob()));
+                        WrightsClientConfig.setDroneCount(WrightsClientState.stepped(WrightsClientConfig.droneCount(), step, 1, WrightsConfig.maxWrightsPerJob()));
                         WrightsClientState.applyDeploy();
                         return true;
                     }
@@ -1596,6 +1622,10 @@ public class WrightsMenuScreen extends Screen {
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (managePage && keyCode == 256) {
+            if (portRenamePos != null) {
+                finishPortRename(false);
+                return true;
+            }
             if (manage.closeTop()) {
                 return true;
             }
@@ -1609,6 +1639,10 @@ public class WrightsMenuScreen extends Screen {
             if (sortButton != null) {
                 sortButton.setPicked(false);
             }
+            return true;
+        }
+        if (portRename != null && portRename.visible && portRename.isFocused() && (keyCode == 257 || keyCode == 335)) {
+            finishPortRename(true);
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
@@ -1877,7 +1911,7 @@ public class WrightsMenuScreen extends Screen {
         graphics.fill(x, y, x + width, y + 66, hover ? 0xFF24303C : 0xFF18222C);
         String name = this.font.plainSubstrByWidth(job.name(), Math.max(40, width / 2));
         graphics.drawString(this.font, name, x + 6, y + 4, WrightsUi.TEXT, false);
-        Component statusText = Component.translatable(jobStatus(job));
+        Component statusText = jobStatusText(job);
         graphics.drawString(this.font, statusText, x + width - 8 - this.font.width(statusText), y + 4, jobColor(job), false);
         Component source = jobSource(job);
         if (!source.getString().isEmpty()) {
@@ -1916,7 +1950,7 @@ public class WrightsMenuScreen extends Screen {
     private void drawJobTooltip(GuiGraphics graphics, int mouseX, int mouseY, BlueprintPayloads.JobLine job) {
         List<FormattedCharSequence> lines = new ArrayList<>();
         lines.add(Component.literal(job.name()).getVisualOrderText());
-        lines.add(Component.translatable(jobStatus(job)).getVisualOrderText());
+        lines.add(jobStatusText(job).getVisualOrderText());
         lines.add(progressLine(job).getVisualOrderText());
         Component wait = WrightsClientState.jobWait(job);
         if (wait != null) {
@@ -1934,6 +1968,14 @@ public class WrightsMenuScreen extends Screen {
             return Component.translatable("menu.wrights.job_drone_queued", job.crew().size(), Math.max(job.crew().size(), job.quota())).getString();
         }
         return Component.translatable("menu.wrights.job_drone_count", job.crew().size()).getString();
+    }
+
+    private Component jobStatusText(BlueprintPayloads.JobLine job) {
+        String named = job.sourceName();
+        if (named != null && !named.isBlank() && job.hold() == com.wrights.job.BuildJob.HOLD_PORT_RANGE && !job.finished() && !job.saving() && !job.undoing()) {
+            return Component.translatable("menu.wrights.hold_port_named", named);
+        }
+        return Component.translatable(jobStatus(job));
     }
 
     private String jobStatus(BlueprintPayloads.JobLine job) {
@@ -1978,14 +2020,24 @@ public class WrightsMenuScreen extends Screen {
     private Component jobSource(BlueprintPayloads.JobLine job) {
         BlockPos at = job.sourcePort();
         boolean coords = job.labelPort() && at != null && !at.equals(BlockPos.ZERO);
+        String named = job.sourceName();
+        boolean hasName = named != null && !named.isBlank();
         return switch (job.source()) {
             case 1 -> Component.translatable("menu.wrights.job_from_you");
-            case 2 -> coords
-                    ? Component.translatable("menu.wrights.job_from_port_at", at.getX(), at.getY(), at.getZ())
-                    : Component.translatable("menu.wrights.job_from_port");
-            case 3 -> coords
-                    ? Component.translatable("menu.wrights.job_from_both_at", at.getX(), at.getY(), at.getZ())
-                    : Component.translatable("menu.wrights.job_from_both");
+            case 2 -> hasName
+                    ? (coords
+                            ? Component.translatable("menu.wrights.job_from_port_named_at", named, at.getX(), at.getY(), at.getZ())
+                            : Component.translatable("menu.wrights.job_from_port_named", named))
+                    : (coords
+                            ? Component.translatable("menu.wrights.job_from_port_at", at.getX(), at.getY(), at.getZ())
+                            : Component.translatable("menu.wrights.job_from_port"));
+            case 3 -> hasName
+                    ? (coords
+                            ? Component.translatable("menu.wrights.job_from_both_named_at", named, at.getX(), at.getY(), at.getZ())
+                            : Component.translatable("menu.wrights.job_from_both_named", named))
+                    : (coords
+                            ? Component.translatable("menu.wrights.job_from_both_at", at.getX(), at.getY(), at.getZ())
+                            : Component.translatable("menu.wrights.job_from_both"));
             default -> Component.empty();
         };
     }
@@ -2218,6 +2270,7 @@ public class WrightsMenuScreen extends Screen {
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         if (managePage) {
             if (manageTab == 1 && mouseY >= placedListTop() && mouseY < placedListTop() + placedShown() * 18) {
+                finishPortRename(true);
                 int max = Math.max(0, WrightsClientState.placedPorts.size() - placedShown());
                 placedScroll = Mth.clamp(placedScroll - (int) Math.signum(scrollY), 0, max);
                 return true;
@@ -3010,6 +3063,7 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private void leaveManage() {
+        finishPortRename(true);
         if (!managePage && !holding) {
             return;
         }
@@ -3211,8 +3265,14 @@ public class WrightsMenuScreen extends Screen {
             if (picked && placedReady()) {
                 units = WrightsClientState.placedSwarm.units().size();
             }
-            String text = this.font.plainSubstrByWidth(placedLine(port, units).getString(), Math.max(0, right - x - 8));
-            graphics.drawString(this.font, text, x + 6, rowY + 5, WrightsUi.TEXT, false);
+            if (renamingPort(port) && portRename != null) {
+                portRename.setX(x + 4);
+                portRename.setY(rowY + 2);
+                portRename.setWidth(Math.max(40, right - x - 10));
+            } else {
+                String text = this.font.plainSubstrByWidth(placedLine(port, units).getString(), Math.max(0, right - x - 8));
+                graphics.drawString(this.font, text, x + 6, rowY + 5, WrightsUi.TEXT, false);
+            }
         }
         if (placedPick != null && !placedReady()) {
             int noteY = top + h + 8;
@@ -3236,6 +3296,7 @@ public class WrightsMenuScreen extends Screen {
         if (creativeVisit()) {
             right = drawJobButton(graphics, right, y, "menu.wrights.visit", mouseX, mouseY, jobButtonWidth("menu.wrights.visit"));
         }
+        right = drawJobButton(graphics, right, y, "menu.wrights.rename", mouseX, mouseY, jobButtonWidth("menu.wrights.rename"));
         boolean marked = WrightsClientState.portMarked(port.dimension(), port.pos());
         String markKey = marked ? "menu.wrights.mark_on" : "menu.wrights.mark";
         return drawJobButton(graphics, right, y, markKey, mouseX, mouseY, jobButtonWidth(markKey), marked ? 0xFFF2D48A : 0);
@@ -3245,7 +3306,7 @@ public class WrightsMenuScreen extends Screen {
         String here = this.minecraft.level == null ? "" : this.minecraft.level.dimension().location().toString();
         if (here.equals(port.dimension())) {
             Component line = Component.translatable("menu.wrights.placed_line", port.pos().getX(), port.pos().getY(), port.pos().getZ(), units);
-            return port.unowned() ? line.copy().append(" · ").append(Component.translatable("block.wrights.wrightport.no_owner")) : line;
+            return withPortName(port, line);
         }
         String dim = port.dimension();
         int colon = dim.indexOf(':');
@@ -3253,7 +3314,59 @@ public class WrightsMenuScreen extends Screen {
             dim = dim.substring(colon + 1);
         }
         Component line = Component.translatable("menu.wrights.placed_line_dim", port.pos().getX(), port.pos().getY(), port.pos().getZ(), units, dim);
-        return port.unowned() ? line.copy().append(" · ").append(Component.translatable("block.wrights.wrightport.no_owner")) : line;
+        return withPortName(port, line);
+    }
+
+    private Component withPortName(BlueprintPayloads.PlacedPort port, Component line) {
+        String name = port.name();
+        Component shown = name == null || name.isBlank() ? line : WrightportBlockEntity.titled(name).copy().append(" · ").append(line);
+        if (port.unowned()) {
+            shown = shown.copy().append(" · ").append(Component.translatable("block.wrights.wrightport.no_owner"));
+        }
+        return shown;
+    }
+
+    private boolean renamingPort(BlueprintPayloads.PlacedPort port) {
+        return portRenamePos != null && port.dimension().equals(portRenameDim) && port.pos().equals(portRenamePos);
+    }
+
+    private void beginPortRename(BlueprintPayloads.PlacedPort port) {
+        if (portRename == null || port == null) {
+            return;
+        }
+        if (renamingPort(port)) {
+            portRename.setFocused(true);
+            setFocused(portRename);
+            return;
+        }
+        finishPortRename(true);
+        portRenameDim = port.dimension();
+        portRenamePos = port.pos();
+        portRename.setValue(port.name() == null ? "" : port.name());
+        portRename.setCursorPosition(portRename.getValue().length());
+        portRename.setHighlightPos(0);
+        portRename.setVisible(true);
+        portRename.setFocused(true);
+        setFocused(portRename);
+    }
+
+    private void finishPortRename(boolean send) {
+        if (portRenamePos == null || portRename == null) {
+            return;
+        }
+        String dim = portRenameDim;
+        BlockPos pos = portRenamePos;
+        String value = portRename.getValue();
+        portRenamePos = null;
+        portRenameDim = "";
+        portRename.setFocused(false);
+        portRename.setVisible(false);
+        if (getFocused() == portRename) {
+            setFocused(null);
+        }
+        if (send) {
+            PacketDistributor.sendToServer(new BlueprintPayloads.RenameWrightport(dim, pos, value));
+        }
     }
 
     private void drawManageTabs(GuiGraphics graphics, int mouseX, int mouseY) {
@@ -3293,6 +3406,7 @@ public class WrightsMenuScreen extends Screen {
         int x = portBarX();
         if (mouseX >= x && mouseX < x + personalW) {
             if (manageTab != 0) {
+                finishPortRename(true);
                 manageTab = 0;
                 portListOpen = false;
                 manage.resetView();
@@ -3339,6 +3453,9 @@ public class WrightsMenuScreen extends Screen {
             return true;
         }
         BlueprintPayloads.PlacedPort port = list.get(index);
+        if (portRename != null && portRename.visible && portRename.isMouseOver(mouseX, mouseY)) {
+            return false;
+        }
         int right = x + w - 4;
         int buttonY = top + row * 18 + 1;
         if (creativeVisit()) {
@@ -3350,6 +3467,12 @@ public class WrightsMenuScreen extends Screen {
             }
             right -= goW + 4;
         }
+        int renameW = jobButtonWidth("menu.wrights.rename");
+        if (hitWide(mouseX, mouseY, right, buttonY, renameW)) {
+            beginPortRename(port);
+            return true;
+        }
+        right -= renameW + 4;
         boolean marked = WrightsClientState.portMarked(port.dimension(), port.pos());
         String markKey = marked ? "menu.wrights.mark_on" : "menu.wrights.mark";
         int markW = jobButtonWidth(markKey);
@@ -3362,6 +3485,7 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private void pickPlaced(BlueprintPayloads.PlacedPort port) {
+        finishPortRename(true);
         if (!samePort(port, placedPick)) {
             manage.resetView();
         }

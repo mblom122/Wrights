@@ -63,7 +63,8 @@ public final class WrightLedger extends SavedData {
                 continue;
             }
             UUID owner = entry.hasUUID("owner") ? entry.getUUID("owner") : null;
-            ledger.ports.put(new Key(dimension.toString(), pos.asLong()), new Port(owner, Math.max(0, entry.getInt("units"))));
+            String name = entry.contains("name") ? WrightportBlockEntity.cleanLabel(entry.getString("name")) : "";
+            ledger.ports.put(new Key(dimension.toString(), pos.asLong()), new Port(owner, Math.max(0, entry.getInt("units")), name));
         }
         return ledger;
     }
@@ -81,11 +82,11 @@ public final class WrightLedger extends SavedData {
         return Math.max(0, WrightsConfig.maxWrightsOwned() - owned);
     }
 
-    public void remember(@javax.annotation.Nullable UUID owner, ResourceKey<Level> dimension, BlockPos pos, int units) {
+    public void remember(@javax.annotation.Nullable UUID owner, ResourceKey<Level> dimension, BlockPos pos, int units, String name) {
         if (dimension == null || pos == null) {
             return;
         }
-        Port next = new Port(owner, Math.max(0, units));
+        Port next = new Port(owner, Math.max(0, units), name == null ? "" : name);
         Port previous = ports.put(new Key(dimension.location().toString(), pos.asLong()), next);
         if (!next.equals(previous)) {
             setDirty();
@@ -109,7 +110,8 @@ public final class WrightLedger extends SavedData {
             if (holder != null && !holder.equals(owner)) {
                 continue;
             }
-            list.add(new Placed(entry.getKey().dimension, BlockPos.of(entry.getKey().pos), entry.getValue().units, holder == null));
+            String name = entry.getValue().name == null ? "" : entry.getValue().name;
+            list.add(new Placed(entry.getKey().dimension, BlockPos.of(entry.getKey().pos), entry.getValue().units, holder == null, name));
         }
         list.sort((a, b) -> {
             int dim = a.dimension.compareTo(b.dimension);
@@ -146,7 +148,7 @@ public final class WrightLedger extends SavedData {
             if (!(entity instanceof WrightportBlockEntity port)) {
                 continue;
             }
-            live.put(entity.getBlockPos().asLong(), new Port(port.owner(), port.swarm().units().size()));
+            live.put(entity.getBlockPos().asLong(), new Port(port.owner(), port.swarm().units().size(), port.label()));
         }
         boolean changed = false;
         Iterator<Map.Entry<Key, Port>> entries = ports.entrySet().iterator();
@@ -208,6 +210,9 @@ public final class WrightLedger extends SavedData {
             saved.putString("dim", dimension.toString());
             saved.put("pos", NbtUtils.writeBlockPos(BlockPos.of(entry.getKey().pos)));
             saved.putInt("units", entry.getValue().units);
+            if (entry.getValue().name != null && !entry.getValue().name.isBlank()) {
+                saved.putString("name", entry.getValue().name);
+            }
             list.add(saved);
         }
         tag.put("ports", list);
@@ -243,12 +248,20 @@ public final class WrightLedger extends SavedData {
         }
     }
 
-    public record Placed(String dimension, BlockPos pos, int units, boolean unowned) {
+    public String label(String dimension, BlockPos pos) {
+        if (dimension == null || pos == null) {
+            return "";
+        }
+        Port port = ports.get(new Key(dimension, pos.asLong()));
+        return port == null || port.name == null ? "" : port.name;
+    }
+
+    public record Placed(String dimension, BlockPos pos, int units, boolean unowned, String name) {
     }
 
     private record Key(String dimension, long pos) {
     }
 
-    private record Port(UUID owner, int units) {
+    private record Port(UUID owner, int units, String name) {
     }
 }

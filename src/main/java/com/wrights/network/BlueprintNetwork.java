@@ -62,6 +62,7 @@ public final class BlueprintNetwork {
         registrar.playToServer(BlueprintPayloads.PlacedVisit.TYPE, BlueprintPayloads.PlacedVisit.STREAM_CODEC, BlueprintNetwork::placedVisit);
         registrar.playToServer(BlueprintPayloads.PlacedEdit.TYPE, BlueprintPayloads.PlacedEdit.STREAM_CODEC, BlueprintNetwork::placedEdit);
         registrar.playToServer(BlueprintPayloads.PlacedBatch.TYPE, BlueprintPayloads.PlacedBatch.STREAM_CODEC, BlueprintNetwork::placedBatch);
+        registrar.playToServer(BlueprintPayloads.RenameWrightport.TYPE, BlueprintPayloads.RenameWrightport.STREAM_CODEC, BlueprintNetwork::renameWrightport);
         registrar.playToServer(BlueprintPayloads.BindSupply.TYPE, BlueprintPayloads.BindSupply.STREAM_CODEC, BlueprintNetwork::bindSupply);
         registrar.playToServer(BlueprintPayloads.BindDigital.TYPE, BlueprintPayloads.BindDigital.STREAM_CODEC, BlueprintNetwork::bindDigital);
         registrar.playToServer(BlueprintPayloads.DigitalInfoRequest.TYPE, BlueprintPayloads.DigitalInfoRequest.STREAM_CODEC, BlueprintNetwork::digitalInfo);
@@ -421,6 +422,11 @@ public final class BlueprintNetwork {
         context.enqueueWork(() -> com.wrights.drone.PlacedPortManage.batch(player, payload.dimension(), payload.pos(), payload.action(), payload.value(), payload.units()));
     }
 
+    private static void renameWrightport(BlueprintPayloads.RenameWrightport payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> com.wrights.drone.PlacedPortManage.rename(player, payload.dimension(), payload.pos(), payload.name()));
+    }
+
     private static void clientPortGlow(BlueprintPayloads.PortGlow payload, IPayloadContext context) {
         if (FMLEnvironment.dist != Dist.CLIENT) {
             return;
@@ -690,7 +696,8 @@ public final class BlueprintNetwork {
                     jobSourcePort(job),
                     labelPort(player, job),
                     job.queued(),
-                    job.crewQuota()));
+                    job.crewQuota(),
+                    jobSourceName(player, job)));
         }
         PacketDistributor.sendToPlayer(player, new BlueprintPayloads.JobSync(lines));
     }
@@ -712,6 +719,18 @@ public final class BlueprintNetwork {
             return 2;
         }
         return you ? 1 : 0;
+    }
+
+    private static String jobSourceName(ServerPlayer player, BuildJob job) {
+        BlockPos pos = jobSourcePort(job);
+        if (pos == null || pos.equals(BlockPos.ZERO) || player.getServer() == null) {
+            return "";
+        }
+        var level = player.getServer().getLevel(job.dimension());
+        if (level != null && level.getBlockEntity(pos) instanceof com.wrights.block.WrightportBlockEntity port) {
+            return port.label();
+        }
+        return com.wrights.drone.WrightLedger.get(player.getServer()).label(job.dimension().location().toString(), pos);
     }
 
     private static BlockPos jobSourcePort(BuildJob job) {

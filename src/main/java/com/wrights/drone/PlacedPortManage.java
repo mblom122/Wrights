@@ -31,7 +31,7 @@ public final class PlacedPortManage {
         var ports = new java.util.ArrayList<BlueprintPayloads.PlacedPort>(Math.min(owned.size(), 512));
         for (int i = 0; i < owned.size() && ports.size() < 512; i++) {
             WrightLedger.Placed placed = owned.get(i);
-            ports.add(new BlueprintPayloads.PlacedPort(placed.dimension(), placed.pos(), placed.units(), placed.unowned()));
+            ports.add(new BlueprintPayloads.PlacedPort(placed.dimension(), placed.pos(), placed.units(), placed.unowned(), placed.name()));
         }
         PacketDistributor.sendToPlayer(player, new BlueprintPayloads.PlacedPorts(ports));
     }
@@ -76,6 +76,20 @@ public final class PlacedPortManage {
         port.setSwarm(next);
         sendSwarm(player, dimension, pos, false, next);
         sync(player);
+    }
+
+    public static void rename(ServerPlayer player, String dimension, BlockPos pos, String name) {
+        WrightportBlockEntity port = ownedPort(player, dimension, pos);
+        if (port == null) {
+            sync(player);
+            return;
+        }
+        if (port.owner() == null) {
+            port.assignOwner(player.getUUID(), player.getGameProfile().getName());
+        }
+        port.setLabel(name);
+        sync(player);
+        com.wrights.network.BlueprintNetwork.syncJobs(player);
     }
 
     public static void visit(ServerPlayer player, String dimension, BlockPos pos) {

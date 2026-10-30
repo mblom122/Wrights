@@ -46,6 +46,8 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
     /** Player who placed this port. Their stored wrights share one limit. */
     private UUID owner;
     private String ownerName = "";
+    /** Short name chosen for this port. Blank keeps the plain Wrightport label. */
+    private String label = "";
 
     public WrightportBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.WRIGHTPORT.get(), pos, state);
@@ -94,6 +96,43 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
         sync();
     }
 
+    public String label() {
+        return label == null ? "" : label;
+    }
+
+    public void setLabel(String name) {
+        String next = cleanLabel(name);
+        if (next.equals(label())) {
+            return;
+        }
+        this.label = next;
+        setChanged();
+        remember();
+        sync();
+    }
+
+    public Component title() {
+        return titled(label());
+    }
+
+    public static Component titled(String name) {
+        if (name == null || name.isBlank()) {
+            return Component.translatable("block.wrights.wrightport");
+        }
+        return Component.translatable("block.wrights.wrightport.named", name);
+    }
+
+    public static String cleanLabel(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        String text = raw.replace("§", "").replaceAll("[\\p{Cntrl}]", "").trim();
+        if (text.length() > 32) {
+            text = text.substring(0, 32).trim();
+        }
+        return text;
+    }
+
     public Component ownerLabel() {
         if (owner == null) {
             return Component.translatable("block.wrights.wrightport.no_owner");
@@ -107,7 +146,7 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
 
     private void remember() {
         if (level instanceof ServerLevel server) {
-            com.wrights.drone.WrightLedger.get(server.getServer()).remember(owner, server.dimension(), worldPosition, swarm().units().size());
+            com.wrights.drone.WrightLedger.get(server.getServer()).remember(owner, server.dimension(), worldPosition, swarm().units().size(), label());
         }
     }
 
@@ -190,7 +229,7 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
 
     @Override
     public Component getDisplayName() {
-        return Component.translatable("block.wrights.wrightport");
+        return title();
     }
 
     @Override
@@ -212,6 +251,9 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
                 tag.putString("OwnerName", ownerName);
             }
         }
+        if (!label().isBlank()) {
+            tag.putString("Label", label());
+        }
     }
 
     @Override
@@ -229,6 +271,7 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
         if (tag.contains("OwnerName")) {
             ownerName = tag.getString("OwnerName");
         }
+        label = tag.contains("Label") ? cleanLabel(tag.getString("Label")) : "";
     }
 
     @Override

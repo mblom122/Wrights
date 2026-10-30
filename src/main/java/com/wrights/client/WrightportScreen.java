@@ -22,6 +22,8 @@ import com.wrights.network.BlueprintPayloads;
 public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> implements ManageHost {
     private final WrightManagePanel manage = new WrightManagePanel();
     private WrightsButton boundaryButton;
+    private EditBox nameBox;
+    private String sentName = "";
 
     public WrightportScreen(WrightportMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
@@ -43,17 +45,70 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
             }
         });
         addRenderableWidget(boundaryButton);
+        nameBox = new EditBox(this.font, 0, 0, 140, 16, Component.translatable("screen.wrights.name"));
+        nameBox.setMaxLength(32);
+        nameBox.setHint(Component.translatable("screen.wrights.name"));
+        if (getMinecraft().level != null && getMinecraft().level.getBlockEntity(menu.pos()) instanceof WrightportBlockEntity port) {
+            sentName = port.label();
+            nameBox.setValue(sentName);
+        }
+        addRenderableWidget(nameBox);
         placeBoundary();
+    }
+
+    private boolean canRename() {
+        if (getMinecraft().player == null || getMinecraft().level == null) {
+            return false;
+        }
+        if (!(getMinecraft().level.getBlockEntity(menu.pos()) instanceof WrightportBlockEntity port)) {
+            return false;
+        }
+        return port.owner() == null || port.owner().equals(getMinecraft().player.getUUID());
+    }
+
+    private void commitName() {
+        if (nameBox == null || !canRename() || getMinecraft().level == null) {
+            return;
+        }
+        String next = WrightportBlockEntity.cleanLabel(nameBox.getValue());
+        if (next.equals(sentName)) {
+            if (!nameBox.getValue().equals(next)) {
+                nameBox.setValue(next);
+            }
+            return;
+        }
+        sentName = next;
+        nameBox.setValue(next);
+        PacketDistributor.sendToServer(new BlueprintPayloads.RenameWrightport(
+                getMinecraft().level.dimension().location().toString(), menu.pos(), next));
+    }
+
+    private void placeName() {
+        if (nameBox == null || boundaryButton == null) {
+            return;
+        }
+        boolean mine = canRename();
+        nameBox.visible = mine;
+        if (!mine) {
+            return;
+        }
+        int right = boundaryButton.getX() - 6;
+        nameBox.setX(leftPos + 12);
+        nameBox.setY(topPos + 8);
+        nameBox.setWidth(Math.max(60, right - nameBox.getX()));
     }
 
     private void drawOwner(GuiGraphics graphics) {
         if (getMinecraft().level == null || !(getMinecraft().level.getBlockEntity(menu.pos()) instanceof WrightportBlockEntity port)) {
             return;
         }
+        if (!canRename()) {
+            String title = this.font.plainSubstrByWidth(port.title().getString(), Math.max(40, imageWidth - 120));
+            graphics.drawString(this.font, title, leftPos + 12, topPos + 12, WrightsUi.TEXT, false);
+        }
         Component owner = port.ownerLabel();
-        int x = leftPos + 12 + this.font.width(Component.translatable("screen.wrights.manage_wrights")) + 10;
-        int limit = (boundaryButton == null ? leftPos + imageWidth - 16 : boundaryButton.getX()) - x - 6;
-        graphics.drawString(this.font, this.font.plainSubstrByWidth(owner.getString(), Math.max(24, limit)), x, topPos + 12, WrightsUi.MUTED, false);
+        int limit = imageWidth - 24;
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(owner.getString(), Math.max(24, limit)), leftPos + 12, topPos + 28, WrightsUi.MUTED, false);
     }
 
     private void placeBoundary() {
@@ -142,7 +197,7 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
 
     @Override
     public int areaY() {
-        return topPos + 4;
+        return topPos + 42;
     }
 
     @Override
@@ -152,7 +207,7 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
 
     @Override
     public int areaH() {
-        return Math.max(120, imageHeight - 8);
+        return Math.max(120, imageHeight - 46);
     }
 
     @Override
@@ -171,6 +226,7 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         manage.render(this, graphics, mouseX, mouseY);
         drawOwner(graphics);
         placeBoundary();
+        placeName();
         for (Renderable widget : this.renderables) {
             widget.render(graphics, mouseX, mouseY, partialTick);
         }
@@ -178,6 +234,9 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (nameBox != null && nameBox.isFocused() && !nameBox.isMouseOver(mouseX, mouseY)) {
+            commitName();
+        }
         if (manage.mouseClicked(this, mouseX, mouseY, button)) {
             return true;
         }
@@ -215,9 +274,27 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (nameBox != null && nameBox.isFocused() && (keyCode == 257 || keyCode == 335)) {
+            commitName();
+            setFocused(null);
+            nameBox.setFocused(false);
+            return true;
+        }
+        if (keyCode == 256 && nameBox != null && nameBox.isFocused()) {
+            nameBox.setValue(sentName);
+            nameBox.setFocused(false);
+            setFocused(null);
+            return true;
+        }
         if (keyCode == 256 && manage.closeTop()) {
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    @Override
+    public void removed() {
+        commitName();
+        super.removed();
     }
 }

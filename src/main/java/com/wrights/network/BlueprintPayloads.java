@@ -679,7 +679,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record JobLine(UUID id, String name, int done, int total, int skipped, boolean paused, boolean saving, boolean finished, boolean canUndo, boolean undoing, boolean stopped, boolean undone, String dimension, BlockPos anchor, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, List<UUID> crew, int workedTicks, int hold, int waitKind, int source, BlockPos sourcePort, boolean labelPort, boolean queued, int quota) {
+    public record JobLine(UUID id, String name, int done, int total, int skipped, boolean paused, boolean saving, boolean finished, boolean canUndo, boolean undoing, boolean stopped, boolean undone, String dimension, BlockPos anchor, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, List<UUID> crew, int workedTicks, int hold, int waitKind, int source, BlockPos sourcePort, boolean labelPort, boolean queued, int quota, String sourceName) {
         public void write(RegistryFriendlyByteBuf buf) {
             buf.writeUUID(id);
             buf.writeUtf(name, 48);
@@ -712,6 +712,7 @@ public final class BlueprintPayloads {
             buf.writeBoolean(labelPort);
             buf.writeBoolean(queued);
             buf.writeVarInt(quota);
+            buf.writeUtf(sourceName == null ? "" : sourceName, 32);
         }
 
         public static JobLine read(RegistryFriendlyByteBuf buf) {
@@ -743,7 +744,8 @@ public final class BlueprintPayloads {
                     buf.readBlockPos(),
                     buf.readBoolean(),
                     buf.readBoolean(),
-                    buf.readVarInt());
+                    buf.readVarInt(),
+                    buf.readUtf(32));
         }
 
         private static List<UUID> readCrew(RegistryFriendlyByteBuf buf) {
@@ -1035,16 +1037,33 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record PlacedPort(String dimension, BlockPos pos, int units, boolean unowned) {
+    public record PlacedPort(String dimension, BlockPos pos, int units, boolean unowned, String name) {
         public void write(RegistryFriendlyByteBuf buf) {
             buf.writeUtf(dimension);
             buf.writeBlockPos(pos);
             buf.writeVarInt(units);
             buf.writeBoolean(unowned);
+            buf.writeUtf(name == null ? "" : name, 32);
         }
 
         public static PlacedPort read(RegistryFriendlyByteBuf buf) {
-            return new PlacedPort(buf.readUtf(), buf.readBlockPos(), buf.readVarInt(), buf.readBoolean());
+            return new PlacedPort(buf.readUtf(), buf.readBlockPos(), buf.readVarInt(), buf.readBoolean(), buf.readUtf(32));
+        }
+    }
+
+    public record RenameWrightport(String dimension, BlockPos pos, String name) implements CustomPacketPayload {
+        public static final Type<RenameWrightport> TYPE = payloadType("rename_wrightport");
+        public static final StreamCodec<RegistryFriendlyByteBuf, RenameWrightport> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeUtf(value.dimension);
+                    buf.writeBlockPos(value.pos);
+                    buf.writeUtf(value.name == null ? "" : value.name, 32);
+                },
+                buf -> new RenameWrightport(buf.readUtf(), buf.readBlockPos(), buf.readUtf(32)));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
         }
     }
 
