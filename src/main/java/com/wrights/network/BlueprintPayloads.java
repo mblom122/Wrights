@@ -12,6 +12,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type;
 import net.minecraft.resources.ResourceLocation;
 
 import com.wrights.WrightsMod;
+import com.wrights.drone.Swarm;
 
 public final class BlueprintPayloads {
     private BlueprintPayloads() {
@@ -1022,6 +1023,156 @@ public final class BlueprintPayloads {
                     buf.writeBoolean(value.active);
                 },
                 buf -> new PortHold(buf.readByte(), buf.readVarInt(), buf.readBoolean()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record PlacedPort(String dimension, BlockPos pos, int units) {
+        public void write(RegistryFriendlyByteBuf buf) {
+            buf.writeUtf(dimension);
+            buf.writeBlockPos(pos);
+            buf.writeVarInt(units);
+        }
+
+        public static PlacedPort read(RegistryFriendlyByteBuf buf) {
+            return new PlacedPort(buf.readUtf(), buf.readBlockPos(), buf.readVarInt());
+        }
+    }
+
+    public record PlacedPortsAsk() implements CustomPacketPayload {
+        public static final Type<PlacedPortsAsk> TYPE = payloadType("placed_ports_ask");
+        public static final StreamCodec<RegistryFriendlyByteBuf, PlacedPortsAsk> STREAM_CODEC = empty(new PlacedPortsAsk());
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record PlacedPorts(List<PlacedPort> ports) implements CustomPacketPayload {
+        public static final Type<PlacedPorts> TYPE = payloadType("placed_ports");
+        public static final StreamCodec<RegistryFriendlyByteBuf, PlacedPorts> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    List<PlacedPort> ports = value.ports == null ? List.of() : value.ports;
+                    buf.writeVarInt(ports.size());
+                    for (PlacedPort port : ports) {
+                        port.write(buf);
+                    }
+                },
+                buf -> {
+                    int count = buf.readVarInt();
+                    if (count < 0 || count > 512) {
+                        throw new IllegalArgumentException("ports");
+                    }
+                    List<PlacedPort> ports = new ArrayList<>();
+                    for (int i = 0; i < count; i++) {
+                        ports.add(PlacedPort.read(buf));
+                    }
+                    return new PlacedPorts(ports);
+                });
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record PlacedSwarmAsk(String dimension, BlockPos pos) implements CustomPacketPayload {
+        public static final Type<PlacedSwarmAsk> TYPE = payloadType("placed_swarm_ask");
+        public static final StreamCodec<RegistryFriendlyByteBuf, PlacedSwarmAsk> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeUtf(value.dimension);
+                    buf.writeBlockPos(value.pos);
+                },
+                buf -> new PlacedSwarmAsk(buf.readUtf(), buf.readBlockPos()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record PlacedSwarm(String dimension, BlockPos pos, boolean missing, Swarm swarm) implements CustomPacketPayload {
+        public static final Type<PlacedSwarm> TYPE = payloadType("placed_swarm");
+        public static final StreamCodec<RegistryFriendlyByteBuf, PlacedSwarm> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeUtf(value.dimension);
+                    buf.writeBlockPos(value.pos);
+                    buf.writeBoolean(value.missing);
+                    Swarm.STREAM_CODEC.encode(buf, value.swarm == null ? Swarm.EMPTY : value.swarm);
+                },
+                buf -> new PlacedSwarm(buf.readUtf(), buf.readBlockPos(), buf.readBoolean(), Swarm.STREAM_CODEC.decode(buf)));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record PlacedVisit(String dimension, BlockPos pos) implements CustomPacketPayload {
+        public static final Type<PlacedVisit> TYPE = payloadType("placed_visit");
+        public static final StreamCodec<RegistryFriendlyByteBuf, PlacedVisit> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeUtf(value.dimension);
+                    buf.writeBlockPos(value.pos);
+                },
+                buf -> new PlacedVisit(buf.readUtf(), buf.readBlockPos()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record PlacedEdit(String dimension, BlockPos pos, int action, int unit) implements CustomPacketPayload {
+        public static final Type<PlacedEdit> TYPE = payloadType("placed_edit");
+        public static final StreamCodec<RegistryFriendlyByteBuf, PlacedEdit> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeUtf(value.dimension);
+                    buf.writeBlockPos(value.pos);
+                    buf.writeByte(value.action);
+                    buf.writeVarInt(value.unit);
+                },
+                buf -> new PlacedEdit(buf.readUtf(), buf.readBlockPos(), buf.readByte(), buf.readVarInt()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record PlacedBatch(String dimension, BlockPos pos, int action, int value, int[] units) implements CustomPacketPayload {
+        public static final Type<PlacedBatch> TYPE = payloadType("placed_batch");
+        public static final StreamCodec<RegistryFriendlyByteBuf, PlacedBatch> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeUtf(value.dimension);
+                    buf.writeBlockPos(value.pos);
+                    buf.writeByte(value.action);
+                    buf.writeVarInt(value.value);
+                    int[] units = value.units == null ? new int[0] : value.units;
+                    buf.writeVarInt(units.length);
+                    for (int unit : units) {
+                        buf.writeVarInt(unit);
+                    }
+                },
+                buf -> {
+                    String dimension = buf.readUtf();
+                    BlockPos pos = buf.readBlockPos();
+                    int action = buf.readByte();
+                    int value = buf.readVarInt();
+                    int count = buf.readVarInt();
+                    if (count < 0 || count > 1024) {
+                        throw new IllegalArgumentException("port");
+                    }
+                    int[] units = new int[count];
+                    for (int i = 0; i < count; i++) {
+                        units[i] = buf.readVarInt();
+                    }
+                    return new PlacedBatch(dimension, pos, action, value, units);
+                });
 
         @Override
         public Type<? extends CustomPacketPayload> type() {

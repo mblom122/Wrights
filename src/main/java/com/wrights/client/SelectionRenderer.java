@@ -87,6 +87,7 @@ public final class SelectionRenderer {
             drawActiveBuilds(pose, buffers, camera, minecraft, !gui);
         }
         drawMarkedJobs(pose, buffers, camera, minecraft);
+        drawMarkedPorts(pose, buffers, camera, minecraft);
     }
 
     public static BlockPos supplyTarget(Minecraft minecraft) {
@@ -218,6 +219,42 @@ public final class SelectionRenderer {
         for (BlueprintPayloads.JobLine job : WrightsClientState.jobs) {
             if (markedHere(job, here)) {
                 drawBox(pose, lines, markedBox(job), camera, 0.98F, 0.86F, 0.32F, pulse);
+            }
+        }
+        buffers.endBatch(RenderType.lines());
+    }
+
+    private static void drawMarkedPorts(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
+        if (WrightsClientState.markedPorts.isEmpty() || minecraft.level == null || WrightsClientState.placedPorts.isEmpty()) {
+            return;
+        }
+        String here = minecraft.level.dimension().location().toString();
+        boolean any = false;
+        for (BlueprintPayloads.PlacedPort port : WrightsClientState.placedPorts) {
+            if (here.equals(port.dimension()) && WrightsClientState.portMarked(port.dimension(), port.pos())) {
+                any = true;
+                break;
+            }
+        }
+        if (!any) {
+            return;
+        }
+        float pulse = 0.65F + 0.35F * (float) Math.sin(System.currentTimeMillis() / 180.0D);
+        VertexConsumer fill = buffers.getBuffer(RenderType.debugFilledBox());
+        for (BlueprintPayloads.PlacedPort port : WrightsClientState.placedPorts) {
+            if (!here.equals(port.dimension()) || !WrightsClientState.portMarked(port.dimension(), port.pos())) {
+                continue;
+            }
+            AABB local = new AABB(port.pos()).inflate(0.02D).move(-camera.x, -camera.y, -camera.z);
+            LevelRenderer.addChainedFilledBoxVertices(
+                    pose, fill, local.minX, local.minY, local.minZ, local.maxX, local.maxY, local.maxZ,
+                    0.24F, 0.86F, 0.36F, 0.14F + 0.08F * pulse);
+        }
+        buffers.endBatch(RenderType.debugFilledBox());
+        VertexConsumer lines = buffers.getBuffer(RenderType.lines());
+        for (BlueprintPayloads.PlacedPort port : WrightsClientState.placedPorts) {
+            if (here.equals(port.dimension()) && WrightsClientState.portMarked(port.dimension(), port.pos())) {
+                drawBox(pose, lines, new AABB(port.pos()).inflate(0.02D), camera, 0.24F, 0.86F, 0.36F, pulse);
             }
         }
         buffers.endBatch(RenderType.lines());

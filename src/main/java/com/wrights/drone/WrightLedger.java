@@ -1,7 +1,9 @@
 package com.wrights.drone;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -101,6 +103,32 @@ public final class WrightLedger extends SavedData {
         }
     }
 
+    public List<Placed> owned(UUID owner) {
+        List<Placed> list = new ArrayList<>();
+        if (owner == null) {
+            return list;
+        }
+        for (Map.Entry<Key, Port> entry : ports.entrySet()) {
+            if (!owner.equals(entry.getValue().owner)) {
+                continue;
+            }
+            list.add(new Placed(entry.getKey().dimension, BlockPos.of(entry.getKey().pos), entry.getValue().units));
+        }
+        list.sort((a, b) -> {
+            int dim = a.dimension.compareTo(b.dimension);
+            if (dim != 0) {
+                return dim;
+            }
+            int y = Integer.compare(a.pos.getY(), b.pos.getY());
+            if (y != 0) {
+                return y;
+            }
+            int x = Integer.compare(a.pos.getX(), b.pos.getX());
+            return x != 0 ? x : Integer.compare(a.pos.getZ(), b.pos.getZ());
+        });
+        return list;
+    }
+
     public int blockUnits(UUID owner) {
         int count = 0;
         for (Port port : ports.values()) {
@@ -193,6 +221,9 @@ public final class WrightLedger extends SavedData {
             return;
         }
         get(level.getServer()).reconcile(level.dimension(), chunk);
+    }
+
+    public record Placed(String dimension, BlockPos pos, int units) {
     }
 
     private record Key(String dimension, long pos) {

@@ -57,6 +57,11 @@ public final class BlueprintNetwork {
         registrar.playToServer(BlueprintPayloads.PortEdit.TYPE, BlueprintPayloads.PortEdit.STREAM_CODEC, BlueprintNetwork::portEdit);
         registrar.playToServer(BlueprintPayloads.PortBatch.TYPE, BlueprintPayloads.PortBatch.STREAM_CODEC, BlueprintNetwork::portBatch);
         registrar.playToServer(BlueprintPayloads.PortHold.TYPE, BlueprintPayloads.PortHold.STREAM_CODEC, BlueprintNetwork::portHold);
+        registrar.playToServer(BlueprintPayloads.PlacedPortsAsk.TYPE, BlueprintPayloads.PlacedPortsAsk.STREAM_CODEC, BlueprintNetwork::placedPortsAsk);
+        registrar.playToServer(BlueprintPayloads.PlacedSwarmAsk.TYPE, BlueprintPayloads.PlacedSwarmAsk.STREAM_CODEC, BlueprintNetwork::placedSwarmAsk);
+        registrar.playToServer(BlueprintPayloads.PlacedVisit.TYPE, BlueprintPayloads.PlacedVisit.STREAM_CODEC, BlueprintNetwork::placedVisit);
+        registrar.playToServer(BlueprintPayloads.PlacedEdit.TYPE, BlueprintPayloads.PlacedEdit.STREAM_CODEC, BlueprintNetwork::placedEdit);
+        registrar.playToServer(BlueprintPayloads.PlacedBatch.TYPE, BlueprintPayloads.PlacedBatch.STREAM_CODEC, BlueprintNetwork::placedBatch);
         registrar.playToServer(BlueprintPayloads.BindSupply.TYPE, BlueprintPayloads.BindSupply.STREAM_CODEC, BlueprintNetwork::bindSupply);
         registrar.playToServer(BlueprintPayloads.BindDigital.TYPE, BlueprintPayloads.BindDigital.STREAM_CODEC, BlueprintNetwork::bindDigital);
         registrar.playToServer(BlueprintPayloads.DigitalInfoRequest.TYPE, BlueprintPayloads.DigitalInfoRequest.STREAM_CODEC, BlueprintNetwork::digitalInfo);
@@ -83,6 +88,8 @@ public final class BlueprintNetwork {
         registrar.playToClient(BlueprintPayloads.CaptureFinished.TYPE, BlueprintPayloads.CaptureFinished.STREAM_CODEC, BlueprintNetwork::clientFinished);
         registrar.playToClient(BlueprintPayloads.JobHologram.TYPE, BlueprintPayloads.JobHologram.STREAM_CODEC, BlueprintNetwork::clientJobHologram);
         registrar.playToClient(BlueprintPayloads.JobSync.TYPE, BlueprintPayloads.JobSync.STREAM_CODEC, BlueprintNetwork::clientJobs);
+        registrar.playToClient(BlueprintPayloads.PlacedPorts.TYPE, BlueprintPayloads.PlacedPorts.STREAM_CODEC, BlueprintNetwork::clientPlacedPorts);
+        registrar.playToClient(BlueprintPayloads.PlacedSwarm.TYPE, BlueprintPayloads.PlacedSwarm.STREAM_CODEC, BlueprintNetwork::clientPlacedSwarm);
         registrar.playToClient(BlueprintPayloads.DeployPool.TYPE, BlueprintPayloads.DeployPool.STREAM_CODEC, BlueprintNetwork::clientDeployPool);
         registrar.playToClient(BlueprintPayloads.SupplySync.TYPE, BlueprintPayloads.SupplySync.STREAM_CODEC, BlueprintNetwork::clientSupply);
         registrar.playToClient(BlueprintPayloads.DigitalSync.TYPE, BlueprintPayloads.DigitalSync.STREAM_CODEC, BlueprintNetwork::clientDigital);
@@ -385,6 +392,45 @@ public final class BlueprintNetwork {
             }
             com.wrights.drone.ManageLock.hold(player, payload.kind(), payload.index());
         });
+    }
+
+    private static void placedPortsAsk(BlueprintPayloads.PlacedPortsAsk payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> com.wrights.drone.PlacedPortManage.sync(player));
+    }
+
+    private static void placedSwarmAsk(BlueprintPayloads.PlacedSwarmAsk payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> com.wrights.drone.PlacedPortManage.swarm(player, payload.dimension(), payload.pos()));
+    }
+
+    private static void placedVisit(BlueprintPayloads.PlacedVisit payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> com.wrights.drone.PlacedPortManage.visit(player, payload.dimension(), payload.pos()));
+    }
+
+    private static void placedEdit(BlueprintPayloads.PlacedEdit payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> com.wrights.drone.PlacedPortManage.edit(player, payload.dimension(), payload.pos(), payload.action(), payload.unit()));
+    }
+
+    private static void placedBatch(BlueprintPayloads.PlacedBatch payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> com.wrights.drone.PlacedPortManage.batch(player, payload.dimension(), payload.pos(), payload.action(), payload.value(), payload.units()));
+    }
+
+    private static void clientPlacedPorts(BlueprintPayloads.PlacedPorts payload, IPayloadContext context) {
+        if (FMLEnvironment.dist != Dist.CLIENT) {
+            return;
+        }
+        context.enqueueWork(() -> com.wrights.client.WrightsClientState.applyPlacedPorts(payload.ports()));
+    }
+
+    private static void clientPlacedSwarm(BlueprintPayloads.PlacedSwarm payload, IPayloadContext context) {
+        if (FMLEnvironment.dist != Dist.CLIENT) {
+            return;
+        }
+        context.enqueueWork(() -> com.wrights.client.WrightsClientState.applyPlacedSwarm(payload.dimension(), payload.pos(), payload.missing(), payload.swarm()));
     }
 
     private static void hangar(BlueprintPayloads.HangarEdit payload, IPayloadContext context) {

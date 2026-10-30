@@ -27,6 +27,7 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.WrightsClientConfig;
+import com.wrights.drone.Swarm;
 import com.wrights.WrightsConfig;
 import com.wrights.blueprint.BoxEdits;
 import com.wrights.blueprint.BlueprintClientFlags;
@@ -149,6 +150,13 @@ public final class WrightsClientState {
     public static final Map<UUID, ActiveBuild> activeBuilds = new LinkedHashMap<>();
     public static final Set<Long> activeCells = new HashSet<>();
     public static final Set<UUID> markedJobs = new HashSet<>();
+    public static List<BlueprintPayloads.PlacedPort> placedPorts = List.of();
+    public static final Set<String> markedPorts = new HashSet<>();
+    public static String placedDim = "";
+    public static BlockPos placedPos = BlockPos.ZERO;
+    public static Swarm placedSwarm = Swarm.EMPTY;
+    public static boolean placedKnown;
+    public static boolean placedMissing;
     private static final Map<UUID, Pace> paces = new HashMap<>();
 
     public static void applyJobHologram(BlueprintPayloads.JobHologram payload) {
@@ -212,6 +220,38 @@ public final class WrightsClientState {
                 activeCells.add(BlockPos.asLong(build.origin().getX() + ghost.x(), build.origin().getY() + ghost.y(), build.origin().getZ() + ghost.z()));
             }
         }
+    }
+
+    public static String portMark(String dimension, BlockPos pos) {
+        return dimension + "|" + pos.asLong();
+    }
+
+    public static boolean portMarked(String dimension, BlockPos pos) {
+        return markedPorts.contains(portMark(dimension, pos));
+    }
+
+    public static void togglePortMark(String dimension, BlockPos pos) {
+        String key = portMark(dimension, pos);
+        if (!markedPorts.add(key)) {
+            markedPorts.remove(key);
+        }
+    }
+
+    public static void applyPlacedPorts(List<BlueprintPayloads.PlacedPort> ports) {
+        placedPorts = List.copyOf(ports == null ? List.of() : ports);
+        Set<String> live = new HashSet<>();
+        for (BlueprintPayloads.PlacedPort port : placedPorts) {
+            live.add(portMark(port.dimension(), port.pos()));
+        }
+        markedPorts.retainAll(live);
+    }
+
+    public static void applyPlacedSwarm(String dimension, BlockPos pos, boolean missing, Swarm swarm) {
+        placedDim = dimension == null ? "" : dimension;
+        placedPos = pos == null ? BlockPos.ZERO : pos;
+        placedMissing = missing;
+        placedKnown = true;
+        placedSwarm = swarm == null ? Swarm.EMPTY : swarm;
     }
 
     public static void toggleMark(UUID id) {
