@@ -1,9 +1,12 @@
 package com.wrights.client;
 
+import java.util.List;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 
 import org.lwjgl.glfw.GLFW;
 
@@ -124,11 +127,7 @@ public final class WrightsHud {
         if (showMainModes(minecraft)) {
             drawMainModes(graphics, minecraft);
         } else if (showModes(minecraft)) {
-            if (WrightsClientState.mode == WrightsClientState.Mode.BUILD) {
-                drawBuildModes(graphics, minecraft);
-            } else {
-                drawModes(graphics, minecraft);
-            }
+            drawBuildModes(graphics, minecraft);
         }
     }
 
@@ -137,9 +136,6 @@ public final class WrightsHud {
             return Component.translatable("hud.wrights.task_new", Component.translatable(styleKey(WrightsClientState.captureStyle)));
         }
         if (WrightsClientState.mode == WrightsClientState.Mode.BUILD) {
-            if (WrightsClientState.buildId == null) {
-                return Component.translatable("hud.wrights.main_build");
-            }
             return Component.translatable("hud.wrights.task_build_tool", Component.translatable(WrightsClientState.bindSupply ? "hud.wrights.tool_bind" : "hud.wrights.tool_build"));
         }
         if (WrightsClientState.mode == WrightsClientState.Mode.JOBS) {
@@ -161,27 +157,27 @@ public final class WrightsHud {
     private static void drawMainModes(GuiGraphics graphics, Minecraft minecraft) {
         Component title = Component.translatable("hud.wrights.main_modes");
         Component how = Component.translatable("hud.wrights.main_how");
-        Component fresh = Component.translatable("hud.wrights.main_new");
         Component build = Component.translatable("hud.wrights.main_build");
         Component jobs = Component.translatable("hud.wrights.main_jobs");
         Component selected = Component.translatable("hud.wrights.mode_selected");
         int width = 188;
         width = Math.max(width, minecraft.font.width(title) + 28);
-        width = Math.max(width, minecraft.font.width(how) + 28);
-        width = Math.max(width, minecraft.font.width(fresh) + minecraft.font.width(selected) + 36);
         width = Math.max(width, minecraft.font.width(build) + minecraft.font.width(selected) + 36);
         width = Math.max(width, minecraft.font.width(jobs) + minecraft.font.width(selected) + 36);
         int row = 18;
-        int height = 28 + row * 3 + 18;
+        int textWidth = width - 24;
+        int footer = footerHeight(minecraft, how, textWidth);
+        int height = 28 + row * 2 + footer;
         int x = (graphics.guiWidth() - width) / 2;
         int y = graphics.guiHeight() / 2 + 8;
         WrightsUi.panel(graphics, x, y, width, height);
         graphics.drawString(minecraft.font, title, x + 12, y + 8, WrightsUi.TEXT, false);
-        boolean making = WrightsClientState.mode == WrightsClientState.Mode.CAPTURE || WrightsClientState.mode == WrightsClientState.Mode.SAVING;
-        drawMainRow(graphics, minecraft, x, y + 24, width, making, fresh, selected);
-        drawMainRow(graphics, minecraft, x, y + 24 + row, width, WrightsClientState.mode == WrightsClientState.Mode.BUILD, build, selected);
-        drawMainRow(graphics, minecraft, x, y + 24 + row * 2, width, WrightsClientState.mode == WrightsClientState.Mode.JOBS, jobs, selected);
-        graphics.drawString(minecraft.font, how, x + 12, y + height - 14, WrightsUi.MUTED, false);
+        boolean building = WrightsClientState.mode == WrightsClientState.Mode.BUILD
+                || WrightsClientState.mode == WrightsClientState.Mode.CAPTURE
+                || WrightsClientState.mode == WrightsClientState.Mode.SAVING;
+        drawMainRow(graphics, minecraft, x, y + 24, width, building, build, selected);
+        drawMainRow(graphics, minecraft, x, y + 24 + row, width, WrightsClientState.mode == WrightsClientState.Mode.JOBS, jobs, selected);
+        drawFooter(graphics, minecraft, how, x + 12, y + height - footer + 4, textWidth, WrightsUi.MUTED);
     }
 
     private static void drawMainRow(GuiGraphics graphics, Minecraft minecraft, int x, int y, int width, boolean on, Component label, Component selected) {
@@ -204,31 +200,73 @@ public final class WrightsHud {
 
     private static void drawBuildModes(GuiGraphics graphics, Minecraft minecraft) {
         Component title = Component.translatable("hud.wrights.build_modes");
-        Component how = WrightsClientState.buildId == null
-                ? Component.translatable("hud.wrights.pick_blueprint")
-                : Component.translatable(WrightsClientState.bindSupply ? "hud.wrights.bind_explain" : "hud.wrights.build_explain");
-        Component build = Component.translatable("hud.wrights.tool_build");
+        boolean making = WrightsClientState.mode == WrightsClientState.Mode.CAPTURE
+                || WrightsClientState.mode == WrightsClientState.Mode.SAVING;
+        Component how = making
+                ? (WrightsClientState.styleAnnounce
+                        ? Component.translatable("hud.wrights.mode_now", Component.translatable(styleKey(WrightsClientState.captureStyle)))
+                        : Component.translatable("hud.wrights.mode_how"))
+                : WrightsClientState.bindSupply
+                        ? Component.translatable("hud.wrights.bind_explain")
+                        : WrightsClientState.buildId == null
+                                ? Component.translatable("hud.wrights.pick_blueprint")
+                                : Component.translatable("hud.wrights.build_explain");
+        Component use = Component.translatable("hud.wrights.tool_build");
+        Component fresh = Component.translatable("hud.wrights.tool_new");
         Component bind = Component.translatable("hud.wrights.tool_bind");
         Component selected = Component.translatable("hud.wrights.mode_selected");
+        Component corners = Component.translatable("hud.wrights.mode_corners");
+        Component box = Component.translatable("hud.wrights.mode_box");
+        Component move = Component.translatable("hud.wrights.mode_move");
+        Component need = Component.translatable("hud.wrights.mode_move_need");
+        boolean canMove = WrightsClientState.hasBox();
         int width = 188;
         width = Math.max(width, minecraft.font.width(title) + 28);
-        width = Math.max(width, minecraft.font.width(how) + 28);
-        width = Math.max(width, minecraft.font.width(build) + minecraft.font.width(selected) + 36);
+        width = Math.max(width, minecraft.font.width(use) + minecraft.font.width(selected) + 36);
+        width = Math.max(width, minecraft.font.width(fresh) + minecraft.font.width(selected) + 36);
         width = Math.max(width, minecraft.font.width(bind) + minecraft.font.width(selected) + 36);
+        if (making) {
+            width = Math.max(width, minecraft.font.width(corners) + minecraft.font.width(selected) + 36);
+            width = Math.max(width, minecraft.font.width(box) + minecraft.font.width(selected) + 36);
+            width = Math.max(width, minecraft.font.width(move) + minecraft.font.width(canMove ? selected : need) + 36);
+        }
         int row = 18;
-        int height = 28 + row * 2 + 18;
+        int rows = 3 + (making ? 3 : 0);
+        int textWidth = width - 24;
+        int footer = footerHeight(minecraft, how, textWidth);
+        int height = 28 + row * rows + footer;
         int x = (graphics.guiWidth() - width) / 2;
         int y = graphics.guiHeight() / 2 + 8;
         WrightsUi.panel(graphics, x, y, width, height);
         graphics.drawString(minecraft.font, title, x + 12, y + 8, WrightsUi.TEXT, false);
-        drawToolRow(graphics, minecraft, x, y + 24, width, false, build, selected);
-        drawToolRow(graphics, minecraft, x, y + 24 + row, width, true, bind, selected);
+        boolean building = WrightsClientState.mode == WrightsClientState.Mode.BUILD;
+        int yRow = y + 24;
+        drawToolRow(graphics, minecraft, x, yRow, width, building && !WrightsClientState.bindSupply, use, selected);
+        drawToolRow(graphics, minecraft, x, yRow + row, width, making, fresh, selected);
+        int yAfterNew = yRow + row * 2;
+        if (making) {
+            drawModeRow(graphics, minecraft, x, yAfterNew, width, WrightsClientState.CaptureStyle.CORNERS, corners, selected, true, null);
+            drawModeRow(graphics, minecraft, x, yAfterNew + row, width, WrightsClientState.CaptureStyle.BOX, box, selected, true, null);
+            drawModeRow(graphics, minecraft, x, yAfterNew + row * 2, width, WrightsClientState.CaptureStyle.MOVE, move, selected, canMove, need);
+            yAfterNew += row * 3;
+        }
+        drawToolRow(graphics, minecraft, x, yAfterNew, width, building && WrightsClientState.bindSupply, bind, selected);
         int foot = WrightsClientState.styleAnnounce ? 0xFFF2C14E : WrightsUi.MUTED;
-        graphics.drawString(minecraft.font, how, x + 12, y + height - 14, foot, false);
+        drawFooter(graphics, minecraft, how, x + 12, y + height - footer + 4, textWidth, foot);
     }
 
-    private static void drawToolRow(GuiGraphics graphics, Minecraft minecraft, int x, int y, int width, boolean bind, Component label, Component selected) {
-        boolean on = WrightsClientState.bindSupply == bind;
+    private static int footerHeight(Minecraft minecraft, Component text, int width) {
+        return 8 + Math.max(1, minecraft.font.split(text, width).size()) * 10;
+    }
+
+    private static void drawFooter(GuiGraphics graphics, Minecraft minecraft, Component text, int x, int y, int width, int color) {
+        List<FormattedCharSequence> lines = minecraft.font.split(text, width);
+        for (int i = 0; i < lines.size(); i++) {
+            graphics.drawString(minecraft.font, lines.get(i), x, y + i * 10, color, false);
+        }
+    }
+
+    private static void drawToolRow(GuiGraphics graphics, Minecraft minecraft, int x, int y, int width, boolean on, Component label, Component selected) {
         if (on) {
             graphics.fill(x + 8, y - 3, x + width - 8, y + 11, 0xA0C47A3A);
         }
@@ -237,36 +275,6 @@ public final class WrightsHud {
             int markWidth = minecraft.font.width(selected);
             graphics.drawString(minecraft.font, selected, x + width - markWidth - 14, y, 0xFFFFFFFF, false);
         }
-    }
-
-    private static void drawModes(GuiGraphics graphics, Minecraft minecraft) {
-        Component title = Component.translatable("hud.wrights.mode_title");
-        Component how = WrightsClientState.styleAnnounce
-                ? Component.translatable("hud.wrights.mode_now", Component.translatable(styleKey(WrightsClientState.captureStyle)))
-                : Component.translatable("hud.wrights.mode_how");
-        Component corners = Component.translatable("hud.wrights.mode_corners");
-        Component box = Component.translatable("hud.wrights.mode_box");
-        Component move = Component.translatable("hud.wrights.mode_move");
-        Component need = Component.translatable("hud.wrights.mode_move_need");
-        Component selected = Component.translatable("hud.wrights.mode_selected");
-        boolean canMove = WrightsClientState.hasBox();
-        int width = 188;
-        width = Math.max(width, minecraft.font.width(title) + 28);
-        width = Math.max(width, minecraft.font.width(how) + 28);
-        width = Math.max(width, minecraft.font.width(corners) + minecraft.font.width(selected) + 36);
-        width = Math.max(width, minecraft.font.width(box) + minecraft.font.width(selected) + 36);
-        width = Math.max(width, minecraft.font.width(move) + minecraft.font.width(canMove ? selected : need) + 36);
-        int row = 18;
-        int height = 28 + row * 3 + 18;
-        int x = (graphics.guiWidth() - width) / 2;
-        int y = graphics.guiHeight() / 2 + 8;
-        WrightsUi.panel(graphics, x, y, width, height);
-        graphics.drawString(minecraft.font, title, x + 12, y + 8, WrightsUi.TEXT, false);
-        drawModeRow(graphics, minecraft, x, y + 24, width, WrightsClientState.CaptureStyle.CORNERS, corners, selected, true, null);
-        drawModeRow(graphics, minecraft, x, y + 24 + row, width, WrightsClientState.CaptureStyle.BOX, box, selected, true, null);
-        drawModeRow(graphics, minecraft, x, y + 24 + row * 2, width, WrightsClientState.CaptureStyle.MOVE, move, selected, canMove, need);
-        int foot = WrightsClientState.styleAnnounce ? 0xFFF2C14E : WrightsUi.MUTED;
-        graphics.drawString(minecraft.font, how, x + 12, y + height - 14, foot, false);
     }
 
     private static Component supplyChoice(Minecraft minecraft) {

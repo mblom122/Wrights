@@ -511,16 +511,14 @@ public final class WrightsClientState {
 
     public static void cycleMainMode(int delta) {
         int index = switch (mode) {
-            case CAPTURE, SAVING -> 0;
-            case BUILD -> 1;
-            case JOBS -> 2;
-            default -> delta > 0 ? -1 : 3;
+            case CAPTURE, SAVING, BUILD -> 0;
+            case JOBS -> 1;
+            default -> delta > 0 ? -1 : 2;
         };
-        int next = Math.floorMod(index + delta, 3);
+        int next = Math.floorMod(index + delta, 2);
         if (next == 0) {
-            enterNewMode();
-        } else if (next == 1) {
             enterBuildFromLast();
+            bindSupply = false;
         } else {
             enterJobs();
         }
@@ -1045,19 +1043,83 @@ public final class WrightsClientState {
         rememberMode();
     }
 
-    public static void cycleBuildTool() {
+    public static void cycleBuildTool(int direction) {
         mainPicker = false;
-        if (buildId == null) {
+        if (mode == Mode.SAVING) {
             styleHudTicks = 70;
             styleAnnounce = true;
             return;
         }
-        bindSupply = !bindSupply;
-        if (bindSupply) {
-            bindFromMenu = false;
+        int styles = styleSteps();
+        int count = 2 + styles;
+        int next = Math.floorMod(buildToolSlot() + direction, count);
+        if (next == 0) {
+            selectBuildTool(false);
+        } else if (next == count - 1) {
+            selectBuildTool(true);
+        } else {
+            selectNewStyle(styleAt(next - 1));
         }
         styleHudTicks = 70;
         styleAnnounce = true;
+    }
+
+    private static int styleSteps() {
+        return hasBox() ? CaptureStyle.values().length : CaptureStyle.values().length - 1;
+    }
+
+    private static CaptureStyle styleAt(int offset) {
+        if (offset <= 0) {
+            return CaptureStyle.CORNERS;
+        }
+        if (offset == 1) {
+            return CaptureStyle.BOX;
+        }
+        return CaptureStyle.MOVE;
+    }
+
+    /** Use template, each capture style under New template, then Bind inventory. */
+    private static int buildToolSlot() {
+        if (mode == Mode.CAPTURE) {
+            int offset = switch (captureStyle) {
+                case BOX -> 1;
+                case MOVE -> hasBox() ? 2 : 0;
+                case CORNERS -> 0;
+            };
+            return 1 + Math.min(offset, styleSteps() - 1);
+        }
+        if (mode == Mode.BUILD && bindSupply) {
+            return 1 + styleSteps();
+        }
+        return 0;
+    }
+
+    private static void selectBuildTool(boolean bind) {
+        if (mode != Mode.BUILD) {
+            boxDragging = false;
+            moveGrabbed = false;
+            enterBuildFromLast();
+        }
+        bindSupply = bind;
+        if (bind) {
+            bindFromMenu = false;
+        }
+    }
+
+    private static void selectNewStyle(CaptureStyle style) {
+        if (mode != Mode.CAPTURE) {
+            enterNewMode();
+        }
+        if (mode != Mode.CAPTURE || style == captureStyle) {
+            return;
+        }
+        if (moveGrabbed) {
+            moveGrabbed = false;
+            sendUpdate();
+        }
+        releaseBoxDrag();
+        captureStyle = style;
+        rememberMode();
     }
 
     public static boolean supplyHighlighting() {

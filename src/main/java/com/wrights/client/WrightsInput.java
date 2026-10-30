@@ -267,11 +267,9 @@ public final class WrightsInput {
         if (!shift) {
             return;
         }
-        if (WrightsClientState.mode == WrightsClientState.Mode.CAPTURE) {
-            WrightsClientState.cycleStyle(event.getScrollDeltaY() > 0.0D ? -1 : 1);
-            event.setCanceled(true);
-        } else if (WrightsClientState.mode == WrightsClientState.Mode.BUILD) {
-            WrightsClientState.cycleBuildTool();
+        if (WrightsClientState.mode == WrightsClientState.Mode.CAPTURE
+                || WrightsClientState.mode == WrightsClientState.Mode.BUILD) {
+            WrightsClientState.cycleBuildTool(event.getScrollDeltaY() > 0.0D ? -1 : 1);
             event.setCanceled(true);
         }
     }
