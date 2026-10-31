@@ -303,7 +303,10 @@ public final class WrightsClientState {
         if (pace == null || pace.shownSeconds < 0) {
             return "";
         }
-        double seconds = pace.shownSeconds - (System.currentTimeMillis() - pace.shownAt) / 1000.0D;
+        double seconds = pace.shownSeconds;
+        if (job.waitKind() != com.wrights.job.BuildJob.WAIT_ITEMS) {
+            seconds -= (System.currentTimeMillis() - pace.shownAt) / 1000.0D;
+        }
         if (seconds < 1) {
             return "1s";
         }
@@ -336,12 +339,13 @@ public final class WrightsClientState {
             pace.shownAt = now;
             return;
         }
-        if (job.paused()) {
+        if (job.paused() || job.waitKind() == com.wrights.job.BuildJob.WAIT_ITEMS) {
             pace.samples.clear();
             pace.shownAt = now;
             pace.done = job.done();
             return;
         }
+        boolean progressed = job.done() > pace.done;
         pace.samples.addLast(new Sample(now, job.done()));
         long keep = now - 15_000L;
         while (pace.samples.size() > 2 && pace.samples.peekFirst().at < keep) {
@@ -354,6 +358,9 @@ public final class WrightsClientState {
         }
         int left = Math.max(0, job.total() - job.done());
         double raw = left / rate;
+        if (!progressed && pace.shownSeconds >= 0 && raw > pace.shownSeconds) {
+            return;
+        }
         if (pace.shownSeconds < 0) {
             pace.shownSeconds = raw;
             pace.shownAt = now;
@@ -393,10 +400,13 @@ public final class WrightsClientState {
                 window = gained / span;
             }
         }
-        if (window > 0 && lifetime > 0) {
-            return lifetime * 0.75D + window * 0.25D;
+        if (window > 0) {
+            return window;
         }
-        return window > 0 ? window : lifetime;
+        if (pace.shownSeconds >= 0) {
+            return 0;
+        }
+        return lifetime;
     }
 
     private static final class Sample {

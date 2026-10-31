@@ -997,7 +997,9 @@ public final class JobManager {
                 job.setWaitKind(BuildJob.WAIT_NONE);
                 return;
             }
-            job.workedTick();
+            if (job.waitKind() != BuildJob.WAIT_ITEMS) {
+                job.workedTick();
+            }
             tickCrew(level, player, library, job, schematic);
             return;
         }
@@ -1005,7 +1007,9 @@ public final class JobManager {
             job.setWaitKind(BuildJob.WAIT_NONE);
             return;
         }
-        job.workedTick();
+        if (job.waitKind() != BuildJob.WAIT_ITEMS) {
+            job.workedTick();
+        }
         int at = nextSolo(level, player, schematic, job);
         if (at == SUPPORT_WAIT) {
             job.setWaitKind(BuildJob.WAIT_FLOOR);
