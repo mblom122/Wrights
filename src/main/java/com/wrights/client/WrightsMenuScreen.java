@@ -1783,9 +1783,14 @@ public class WrightsMenuScreen extends Screen {
         return min + (int) Math.round(t * (max - min));
     }
 
-    private static final int JOB_ROW = 70;
     private static final int JOB_HEADER = 20;
     private static final int JOB_GROUP_MIN = 46;
+    private static final int JOB_BODY = 48;
+    private static final int JOB_CREW = 18;
+    private static final int JOB_BUTTON = 18;
+    private static final int ACT_MANAGE = -1;
+    private static final int ACT_MARK = -2;
+    private int jobStride = JOB_BODY + JOB_CREW + JOB_BUTTON + 6;
 
     private int jobsInsetY() {
         return panelY + 38;
@@ -1813,6 +1818,7 @@ public class WrightsMenuScreen extends Screen {
         int insetW = panelX + panelW - 12 - insetX;
         jobX = insetX + 6;
         jobW = insetW - 12;
+        jobStride = JOB_BODY + JOB_CREW + actionLines(Math.max(80, jobW - 8)) * JOB_BUTTON + 6;
         manageAllWidth = jobButtonWidth("menu.wrights.manage_all");
         manageAllRight = jobX + jobW;
         manageAllY = jobsInsetY() + 6;
@@ -1843,12 +1849,12 @@ public class WrightsMenuScreen extends Screen {
         workGroupH = workBlock;
         workHeaderY = workGroupY + 2;
         workListY = workGroupY + JOB_HEADER + 4;
-        workRows = workOpen ? Math.max(1, (workBlock - JOB_HEADER - 8) / JOB_ROW) : 0;
+        workRows = workOpen ? Math.max(1, (workBlock - JOB_HEADER - 8) / jobStride) : 0;
         doneGroupY = workGroupY + workBlock + gap;
         doneGroupH = doneBlock;
         doneHeaderY = doneGroupY + 2;
         doneListY = doneGroupY + JOB_HEADER + 4;
-        doneRows = doneOpen ? Math.max(1, (doneBlock - JOB_HEADER - 8) / JOB_ROW) : 0;
+        doneRows = doneOpen ? Math.max(1, (doneBlock - JOB_HEADER - 8) / jobStride) : 0;
         if (!workingJobs.isEmpty()) {
             UUID lead = workingJobs.get(0).id();
             if (leadJob != null && !leadJob.equals(lead)) {
@@ -1869,11 +1875,11 @@ public class WrightsMenuScreen extends Screen {
         doneRemoveRight = right;
     }
 
-    private static int jobGroupHeight(int rows) {
+    private int jobGroupHeight(int rows) {
         if (rows <= 0) {
             return JOB_GROUP_MIN;
         }
-        return JOB_HEADER + 8 + rows * JOB_ROW;
+        return JOB_HEADER + 8 + rows * jobStride;
     }
 
     private int jobButtonWidth(String key) {
@@ -1889,25 +1895,29 @@ public class WrightsMenuScreen extends Screen {
         drawJobButton(graphics, manageAllRight, manageAllY, "menu.wrights.manage_all", mouseX, mouseY, manageAllWidth);
         int rowX = jobX + 4;
         int rowW = jobW - 8;
-        Component workTitle = workingJobs.size() > workRows
-                ? Component.translatable("menu.wrights.jobs_working_count", workingJobs.size())
-                : Component.translatable("menu.wrights.jobs_working");
+        int activeJobs = 0;
+        for (BlueprintPayloads.JobLine job : workingJobs) {
+            if (!job.paused()) {
+                activeJobs++;
+            }
+        }
+        Component workTitle = workingJobs.isEmpty()
+                ? Component.translatable("menu.wrights.jobs_working")
+                : Component.translatable("menu.wrights.jobs_working_ratio", activeJobs, workingJobs.size());
         drawJobGroup(graphics, jobX, workGroupY, jobW, workGroupH, workTitle, workingJobs.isEmpty() ? Component.translatable("menu.wrights.jobs_working_empty") : null, workingJobs.isEmpty() ? 0 : workPauseWidth + workRemoveWidth + 18);
         if (!workingJobs.isEmpty()) {
             drawJobButton(graphics, workRemoveRight, workHeaderY, "menu.wrights.remove_all", mouseX, mouseY, workRemoveWidth);
             drawJobButton(graphics, workPauseRight, workHeaderY, workAllPaused ? "menu.wrights.resume_all" : "menu.wrights.pause_all", mouseX, mouseY, workPauseWidth);
             for (int row = 0; row < workRows && jobScroll + row < workingJobs.size(); row++) {
-                drawJobRow(graphics, mouseX, mouseY, rowX, rowW, workListY + row * JOB_ROW, workingJobs.get(jobScroll + row));
+                drawJobRow(graphics, mouseX, mouseY, rowX, rowW, workListY + row * jobStride, workingJobs.get(jobScroll + row));
             }
         }
-        Component doneTitle = finishedJobs.size() > doneRows
-                ? Component.translatable("menu.wrights.jobs_finished_count", finishedJobs.size())
-                : Component.translatable("menu.wrights.jobs_finished");
+        Component doneTitle = finishedTitle();
         drawJobGroup(graphics, jobX, doneGroupY, jobW, doneGroupH, doneTitle, finishedJobs.isEmpty() ? Component.translatable("menu.wrights.jobs_finished_empty") : null, finishedJobs.isEmpty() ? 0 : doneRemoveWidth + 14);
         if (!finishedJobs.isEmpty()) {
             drawJobButton(graphics, doneRemoveRight, doneHeaderY, "menu.wrights.remove_all", mouseX, mouseY, doneRemoveWidth);
             for (int row = 0; row < doneRows && historyScroll + row < finishedJobs.size(); row++) {
-                drawJobRow(graphics, mouseX, mouseY, rowX, rowW, doneListY + row * JOB_ROW, finishedJobs.get(historyScroll + row));
+                drawJobRow(graphics, mouseX, mouseY, rowX, rowW, doneListY + row * jobStride, finishedJobs.get(historyScroll + row));
             }
         }
         if (hoveredJob != null) {
@@ -1929,11 +1939,10 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private void drawJobRow(GuiGraphics graphics, int mouseX, int mouseY, int x, int width, int y, BlueprintPayloads.JobLine job) {
-        boolean working = !job.finished() && !job.saving();
-        int buttonY = y + 48;
-        boolean hover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 66;
+        int rowH = jobStride - 4;
+        boolean hover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + rowH;
         hoveredJob = hover ? job : hoveredJob;
-        graphics.fill(x, y, x + width, y + 66, hover ? 0xFF24303C : 0xFF18222C);
+        graphics.fill(x, y, x + width, y + rowH, hover ? 0xFF24303C : 0xFF18222C);
         String name = this.font.plainSubstrByWidth(job.name(), Math.max(40, width / 2));
         graphics.drawString(this.font, name, x + 6, y + 4, WrightsUi.TEXT, false);
         Component statusText = jobStatusText(job);
@@ -1945,29 +1954,132 @@ public class WrightsMenuScreen extends Screen {
         BlockPos anchor = job.anchor();
         graphics.drawString(this.font, Component.translatable("menu.wrights.job_anchor", anchor.getX(), anchor.getY(), anchor.getZ()), x + 6, y + 26, WrightsUi.MUTED, false);
         drawProgress(graphics, x + 6, y + 37, Math.max(40, width - 12), job);
-        int right = x + width - 4;
-        if (working) {
-            String count = crewCountText(job);
-            graphics.drawString(this.font, count, x + 6, buttonY + 4, WrightsUi.MUTED, false);
-            int manageW = jobButtonWidth("menu.wrights.manage_drones");
-            drawJobButton(graphics, x + 6 + this.font.width(count) + 6 + manageW, buttonY, "menu.wrights.manage_drones", mouseX, mouseY, manageW);
+        if (!job.finished() && !job.saving()) {
+            graphics.drawString(this.font, crewCountText(job), x + 6, y + JOB_BODY + 4, WrightsUi.MUTED, false);
         }
-        right = drawJobButton(graphics, right, buttonY, "menu.wrights.remove", mouseX, mouseY, 52);
+        for (RowButton button : rowButtons(job, x, y, width)) {
+            drawJobButton(graphics, button.x() + button.width(), button.y(), button.key(), mouseX, mouseY, button.width(), button.border());
+        }
+    }
+
+    private Component finishedTitle() {
+        if (finishedJobs.isEmpty()) {
+            return Component.translatable("menu.wrights.jobs_finished");
+        }
+        int done = 0;
+        int stopped = 0;
+        int undone = 0;
+        for (BlueprintPayloads.JobLine job : finishedJobs) {
+            if (job.stopped()) {
+                stopped++;
+            } else if (job.undone()) {
+                undone++;
+            } else {
+                done++;
+            }
+        }
+        net.minecraft.network.chat.MutableComponent title = Component.empty();
+        if (done > 0) {
+            title.append(Component.translatable("menu.wrights.jobs_finished_done", done));
+        }
+        if (stopped > 0) {
+            if (!title.getString().isEmpty()) {
+                title.append(Component.literal(" · "));
+            }
+            title.append(Component.translatable("menu.wrights.jobs_finished_stopped", stopped));
+        }
+        if (undone > 0) {
+            if (!title.getString().isEmpty()) {
+                title.append(Component.literal(" · "));
+            }
+            title.append(Component.translatable("menu.wrights.jobs_finished_undone", undone));
+        }
+        return title.getString().isEmpty() ? Component.translatable("menu.wrights.jobs_finished_done", finishedJobs.size()) : title;
+    }
+
+    private int actionLines(int width) {
+        return Math.max(buttonLines(workingKeys(), width), buttonLines(finishedKeys(), width));
+    }
+
+    private int buttonLines(List<String> keys, int width) {
+        int limit = Math.max(40, width - 10);
+        int lines = 1;
+        int cursor = 0;
+        for (String key : keys) {
+            int button = jobButtonWidth(key);
+            if (cursor > 0 && cursor + button > limit) {
+                lines++;
+                cursor = 0;
+            }
+            cursor += button + 4;
+        }
+        return lines;
+    }
+
+    private List<String> workingKeys() {
+        List<String> keys = new ArrayList<>();
+        keys.add("menu.wrights.resume");
+        keys.add("menu.wrights.stop");
+        keys.add("menu.wrights.manage_drones");
+        keys.add("menu.wrights.mark_on");
         if (creativeVisit()) {
-            right = drawJobButton(graphics, right, buttonY, "menu.wrights.visit", mouseX, mouseY, 52);
+            keys.add("menu.wrights.visit");
         }
+        keys.add("menu.wrights.remove");
+        return keys;
+    }
+
+    private List<String> finishedKeys() {
+        List<String> keys = new ArrayList<>();
+        keys.add("menu.wrights.redo");
+        keys.add("menu.wrights.undo");
+        keys.add("menu.wrights.mark_on");
+        if (creativeVisit()) {
+            keys.add("menu.wrights.visit");
+        }
+        keys.add("menu.wrights.remove");
+        return keys;
+    }
+
+    private List<RowButton> rowButtons(BlueprintPayloads.JobLine job, int x, int y, int width) {
+        List<RowButton> buttons = new ArrayList<>();
         boolean highlighted = WrightsClientState.markedJobs.contains(job.id());
         String markKey = highlighted ? "menu.wrights.mark_on" : "menu.wrights.mark";
-        right = drawJobButton(graphics, right, buttonY, markKey, mouseX, mouseY, jobButtonWidth(markKey), highlighted ? 0xFFF2D48A : 0);
+        int markBorder = highlighted ? 0xFFF2D48A : 0;
         if (job.finished()) {
-            right = drawJobButton(graphics, right, buttonY, "menu.wrights.redo", mouseX, mouseY, 52);
+            buttons.add(new RowButton(0, 0, 0, BlueprintPayloads.JobControl.REDO, "menu.wrights.redo", 0));
             if (job.canUndo()) {
-                drawJobButton(graphics, right, buttonY, "menu.wrights.undo", mouseX, mouseY, 52);
+                buttons.add(new RowButton(0, 0, 0, BlueprintPayloads.JobControl.UNDO, "menu.wrights.undo", 0));
             }
         } else {
-            right = drawJobButton(graphics, right, buttonY, "menu.wrights.stop", mouseX, mouseY, 52);
-            drawJobButton(graphics, right, buttonY, job.paused() ? "menu.wrights.resume" : "menu.wrights.pause", mouseX, mouseY, 52);
+            buttons.add(new RowButton(0, 0, 0, job.paused() ? BlueprintPayloads.JobControl.RESUME : BlueprintPayloads.JobControl.PAUSE, job.paused() ? "menu.wrights.resume" : "menu.wrights.pause", 0));
+            buttons.add(new RowButton(0, 0, 0, BlueprintPayloads.JobControl.STOP, "menu.wrights.stop", 0));
+            if (!job.saving()) {
+                buttons.add(new RowButton(0, 0, 0, ACT_MANAGE, "menu.wrights.manage_drones", 0));
+            }
         }
+        buttons.add(new RowButton(0, 0, 0, ACT_MARK, markKey, markBorder));
+        if (creativeVisit()) {
+            buttons.add(new RowButton(0, 0, 0, BlueprintPayloads.JobControl.VISIT, "menu.wrights.visit", 0));
+        }
+        buttons.add(new RowButton(0, 0, 0, BlueprintPayloads.JobControl.REMOVE, "menu.wrights.remove", 0));
+        int limit = x + width - 4;
+        int cursor = x + 6;
+        int lineY = y + JOB_BODY + JOB_CREW;
+        List<RowButton> placed = new ArrayList<>(buttons.size());
+        for (RowButton button : buttons) {
+            int buttonW = jobButtonWidth(button.key());
+            if (cursor > x + 6 && cursor + buttonW > limit) {
+                cursor = x + 6;
+                lineY += JOB_BUTTON;
+            }
+            placed.add(new RowButton(cursor, lineY, buttonW, button.action(), button.key(), button.border()));
+            cursor += buttonW + 4;
+        }
+        return placed;
+    }
+
+    private record RowButton(int x, int y, int width, int action, String key, int border) {
     }
 
     private BlueprintPayloads.JobLine hoveredJob;
@@ -2181,98 +2293,40 @@ public class WrightsMenuScreen extends Screen {
             PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(new UUID(0L, 0L), BlueprintPayloads.JobControl.REMOVE_DONE));
             return true;
         }
-        if (mouseY >= workListY && mouseY < workListY + workRows * JOB_ROW) {
-            int row = (int) ((mouseY - workListY) / JOB_ROW);
+        if (mouseY >= workListY && mouseY < workListY + workRows * jobStride) {
+            int row = (int) ((mouseY - workListY) / jobStride);
             if (row >= 0 && row < workRows && jobScroll + row < workingJobs.size()) {
-                return clickJobRow(mouseX, mouseY, workListY + row * JOB_ROW, workingJobs.get(jobScroll + row));
+                return clickJobRow(mouseX, mouseY, workListY + row * jobStride, workingJobs.get(jobScroll + row));
             }
         }
-        if (mouseY >= doneListY && mouseY < doneListY + doneRows * JOB_ROW) {
-            int row = (int) ((mouseY - doneListY) / JOB_ROW);
+        if (mouseY >= doneListY && mouseY < doneListY + doneRows * jobStride) {
+            int row = (int) ((mouseY - doneListY) / jobStride);
             if (row >= 0 && row < doneRows && historyScroll + row < finishedJobs.size()) {
-                return clickJobRow(mouseX, mouseY, doneListY + row * JOB_ROW, finishedJobs.get(historyScroll + row));
+                return clickJobRow(mouseX, mouseY, doneListY + row * jobStride, finishedJobs.get(historyScroll + row));
             }
         }
         return false;
     }
 
     private boolean clickJobRow(double mouseX, double mouseY, int y, BlueprintPayloads.JobLine job) {
-        boolean working = !job.finished() && !job.saving();
-        int buttonY = y + 48;
-        if (mouseY < buttonY || mouseY >= buttonY + 16) {
-            return false;
-        }
         int rowX = jobX + 4;
         int rowW = jobW - 8;
-        if (working) {
-            String count = crewCountText(job);
-            int manageW = jobButtonWidth("menu.wrights.manage_drones");
-            int manageRight = rowX + 6 + this.font.width(count) + 6 + manageW;
-            if (mouseX >= manageRight - manageW && mouseX < manageRight) {
-                if (!requireTool()) {
-                    return true;
-                }
+        for (RowButton button : rowButtons(job, rowX, y, rowW)) {
+            if (mouseX < button.x() || mouseX >= button.x() + button.width() || mouseY < button.y() || mouseY >= button.y() + 16) {
+                continue;
+            }
+            if (button.action() == ACT_MARK) {
+                WrightsClientState.toggleMark(job.id());
+                return true;
+            }
+            if (!requireTool()) {
+                return true;
+            }
+            if (button.action() == ACT_MANAGE) {
                 this.minecraft.setScreen(new JobDroneScreen(job.id(), null));
                 return true;
             }
-        }
-        int right = rowX + rowW - 4;
-        if (hitJobButton(mouseX, right, buttonY)) {
-            if (!requireTool()) {
-                return true;
-            }
-            PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.REMOVE));
-            return true;
-        }
-        right -= 56;
-        if (creativeVisit()) {
-            if (hitJobButton(mouseX, right, buttonY)) {
-                if (!requireTool()) {
-                    return true;
-                }
-                PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.VISIT));
-                return true;
-            }
-            right -= 56;
-        }
-        String markKey = WrightsClientState.markedJobs.contains(job.id()) ? "menu.wrights.mark_on" : "menu.wrights.mark";
-        int markW = jobButtonWidth(markKey);
-        if (hitWide(mouseX, mouseY, right, buttonY, markW)) {
-            WrightsClientState.toggleMark(job.id());
-            return true;
-        }
-        right -= markW + 4;
-        if (job.finished()) {
-            if (hitJobButton(mouseX, right, buttonY)) {
-                if (!requireTool()) {
-                    return true;
-                }
-                PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.REDO));
-                return true;
-            }
-            right -= 56;
-            if (job.canUndo() && hitJobButton(mouseX, right, buttonY)) {
-                if (!requireTool()) {
-                    return true;
-                }
-                PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.UNDO));
-                return true;
-            }
-            return false;
-        }
-        if (hitJobButton(mouseX, right, buttonY)) {
-            if (!requireTool()) {
-                return true;
-            }
-            PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.STOP));
-            return true;
-        }
-        right -= 56;
-        if (hitJobButton(mouseX, right, buttonY)) {
-            if (!requireTool()) {
-                return true;
-            }
-            PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), job.paused() ? BlueprintPayloads.JobControl.RESUME : BlueprintPayloads.JobControl.PAUSE));
+            PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(job.id(), button.action()));
             return true;
         }
         return false;
@@ -2287,10 +2341,6 @@ public class WrightsMenuScreen extends Screen {
             }
         }
         return new int[] {working, total};
-    }
-
-    private boolean hitJobButton(double mouseX, int right, int y) {
-        return hitWide(mouseX, y, right, y, 52);
     }
 
     private boolean hitWide(double mouseX, double mouseY, int right, int y, int width) {
