@@ -13,6 +13,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -59,7 +60,16 @@ public final class MirrorLaunch {
         BlockState beforeClick = level.getBlockState(clicked);
         BlockState beforeSide = level.getBlockState(side);
         ItemStack stack = player.getItemInHand(hand);
-        InteractionResult result = stack.useOn(new UseOnContext(player, hand, new BlockHitResult(at, face, clicked, false)));
+        UseOnContext context = new UseOnContext(player, hand, new BlockHitResult(at, face, clicked, false));
+        BlockPlaceContext planned = new BlockPlaceContext(context);
+        if (!planned.canPlace()) {
+            return;
+        }
+        BlockPos target = planned.getClickedPos();
+        if (!payload.replace() && !level.getBlockState(target).isAir()) {
+            return;
+        }
+        InteractionResult result = stack.useOn(context);
         if (!result.consumesAction()) {
             return;
         }
@@ -124,8 +134,12 @@ public final class MirrorLaunch {
             if (!BoxEdits.inWorld(min) || !BoxEdits.inWorld(far)) {
                 continue;
             }
+            if (!payload.replace() && (!level.isLoaded(min) || !level.getBlockState(min).isAir())) {
+                continue;
+            }
             library.putSchematic(schematic);
-            boolean ok = JobManager.startBlueprintBuild(player, schematic.id(), min, schematic.sizeX(), schematic.sizeY(), schematic.sizeZ(), 0, false, false, false, false, true, true, false, copyNbt, settings, all);
+            boolean replace = payload.replace();
+            boolean ok = JobManager.startBlueprintBuild(player, schematic.id(), min, schematic.sizeX(), schematic.sizeY(), schematic.sizeZ(), 0, false, replace, replace, replace, true, true, false, copyNbt, settings, all);
             if (!ok) {
                 library.removeSchematic(schematic.id());
                 continue;

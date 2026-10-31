@@ -170,6 +170,9 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.BooleanValue MIRROR_SHAPES = BUILDER
             .comment("When true, stairs, slabs and facing are flipped to match the copy.")
             .define("mirrorShapes", true);
+    public static final ModConfigSpec.BooleanValue MIRROR_REPLACE = BUILDER
+            .comment("When true, a mirrored block copy replaces whatever is already there. When false, that spot is skipped unless it is air.")
+            .define("mirrorReplace", false);
     public static final ModConfigSpec.IntValue MIRROR_PATTERN = BUILDER
             .comment("0 pair, 1 cross, 2 eight.")
             .defineInRange("mirrorPattern", 0, 0, 2);
@@ -577,6 +580,15 @@ public final class WrightsClientConfig {
 
     public static void setMirrorShapes(boolean shapes) {
         MIRROR_SHAPES.set(shapes);
+        save();
+    }
+
+    public static boolean mirrorReplace() {
+        return MIRROR_REPLACE.get();
+    }
+
+    public static void setMirrorReplace(boolean replace) {
+        MIRROR_REPLACE.set(replace);
         save();
     }
 

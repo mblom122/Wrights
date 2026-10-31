@@ -810,6 +810,8 @@
   "menu.wrights.mirror_eight_hint": "Eight copies around the anchor corner.",
   "menu.wrights.mirror_shapes": "Flip stairs and facing",
   "menu.wrights.mirror_shapes_hint": "Stairs, slabs and facing are turned so the copy matches the reflection.",
+  "menu.wrights.mirror_replace": "Replace blocks",
+  "menu.wrights.mirror_replace_hint": "When off, a spot that already has a block gets no ghost and is skipped. Air, including cave air, still gets a copy.",
   "menu.wrights.mirror_on": "Mirror the next builds",
   "menu.wrights.mirror_on_hint": "Wrights build the copies. Off keeps the anchor but skips them.",
   "menu.wrights.mirror_clear": "Clear anchor",

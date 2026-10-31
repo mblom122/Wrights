@@ -346,7 +346,8 @@ public final class WrightsInput {
                     com.wrights.WrightsClientConfig.MIRROR_ON.get(),
                     com.wrights.WrightsClientConfig.COPY_NBT_BLOCKS.get(),
                     com.wrights.WrightsClientConfig.COPY_NBT_SETTINGS.get(),
-                    com.wrights.WrightsClientConfig.COPY_NBT_ALL.get()));
+                    com.wrights.WrightsClientConfig.COPY_NBT_ALL.get(),
+                    com.wrights.WrightsClientConfig.mirrorReplace()));
             return;
         }
         if (WrightsClientState.buildId == null) {

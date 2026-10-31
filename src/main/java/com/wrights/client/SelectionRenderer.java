@@ -132,6 +132,10 @@ public final class SelectionRenderer {
             return;
         }
         BlockPos at = place.getClickedPos();
+        boolean replace = WrightsClientConfig.mirrorReplace();
+        if (!replace && !minecraft.level.getBlockState(at).isAir()) {
+            return;
+        }
         double dx = at.getX() + 0.5D - camera.x;
         double dy = at.getY() + 0.5D - camera.y;
         double dz = at.getZ() + 0.5D - camera.z;
@@ -147,6 +151,9 @@ public final class SelectionRenderer {
             int pattern = WrightsClientConfig.MIRROR_PATTERN.get();
             boolean shapes = WrightsClientConfig.MIRROR_SHAPES.get();
             for (BlockPos copy : Mirror.copiesOf(at, anchor, face, pattern)) {
+                if (!replace && !minecraft.level.getBlockState(copy).isAir()) {
+                    continue;
+                }
                 double cx = copy.getX() + 0.5D - camera.x;
                 double cy = copy.getY() + 0.5D - camera.y;
                 double cz = copy.getZ() + 0.5D - camera.z;
