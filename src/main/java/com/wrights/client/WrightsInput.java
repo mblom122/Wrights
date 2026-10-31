@@ -40,6 +40,9 @@ public final class WrightsInput {
     private static int resumeDelay;
     private static boolean paceSent;
     private static boolean boundThisClick;
+    private static BlockPos mineWatch;
+    private static net.minecraft.world.level.block.state.BlockState mineState;
+    private static boolean mineSent;
 
     private WrightsInput() {
     }
@@ -106,6 +109,7 @@ public final class WrightsInput {
             }
         }
         boundThisClick = false;
+        watchMirrorMine(minecraft);
         WrightsClientState.tickCapture();
         if (held) {
             WrightsClientState.tickFollow();
@@ -129,6 +133,72 @@ public final class WrightsInput {
                 minecraft.setScreen(null);
             }
         }
+    }
+
+    @SubscribeEvent
+    public static void onMine(PlayerInteractEvent.LeftClickBlock event) {
+        if (!event.getLevel().isClientSide() || event.getEntity() == null || !event.getEntity().getAbilities().instabuild) {
+            return;
+        }
+        net.minecraft.world.level.block.state.BlockState state = event.getLevel().getBlockState(event.getPos());
+        if (!state.isAir()) {
+            sendMirrorMine(event.getPos(), state);
+        }
+    }
+
+    private static void watchMirrorMine(Minecraft minecraft) {
+        if (minecraft.player == null || minecraft.level == null || minecraft.screen != null || !mirrorMineReady(minecraft)) {
+            mineWatch = null;
+            mineState = null;
+            mineSent = false;
+            return;
+        }
+        if (minecraft.hitResult instanceof BlockHitResult hit && hit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK && minecraft.options.keyAttack.isDown()) {
+            BlockPos pos = hit.getBlockPos();
+            net.minecraft.world.level.block.state.BlockState state = minecraft.level.getBlockState(pos);
+            if (!state.isAir() && !pos.equals(mineWatch)) {
+                mineWatch = pos;
+                mineState = state;
+                mineSent = false;
+            }
+        }
+        if (mineWatch == null || mineSent || mineState == null || mineState.isAir()) {
+            return;
+        }
+        if (minecraft.level.getBlockState(mineWatch).isAir()) {
+            mineSent = true;
+            sendMirrorMine(mineWatch, mineState);
+        }
+    }
+
+    private static boolean mirrorMineReady(Minecraft minecraft) {
+        if (!WrightsClientState.mirrorAim || !com.wrights.WrightsClientConfig.mirrorBlocks() || !com.wrights.WrightsClientConfig.mirrorMine()) {
+            return false;
+        }
+        if (!com.wrights.WrightsConfig.allowMirrorMine() || !com.wrights.item.ControllerItem.isHeld(minecraft.player)) {
+            return false;
+        }
+        String dimension = minecraft.level.dimension().location().toString();
+        return com.wrights.WrightsClientConfig.mirrorArmed(dimension);
+    }
+
+    private static void sendMirrorMine(BlockPos pos, net.minecraft.world.level.block.state.BlockState state) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || !mirrorMineReady(minecraft) || state == null || state.isAir()) {
+            return;
+        }
+        mineWatch = pos;
+        mineState = state;
+        mineSent = true;
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(new BlueprintPayloads.MirrorMine(
+                pos,
+                net.minecraft.world.level.block.Block.getId(state),
+                com.wrights.WrightsClientConfig.mirrorAnchor(),
+                com.wrights.WrightsClientConfig.MIRROR_FACE.get(),
+                com.wrights.WrightsClientConfig.MIRROR_PATTERN.get(),
+                com.wrights.WrightsClientConfig.MIRROR_AXES.get(),
+                com.wrights.WrightsClientConfig.mirrorMineAny(),
+                com.wrights.WrightsClientConfig.mirrorMineSilk()));
     }
 
     @SubscribeEvent

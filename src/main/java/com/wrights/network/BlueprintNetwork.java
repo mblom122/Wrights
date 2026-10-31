@@ -47,6 +47,7 @@ public final class BlueprintNetwork {
         registrar.playToServer(BlueprintPayloads.BeginBuild.TYPE, BlueprintPayloads.BeginBuild.STREAM_CODEC, BlueprintNetwork::build);
         registrar.playToServer(BlueprintPayloads.LaunchBuild.TYPE, BlueprintPayloads.LaunchBuild.STREAM_CODEC, BlueprintNetwork::launch);
         registrar.playToServer(BlueprintPayloads.MirrorPlace.TYPE, BlueprintPayloads.MirrorPlace.STREAM_CODEC, BlueprintNetwork::mirrorPlace);
+        registrar.playToServer(BlueprintPayloads.MirrorMine.TYPE, BlueprintPayloads.MirrorMine.STREAM_CODEC, BlueprintNetwork::mirrorMine);
         registrar.playToServer(BlueprintPayloads.StopJob.TYPE, BlueprintPayloads.StopJob.STREAM_CODEC, BlueprintNetwork::stop);
         registrar.playToServer(BlueprintPayloads.SaveSession.TYPE, BlueprintPayloads.SaveSession.STREAM_CODEC, BlueprintNetwork::saveSession);
         registrar.playToServer(BlueprintPayloads.JobControl.TYPE, BlueprintPayloads.JobControl.STREAM_CODEC, BlueprintNetwork::control);
@@ -264,6 +265,11 @@ public final class BlueprintNetwork {
     private static void mirrorPlace(BlueprintPayloads.MirrorPlace payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
         context.enqueueWork(() -> com.wrights.blueprint.MirrorLaunch.placeHeld(player, payload));
+    }
+
+    private static void mirrorMine(BlueprintPayloads.MirrorMine payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> com.wrights.blueprint.MirrorLaunch.mine(player, payload));
     }
 
     private static void launch(BlueprintPayloads.LaunchBuild payload, IPayloadContext context) {

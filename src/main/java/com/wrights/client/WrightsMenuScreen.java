@@ -425,7 +425,7 @@ public class WrightsMenuScreen extends Screen {
 
     private void layout() {
         panelW = Math.min(540, this.width - 16);
-        panelH = Math.min(mirrorPage ? 408 : 360, this.height - 16);
+        panelH = Math.min(mirrorPage ? 480 : 360, this.height - 16);
         panelX = (this.width - panelW) / 2;
         panelY = (this.height - panelH) / 2;
         listX = panelX + 126;
@@ -1429,6 +1429,9 @@ public class WrightsMenuScreen extends Screen {
         if (!WrightsConfig.allowMirrorReplace() && WrightsClientConfig.mirrorReplace()) {
             WrightsClientConfig.setMirrorReplace(false);
         }
+        if (!WrightsConfig.allowMirrorMine() && WrightsClientConfig.mirrorMine()) {
+            WrightsClientConfig.setMirrorMine(false);
+        }
         if (!WrightsConfig.allowPlaceFluids() && WrightsClientConfig.PLACE_FLUIDS.get()) {
             WrightsClientConfig.setPlaceFluids(false);
         }
@@ -1582,6 +1585,9 @@ public class WrightsMenuScreen extends Screen {
     private int mirrorShapesY;
     private int mirrorReplaceY = -1;
     private int mirrorOnY;
+    private int mirrorMineY = -1;
+    private int mirrorMineModeY = -1;
+    private int mirrorSilkY = -1;
     private int mirrorHighlightX;
     private int mirrorHighlightY = -1;
     private int mirrorHighlightW;
@@ -1693,7 +1699,27 @@ public class WrightsMenuScreen extends Screen {
         }
         mirrorOnY = y;
         drawMirrorToggle(graphics, mouseX, mouseY, x, y, WrightsClientConfig.MIRROR_ON.get(), "menu.wrights.mirror_on", "menu.wrights.mirror_on_hint", true);
-        y += 22;
+        y += 16;
+        mirrorMineY = -1;
+        mirrorMineModeY = -1;
+        mirrorSilkY = -1;
+        if (WrightsClientConfig.mirrorBlocks() && WrightsConfig.allowMirrorMine()) {
+            mirrorMineY = y;
+            drawMirrorToggle(graphics, mouseX, mouseY, x, y, WrightsClientConfig.mirrorMine(), "menu.wrights.mirror_mine", "menu.wrights.mirror_mine_hint", true);
+            y += 16;
+            if (WrightsClientConfig.mirrorMine()) {
+                mirrorMineModeY = y;
+                int half = (w - gap) / 2;
+                boolean any = WrightsClientConfig.mirrorMineAny();
+                drawChoice(graphics, mouseX, mouseY, x + 16, y, half, 22, !any, "menu.wrights.mirror_mine_same");
+                drawChoice(graphics, mouseX, mouseY, x + 16 + half + gap, y, w - 16 - half - gap, 22, any, "menu.wrights.mirror_mine_any");
+                y += 28;
+                mirrorSilkY = y;
+                drawMirrorToggle(graphics, mouseX, mouseY, x + 16, y, WrightsClientConfig.mirrorMineSilk(), "menu.wrights.mirror_mine_silk", "menu.wrights.mirror_mine_silk_hint", true);
+                y += 16;
+            }
+        }
+        y += 6;
         drawMirrorStatus(graphics, x, y, w);
         y += 40;
         mirrorHighlightY = y;
@@ -1882,6 +1908,27 @@ public class WrightsMenuScreen extends Screen {
         }
         if (hitMirrorToggle(mouseX, mouseY, x, mirrorOnY, "menu.wrights.mirror_on")) {
             WrightsClientConfig.setMirrorOn(!WrightsClientConfig.MIRROR_ON.get());
+            return true;
+        }
+        if (mirrorMineY >= 0 && hitMirrorToggle(mouseX, mouseY, x, mirrorMineY, "menu.wrights.mirror_mine")) {
+            WrightsClientConfig.setMirrorMine(!WrightsClientConfig.mirrorMine());
+            return true;
+        }
+        if (mirrorMineModeY >= 0 && mouseY >= mirrorMineModeY && mouseY < mirrorMineModeY + 22) {
+            int half = (mirrorBodyW - 6) / 2;
+            int left = x + 16;
+            if (mouseX >= left && mouseX < left + half) {
+                WrightsClientConfig.setMirrorMineAny(false);
+                return true;
+            }
+            int right = left + half + 6;
+            if (mouseX >= right && mouseX < x + mirrorBodyW) {
+                WrightsClientConfig.setMirrorMineAny(true);
+                return true;
+            }
+        }
+        if (mirrorSilkY >= 0 && hitMirrorToggle(mouseX, mouseY, x + 16, mirrorSilkY, "menu.wrights.mirror_mine_silk")) {
+            WrightsClientConfig.setMirrorMineSilk(!WrightsClientConfig.mirrorMineSilk());
             return true;
         }
         if (mirrorHighlightY >= 0 && mouseX >= mirrorHighlightX && mouseX < mirrorHighlightX + mirrorHighlightW && mouseY >= mirrorHighlightY && mouseY < mirrorHighlightY + 18) {

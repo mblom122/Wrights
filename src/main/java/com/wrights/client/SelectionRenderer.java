@@ -101,6 +101,7 @@ public final class SelectionRenderer {
             drawPreview(pose, buffers, camera);
         } else if ((!gui || placing) && mirrorBlocks()) {
             drawMirrorBlockGhosts(pose, buffers, camera, minecraft);
+            drawMirrorMine(pose, buffers, camera, minecraft);
         }
         if ((!gui || placing) && WrightsClientState.mode == WrightsClientState.Mode.BUILD && (WrightsClientState.bindSupply || WrightsClientState.supplyBound)) {
             drawSupplyMarkers(pose, buffers, camera, minecraft);
@@ -169,6 +170,48 @@ public final class SelectionRenderer {
             }
         }
         buffers.endBatch();
+    }
+
+    /** Outlines the copies that mirror mining will break. */
+    private static void drawMirrorMine(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
+        if (minecraft.level == null || !WrightsClientConfig.mirrorMine() || !WrightsConfig.allowMirrorMine()) {
+            return;
+        }
+        if (!(minecraft.hitResult instanceof BlockHitResult hit) || hit.getType() != HitResult.Type.BLOCK) {
+            return;
+        }
+        String here = minecraft.level.dimension().location().toString();
+        if (!WrightsClientConfig.mirrorArmed(here)) {
+            return;
+        }
+        BlockPos at = hit.getBlockPos();
+        BlockState mined = minecraft.level.getBlockState(at);
+        if (mined.isAir()) {
+            return;
+        }
+        BlockPos anchor = WrightsClientConfig.mirrorAnchor();
+        Direction face = Direction.from3DDataValue(WrightsClientConfig.MIRROR_FACE.get());
+        int pattern = WrightsConfig.allowedPattern(WrightsClientConfig.MIRROR_PATTERN.get());
+        int axes = WrightsConfig.allowedAxes(WrightsClientConfig.MIRROR_AXES.get());
+        boolean any = WrightsClientConfig.mirrorMineAny();
+        VertexConsumer lines = buffers.getBuffer(RenderType.lines());
+        boolean drawn = false;
+        for (BlockPos copy : Mirror.copiesOf(at, anchor, face, pattern, axes)) {
+            if (!com.wrights.blueprint.MirrorLaunch.accepts(minecraft.level, copy, mined.getBlock(), any)) {
+                continue;
+            }
+            double dx = copy.getX() + 0.5D - camera.x;
+            double dy = copy.getY() + 0.5D - camera.y;
+            double dz = copy.getZ() + 0.5D - camera.z;
+            if (dx * dx + dy * dy + dz * dz > rangeSqr()) {
+                continue;
+            }
+            drawBox(pose, lines, new AABB(copy).inflate(0.02D), camera, 0.86F, 0.45F, 0.38F, 0.9F);
+            drawn = true;
+        }
+        if (drawn) {
+            buffers.endBatch(RenderType.lines());
+        }
     }
 
     private static InteractionHand mirrorBlockHand(LocalPlayer player) {

@@ -1913,6 +1913,31 @@ public final class BlueprintPayloads {
         }
     }
 
+    public record MirrorMine(BlockPos pos, int stateId, BlockPos anchor, int anchorFace, int pattern, int axes, boolean any, boolean silk) implements CustomPacketPayload {
+        public static final Type<MirrorMine> TYPE = payloadType("mirror_mine");
+        public static final StreamCodec<RegistryFriendlyByteBuf, MirrorMine> STREAM_CODEC = StreamCodec.of((buf, value) -> value.write(buf), MirrorMine::read);
+
+        public void write(RegistryFriendlyByteBuf buf) {
+            buf.writeBlockPos(pos);
+            buf.writeVarInt(stateId);
+            buf.writeBlockPos(anchor);
+            buf.writeVarInt(anchorFace);
+            buf.writeVarInt(pattern);
+            buf.writeVarInt(axes);
+            buf.writeBoolean(any);
+            buf.writeBoolean(silk);
+        }
+
+        public static MirrorMine read(RegistryFriendlyByteBuf buf) {
+            return new MirrorMine(buf.readBlockPos(), buf.readVarInt(), buf.readBlockPos(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readBoolean(), buf.readBoolean());
+        }
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     private static void writeBlob(RegistryFriendlyByteBuf buf, byte[] data) {
         byte[] bytes = data == null ? new byte[0] : data;
         buf.writeVarInt(bytes.length);

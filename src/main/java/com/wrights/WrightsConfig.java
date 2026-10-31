@@ -179,6 +179,9 @@ public final class WrightsConfig {
     public static final ModConfigSpec.BooleanValue ALLOW_MIRROR_REPLACE = BUILDER
             .comment("Mirrored block copies may replace a block that is already there.")
             .define("mirrorReplace", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_MIRROR_MINE = BUILDER
+            .comment("Breaking a block can also break the mirrored copies.")
+            .define("mirrorMine", true);
     public static final ModConfigSpec.BooleanValue ALLOW_MIRROR_AXES = BUILDER
             .comment("Choosing X, Y, and Z in the mirror menu. Off keeps the axis from the anchor face.")
             .define("mirrorAxes", true);
@@ -336,6 +339,10 @@ public final class WrightsConfig {
 
     public static boolean allowMirrorReplace() {
         return allowMirrorBlocks() && read(ALLOW_MIRROR_REPLACE, true);
+    }
+
+    public static boolean allowMirrorMine() {
+        return allowMirrorBlocks() && read(ALLOW_MIRROR_MINE, true);
     }
 
     public static boolean allowMirrorAxes() {

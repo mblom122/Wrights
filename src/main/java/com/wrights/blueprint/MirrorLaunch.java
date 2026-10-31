@@ -228,4 +228,75 @@ public final class MirrorLaunch {
         }
         return started;
     }
+
+    /** Breaking one block also breaks the reflected copies that match the mining rule. */
+    public static void mine(ServerPlayer player, BlueprintPayloads.MirrorMine payload) {
+        if (player == null || payload == null || WrightsConfig.refuse(player, WrightsConfig.allowMirrorMine())) {
+            return;
+        }
+        if (!ControllerItem.isHeld(player)) {
+            return;
+        }
+        ServerLevel level = player.serverLevel();
+        BlockPos origin = payload.pos();
+        double reach = player.blockInteractionRange() + 1.5D;
+        if (origin == null || player.distanceToSqr(origin.getCenter()) > reach * reach) {
+            return;
+        }
+        BlockState mined = net.minecraft.world.level.block.Block.stateById(payload.stateId());
+        if (mined.isAir()) {
+            return;
+        }
+        BlockState now = level.getBlockState(origin);
+        if (!now.isAir() && now.getBlock() != mined.getBlock()) {
+            return;
+        }
+        Direction face = Direction.from3DDataValue(Mth.clamp(payload.anchorFace(), 0, 5));
+        int pattern = WrightsConfig.allowedPattern(payload.pattern());
+        int axes = WrightsConfig.allowedAxes(payload.axes());
+        ItemStack tool = mineTool(player, level, payload.silk());
+        for (BlockPos copy : Mirror.copiesOf(origin, payload.anchor(), face, pattern, axes)) {
+            if (!level.isLoaded(copy) || !level.mayInteract(player, copy) || !accepts(level, copy, mined.getBlock(), payload.any())) {
+                continue;
+            }
+            BlockState state = level.getBlockState(copy);
+            BlockEntity entity = level.getBlockEntity(copy);
+            if (!player.getAbilities().instabuild) {
+                net.minecraft.world.level.block.Block.dropResources(state, level, copy, entity, player, tool);
+            }
+            level.destroyBlock(copy, false, player);
+        }
+    }
+
+    /** Same block, or any block that does not store data. */
+    public static boolean accepts(net.minecraft.world.level.Level level, BlockPos pos, net.minecraft.world.level.block.Block mined, boolean any) {
+        BlockState state = level.getBlockState(pos);
+        if (state.isAir() || state.getDestroySpeed(level, pos) < 0.0F || state.getBlock() instanceof net.minecraft.world.level.block.LiquidBlock) {
+            return false;
+        }
+        if (any) {
+            return !(state.getBlock() instanceof net.minecraft.world.level.block.EntityBlock);
+        }
+        return state.getBlock() == mined;
+    }
+
+    private static ItemStack mineTool(ServerPlayer player, ServerLevel level, boolean silk) {
+        var enchantments = level.registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.ENCHANTMENT);
+        var silkTouch = enchantments.getOrThrow(net.minecraft.world.item.enchantment.Enchantments.SILK_TOUCH);
+        if (silk) {
+            ItemStack stack = new ItemStack(net.minecraft.world.item.Items.DIAMOND_PICKAXE);
+            stack.enchant(silkTouch, 1);
+            return stack;
+        }
+        ItemStack held = player.getMainHandItem();
+        net.minecraft.world.item.enchantment.ItemEnchantments current = held.getOrDefault(net.minecraft.core.component.DataComponents.ENCHANTMENTS, net.minecraft.world.item.enchantment.ItemEnchantments.EMPTY);
+        if (current.getLevel(silkTouch) <= 0) {
+            return held;
+        }
+        ItemStack copy = held.copy();
+        net.minecraft.world.item.enchantment.ItemEnchantments.Mutable mutable = new net.minecraft.world.item.enchantment.ItemEnchantments.Mutable(current);
+        mutable.set(silkTouch, 0);
+        copy.set(net.minecraft.core.component.DataComponents.ENCHANTMENTS, mutable.toImmutable());
+        return copy;
+    }
 }
