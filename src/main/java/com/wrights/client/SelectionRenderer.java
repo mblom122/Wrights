@@ -312,7 +312,7 @@ public final class SelectionRenderer {
             float alpha = com.wrights.WrightsClientConfig.wallAlpha();
             if (alpha > 0.01F) {
                 int rgb = com.wrights.WrightsClientConfig.wallRgb();
-                AABB wall = box.inflate(0.02D).move(-camera.x, -camera.y, -camera.z);
+                AABB wall = box.deflate(0.04D).move(-camera.x, -camera.y, -camera.z);
                 LevelRenderer.addChainedFilledBoxVertices(
                         pose, fill, wall.minX, wall.minY, wall.minZ, wall.maxX, wall.maxY, wall.maxZ,
                         com.wrights.WrightsClientConfig.channel(rgb, 16),
@@ -325,7 +325,7 @@ public final class SelectionRenderer {
             }
             buffers.endBatch(RenderType.debugFilledBox());
             int edge = com.wrights.WrightsClientConfig.edgeRgb();
-            drawBox(pose, buffers.getBuffer(RenderType.lines()), box, camera,
+            drawBox(pose, buffers.getBuffer(RenderType.lines()), box.inflate(0.02D), camera,
                     com.wrights.WrightsClientConfig.channel(edge, 16),
                     com.wrights.WrightsClientConfig.channel(edge, 8),
                     com.wrights.WrightsClientConfig.channel(edge, 0),
@@ -550,13 +550,15 @@ public final class SelectionRenderer {
 
     private static void drawCorners(PoseStack pose, VertexConsumer fill, AABB box, Vec3 camera, float red, float green, float blue) {
         AABB local = box.move(-camera.x, -camera.y, -camera.z);
-        double[] xs = {local.minX, local.maxX - 0.18D};
-        double[] ys = {local.minY, local.maxY - 0.18D};
-        double[] zs = {local.minZ, local.maxZ - 0.18D};
+        double out = 0.06D;
+        double size = 0.24D;
+        double[] xs = {local.minX - out, local.maxX + out - size};
+        double[] ys = {local.minY - out, local.maxY + out - size};
+        double[] zs = {local.minZ - out, local.maxZ + out - size};
         for (double x : xs) {
             for (double y : ys) {
                 for (double z : zs) {
-                    LevelRenderer.addChainedFilledBoxVertices(pose, fill, x, y, z, x + 0.18D, y + 0.18D, z + 0.18D, red, green, blue, 0.95F);
+                    LevelRenderer.addChainedFilledBoxVertices(pose, fill, x, y, z, x + size, y + size, z + size, red, green, blue, 0.95F);
                 }
             }
         }
