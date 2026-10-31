@@ -1885,6 +1885,19 @@ public final class BlueprintPayloads {
         }
     }
 
+    /** Shown on top of an open manage window. The vanilla action bar sits behind that window. */
+    public record Notice(Component text) implements CustomPacketPayload {
+        public static final Type<Notice> TYPE = payloadType("notice");
+        public static final StreamCodec<RegistryFriendlyByteBuf, Notice> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> buf.writeJsonWithCodec(ComponentSerialization.CODEC, value.text == null ? Component.empty() : value.text),
+                buf -> new Notice(buf.readJsonWithCodec(ComponentSerialization.CODEC)));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public record DigitalUse(java.util.List<DigitalUseLine> lines) implements CustomPacketPayload {
         public static final Type<DigitalUse> TYPE = payloadType("digital_use");
         public static final StreamCodec<RegistryFriendlyByteBuf, DigitalUse> STREAM_CODEC = StreamCodec.of(

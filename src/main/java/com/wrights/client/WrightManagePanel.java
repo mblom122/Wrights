@@ -277,14 +277,38 @@ final class WrightManagePanel {
     }
 
     void drawDigitalTip(ManageHost screen, GuiGraphics graphics, int mouseX, int mouseY) {
-        if (WrightsClientState.digitalUseTip.isEmpty() || System.currentTimeMillis() >= WrightsClientState.digitalUseUntil) {
+        long now = System.currentTimeMillis();
+        List<Component> source = new ArrayList<>();
+        if (WrightsClientState.notice != null && now < WrightsClientState.noticeUntil && !WrightsClientState.notice.getString().isEmpty()) {
+            source.add(WrightsClientState.notice);
+        } else if (!WrightsClientState.digitalUseTip.isEmpty() && now < WrightsClientState.digitalUseUntil) {
+            source.addAll(WrightsClientState.digitalUseTip);
+        }
+        if (source.isEmpty()) {
             return;
         }
+        int max = Math.max(80, panelW - 28);
         List<FormattedCharSequence> lines = new ArrayList<>();
-        for (Component line : WrightsClientState.digitalUseTip) {
-            lines.add(line.getVisualOrderText());
+        for (Component line : source) {
+            lines.addAll(screen.font().split(line, max));
         }
-        graphics.renderTooltip(screen.font(), lines, mouseX, mouseY);
+        if (lines.isEmpty()) {
+            return;
+        }
+        int boxH = lines.size() * 10 + 8;
+        int x = panelX + 8;
+        int w = panelW - 16;
+        int y = panelY + panelH - 54 - boxH - 6;
+        if (y < panelY + 20) {
+            y = panelY + 20;
+        }
+        graphics.fill(x, y, x + w, y + boxH, 0xF0141810);
+        WrightsUi.border(graphics, x, y, w, boxH, 0xFFE0B060);
+        int textY = y + 4;
+        for (FormattedCharSequence line : lines) {
+            graphics.drawString(screen.font(), line, x + 6, textY, 0xFFFFE7B0, false);
+            textY += 10;
+        }
     }
 
     boolean mouseClicked(ManageHost screen, double mouseX, double mouseY, int button) {

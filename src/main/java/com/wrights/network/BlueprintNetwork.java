@@ -107,6 +107,7 @@ public final class BlueprintNetwork {
         registrar.playToClient(BlueprintPayloads.DigitalSync.TYPE, BlueprintPayloads.DigitalSync.STREAM_CODEC, BlueprintNetwork::clientDigital);
         registrar.playToClient(BlueprintPayloads.DigitalInfoSync.TYPE, BlueprintPayloads.DigitalInfoSync.STREAM_CODEC, BlueprintNetwork::clientDigitalInfo);
         registrar.playToClient(BlueprintPayloads.DigitalUse.TYPE, BlueprintPayloads.DigitalUse.STREAM_CODEC, BlueprintNetwork::clientDigitalUse);
+        registrar.playToClient(BlueprintPayloads.Notice.TYPE, BlueprintPayloads.Notice.STREAM_CODEC, BlueprintNetwork::clientNotice);
         registrar.playToClient(BlueprintPayloads.UndoPrompt.TYPE, BlueprintPayloads.UndoPrompt.STREAM_CODEC, BlueprintNetwork::clientUndoPrompt);
         registrar.playToClient(BlueprintPayloads.JobDone.TYPE, BlueprintPayloads.JobDone.STREAM_CODEC, BlueprintNetwork::clientJobDone);
         registrar.playToClient(BlueprintPayloads.DockToast.TYPE, BlueprintPayloads.DockToast.STREAM_CODEC, BlueprintNetwork::clientDockToast);
@@ -612,6 +613,13 @@ public final class BlueprintNetwork {
             return;
         }
         context.enqueueWork(() -> com.wrights.client.WrightsClientState.applyDigitalInfo(payload));
+    }
+
+    private static void clientNotice(BlueprintPayloads.Notice payload, IPayloadContext context) {
+        if (FMLEnvironment.dist != Dist.CLIENT) {
+            return;
+        }
+        context.enqueueWork(() -> com.wrights.client.WrightsClientState.showNotice(payload.text()));
     }
 
     private static void clientDigitalUse(BlueprintPayloads.DigitalUse payload, IPayloadContext context) {
