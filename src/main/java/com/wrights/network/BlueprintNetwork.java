@@ -94,6 +94,7 @@ public final class BlueprintNetwork {
         registrar.playToClient(BlueprintPayloads.Materials.TYPE, BlueprintPayloads.Materials.STREAM_CODEC, BlueprintNetwork::clientMaterials);
         registrar.playToClient(BlueprintPayloads.CaptureFinished.TYPE, BlueprintPayloads.CaptureFinished.STREAM_CODEC, BlueprintNetwork::clientFinished);
         registrar.playToClient(BlueprintPayloads.JobHologram.TYPE, BlueprintPayloads.JobHologram.STREAM_CODEC, BlueprintNetwork::clientJobHologram);
+        registrar.playToClient(BlueprintPayloads.JobGhostDrop.TYPE, BlueprintPayloads.JobGhostDrop.STREAM_CODEC, BlueprintNetwork::clientJobGhostDrop);
         registrar.playToClient(BlueprintPayloads.JobSync.TYPE, BlueprintPayloads.JobSync.STREAM_CODEC, BlueprintNetwork::clientJobs);
         registrar.playToClient(BlueprintPayloads.PlacedPorts.TYPE, BlueprintPayloads.PlacedPorts.STREAM_CODEC, BlueprintNetwork::clientPlacedPorts);
         registrar.playToClient(BlueprintPayloads.PortGlow.TYPE, BlueprintPayloads.PortGlow.STREAM_CODEC, BlueprintNetwork::clientPortGlow);
@@ -558,6 +559,13 @@ public final class BlueprintNetwork {
         context.enqueueWork(() -> com.wrights.client.WrightsClientState.applyJobHologram(payload));
     }
 
+    private static void clientJobGhostDrop(BlueprintPayloads.JobGhostDrop payload, IPayloadContext context) {
+        if (FMLEnvironment.dist != Dist.CLIENT) {
+            return;
+        }
+        context.enqueueWork(() -> com.wrights.client.WrightsClientState.dropJobGhost(payload.jobId(), payload.x(), payload.y(), payload.z()));
+    }
+
     private static void clientJobs(BlueprintPayloads.JobSync payload, IPayloadContext context) {
         if (FMLEnvironment.dist != Dist.CLIENT) {
             return;
@@ -921,9 +929,11 @@ public final class BlueprintNetwork {
     /** Keeps a big build under the packet cap by stepping through it, so the ghost still shows. */
     private static java.util.List<BlueprintPayloads.Bit> hologramBits(BuildJob job, Schematic schematic) {
         int limit = Math.max(1, com.wrights.WrightsConfig.maxPreviewBlocks());
+        java.util.Set<Long> settled = new java.util.HashSet<>();
+        job.collectSettledGhosts(settled);
         int count = 0;
         for (Schematic.Entry entry : schematic.entries()) {
-            if (!job.outsideClip(entry)) {
+            if (!job.outsideClip(entry) && !settled.contains(BlockPos.asLong(Short.toUnsignedInt(entry.x()), Short.toUnsignedInt(entry.y()), Short.toUnsignedInt(entry.z())))) {
                 count++;
             }
         }
@@ -931,7 +941,7 @@ public final class BlueprintNetwork {
         java.util.List<BlueprintPayloads.Bit> bits = new java.util.ArrayList<>(Math.min(count, limit));
         int seen = 0;
         for (Schematic.Entry entry : schematic.entries()) {
-            if (job.outsideClip(entry)) {
+            if (job.outsideClip(entry) || settled.contains(BlockPos.asLong(Short.toUnsignedInt(entry.x()), Short.toUnsignedInt(entry.y()), Short.toUnsignedInt(entry.z())))) {
                 continue;
             }
             if (seen % step == 0) {
@@ -940,6 +950,10 @@ public final class BlueprintNetwork {
             seen++;
         }
         return bits;
+    }
+
+    public static void dropJobGhost(ServerPlayer player, java.util.UUID jobId, short x, short y, short z) {
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.JobGhostDrop(jobId, Short.toUnsignedInt(x), Short.toUnsignedInt(y), Short.toUnsignedInt(z)));
     }
 
     public static void clearJobHologram(ServerPlayer player, java.util.UUID jobId) {

@@ -200,6 +200,28 @@ public final class WrightsClientState {
         rebuildActiveCells();
     }
 
+    /** A placed cell is finished. Breaking that block later must not bring its ghost back. */
+    public static void dropJobGhost(UUID jobId, int x, int y, int z) {
+        ActiveBuild build = activeBuilds.get(jobId);
+        if (build == null) {
+            return;
+        }
+        List<Ghost> next = new ArrayList<>();
+        boolean hit = false;
+        for (Ghost ghost : build.ghosts()) {
+            if (ghost.x() == x && ghost.y() == y && ghost.z() == z) {
+                hit = true;
+                continue;
+            }
+            next.add(ghost);
+        }
+        if (!hit) {
+            return;
+        }
+        activeBuilds.put(jobId, new ActiveBuild(build.origin(), build.clipX(), build.clipY(), build.clipZ(), next, build.dimension()));
+        rebuildActiveCells();
+    }
+
     public static void applyJobs(BlueprintPayloads.JobSync payload) {
         jobs = List.copyOf(payload.jobs());
         busy = false;

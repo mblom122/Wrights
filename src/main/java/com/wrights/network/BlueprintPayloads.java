@@ -699,6 +699,24 @@ public final class BlueprintPayloads {
         }
     }
 
+    /** Drops one placed cell from a job's ghost preview. */
+    public record JobGhostDrop(UUID jobId, int x, int y, int z) implements CustomPacketPayload {
+        public static final Type<JobGhostDrop> TYPE = payloadType("job_ghost_drop");
+        public static final StreamCodec<RegistryFriendlyByteBuf, JobGhostDrop> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeUUID(value.jobId);
+                    buf.writeShort(value.x);
+                    buf.writeShort(value.y);
+                    buf.writeShort(value.z);
+                },
+                buf -> new JobGhostDrop(buf.readUUID(), Short.toUnsignedInt(buf.readShort()), Short.toUnsignedInt(buf.readShort()), Short.toUnsignedInt(buf.readShort())));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public record JobLine(UUID id, String name, int done, int total, int skipped, boolean paused, boolean saving, boolean finished, boolean canUndo, boolean undoing, boolean stopped, boolean undone, String dimension, BlockPos anchor, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, List<UUID> crew, int workedTicks, int hold, int waitKind, int source, BlockPos sourcePort, boolean labelPort, boolean queued, int quota, String sourceName, boolean cellMarks) {
         public void write(RegistryFriendlyByteBuf buf) {
             buf.writeUUID(id);

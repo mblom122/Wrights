@@ -3648,6 +3648,7 @@ public final class JobManager {
         BlockState existing = level.getBlockState(pos);
         if (existing.equals(state)) {
             applyEntryNbt(level, player, job, pos, entry);
+            clearPlacedGhost(player, job, entry);
             return PlaceResult.DONE;
         }
         if (skippedContent(job, entry)) {
@@ -3718,6 +3719,7 @@ public final class JobManager {
         }
         applyEntryNbt(level, player, job, pos, entry);
         job.recordPlaced(entry.x(), entry.y(), entry.z(), after, paid);
+        clearPlacedGhost(player, job, entry);
         if (!quiet) {
             level.gameEvent(player, GameEvent.BLOCK_PLACE, pos);
             level.playSound(null, pos, state.getSoundType(level, pos, player).getPlaceSound(), SoundSource.BLOCKS, 1.0F, 1.0F);
@@ -3725,6 +3727,12 @@ public final class JobManager {
         }
         job.placedOne();
         return PlaceResult.DONE;
+    }
+
+    /** The cell is filled, so the preview ghost for it is finished. */
+    private static void clearPlacedGhost(ServerPlayer player, BuildJob job, Schematic.Entry entry) {
+        job.settleGhost(entry.x(), entry.y(), entry.z());
+        com.wrights.network.BlueprintNetwork.dropJobGhost(player, job.id(), entry.x(), entry.y(), entry.z());
     }
 
     private static boolean skippedContent(BuildJob job, Schematic.Entry entry) {

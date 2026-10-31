@@ -43,6 +43,8 @@ public final class BuildJob {
     private final int total;
     private final List<Schematic.Entry> partial = new ArrayList<>();
     private final List<Refund> refunds = new ArrayList<>();
+    /** Local cells whose ghost is done. Placed cells also live in {@link #refunds}. */
+    private final Set<Long> settledGhosts = new HashSet<>();
 
     private UUID schematicId;
     private UUID resultSchematicId;
@@ -680,6 +682,19 @@ public final class BuildJob {
 
     public void recordPlaced(short x, short y, short z, BlockState state, boolean paid) {
         refunds.add(new Refund(x, y, z, state, paid));
+        settleGhost(x, y, z);
+    }
+
+    /** The real block has this cell, so its ghost should not come back if the block is broken. */
+    public void settleGhost(short x, short y, short z) {
+        settledGhosts.add(BlockPos.asLong(Short.toUnsignedInt(x), Short.toUnsignedInt(y), Short.toUnsignedInt(z)));
+    }
+
+    public void collectSettledGhosts(Set<Long> into) {
+        into.addAll(settledGhosts);
+        for (Refund refund : refunds) {
+            into.add(BlockPos.asLong(Short.toUnsignedInt(refund.x()), Short.toUnsignedInt(refund.y()), Short.toUnsignedInt(refund.z())));
+        }
     }
 
     public Refund pollRefund() {
@@ -759,6 +774,7 @@ public final class BuildJob {
         cursor = 0;
         pasteProbe = 0;
         placed = 0;
+        settledGhosts.clear();
         skipped = 0;
         skippedSpecial = 0;
         droneId = null;
@@ -930,6 +946,14 @@ public final class BuildJob {
             refundList.add(refund.save());
         }
         tag.put("refunds", refundList);
+        if (!settledGhosts.isEmpty()) {
+            long[] packed = new long[settledGhosts.size()];
+            int i = 0;
+            for (long key : settledGhosts) {
+                packed[i++] = key;
+            }
+            tag.putLongArray("settledGhosts", packed);
+        }
         if (clipX != Integer.MAX_VALUE) {
             tag.putInt("clipX", clipX);
             tag.putInt("clipY", clipY);
@@ -958,6 +982,11 @@ public final class BuildJob {
         job.phase = Phase.valueOf(tag.getString("phase"));
         job.cursor = tag.getInt("cursor");
         job.placed = tag.getInt("placed");
+        if (tag.contains("settledGhosts")) {
+            for (long key : tag.getLongArray("settledGhosts")) {
+                job.settledGhosts.add(key);
+            }
+        }
         job.skipped = tag.getInt("skipped");
         job.skippedSpecial = tag.getInt("skippedSpecial");
         if (tag.hasUUID("schematic")) {
