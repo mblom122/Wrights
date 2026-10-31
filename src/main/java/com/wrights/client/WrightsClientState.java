@@ -1467,6 +1467,11 @@ public final class WrightsClientState {
                     cornerB = aimCorner(cornerA);
                     return;
                 }
+                if (hasBox() && aimingAtSelection()) {
+                    minecraft.setScreen(new BlueprintAdjustScreen());
+                    return;
+                }
+                clearCapturePreview();
                 BlockPos pos = clicked != null ? clicked : aimCorner(null);
                 cornerA = pos;
                 cornerB = pos;
@@ -1481,6 +1486,20 @@ public final class WrightsClientState {
             PacketDistributor.sendToServer(new BlueprintPayloads.CapturePick(pos, BlueprintPayloads.CapturePick.BOX_COMMIT));
             return;
         }
+        if (hasBox()) {
+            if (aimingAtSelection()) {
+                minecraft.setScreen(new BlueprintAdjustScreen());
+                return;
+            }
+            if (clicked == null) {
+                return;
+            }
+            cornerA = clicked;
+            cornerB = null;
+            clearCapturePreview();
+            PacketDistributor.sendToServer(new BlueprintPayloads.CapturePick(clicked, BlueprintPayloads.CapturePick.BOX_BEGIN));
+            return;
+        }
         if (clicked == null) {
             return;
         }
@@ -1490,6 +1509,29 @@ public final class WrightsClientState {
 
     public static boolean hasBox() {
         return cornerA != null && cornerB != null;
+    }
+
+    private static boolean aimingAtSelection() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || minecraft.level == null || !hasBox()) {
+            return false;
+        }
+        AABB box = selection(cornerA, cornerB);
+        AABB target = box.inflate(0.25D);
+        Vec3 eye = minecraft.player.getEyePosition(1.0F);
+        Vec3 end = eye.add(minecraft.player.getViewVector(1.0F).scale(WrightsConfig.MAX_RANGE.getAsInt()));
+        if (target.contains(eye)) {
+            return true;
+        }
+        Vec3 hit = target.clip(eye, end).orElse(null);
+        if (hit == null) {
+            return false;
+        }
+        BlockHitResult world = minecraft.level.clip(new ClipContext(eye, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, minecraft.player));
+        if (world.getType() != HitResult.Type.BLOCK || world.getLocation().distanceToSqr(eye) + 1.0E-3D >= hit.distanceToSqr(eye)) {
+            return true;
+        }
+        return box.inflate(0.01D).contains(Vec3.atCenterOf(world.getBlockPos()));
     }
 
     private static boolean grabMove() {

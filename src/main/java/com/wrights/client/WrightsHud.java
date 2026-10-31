@@ -55,10 +55,13 @@ public final class WrightsHud {
                 line = volumeLine();
                 sub = Component.translatable("hud.wrights.box_sub");
             } else if (box && WrightsClientState.cornerA != null) {
-                line = Component.translatable(WrightsClientState.hasBox() ? "hud.wrights.resize_ready" : "hud.wrights.box_idle");
-                sub = Component.translatable("hud.wrights.mode_how");
                 if (WrightsClientState.hasBox()) {
-                    note = Component.translatable("hud.wrights.resize_side");
+                    line = volumeLine();
+                    sub = Component.translatable("hud.wrights.shape_open");
+                    note = Component.translatable("hud.wrights.shape_again");
+                } else {
+                    line = Component.translatable("hud.wrights.box_idle");
+                    sub = Component.translatable("hud.wrights.mode_how");
                 }
             } else if (WrightsClientState.cornerA == null) {
                 line = Component.translatable("hud.wrights.capture");
@@ -68,8 +71,8 @@ public final class WrightsHud {
                 sub = Component.translatable("hud.wrights.mode_how");
             } else {
                 line = volumeLine();
-                sub = Component.translatable("hud.wrights.mode_how");
-                note = Component.translatable("hud.wrights.resize_side");
+                sub = Component.translatable("hud.wrights.shape_open");
+                note = Component.translatable("hud.wrights.shape_again");
             }
         } else if (WrightsClientState.mode == WrightsClientState.Mode.SAVING) {
             line = Component.translatable("hud.wrights.saving", WrightsClientState.name);
