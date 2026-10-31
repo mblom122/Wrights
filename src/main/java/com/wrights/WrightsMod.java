@@ -50,5 +50,18 @@ public class WrightsMod {
                 ResourceLocation.fromNamespaceAndPath(MOD_ID, "wrightport"),
                 result -> result.stack().is(ModItems.PERSONAL_WRIGHTPORT.get())));
         event.enqueueWork(() -> com.wrights.schematic.GlobalBlueprintStore.get());
+        event.enqueueWork(WrightsMod::registerAe2Link);
+    }
+
+    /** Loaded by name so a pack without AE2 never touches its classes. */
+    private static void registerAe2Link() {
+        if (!net.neoforged.fml.ModList.get().isLoaded("ae2")) {
+            return;
+        }
+        try {
+            Class.forName("com.wrights.compat.ae2.Ae2ControllerLink").getMethod("register").invoke(null);
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            LOGGER.warn("AE2 is loaded, but the controller could not be registered for the wireless access point", exception);
+        }
     }
 }

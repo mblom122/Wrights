@@ -3,6 +3,7 @@ package com.wrights.item;
 import com.mojang.serialization.Codec;
 import com.wrights.WrightsMod;
 
+import net.minecraft.core.GlobalPos;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
@@ -42,6 +43,12 @@ public final class ModDataComponents {
             DATA_COMPONENTS.registerComponentType("port_name", builder -> builder
                     .persistent(Codec.STRING)
                     .networkSynchronized(ByteBufCodecs.stringUtf8(32)));
+
+    /** Access point this controller was linked to, the same way a wireless terminal stores its link. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<GlobalPos>> AE_LINK =
+            DATA_COMPONENTS.registerComponentType("ae_link", builder -> builder
+                    .persistent(GlobalPos.CODEC)
+                    .networkSynchronized(GlobalPos.STREAM_CODEC));
 
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> WRIGHT_TIER =
             DATA_COMPONENTS.registerComponentType("wright_tier", builder -> builder

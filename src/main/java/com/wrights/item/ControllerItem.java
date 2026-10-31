@@ -3,6 +3,7 @@ package com.wrights.item;
 import java.util.List;
 
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
@@ -79,6 +80,14 @@ public class ControllerItem extends Item {
         tooltip.add(Component.translatable("item.wrights.controller.hint.copy").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("item.wrights.controller.hint.paste").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("item.wrights.controller.hint.stop").withStyle(ChatFormatting.GRAY));
+        GlobalPos linked = stack.get(ModDataComponents.AE_LINK.get());
+        if (linked != null) {
+            tooltip.add(Component.translatable(
+                    "item.wrights.controller.linked",
+                    linked.pos().getX(),
+                    linked.pos().getY(),
+                    linked.pos().getZ()).withStyle(ChatFormatting.AQUA));
+        }
         ControllerData data = ControllerData.from(stack);
         if (data.hasSchematic()) {
             tooltip.add(Component.translatable(

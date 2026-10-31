@@ -57,4 +57,30 @@ public final class DigitalBinder {
                 ? "message.wrights.digital_bound_ae2"
                 : "message.wrights.digital_bound_rs");
     }
+
+    /**
+     * Bind from an AE2 wireless access point link slot. The controller is in that slot, not in the hand,
+     * and the access point may have been opened through the network rather than by standing beside it.
+     */
+    public static void bindLinked(ServerPlayer player, GlobalPos pos) {
+        if (player == null || pos == null || player.getServer() == null) {
+            return;
+        }
+        ServerLevel level = player.getServer().getLevel(pos.dimension());
+        if (level == null) {
+            return;
+        }
+        DigitalLink.Kind kind = DigitalNetworks.bindKindAt(level, pos.pos());
+        if (kind == DigitalLink.Kind.NONE) {
+            Messages.actionBar(player, "message.wrights.digital_not_target");
+            return;
+        }
+        DigitalLink link = new DigitalLink(kind, GlobalPos.of(pos.dimension(), pos.pos().immutable()));
+        BlueprintSessions.get(player).setDigitalLink(link);
+        SchematicLibrary.get(player.getServer()).setDigital(player.getUUID(), link);
+        BlueprintNetwork.syncDigital(player);
+        Messages.actionBar(player, kind == DigitalLink.Kind.AE2
+                ? "message.wrights.digital_bound_ae2"
+                : "message.wrights.digital_bound_rs");
+    }
 }

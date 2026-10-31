@@ -91,6 +91,7 @@
   "key.wrights.menu": "Open Wrights Menu",
   "item.wrights.controller.hint.menu": "Press B anytime for blueprints and jobs",
   "item.wrights.controller.hint.tool": "Hold this to build, capture, and run wrights",
+  "item.wrights.controller.linked": "Linked to an ME network at %s, %s, %s",
   "menu.wrights.title": "Wrights",
   "menu.wrights.subtitle": "Wrights for the work you point at",
   "menu.wrights.need_controller": "Hold controller to build or run jobs",
