@@ -59,6 +59,7 @@
   "message.wrights.digital_crafting": "Requested craft from digital storage",
   "message.wrights.digital_pulled": "Pulled %s %s from digital storage",
   "message.wrights.digital_crafted": "Crafting %s %s from digital storage",
+  "message.wrights.digital_craft_partial": "Only enough materials to craft %s of %s %s",
   "message.wrights.digital_craft_materials": "Not enough materials in the network to craft %s",
   "message.wrights.digital_craft_cpu": "No free crafting CPU to craft %s",
   "message.wrights.digital_craft_blocked": "Not enough materials, and no free crafting CPU, to craft %s",

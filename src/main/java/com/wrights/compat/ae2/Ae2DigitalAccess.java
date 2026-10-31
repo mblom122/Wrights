@@ -47,6 +47,7 @@ import appeng.api.storage.MEStorage;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.WrightsMod;
+import com.wrights.drone.CraftDeliveries;
 import com.wrights.drone.WrightTier;
 import com.wrights.network.BlueprintPayloads;
 import com.wrights.item.ModItems;
@@ -201,7 +202,7 @@ public final class Ae2DigitalAccess implements DigitalAccess {
                 key,
                 amount,
                 CalculationStrategy.CRAFT_LESS);
-        PENDING.put(craftKey, new PendingCraft(craftKey, future, src));
+        PENDING.put(craftKey, new PendingCraft(craftKey, future, src, amount));
         return true;
     }
 
@@ -229,6 +230,7 @@ public final class Ae2DigitalAccess implements DigitalAccess {
             } catch (RuntimeException ex) {
                 WrightsMod.LOGGER.warn("AE2 craft request failed", ex);
                 ServerPlayer player = server.getPlayerList().getPlayer(craft.key.player);
+                CraftDeliveries.cancel(craft.key.player);
                 tell(server, player, craft, Component.translatable(
                         "message.wrights.digital_craft_failed_reason", Component.literal(shortReason(ex))));
             }
@@ -250,6 +252,7 @@ public final class Ae2DigitalAccess implements DigitalAccess {
             }
             WrightsMod.LOGGER.warn("AE2 craft plan failed", ex);
             Throwable cause = ex.getCause() == null ? ex : ex.getCause();
+            CraftDeliveries.cancel(craft.key.player);
             tell(server, player, craft, Component.translatable(
                     "message.wrights.digital_craft_failed_reason", Component.literal(shortReason(cause))));
             return;
@@ -258,12 +261,14 @@ public final class Ae2DigitalAccess implements DigitalAccess {
             return;
         }
         if (plan == null) {
+            CraftDeliveries.cancel(craft.key.player);
             tell(server, player, craft, Component.translatable("message.wrights.digital_craft_incomplete", new ItemStack(craft.key.item).getHoverName()));
             return;
         }
         ServerLevel level = server.getLevel(craft.key.pos.dimension());
         IGrid grid = level == null ? null : grid(level, craft.key.pos);
         if (grid == null) {
+            CraftDeliveries.cancel(craft.key.player);
             tell(server, player, craft, "message.wrights.digital_offline");
             return;
         }
@@ -275,6 +280,11 @@ public final class Ae2DigitalAccess implements DigitalAccess {
             result = grid.getCraftingService().submitJob(plan, null, null, false, craft.source);
             if (result.successful()) {
                 ACCEPTED_UNTIL.put(craft.key, server.getTickCount() + 40L);
+                long planned = plan.finalOutput() == null ? craft.amount : Math.max(0L, plan.finalOutput().amount());
+                if (planned <= 0L) {
+                    planned = craft.amount;
+                }
+                CraftDeliveries.accepted(player, craft.key.item, planned, craft.amount);
                 return;
             }
             CraftingSubmitErrorCode code = result.errorCode();
@@ -298,6 +308,7 @@ public final class Ae2DigitalAccess implements DigitalAccess {
                 missingIds(plan),
                 result == null || result.errorCode() == null ? "-" : result.errorCode(),
                 result == null || result.errorDetail() == null ? "-" : result.errorDetail());
+        CraftDeliveries.cancel(craft.key.player);
         tell(server, player, craft, reason);
     }
 
@@ -566,7 +577,7 @@ public final class Ae2DigitalAccess implements DigitalAccess {
     private record CraftKey(UUID player, GlobalPos pos, Item item) {
     }
 
-    private record PendingCraft(CraftKey key, Future<ICraftingPlan> future, IActionSource source) {
+    private record PendingCraft(CraftKey key, Future<ICraftingPlan> future, IActionSource source, long amount) {
     }
 
     /**

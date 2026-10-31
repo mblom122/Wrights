@@ -67,7 +67,12 @@ public final class HangarOps {
             ManageLock.hold(player, kind, index);
             return;
         }
-        storePort(player, kind, index, swarm, edit(player, swarm, action, unit));
+        CraftDeliveries.push(CraftDeliveries.Hangar.personal(player.getUUID(), kind, index));
+        try {
+            storePort(player, kind, index, swarm, edit(player, swarm, action, unit));
+        } finally {
+            CraftDeliveries.pop();
+        }
     }
 
     public static void batchPort(ServerPlayer player, int kind, int index, int action, int value, int[] units) {
@@ -83,7 +88,12 @@ public final class HangarOps {
             ManageLock.hold(player, kind, index);
             return;
         }
-        storePort(player, kind, index, swarm, applyBatch(player, swarm, action, value, home));
+        CraftDeliveries.push(CraftDeliveries.Hangar.personal(player.getUUID(), kind, index));
+        try {
+            storePort(player, kind, index, swarm, applyBatch(player, swarm, action, value, home));
+        } finally {
+            CraftDeliveries.pop();
+        }
     }
 
     static Swarm applyBatch(ServerPlayer player, Swarm swarm, int action, int value, int[] units) {
@@ -205,7 +215,7 @@ public final class HangarOps {
         List<Taken> tiers = pulled.tiers();
         if (tiers.isEmpty()) {
             if (pulled.crafting() > 0) {
-                Messages.actionBar(player, "message.wrights.digital_crafted", pulled.crafting(), new ItemStack(ModItems.WRIGHT.get()).getHoverName());
+                Messages.actionBar(player, "message.wrights.digital_crafting");
             } else if (!DigitalNetworks.craftFailureExplained()) {
                 Messages.actionBar(player, "message.wrights.need_wright_item");
             }
@@ -607,11 +617,21 @@ public final class HangarOps {
         }
         var link = ItemSource.linkOf(player);
         var level = DigitalNetworks.levelOf(player, link == null ? null : link.pos());
+        boolean wright = item == ModItems.WRIGHT.get();
+        if (wright) {
+            CraftDeliveries.expect(player, amount);
+        }
         boolean ordered = level != null && DigitalNetworks.requestCraft(player, level, link, item, amount);
-        if (ordered) {
+        if (!ordered) {
+            if (wright) {
+                CraftDeliveries.cancel(player.getUUID());
+            }
+            return false;
+        }
+        if (!wright) {
             noteUse(item, 0, (int) Math.min(Integer.MAX_VALUE, amount));
         }
-        return ordered;
+        return true;
     }
 
     private static final ThreadLocal<Map<Item, int[]>> USE_NOTES = ThreadLocal.withInitial(HashMap::new);

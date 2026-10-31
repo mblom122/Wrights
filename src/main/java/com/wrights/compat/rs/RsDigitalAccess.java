@@ -199,9 +199,11 @@ public final class RsDigitalAccess implements DigitalAccess {
         }
         if (result == AutocraftingNetworkComponent.EnsureResult.TASK_CREATED
                 || result == AutocraftingNetworkComponent.EnsureResult.TASK_ALREADY_RUNNING) {
+            com.wrights.drone.CraftDeliveries.accepted(player, item, amount, amount);
             return true;
         }
         quiet(level, craftKey);
+        com.wrights.drone.CraftDeliveries.cancel(player.getUUID());
         if (result == AutocraftingNetworkComponent.EnsureResult.MISSING_RESOURCES) {
             DigitalNetworks.explainCraftFailure(player, "message.wrights.digital_craft_materials", named.getHoverName());
         } else {

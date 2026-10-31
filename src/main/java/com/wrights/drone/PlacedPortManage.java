@@ -56,7 +56,13 @@ public final class PlacedPortManage {
         if (port.owner() == null) {
             port.assignOwner(player.getUUID(), player.getGameProfile().getName());
         }
-        Swarm next = HangarOps.edit(player, port.swarm(), action, unit);
+        CraftDeliveries.push(CraftDeliveries.Hangar.placed(port.owner(), port.getLevel().dimension(), pos));
+        Swarm next;
+        try {
+            next = HangarOps.edit(player, port.swarm(), action, unit);
+        } finally {
+            CraftDeliveries.pop();
+        }
         port.setSwarm(next);
         sendSwarm(player, dimension, pos, false, next);
         sync(player);
@@ -72,7 +78,13 @@ public final class PlacedPortManage {
         if (port.owner() == null) {
             port.assignOwner(player.getUUID(), player.getGameProfile().getName());
         }
-        Swarm next = HangarOps.applyBatch(player, port.swarm(), action, value, units);
+        CraftDeliveries.push(CraftDeliveries.Hangar.placed(port.owner(), port.getLevel().dimension(), pos));
+        Swarm next;
+        try {
+            next = HangarOps.applyBatch(player, port.swarm(), action, value, units);
+        } finally {
+            CraftDeliveries.pop();
+        }
         port.setSwarm(next);
         sendSwarm(player, dimension, pos, false, next);
         sync(player);

@@ -29,7 +29,13 @@ public final class WrightportOps {
         if (port.owner() == null) {
             port.assignOwner(player.getUUID(), player.getGameProfile().getName());
         }
-        Swarm next = HangarOps.editOwned(player, port.owner(), swarm, action, index);
+        CraftDeliveries.push(CraftDeliveries.Hangar.placed(port.owner(), level.dimension(), menu.pos()));
+        Swarm next;
+        try {
+            next = HangarOps.editOwned(player, port.owner(), swarm, action, index);
+        } finally {
+            CraftDeliveries.pop();
+        }
         if (next == swarm) {
             return;
         }
@@ -79,9 +85,16 @@ public final class WrightportOps {
         if (port.owner() == null && action == HangarOps.ADD_COUNT) {
             port.assignOwner(player.getUUID(), player.getGameProfile().getName());
         }
-        Swarm next = port.owner() == null
-                ? HangarOps.applyBatch(player, swarm, action, value, home)
-                : HangarOps.applyBatchOwned(player, port.owner(), swarm, action, value, home);
+        CraftDeliveries.push(CraftDeliveries.Hangar.placed(
+                port.owner() == null ? player.getUUID() : port.owner(), level.dimension(), menu.pos()));
+        Swarm next;
+        try {
+            next = port.owner() == null
+                    ? HangarOps.applyBatch(player, swarm, action, value, home)
+                    : HangarOps.applyBatchOwned(player, port.owner(), swarm, action, value, home);
+        } finally {
+            CraftDeliveries.pop();
+        }
         if (next == swarm) {
             return;
         }
