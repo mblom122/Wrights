@@ -43,3 +43,6 @@ modpack/mods/*.jar
 **/src/generated/**/.cache/
 repo/
 !**/src/**/repo/
+
+### Art ###
+art/
