@@ -22,7 +22,7 @@ import com.wrights.WrightsConfig;
 import com.wrights.schematic.Schematic;
 
 /**
- * Reflects a placed blueprint across a face, or around the anchor corner.
+ * Reflects a placed blueprint through the middle of the anchor, or around its corner.
  * The original build stays where the player put it. Each image is a new schematic.
  */
 public final class Mirror {
@@ -135,12 +135,12 @@ public final class Mirror {
             if (sizeX > cap || sizeY > cap || sizeZ > cap || sizeX > Short.MAX_VALUE || sizeY > Short.MAX_VALUE || sizeZ > Short.MAX_VALUE) {
                 continue;
             }
-            List<Schematic.Entry> local = new ArrayList<>(raw.size());
+            List<Schematic.Entry> entries = new ArrayList<>(raw.size());
             for (int i = 0; i < raw.size(); i++) {
                 Schematic.Entry entry = raw.get(i);
                 BlockPos world = worlds.get(i);
                 CompoundTag nbt = entry.nbt() == null ? null : entry.nbt().copy();
-                local.add(new Schematic.Entry(
+                entries.add(new Schematic.Entry(
                         (short) (world.getX() - minX),
                         (short) (world.getY() - minY),
                         (short) (world.getZ() - minZ),
@@ -156,7 +156,7 @@ public final class Mirror {
             }
             BlockPos min = new BlockPos(minX, minY, minZ);
             BlockPos max = new BlockPos(maxX, maxY, maxZ);
-            Schematic schematic = new Schematic(UUID.randomUUID(), name + " · " + index, sizeX, sizeY, sizeZ, local, min, max, "", 0, 0, 0, true)
+            Schematic schematic = new Schematic(UUID.randomUUID(), name + " · " + index, sizeX, sizeY, sizeZ, entries, min, max, "", 0, 0, 0, true)
                     .withPaste(source.placeFluids(), source.voidBlocks(), source.voidFluids(), source.voidNbt());
             placed.add(new Placed(schematic, min));
             index++;
@@ -522,22 +522,9 @@ public final class Mirror {
         };
     }
 
-    /** Reflect across the boundary of {@code face}. The clicked block stays on the near side. */
+    /** The clicked face only picks the axis. The plane cuts through the middle of the anchor block. */
     private static BlockPos reflect(BlockPos pos, BlockPos anchor, Direction face) {
-        Direction.Axis axis = face.getAxis();
-        int anchorValue = axis.choose(anchor.getX(), anchor.getY(), anchor.getZ());
-        int plane = face.getAxisDirection() == Direction.AxisDirection.POSITIVE ? anchorValue + 1 : anchorValue;
-        int value = axis.choose(pos.getX(), pos.getY(), pos.getZ());
-        long mirrored = plane * 2L - value - 1L;
-        if (mirrored > Integer.MAX_VALUE || mirrored < Integer.MIN_VALUE) {
-            return null;
-        }
-        int next = (int) mirrored;
-        return switch (axis) {
-            case X -> new BlockPos(next, pos.getY(), pos.getZ());
-            case Y -> new BlockPos(pos.getX(), next, pos.getZ());
-            case Z -> new BlockPos(pos.getX(), pos.getY(), next);
-        };
+        return reflectCenter(pos, anchor, face.getAxis());
     }
 
     /** Steps of 22.5 degrees around the middle of the anchor block. Quarter turns stay on the grid. */
