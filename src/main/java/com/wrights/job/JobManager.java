@@ -1503,7 +1503,7 @@ public final class JobManager {
             if (current.size() < had) {
                 dirty |= job.rememberCrewQuota(had);
             }
-            if (current.isEmpty() && job.crewUnits().isEmpty() && !(job.paused() && job.crewQuota() > 0)) {
+            if (current.isEmpty() && job.crewUnits().isEmpty() && !job.queued() && !(job.paused() && job.crewQuota() > 0)) {
                 int need = job.hasCrew() ? job.hands().size() : (instant(player) ? 0 : 1);
                 int jobCap = WrightsConfig.maxWrightsPerJob();
                 for (WrightHomes.FreeWright free : freeUnits(player, library, job, need)) {
@@ -1575,6 +1575,11 @@ public final class JobManager {
         if (!job.crewUnits().isEmpty()) {
             job.setCrewUnits(List.of());
             changed = true;
+        }
+        if (job.queued()) {
+            job.setPaused(false);
+            job.clearHold();
+            return changed;
         }
         if (!job.paused()) {
             job.noteHold(BuildJob.HOLD_NO_WRIGHTS, null);
@@ -1799,9 +1804,13 @@ public final class JobManager {
             }
             return;
         }
-        if (changed) {
+        boolean launched = job.hasCrew()
+                && job.hands().size() == ids.size()
+                && job.crewUnits().size() == ids.size()
+                && job.crewUnits().containsAll(ids);
+        if (changed || !launched) {
             fitCrew(player, library, job, ids);
-            if (job.paused() && !job.hasCrew()) {
+            if (job.queued() && !job.hasCrew()) {
                 job.setPaused(false);
                 job.clearHold();
                 job.setQueued(true);
@@ -1969,7 +1978,14 @@ public final class JobManager {
         }
         if (kept.isEmpty()) {
             discardDrone(player.getServer(), job);
+            boolean stayQueued = job.queued();
             job.clearAssigned();
+            if (stayQueued) {
+                job.setQueued(true);
+                job.setPaused(false);
+                job.clearHold();
+                return;
+            }
             job.noteHold(BuildJob.HOLD_NO_WRIGHTS, null);
             job.setPaused(true);
             return;
@@ -2112,7 +2128,7 @@ public final class JobManager {
     }
 
     private static boolean holdWithoutDrones(ServerPlayer player, SchematicLibrary library, BuildJob job) {
-        if (!missingDrones(player, job)) {
+        if (job.queued() || !missingDrones(player, job)) {
             return false;
         }
         boolean dirty = job.rememberCrewQuota(assignedCount(job));
@@ -4009,7 +4025,10 @@ public final class JobManager {
         hand.entityId = null;
         if (hands.size() <= 1) {
             job.setCrewUnits(List.of());
-            if (!job.paused()) {
+            if (job.queued()) {
+                job.setPaused(false);
+                job.clearHold();
+            } else if (!job.paused()) {
                 job.noteHold(BuildJob.HOLD_NO_WRIGHTS, null);
                 job.setPaused(true);
             }
