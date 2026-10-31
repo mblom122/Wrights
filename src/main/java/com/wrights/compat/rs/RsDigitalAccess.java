@@ -1,7 +1,10 @@
 package com.wrights.compat.rs;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
@@ -32,10 +35,13 @@ import com.wrights.item.ModItems;
 import com.wrights.item.WrightItem;
 import com.wrights.storage.DigitalAccess;
 import com.wrights.storage.DigitalLink;
+import com.wrights.storage.DigitalNetworks;
 
 public final class RsDigitalAccess implements DigitalAccess {
     private static final ResourceLocation CONTROLLER = ResourceLocation.fromNamespaceAndPath("refinedstorage", "controller");
     private static final ResourceLocation CREATIVE = ResourceLocation.fromNamespaceAndPath("refinedstorage", "creative_controller");
+    private static final int QUIET_TICKS = 100;
+    private static final Map<CraftKey, Long> QUIET_UNTIL = new HashMap<>();
 
     @Override
     public DigitalLink.Kind kind() {
@@ -151,10 +157,44 @@ public final class RsDigitalAccess implements DigitalAccess {
         if (key == null) {
             return false;
         }
+        CraftKey craftKey = new CraftKey(player.getUUID(), pos, item);
+        long now = level.getServer().getTickCount();
+        QUIET_UNTIL.values().removeIf(until -> now >= until);
+        Long quiet = QUIET_UNTIL.get(craftKey);
+        if (quiet != null && now < quiet) {
+            DigitalNetworks.keepCraftFailure();
+            return false;
+        }
+        if (quiet != null) {
+            QUIET_UNTIL.remove(craftKey);
+        }
         Actor actor = new PlayerActor(player);
-        AutocraftingNetworkComponent.EnsureResult result = crafting.ensureTask(key, amount, actor, CancellationToken.NONE);
-        return result == AutocraftingNetworkComponent.EnsureResult.TASK_CREATED
-                || result == AutocraftingNetworkComponent.EnsureResult.TASK_ALREADY_RUNNING;
+        AutocraftingNetworkComponent.EnsureResult result;
+        try {
+            result = crafting.ensureTask(key, amount, actor, CancellationToken.NONE);
+        } catch (RuntimeException ex) {
+            quiet(level, craftKey);
+            DigitalNetworks.explainCraftFailure(player, "message.wrights.digital_craft_failed");
+            return false;
+        }
+        if (result == AutocraftingNetworkComponent.EnsureResult.TASK_CREATED
+                || result == AutocraftingNetworkComponent.EnsureResult.TASK_ALREADY_RUNNING) {
+            return true;
+        }
+        quiet(level, craftKey);
+        if (result == AutocraftingNetworkComponent.EnsureResult.MISSING_RESOURCES) {
+            DigitalNetworks.explainCraftFailure(player, "message.wrights.digital_craft_materials", new ItemStack(item).getHoverName());
+        } else {
+            DigitalNetworks.explainCraftFailure(player, "message.wrights.digital_craft_failed");
+        }
+        return false;
+    }
+
+    private static void quiet(ServerLevel level, CraftKey key) {
+        QUIET_UNTIL.put(key, level.getServer().getTickCount() + (long) QUIET_TICKS);
+    }
+
+    private record CraftKey(UUID player, GlobalPos pos, Item item) {
     }
 
     @Override

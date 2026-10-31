@@ -206,7 +206,7 @@ public final class HangarOps {
         if (tiers.isEmpty()) {
             if (pulled.crafting() > 0) {
                 Messages.actionBar(player, "message.wrights.digital_crafted", pulled.crafting(), new ItemStack(ModItems.WRIGHT.get()).getHoverName());
-            } else {
+            } else if (!DigitalNetworks.craftFailureExplained()) {
                 Messages.actionBar(player, "message.wrights.need_wright_item");
             }
             return swarm;
@@ -383,7 +383,11 @@ public final class HangarOps {
             return swarm;
         }
         if (moved == 0) {
-            Messages.actionBar(player, crafting ? "message.wrights.digital_crafting" : "message.wrights.marked_none");
+            if (crafting) {
+                Messages.actionBar(player, "message.wrights.digital_crafting");
+            } else if (!DigitalNetworks.craftFailureExplained()) {
+                Messages.actionBar(player, "message.wrights.marked_none");
+            }
             return swarm;
         }
         if (stuck > 0) {
@@ -408,7 +412,7 @@ public final class HangarOps {
         if (target > tier && !canAfford(player, tier, target)) {
             if (orderCraft(player, WrightTier.upgradeItem(target), 1)) {
                 Messages.actionBar(player, "message.wrights.digital_crafting");
-            } else {
+            } else if (!DigitalNetworks.craftFailureExplained()) {
                 Messages.actionBar(player, "message.wrights.upgrade_need", Component.translatable(WrightTier.nameKey(missingStep(player, tier, target))));
             }
             return swarm;
@@ -481,7 +485,11 @@ public final class HangarOps {
                     ordered = true;
                 }
             }
-            Messages.actionBar(player, ordered ? "message.wrights.digital_crafting" : "message.wrights.marked_raised_none");
+            if (ordered) {
+                Messages.actionBar(player, "message.wrights.digital_crafting");
+            } else if (!DigitalNetworks.craftFailureExplained()) {
+                Messages.actionBar(player, "message.wrights.marked_raised_none");
+            }
             return swarm;
         }
         Messages.actionBar(player, "message.wrights.marked_raised", count);
@@ -610,6 +618,7 @@ public final class HangarOps {
 
     private static void beginUseNotes() {
         USE_NOTES.get().clear();
+        DigitalNetworks.beginCraftFeedback();
     }
 
     private static void noteUse(Item item, int pulled, int crafted) {
@@ -697,22 +706,24 @@ public final class HangarOps {
         }
         int nextTier = tier + 1;
         Item upgrade = WrightTier.upgradeItem(nextTier);
-        if (upgrade == null || !consume(player, upgrade)) {
+        if (upgrade == null) {
             Messages.actionBar(player, "message.wrights.upgrade_need", Component.translatable(WrightTier.nameKey(nextTier)));
+            return swarm;
+        }
+        ItemSource.Take taken = takeUpgrade(player, upgrade, 1);
+        if (taken.result() == ItemSource.Result.CRAFTING) {
+            Messages.actionBar(player, "message.wrights.digital_crafted", Math.max(1, taken.crafted()), new ItemStack(upgrade).getHoverName());
+            return swarm;
+        }
+        if (taken.result() != ItemSource.Result.OK) {
+            if (!DigitalNetworks.craftFailureExplained()) {
+                Messages.actionBar(player, "message.wrights.upgrade_need", Component.translatable(WrightTier.nameKey(nextTier)));
+            }
             return swarm;
         }
         refundInstalled(player, tier);
         Messages.actionBar(player, "message.wrights.upgrade_done", Component.translatable(WrightTier.nameKey(nextTier)));
         return swarm.withSpeed(index, nextTier);
-    }
-
-    private static boolean consume(ServerPlayer player, Item item) {
-        ItemSource.Take taken = takeUpgrade(player, item, 1);
-        if (taken.result() == ItemSource.Result.CRAFTING) {
-            Messages.actionBar(player, "message.wrights.digital_crafted", Math.max(1, taken.crafted()), new ItemStack(item).getHoverName());
-            return false;
-        }
-        return taken.result() == ItemSource.Result.OK;
     }
 
     static Swarm rename(ServerPlayer player, Swarm swarm, int index, String name) {
@@ -773,7 +784,9 @@ public final class HangarOps {
                 Messages.actionBar(player, "message.wrights.digital_crafting");
                 return swarm;
             }
-            Messages.actionBar(player, "message.wrights.drone_parts", IRON, REDSTONE, AMETHYST);
+            if (!DigitalNetworks.craftFailureExplained()) {
+                Messages.actionBar(player, "message.wrights.drone_parts", IRON, REDSTONE, AMETHYST);
+            }
             return swarm;
         }
         if (takeOrCraft(player, Items.IRON_INGOT, IRON)
@@ -801,7 +814,9 @@ public final class HangarOps {
                 Messages.actionBar(player, "message.wrights.digital_crafting");
                 return swarm;
             }
-            Messages.actionBar(player, "message.wrights.speed_parts", gold, redstone);
+            if (!DigitalNetworks.craftFailureExplained()) {
+                Messages.actionBar(player, "message.wrights.speed_parts", gold, redstone);
+            }
             return swarm;
         }
         if (takeOrCraft(player, Items.GOLD_INGOT, gold) || takeOrCraft(player, Items.REDSTONE, redstone)) {

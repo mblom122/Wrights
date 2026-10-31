@@ -1,7 +1,11 @@
 package com.wrights.compat.ae2;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.Future;
 
 import net.minecraft.core.BlockPos;
@@ -9,6 +13,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Item;
@@ -17,26 +22,39 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
 import appeng.api.config.Actionable;
+import appeng.api.config.CpuSelectionMode;
 import appeng.api.implementations.blockentities.IWirelessAccessPoint;
 import appeng.api.networking.IGrid;
 import appeng.api.networking.IGridNode;
 import appeng.api.networking.IInWorldGridNodeHost;
 import appeng.api.networking.crafting.CalculationStrategy;
+import appeng.api.networking.crafting.CraftingSubmitErrorCode;
+import appeng.api.networking.crafting.ICraftingCPU;
 import appeng.api.networking.crafting.ICraftingPlan;
 import appeng.api.networking.crafting.ICraftingService;
+import appeng.api.networking.crafting.ICraftingSubmitResult;
 import appeng.api.networking.security.IActionSource;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.storage.MEStorage;
 
+import net.neoforged.neoforge.network.PacketDistributor;
+
 import com.wrights.drone.WrightTier;
+import com.wrights.network.BlueprintPayloads;
 import com.wrights.item.ModItems;
 import com.wrights.item.WrightItem;
 import com.wrights.storage.DigitalAccess;
 import com.wrights.storage.DigitalLink;
+import com.wrights.storage.DigitalNetworks;
 
 public final class Ae2DigitalAccess implements DigitalAccess {
     private static final ResourceLocation WAP = ResourceLocation.fromNamespaceAndPath("ae2", "wireless_access_point");
     private static final ResourceLocation CONTROLLER = ResourceLocation.fromNamespaceAndPath("ae2", "controller");
+    /** How long a failed plan stays quiet so a job retry does not ask again every tick. */
+    private static final int QUIET_TICKS = 100;
+    private static final Map<CraftKey, PendingCraft> PENDING = new HashMap<>();
+    private static final Map<CraftKey, Long> QUIET_UNTIL = new HashMap<>();
+    private static final Map<CraftKey, Long> ACCEPTED_UNTIL = new HashMap<>();
 
     @Override
     public DigitalLink.Kind kind() {
@@ -147,24 +165,144 @@ public final class Ae2DigitalAccess implements DigitalAccess {
         if (key == null) {
             return false;
         }
-        ICraftingService crafting = grid.getCraftingService();
+        if (grid.getCraftingService().isRequesting(key)) {
+            return true;
+        }
+        CraftKey craftKey = new CraftKey(player.getUUID(), pos, item);
+        long now = level.getServer().getTickCount();
+        Long quiet = QUIET_UNTIL.get(craftKey);
+        if (quiet != null && now < quiet) {
+            DigitalNetworks.keepCraftFailure();
+            return false;
+        }
+        Long accepted = ACCEPTED_UNTIL.get(craftKey);
+        if ((accepted != null && now < accepted) || PENDING.containsKey(craftKey)) {
+            return true;
+        }
         IActionSource src = IActionSource.ofPlayer(player);
-        Future<ICraftingPlan> future = crafting.beginCraftingCalculation(
+        Future<ICraftingPlan> future = grid.getCraftingService().beginCraftingCalculation(
                 level,
                 () -> src,
                 key,
                 amount,
                 CalculationStrategy.CRAFT_LESS);
-        level.getServer().execute(() -> {
-            try {
-                ICraftingPlan plan = future.get();
-                if (plan != null) {
-                    crafting.submitJob(plan, null, null, false, src);
-                }
-            } catch (Exception ignored) {
-            }
-        });
+        PENDING.put(craftKey, new PendingCraft(craftKey, future, src));
         return true;
+    }
+
+    @Override
+    public void tickCrafts(MinecraftServer server) {
+        if (PENDING.isEmpty() && QUIET_UNTIL.isEmpty() && ACCEPTED_UNTIL.isEmpty()) {
+            return;
+        }
+        long now = server.getTickCount();
+        QUIET_UNTIL.values().removeIf(until -> now >= until);
+        ACCEPTED_UNTIL.values().removeIf(until -> now >= until);
+        Iterator<PendingCraft> pending = PENDING.values().iterator();
+        List<PendingCraft> ready = new ArrayList<>();
+        while (pending.hasNext()) {
+            PendingCraft craft = pending.next();
+            if (!craft.future.isDone()) {
+                continue;
+            }
+            pending.remove();
+            ready.add(craft);
+        }
+        for (PendingCraft craft : ready) {
+            try {
+                finish(server, craft);
+            } catch (RuntimeException ex) {
+                ServerPlayer player = server.getPlayerList().getPlayer(craft.key.player);
+                tell(server, player, craft, "message.wrights.digital_craft_failed");
+            }
+        }
+    }
+
+    /**
+     * The plan is calculated off the server thread, and that work posts back onto the server
+     * thread. Waiting for it here would lock the world, so this only runs once the future is done.
+     */
+    private static void finish(MinecraftServer server, PendingCraft craft) {
+        ServerPlayer player = server.getPlayerList().getPlayer(craft.key.player);
+        ICraftingPlan plan;
+        try {
+            plan = craft.future.get();
+        } catch (Exception ex) {
+            if (ex instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            tell(server, player, craft, "message.wrights.digital_craft_failed");
+            return;
+        }
+        if (player == null) {
+            return;
+        }
+        if (plan == null) {
+            tell(server, player, craft, "message.wrights.digital_craft_failed");
+            return;
+        }
+        ServerLevel level = server.getLevel(craft.key.pos.dimension());
+        IGrid grid = level == null ? null : grid(level, craft.key.pos);
+        if (grid == null) {
+            tell(server, player, craft, "message.wrights.digital_offline");
+            return;
+        }
+        boolean missing = plan.simulation() || !plan.missingItems().isEmpty();
+        boolean noCpu = false;
+        if (!missing) {
+            ICraftingSubmitResult result = grid.getCraftingService().submitJob(plan, null, null, false, craft.source);
+            if (result.successful()) {
+                ACCEPTED_UNTIL.put(craft.key, server.getTickCount() + 40L);
+                return;
+            }
+            CraftingSubmitErrorCode code = result.errorCode();
+            if (code == CraftingSubmitErrorCode.MISSING_INGREDIENT || code == CraftingSubmitErrorCode.INCOMPLETE_PLAN) {
+                missing = true;
+            } else if (code == CraftingSubmitErrorCode.NO_CPU_FOUND
+                    || code == CraftingSubmitErrorCode.NO_SUITABLE_CPU_FOUND
+                    || code == CraftingSubmitErrorCode.CPU_BUSY
+                    || code == CraftingSubmitErrorCode.CPU_OFFLINE
+                    || code == CraftingSubmitErrorCode.CPU_TOO_SMALL) {
+                noCpu = true;
+            } else {
+                tell(server, player, craft, "message.wrights.digital_craft_failed");
+                return;
+            }
+        }
+        if (missing) {
+            noCpu = noCpu || !cpuFree(grid.getCraftingService(), plan);
+        }
+        ItemStack stack = new ItemStack(craft.key.item);
+        if (missing && noCpu) {
+            tell(server, player, craft, "message.wrights.digital_craft_blocked", stack.getHoverName());
+        } else if (missing) {
+            tell(server, player, craft, "message.wrights.digital_craft_materials", stack.getHoverName());
+        } else if (noCpu) {
+            tell(server, player, craft, "message.wrights.digital_craft_cpu", stack.getHoverName());
+        } else {
+            tell(server, player, craft, "message.wrights.digital_craft_failed");
+        }
+    }
+
+    private static void tell(MinecraftServer server, ServerPlayer player, PendingCraft craft, String key, Object... args) {
+        QUIET_UNTIL.put(craft.key, server.getTickCount() + (long) QUIET_TICKS);
+        if (player != null) {
+            PacketDistributor.sendToPlayer(player, new BlueprintPayloads.DigitalUse(List.of()));
+            DigitalNetworks.explainCraftFailure(player, key, args);
+        }
+    }
+
+    private static boolean cpuFree(ICraftingService crafting, ICraftingPlan plan) {
+        for (ICraftingCPU cpu : crafting.getCpus()) {
+            if (cpu.isBusy() || cpu.getAvailableStorage() < plan.bytes()) {
+                continue;
+            }
+            if (cpu.getSelectionMode() == CpuSelectionMode.MACHINE_ONLY) {
+                continue;
+            }
+            return true;
+        }
+        return false;
     }
 
     @Override
@@ -238,5 +376,11 @@ public final class Ae2DigitalAccess implements DigitalAccess {
             }
         }
         return null;
+    }
+
+    private record CraftKey(UUID player, GlobalPos pos, Item item) {
+    }
+
+    private record PendingCraft(CraftKey key, Future<ICraftingPlan> future, IActionSource source) {
     }
 }

@@ -34,6 +34,10 @@ public interface DigitalAccess {
     /** Asks the network to autocraft {@code amount} of the item into storage. */
     boolean requestCraft(ServerPlayer player, ServerLevel level, GlobalPos pos, Item item, long amount);
 
+    /** Finishes craft plans that were started on an earlier tick. Must not block. */
+    default void tickCrafts(net.minecraft.server.MinecraftServer server) {
+    }
+
     /**
      * Pulls wright item stacks of any tier. Returns the tier of each extracted wright.
      * Default drains via {@link #extract} and treats them as stock wrights.

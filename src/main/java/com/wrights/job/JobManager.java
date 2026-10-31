@@ -71,6 +71,7 @@ import com.wrights.item.ControllerData;
 import com.wrights.item.ControllerItem;
 import com.wrights.schematic.Schematic;
 import com.wrights.schematic.SchematicLibrary;
+import com.wrights.storage.DigitalNetworks;
 import com.wrights.util.BlockFilters;
 import com.wrights.util.Messages;
 
@@ -87,6 +88,7 @@ public final class JobManager {
     }
 
     public static void tick(MinecraftServer server) {
+        DigitalNetworks.tickCrafts(server);
         sweepReturns();
         SchematicLibrary library = SchematicLibrary.get(server);
         List<BuildJob> jobs = new ArrayList<>(library.jobs());

@@ -5,11 +5,14 @@ import java.util.List;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
 import net.neoforged.fml.ModList;
+
+import com.wrights.util.Messages;
 
 import com.wrights.drone.WrightTier;
 
@@ -22,6 +25,7 @@ public final class DigitalNetworks {
     public static final String RS_ID = "refinedstorage";
 
     private static final List<DigitalAccess> ACCESS = new ArrayList<>();
+    private static final ThreadLocal<Boolean> CRAFT_FAILURE = ThreadLocal.withInitial(() -> false);
     private static boolean booted;
 
     private DigitalNetworks() {
@@ -126,6 +130,35 @@ public final class DigitalNetworks {
         }
         DigitalAccess access = access(link.kind());
         return access != null && access.online(level, link.pos()) && access.craftable(level, link.pos(), item);
+    }
+
+    /** Clears the "a craft failure was already told to the player" flag for this action. */
+    public static void beginCraftFeedback() {
+        CRAFT_FAILURE.set(false);
+    }
+
+    /** Action-bar a craft failure and remember it so a generic "you need the item" line does not replace it. */
+    public static void explainCraftFailure(ServerPlayer player, String key, Object... args) {
+        CRAFT_FAILURE.set(true);
+        if (player != null) {
+            Messages.actionBar(player, key, args);
+        }
+    }
+
+    /** The failure was already shown. Keep that line on the action bar. */
+    public static void keepCraftFailure() {
+        CRAFT_FAILURE.set(true);
+    }
+
+    public static boolean craftFailureExplained() {
+        return Boolean.TRUE.equals(CRAFT_FAILURE.get());
+    }
+
+    public static void tickCrafts(MinecraftServer server) {
+        boot();
+        for (DigitalAccess access : ACCESS) {
+            access.tickCrafts(server);
+        }
     }
 
     public static boolean requestCraft(ServerPlayer player, ServerLevel level, DigitalLink link, Item item, long amount) {
