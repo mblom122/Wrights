@@ -3,6 +3,8 @@ package com.wrights.network;
 import java.util.UUID;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.Util;
 import net.neoforged.api.distmarker.Dist;
@@ -13,6 +15,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 import com.wrights.blueprint.BlueprintActions;
+import com.wrights.entity.DroneEntity;
 import com.wrights.blueprint.BlueprintSessions;
 import com.wrights.job.BuildJob;
 import com.wrights.job.JobManager;
@@ -732,7 +735,7 @@ public final class BlueprintNetwork {
                     job.boxSizeX(),
                     job.boxSizeY(),
                     job.boxSizeZ(),
-                    job.crewUnits().size(),
+                    wrightsOut(player.getServer(), job),
                     job.crewUnits(),
                     job.workedTicks(),
                     job.hold(),
@@ -745,6 +748,24 @@ public final class BlueprintNetwork {
                     jobSourceName(player, job)));
         }
         PacketDistributor.sendToPlayer(player, new BlueprintPayloads.JobSync(lines));
+    }
+
+    /** Wrights still out on the build. Ones already sent home are not counted. */
+    private static int wrightsOut(MinecraftServer server, BuildJob job) {
+        ServerLevel level = server.getLevel(job.dimension());
+        if (level == null) {
+            return 0;
+        }
+        int out = 0;
+        for (BuildJob.Hand hand : job.hands()) {
+            if (hand.entityId != null && level.getEntity(hand.entityId) instanceof DroneEntity drone && drone.isAlive()) {
+                out++;
+            }
+        }
+        if (job.hands().isEmpty() && job.droneId() != null && level.getEntity(job.droneId()) instanceof DroneEntity drone && drone.isAlive()) {
+            out++;
+        }
+        return out;
     }
 
     private static int jobSource(BuildJob job) {

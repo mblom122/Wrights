@@ -2144,8 +2144,9 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private String crewCountText(BlueprintPayloads.JobLine job) {
-        if (job.queued()) {
-            return Component.translatable("menu.wrights.job_drone_queued", job.crew().size(), Math.max(job.crew().size(), job.quota())).getString();
+        int assigned = Math.max(job.crew().size(), job.quota());
+        if (!job.finished() && assigned > 0) {
+            return Component.translatable("menu.wrights.job_drone_queued", job.drones(), assigned).getString();
         }
         return Component.translatable("menu.wrights.job_drone_count", job.crew().size()).getString();
     }

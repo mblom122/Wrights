@@ -2378,6 +2378,7 @@ public final class JobManager {
             int index = nextWork(level, player, schematic, job, hand, skipBudget);
             if (index == -2) {
                 scanning = true;
+                recallHand(level, player, hand);
                 continue;
             }
             if (index == SUPPORT_WAIT) {
@@ -2385,6 +2386,7 @@ public final class JobManager {
                 hand.awaitingItems = false;
                 hand.waitingOnOthers = true;
                 hand.idle = false;
+                recallHand(level, player, hand);
                 continue;
             }
             if (index == NEED_ITEMS) {
@@ -2422,11 +2424,13 @@ public final class JobManager {
                 int at = nextWork(level, player, schematic, job, hand, skipBudget);
                 if (at == -2) {
                     scanning = true;
+                    recallHand(level, player, hand);
                     break;
                 }
                 if (at == SUPPORT_WAIT) {
                     waiting = true;
                     hand.waitingOnOthers = true;
+                    recallHand(level, player, hand);
                     break;
                 }
                 if (at == NEED_ITEMS) {
@@ -2445,6 +2449,9 @@ public final class JobManager {
                     break;
                 }
                 if (entry.secondary() && supportWaiting(level, job, hand, at, pos, entry)) {
+                    waiting = true;
+                    hand.waitingOnOthers = true;
+                    recallHand(level, player, hand);
                     break;
                 }
                 if (job.outsideClip(entry)) {
@@ -2465,6 +2472,7 @@ public final class JobManager {
                 if (placed == PlaceResult.WAIT) {
                     waitingItems = true;
                     waiting = true;
+                    recallHand(level, player, hand);
                     break;
                 }
                 noteProgress(schematic, job, hand, entry, at);
@@ -2579,6 +2587,16 @@ public final class JobManager {
         } else if (job.tickMessage()) {
             Messages.actionBar(player, "message.wrights.undo_progress", job.undoTotal() - job.refundCount(), job.undoTotal(), job.returned());
         }
+    }
+
+    /** The upper half of a door or bed cannot go down until the block under it is there. */
+    private static boolean secondaryWaiting(ServerLevel level, BuildJob job, Schematic.Entry entry) {
+        BlockPos pos = job.min().offset(entry.x(), entry.y(), entry.z());
+        if (!level.isLoaded(pos.below())) {
+            return true;
+        }
+        BlockState below = level.getBlockState(pos.below());
+        return below.getBlock() != entry.state().getBlock() && (below.isAir() || below.canBeReplaced());
     }
 
     private static boolean supportWaiting(ServerLevel level, BuildJob job, BuildJob.Hand hand, int index, BlockPos pos, Schematic.Entry entry) {
@@ -2780,6 +2798,10 @@ public final class JobManager {
                 if (job.retire(i)) {
                     job.skippedOne();
                 }
+                continue;
+            }
+            if (entry.secondary() && secondaryWaiting(level, job, entry)) {
+                waiting = true;
                 continue;
             }
             if (!canPay(player, level, job, hand, entry)) {
@@ -4292,6 +4314,11 @@ public final class JobManager {
         hand.awaitingItems = true;
         hand.idle = false;
         hand.waitingOnOthers = false;
+        recallHand(level, player, hand);
+    }
+
+    /** Send this wright home. It stays on the crew and comes back when it has something to place. */
+    private static void recallHand(ServerLevel level, ServerPlayer player, BuildJob.Hand hand) {
         if (hand.entityId == null) {
             return;
         }
