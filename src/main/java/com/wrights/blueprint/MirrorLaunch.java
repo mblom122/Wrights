@@ -131,7 +131,7 @@ public final class MirrorLaunch {
         Schematic.Entry entry = new Schematic.Entry((short) 0, (short) 0, (short) 0, state, BlockFilters.isSecondary(state), nbt, full);
         Schematic source = new Schematic(UUID.randomUUID(), "Mirror", 1, 1, 1, List.of(entry), placed, placed, "", 0, 0, 0, true);
         Direction plane = Direction.from3DDataValue(Mth.clamp(payload.anchorFace(), 0, 5));
-        List<Mirror.Placed> copies = Mirror.place(source, placed, 1, 1, 1, payload.anchor(), plane, payload.pattern(), payload.shapes());
+        List<Mirror.Placed> copies = Mirror.place(source, placed, 1, 1, 1, payload.anchor(), plane, payload.pattern(), payload.shapes(), payload.axes());
         if (copies.isEmpty()) {
             Messages.actionBar(player, "message.wrights.mirror_same");
             return;
@@ -185,9 +185,9 @@ public final class MirrorLaunch {
         return reach * reach;
     }
 
-    public static Result spawn(ServerPlayer player, Schematic source, BlockPos origin, int clipX, int clipY, int clipZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean playerFirst, boolean queue, boolean deferSupplies, boolean placeNbt, boolean placeSettings, boolean placeAll, BlockPos plane, int face, int pattern, boolean shapes) {
+    public static Result spawn(ServerPlayer player, Schematic source, BlockPos origin, int clipX, int clipY, int clipZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean playerFirst, boolean queue, boolean deferSupplies, boolean placeNbt, boolean placeSettings, boolean placeAll, BlockPos plane, int face, int pattern, boolean shapes, int axes) {
         Direction direction = Direction.from3DDataValue(Mth.clamp(face, 0, 5));
-        java.util.List<Mirror.Placed> copies = Mirror.place(source, origin, clipX, clipY, clipZ, plane, direction, pattern, shapes);
+        java.util.List<Mirror.Placed> copies = Mirror.place(source, origin, clipX, clipY, clipZ, plane, direction, pattern, shapes, axes);
         if (copies.isEmpty()) {
             return new Result(0, true);
         }

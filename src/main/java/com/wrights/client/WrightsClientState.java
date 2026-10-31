@@ -1268,7 +1268,8 @@ public final class WrightsClientState {
                 mirrorSend() ? WrightsClientConfig.mirrorAnchor() : BlockPos.ZERO,
                 WrightsClientConfig.MIRROR_FACE.get(),
                 WrightsClientConfig.MIRROR_PATTERN.get(),
-                WrightsClientConfig.MIRROR_SHAPES.get()));
+                WrightsClientConfig.MIRROR_SHAPES.get(),
+                WrightsClientConfig.MIRROR_AXES.get()));
         return true;
     }
 

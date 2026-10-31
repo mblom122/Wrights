@@ -425,7 +425,7 @@ public class WrightsMenuScreen extends Screen {
 
     private void layout() {
         panelW = Math.min(540, this.width - 16);
-        panelH = Math.min(360, this.height - 16);
+        panelH = Math.min(mirrorPage ? 408 : 360, this.height - 16);
         panelX = (this.width - panelW) / 2;
         panelY = (this.height - panelH) / 2;
         listX = panelX + 126;
@@ -1450,6 +1450,8 @@ public class WrightsMenuScreen extends Screen {
     private int mirrorModeY;
     private int mirrorCardY;
     private int mirrorCardW;
+    private int mirrorAxisY;
+    private int mirrorAxisW;
     private int mirrorNbtY;
     private int mirrorSettingsY;
     private int mirrorAllY;
@@ -1490,14 +1492,29 @@ public class WrightsMenuScreen extends Screen {
         mirrorCardY = y;
         mirrorCardW = cardW;
         int pattern = WrightsClientConfig.MIRROR_PATTERN.get();
+        int axes = WrightsClientConfig.MIRROR_AXES.get() & 7;
         String[] patternNames = {"menu.wrights.mirror_pair", "menu.wrights.mirror_cross", "menu.wrights.mirror_eight", "menu.wrights.mirror_sixteen"};
         String[] patternHints = {"menu.wrights.mirror_pair_hint", "menu.wrights.mirror_cross_hint", "menu.wrights.mirror_eight_hint", "menu.wrights.mirror_sixteen_hint"};
         for (int i = 0; i < patternNames.length; i++) {
             int cardX = x + (cardW + gap) * i;
             int width = i == patternNames.length - 1 ? x + w - cardX : cardW;
-            drawChoice(graphics, mouseX, mouseY, cardX, y, width, 36, pattern == i, patternNames[i], patternHints[i]);
+            drawChoice(graphics, mouseX, mouseY, cardX, y, width, 36, axes == 0 && pattern == i, patternNames[i], patternHints[i]);
         }
         y += 44;
+        graphics.drawString(this.font, Component.translatable("menu.wrights.mirror_axis"), x, y, WrightsUi.MUTED, false);
+        y += 12;
+        int axisW = Math.max(36, (w - gap * 3) / 4);
+        mirrorAxisY = y;
+        mirrorAxisW = axisW;
+        String[] axisNames = {"menu.wrights.mirror_axis_anchor", "menu.wrights.mirror_axis_x", "menu.wrights.mirror_axis_y", "menu.wrights.mirror_axis_z"};
+        String[] axisHints = {"menu.wrights.mirror_axis_anchor_hint", "menu.wrights.mirror_axis_x_hint", "menu.wrights.mirror_axis_y_hint", "menu.wrights.mirror_axis_z_hint"};
+        boolean[] axisOn = {axes == 0, (axes & com.wrights.blueprint.Mirror.AXIS_X) != 0, (axes & com.wrights.blueprint.Mirror.AXIS_Y) != 0, (axes & com.wrights.blueprint.Mirror.AXIS_Z) != 0};
+        for (int i = 0; i < axisNames.length; i++) {
+            int cardX = x + (axisW + gap) * i;
+            int width = i == axisNames.length - 1 ? x + w - cardX : axisW;
+            drawChoice(graphics, mouseX, mouseY, cardX, y, width, 28, axisOn[i], axisNames[i], axisHints[i]);
+        }
+        y += 36;
         mirrorNbtY = y;
         drawMirrorToggle(graphics, mouseX, mouseY, x, y, WrightsClientConfig.COPY_NBT_BLOCKS.get(), "screen.wrights.copy_nbt_blocks", "screen.wrights.copy_nbt_blocks_hint", true);
         y += 16;
@@ -1563,7 +1580,7 @@ public class WrightsMenuScreen extends Screen {
             net.minecraft.core.BlockPos anchor = WrightsClientConfig.mirrorAnchor();
             Direction face = Direction.from3DDataValue(WrightsClientConfig.MIRROR_FACE.get());
             graphics.drawString(this.font, Component.translatable("menu.wrights.mirror_anchor", anchor.getX(), anchor.getY(), anchor.getZ(), Component.translatable("menu.wrights.face." + face.getName())), x + 10, y + 6, WrightsUi.TEXT, false);
-            int copies = com.wrights.blueprint.Mirror.copyCount(WrightsClientConfig.MIRROR_PATTERN.get());
+            int copies = com.wrights.blueprint.Mirror.copyCount(WrightsClientConfig.MIRROR_PATTERN.get(), WrightsClientConfig.MIRROR_AXES.get());
             graphics.drawString(this.font, Component.translatable(armed ? "menu.wrights.mirror_copies" : "menu.wrights.mirror_paused", copies), x + 10, y + 18, armed ? WrightsUi.TEAL : WrightsUi.MUTED, false);
         }
     }
@@ -1656,6 +1673,19 @@ public class WrightsMenuScreen extends Screen {
             int cardWidth = index == 3 ? x + mirrorBodyW - cardX : mirrorCardW;
             if (index >= 0 && index < 4 && mouseX >= cardX && mouseX < cardX + cardWidth) {
                 WrightsClientConfig.setMirrorPattern(index);
+                return true;
+            }
+        }
+        if (mirrorAxisW > 0 && mouseY >= mirrorAxisY && mouseY < mirrorAxisY + 28) {
+            int index = (int) ((mouseX - x) / (mirrorAxisW + gap));
+            int cardX = x + (mirrorAxisW + gap) * index;
+            int cardWidth = index == 3 ? x + mirrorBodyW - cardX : mirrorAxisW;
+            if (index >= 0 && index < 4 && mouseX >= cardX && mouseX < cardX + cardWidth) {
+                if (index == 0) {
+                    WrightsClientConfig.setMirrorAxes(0);
+                } else {
+                    WrightsClientConfig.toggleMirrorAxis(1 << (index - 1));
+                }
                 return true;
             }
         }

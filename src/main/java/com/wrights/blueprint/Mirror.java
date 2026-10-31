@@ -30,6 +30,9 @@ public final class Mirror {
     public static final int CROSS = 1;
     public static final int EIGHT = 2;
     public static final int SIXTEEN = 3;
+    public static final int AXIS_X = 1;
+    public static final int AXIS_Y = 2;
+    public static final int AXIS_Z = 4;
 
     private Mirror() {
     }
@@ -41,8 +44,16 @@ public final class Mirror {
         return PAIR;
     }
 
-    /** Original build plus the reflected ones. */
+    /** Original build plus the reflected ones. Axis bits replace the pattern when any are set. */
     public static int copyCount(int pattern) {
+        return copyCount(pattern, 0);
+    }
+
+    public static int copyCount(int pattern, int axes) {
+        int mask = axes & 7;
+        if (mask != 0) {
+            return 1 << Integer.bitCount(mask);
+        }
         return switch (clampPattern(pattern)) {
             case SIXTEEN -> 16;
             case EIGHT -> 8;
@@ -51,10 +62,29 @@ public final class Mirror {
         };
     }
 
+    /** Planes to draw. An empty axis mask keeps the face that was clicked. */
+    public static List<Direction> planes(Direction face, int axes) {
+        int mask = axes & 7;
+        if (mask == 0 || face == null) {
+            return face == null ? List.of() : List.of(face);
+        }
+        List<Direction> planes = new ArrayList<>();
+        if ((mask & AXIS_X) != 0) {
+            planes.add(axisFace(face, Direction.Axis.X));
+        }
+        if ((mask & AXIS_Y) != 0) {
+            planes.add(axisFace(face, Direction.Axis.Y));
+        }
+        if ((mask & AXIS_Z) != 0) {
+            planes.add(axisFace(face, Direction.Axis.Z));
+        }
+        return planes;
+    }
+
     public record Placed(Schematic schematic, BlockPos origin) {
     }
 
-    public static List<Placed> place(Schematic source, BlockPos origin, int clipX, int clipY, int clipZ, BlockPos anchor, Direction face, int pattern, boolean shapes) {
+    public static List<Placed> place(Schematic source, BlockPos origin, int clipX, int clipY, int clipZ, BlockPos anchor, Direction face, int pattern, boolean shapes, int axes) {
         List<Placed> placed = new ArrayList<>();
         if (source == null || anchor == null || face == null || origin == null) {
             return placed;
@@ -67,7 +97,7 @@ public final class Mirror {
         }
         int index = 1;
         int cap = Math.max(1, WrightsConfig.MAX_AXIS.getAsInt());
-        for (Shot shot : shots(anchor, face, pattern, shapes)) {
+        for (Shot shot : shots(anchor, face, pattern, shapes, axes)) {
             List<BlockPos> worlds = new ArrayList<>();
             List<Schematic.Entry> raw = new ArrayList<>();
             for (Schematic.Entry entry : source.entries()) {
@@ -133,7 +163,7 @@ public final class Mirror {
         return placed;
     }
 
-    public static List<AABB> volumes(BlockPos origin, int clipX, int clipY, int clipZ, BlockPos anchor, Direction face, int pattern) {
+    public static List<AABB> volumes(BlockPos origin, int clipX, int clipY, int clipZ, BlockPos anchor, Direction face, int pattern, int axes) {
         List<AABB> boxes = new ArrayList<>();
         if (origin == null || anchor == null || face == null || clipX < 1 || clipY < 1 || clipZ < 1) {
             return boxes;
@@ -148,7 +178,7 @@ public final class Mirror {
                 new BlockPos(x0, y0, z0), new BlockPos(x1, y0, z0), new BlockPos(x0, y1, z0), new BlockPos(x1, y1, z0),
                 new BlockPos(x0, y0, z1), new BlockPos(x1, y0, z1), new BlockPos(x0, y1, z1), new BlockPos(x1, y1, z1)
         };
-        for (Shot shot : shots(anchor, face, pattern, false)) {
+        for (Shot shot : shots(anchor, face, pattern, false, axes)) {
             int minX = Integer.MAX_VALUE;
             int minY = Integer.MAX_VALUE;
             int minZ = Integer.MAX_VALUE;
@@ -177,14 +207,14 @@ public final class Mirror {
     }
 
     /** Reflected copies of one block. The original position is left out. */
-    public static List<BlockPos> copiesOf(BlockPos pos, BlockPos anchor, Direction face, int pattern) {
+    public static List<BlockPos> copiesOf(BlockPos pos, BlockPos anchor, Direction face, int pattern, int axes) {
         List<BlockPos> copies = new ArrayList<>();
         if (pos == null || anchor == null || face == null) {
             return copies;
         }
         Set<BlockPos> seen = new HashSet<>();
         seen.add(pos);
-        for (Shot shot : shots(anchor, face, pattern, false)) {
+        for (Shot shot : shots(anchor, face, pattern, false, axes)) {
             BlockPos moved = shot.move(pos);
             if (moved != null && seen.add(moved)) {
                 copies.add(moved);
@@ -193,11 +223,11 @@ public final class Mirror {
         return copies;
     }
 
-    public static BlockState restyle(BlockState state, BlockPos from, BlockPos to, BlockPos anchor, Direction face, int pattern, boolean shapes) {
+    public static BlockState restyle(BlockState state, BlockPos from, BlockPos to, BlockPos anchor, Direction face, int pattern, boolean shapes, int axes) {
         if (state == null || from == null || to == null || !shapes) {
             return state;
         }
-        for (Shot shot : shots(anchor, face, pattern, true)) {
+        for (Shot shot : shots(anchor, face, pattern, true, axes)) {
             BlockPos moved = shot.move(from);
             if (to.equals(moved)) {
                 return shot.restyle(state);
@@ -216,8 +246,12 @@ public final class Mirror {
         BlockState restyle(BlockState state);
     }
 
-    private static List<Shot> shots(BlockPos anchor, Direction face, int pattern, boolean shapes) {
+    private static List<Shot> shots(BlockPos anchor, Direction face, int pattern, boolean shapes, int axes) {
         List<Shot> shots = new ArrayList<>();
+        if ((axes & 7) != 0) {
+            shots.addAll(axisShots(anchor, face, axes & 7, shapes));
+            return shots;
+        }
         int patternId = clampPattern(pattern);
         if (patternId == EIGHT || patternId == SIXTEEN) {
             int steps = patternId == SIXTEEN ? 15 : 7;
@@ -258,6 +292,64 @@ public final class Mirror {
             });
         }
         return shots;
+    }
+
+    /** Every non-empty mix of the chosen axes. The anchor block stays on the near side of each plane. */
+    private static List<Shot> axisShots(BlockPos anchor, Direction face, int mask, boolean shapes) {
+        List<Direction> chosen = new ArrayList<>();
+        if ((mask & AXIS_X) != 0) {
+            chosen.add(axisFace(face, Direction.Axis.X));
+        }
+        if ((mask & AXIS_Y) != 0) {
+            chosen.add(axisFace(face, Direction.Axis.Y));
+        }
+        if ((mask & AXIS_Z) != 0) {
+            chosen.add(axisFace(face, Direction.Axis.Z));
+        }
+        List<Shot> shots = new ArrayList<>();
+        int count = chosen.size();
+        for (int subset = 1; subset < (1 << count); subset++) {
+            int bits = subset;
+            shots.add(new Shot() {
+                @Override
+                public BlockPos move(BlockPos pos) {
+                    BlockPos at = pos;
+                    for (int i = 0; i < count; i++) {
+                        if ((bits & (1 << i)) == 0) {
+                            continue;
+                        }
+                        at = reflect(at, anchor, chosen.get(i));
+                        if (at == null) {
+                            return null;
+                        }
+                    }
+                    return at;
+                }
+
+                @Override
+                public BlockState restyle(BlockState state) {
+                    if (!shapes) {
+                        return state;
+                    }
+                    BlockState styled = state;
+                    for (int i = 0; i < count; i++) {
+                        if ((bits & (1 << i)) != 0) {
+                            styled = flipAxis(styled, chosen.get(i).getAxis());
+                        }
+                    }
+                    return styled;
+                }
+            });
+        }
+        return shots;
+    }
+
+    /** Keep the clicked side when it is this axis. Otherwise the copy sits on the positive side. */
+    private static Direction axisFace(Direction face, Direction.Axis axis) {
+        if (face != null && face.getAxis() == axis) {
+            return face;
+        }
+        return Direction.get(Direction.AxisDirection.POSITIVE, axis);
     }
 
     private static Shot faceShot(BlockPos anchor, Direction face, boolean shapes) {

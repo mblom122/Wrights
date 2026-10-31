@@ -150,8 +150,9 @@ public final class SelectionRenderer {
             BlockPos anchor = WrightsClientConfig.mirrorAnchor();
             Direction face = Direction.from3DDataValue(WrightsClientConfig.MIRROR_FACE.get());
             int pattern = WrightsClientConfig.MIRROR_PATTERN.get();
+            int axes = WrightsClientConfig.MIRROR_AXES.get();
             boolean shapes = WrightsClientConfig.MIRROR_SHAPES.get();
-            for (BlockPos copy : Mirror.copiesOf(at, anchor, face, pattern)) {
+            for (BlockPos copy : Mirror.copiesOf(at, anchor, face, pattern, axes)) {
                 if (!replace && !minecraft.level.getBlockState(copy).isAir()) {
                     continue;
                 }
@@ -161,7 +162,7 @@ public final class SelectionRenderer {
                 if (cx * cx + cy * cy + cz * cz > rangeSqr()) {
                     continue;
                 }
-                BlockState styled = Mirror.restyle(state, at, copy, anchor, face, pattern, shapes);
+                BlockState styled = Mirror.restyle(state, at, copy, anchor, face, pattern, shapes, axes);
                 if (ghostVisible(styled)) {
                     drawGhost(pose, buffers, renderer, camera, copy.getX(), copy.getY(), copy.getZ(), styled);
                 }
@@ -192,17 +193,22 @@ public final class SelectionRenderer {
         }
         BlockPos anchor = WrightsClientConfig.mirrorAnchor();
         Direction face = Direction.from3DDataValue(WrightsClientConfig.MIRROR_FACE.get());
-        AABB slab = faceSlab(anchor, face);
+        int axes = WrightsClientConfig.MIRROR_AXES.get();
         float pulse = 0.55F + 0.45F * (float) Math.sin(System.currentTimeMillis() / 220.0D);
         VertexConsumer fill = buffers.getBuffer(RenderType.debugFilledBox());
-        AABB local = slab.move(-camera.x, -camera.y, -camera.z);
-        LevelRenderer.addChainedFilledBoxVertices(pose, fill, local.minX, local.minY, local.minZ, local.maxX, local.maxY, local.maxZ, 0.35F, 0.78F, 0.74F, 0.18F + 0.10F * pulse);
+        for (Direction plane : Mirror.planes(face, axes)) {
+            AABB slab = faceSlab(anchor, plane);
+            AABB local = slab.move(-camera.x, -camera.y, -camera.z);
+            LevelRenderer.addChainedFilledBoxVertices(pose, fill, local.minX, local.minY, local.minZ, local.maxX, local.maxY, local.maxZ, 0.35F, 0.78F, 0.74F, 0.18F + 0.10F * pulse);
+        }
         buffers.endBatch(RenderType.debugFilledBox());
         VertexConsumer lines = buffers.getBuffer(RenderType.lines());
-        drawBox(pose, lines, slab, camera, 0.45F, 0.92F, 0.86F, 0.85F + 0.15F * pulse);
+        for (Direction plane : Mirror.planes(face, axes)) {
+            drawBox(pose, lines, faceSlab(anchor, plane), camera, 0.45F, 0.92F, 0.86F, 0.85F + 0.15F * pulse);
+        }
         if (!WrightsClientConfig.mirrorBlocks() && WrightsClientConfig.mirrorArmed(here) && WrightsClientState.mode == WrightsClientState.Mode.BUILD && WrightsClientState.anchor != null && WrightsClientState.buildId != null) {
             BlockPos origin = WrightsClientState.anchor.offset(-WrightsClientState.pivotX, -WrightsClientState.pivotY, -WrightsClientState.pivotZ);
-            for (AABB copy : Mirror.volumes(origin, WrightsClientState.viewX, WrightsClientState.viewY, WrightsClientState.viewZ, anchor, face, WrightsClientConfig.MIRROR_PATTERN.get())) {
+            for (AABB copy : Mirror.volumes(origin, WrightsClientState.viewX, WrightsClientState.viewY, WrightsClientState.viewZ, anchor, face, WrightsClientConfig.MIRROR_PATTERN.get(), axes)) {
                 drawBox(pose, lines, copy, camera, 0.35F, 0.78F, 0.74F, 0.55F);
             }
         }

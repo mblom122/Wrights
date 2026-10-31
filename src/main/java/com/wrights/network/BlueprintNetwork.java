@@ -292,7 +292,8 @@ public final class BlueprintNetwork {
                 payload.mirrorAnchor(),
                 payload.mirrorFace(),
                 payload.mirrorPattern(),
-                payload.mirrorShapes()));
+                payload.mirrorShapes(),
+                payload.mirrorAxes()));
     }
 
     private static void editCell(BlueprintPayloads.EditCell payload, IPayloadContext context) {
