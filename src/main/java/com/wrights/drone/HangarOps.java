@@ -186,9 +186,10 @@ public final class HangarOps {
         if (count <= 0) {
             return swarm;
         }
-        List<Taken> tiers = pullWrights(player, Math.min(room, count));
+        Pull pulled = pullWrights(player, Math.min(room, count));
+        List<Taken> tiers = pulled.tiers();
         if (tiers.isEmpty()) {
-            Messages.actionBar(player, "message.wrights.need_wright_item");
+            Messages.actionBar(player, pulled.crafting() ? "message.wrights.digital_crafting" : "message.wrights.need_wright_item");
             return swarm;
         }
         Swarm next = swarm;
@@ -203,10 +204,10 @@ public final class HangarOps {
         return next;
     }
 
-    private static List<Taken> pullWrights(ServerPlayer player, int count) {
+    private static Pull pullWrights(ServerPlayer player, int count) {
         List<Taken> tiers = new ArrayList<>();
         if (count <= 0) {
-            return tiers;
+            return new Pull(tiers, false);
         }
         Inventory inventory = player.getInventory();
         for (int slot = 0; slot < inventory.getContainerSize() && tiers.size() < count; slot++) {
@@ -253,22 +254,23 @@ public final class HangarOps {
             }
         }
         need = count - tiers.size();
+        boolean crafting = false;
         if (need > 0 && ItemSource.craftable(player, ModItems.WRIGHT.get())) {
-            var link = ItemSource.linkOf(player);
-            var level = DigitalNetworks.levelOf(player, link.pos());
-            if (level != null && DigitalNetworks.requestCraft(player, level, link, ModItems.WRIGHT.get(), need)) {
-                Messages.actionBar(player, "message.wrights.digital_crafting");
-            }
+            crafting = orderCraft(player, ModItems.WRIGHT.get(), need);
         }
         if (player.getAbilities().instabuild) {
             while (tiers.size() < count) {
                 tiers.add(new Taken(WrightTier.BASE, ""));
             }
+            crafting = false;
         }
-        return tiers;
+        return new Pull(tiers, crafting);
     }
 
     private record Taken(int tier, String name) {
+    }
+
+    private record Pull(List<Taken> tiers, boolean crafting) {
     }
 
     private static Swarm extract(ServerPlayer player, Swarm swarm, int mode) {
@@ -332,24 +334,33 @@ public final class HangarOps {
         Swarm next = swarm;
         int moved = 0;
         int stuck = 0;
+        int craftNeed = 0;
         for (int index : picked) {
             int tier = WrightTier.clamp(next.units().get(index).speed());
             if (tier == target) {
                 continue;
             }
-            if (target > tier + 1 || (target > tier && !canAfford(player, tier, target))) {
+            if (target == tier + 1 && !canAfford(player, tier, target)) {
+                craftNeed++;
+                continue;
+            }
+            if (target > tier + 1) {
                 stuck++;
                 continue;
             }
             next = applyTier(player, next, index, tier, target);
             moved++;
         }
-        if (moved == 0 && stuck == 0) {
+        boolean crafting = craftNeed > 0 && orderCraft(player, WrightTier.upgradeItem(target), craftNeed);
+        if (!crafting) {
+            stuck += craftNeed;
+        }
+        if (moved == 0 && stuck == 0 && !crafting) {
             Messages.actionBar(player, "message.wrights.marked_already", Component.translatable(WrightTier.nameKey(target)));
             return swarm;
         }
         if (moved == 0) {
-            Messages.actionBar(player, "message.wrights.marked_none");
+            Messages.actionBar(player, crafting ? "message.wrights.digital_crafting" : "message.wrights.marked_none");
             return swarm;
         }
         if (stuck > 0) {
@@ -372,7 +383,11 @@ public final class HangarOps {
             return swarm;
         }
         if (target > tier && !canAfford(player, tier, target)) {
-            Messages.actionBar(player, "message.wrights.upgrade_need", Component.translatable(WrightTier.nameKey(missingStep(player, tier, target))));
+            if (orderCraft(player, WrightTier.upgradeItem(target), 1)) {
+                Messages.actionBar(player, "message.wrights.digital_crafting");
+            } else {
+                Messages.actionBar(player, "message.wrights.upgrade_need", Component.translatable(WrightTier.nameKey(missingStep(player, tier, target))));
+            }
             return swarm;
         }
         Messages.actionBar(player, "message.wrights.tier_set", Component.translatable(WrightTier.nameKey(target)));
@@ -429,7 +444,21 @@ public final class HangarOps {
             }
         }
         if (count == 0) {
-            Messages.actionBar(player, "message.wrights.marked_raised_none");
+            int[] missing = new int[WrightTier.NETHERITE + 1];
+            for (int index : picked) {
+                int tier = WrightTier.clamp(swarm.units().get(index).speed());
+                if (tier >= WrightTier.NETHERITE || afford(player, WrightTier.upgradeItem(tier + 1), 1)) {
+                    continue;
+                }
+                missing[tier + 1]++;
+            }
+            boolean ordered = false;
+            for (int step = WrightTier.COPPER; step <= WrightTier.NETHERITE; step++) {
+                if (missing[step] > 0 && orderCraft(player, WrightTier.upgradeItem(step), missing[step])) {
+                    ordered = true;
+                }
+            }
+            Messages.actionBar(player, ordered ? "message.wrights.digital_crafting" : "message.wrights.marked_raised_none");
             return swarm;
         }
         Messages.actionBar(player, "message.wrights.marked_raised", count);
@@ -539,6 +568,15 @@ public final class HangarOps {
             }
         }
         return picked;
+    }
+
+    private static boolean orderCraft(ServerPlayer player, Item item, long amount) {
+        if (item == null || amount <= 0L || !ItemSource.craftable(player, item)) {
+            return false;
+        }
+        var link = ItemSource.linkOf(player);
+        var level = DigitalNetworks.levelOf(player, link == null ? null : link.pos());
+        return level != null && DigitalNetworks.requestCraft(player, level, link, item, amount);
     }
 
     private static void refundInstalled(ServerPlayer player, int tier) {

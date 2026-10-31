@@ -15,7 +15,9 @@ import net.minecraft.world.item.ItemStack;
 import com.wrights.drone.HangarOps;
 import com.wrights.drone.Swarm;
 import com.wrights.drone.WrightTier;
+import com.wrights.item.ModItems;
 import com.wrights.item.WrightItem;
+import com.wrights.network.BlueprintPayloads;
 
 /**
  * Wright list for one personal wrightport. Only wrights still in the port are
@@ -201,7 +203,7 @@ final class WrightManagePanel {
         if (countBox != null) {
             countBox.setVisible(open && dialog == ADD);
         }
-        graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_count", home, Swarm.capacity(), held(screen)),
+        graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_count", home, Swarm.capacity(), readyWrights(screen)),
                 panelX + 12, panelY + 22, WrightsUi.MUTED, false);
         if (away > 0) {
             graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_away", away), panelX + 12, panelY + 34, WrightsUi.MUTED, false);
@@ -470,7 +472,11 @@ final class WrightManagePanel {
             graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_add_title"), dx + 12, dy + 12, WrightsUi.COPPER, false);
             int room = roomLeft(swarm);
             int fit = allThatFit(screen);
-            graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_add_room", room, held(screen)), dx + 12, dy + 28, WrightsUi.MUTED, false);
+            if (digitalCraftable(ModItems.WRIGHT.get())) {
+                graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_add_craft", room), dx + 12, dy + 28, WrightsUi.MUTED, false);
+            } else {
+                graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_add_room", room, readyWrights(screen)), dx + 12, dy + 28, WrightsUi.MUTED, false);
+            }
             int[] quick = { 1, 8, 16, 64 };
             int gap = 4;
             int width = (dw - 24 - gap * 3) / 4;
@@ -733,7 +739,15 @@ final class WrightManagePanel {
         if (screen.minecraft().player != null && screen.minecraft().player.getAbilities().instabuild) {
             return room;
         }
-        return Math.min(room, held(screen));
+        if (digitalCraftable(ModItems.WRIGHT.get())) {
+            return room;
+        }
+        return (int) Math.min(room, readyWrights(screen));
+    }
+
+    private static int readyWrights(ManageHost screen) {
+        long ready = held(screen) + digitalStock(ModItems.WRIGHT.get());
+        return ready > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) ready;
     }
 
     private static int held(ManageHost screen) {
@@ -763,11 +777,35 @@ final class WrightManagePanel {
             return true;
         }
         for (int step = tier + 1; step <= target; step++) {
-            if (count(screen, WrightTier.upgradeItem(step)) <= 0) {
+            Item upgrade = WrightTier.upgradeItem(step);
+            if (count(screen, upgrade) <= 0 && digitalStock(upgrade) <= 0L && !digitalCraftable(upgrade)) {
                 return false;
             }
         }
         return true;
+    }
+
+    private static BlueprintPayloads.DigitalInfoLine digitalLine(Item item) {
+        if (item == null || !WrightsClientState.digitalOnline) {
+            return null;
+        }
+        int id = Item.getId(item);
+        for (BlueprintPayloads.DigitalInfoLine line : WrightsClientState.digitalLines) {
+            if (line.itemId() == id) {
+                return line;
+            }
+        }
+        return null;
+    }
+
+    private static long digitalStock(Item item) {
+        BlueprintPayloads.DigitalInfoLine line = digitalLine(item);
+        return line == null ? 0L : Math.max(0L, line.stock());
+    }
+
+    private static boolean digitalCraftable(Item item) {
+        BlueprintPayloads.DigitalInfoLine line = digitalLine(item);
+        return line != null && line.craftable();
     }
 
     private void hideChrome() {

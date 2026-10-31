@@ -684,6 +684,10 @@ public class WrightsMenuScreen extends Screen {
             return;
         }
         if (managePage) {
+            if (System.currentTimeMillis() - WrightsClientState.digitalInfoAt > 2000L) {
+                requestDigitalInfo();
+                WrightsClientState.digitalInfoAt = System.currentTimeMillis();
+            }
             renderManage(graphics, mouseX, mouseY);
             return;
         }
