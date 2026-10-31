@@ -66,6 +66,7 @@ public final class BuildJob {
     private String blueprintName;
     private boolean mining;
     private boolean mineAny;
+    private boolean mineVoid;
     private ItemStack mineTool = ItemStack.EMPTY;
     private boolean copyFluids;
     private boolean copyNbtBlocks;
@@ -412,6 +413,14 @@ public final class BuildJob {
 
     public void setMineAny(boolean mineAny) {
         this.mineAny = mineAny;
+    }
+
+    public boolean mineVoid() {
+        return mineVoid;
+    }
+
+    public void setMineVoid(boolean mineVoid) {
+        this.mineVoid = mineVoid;
     }
 
     public ItemStack mineTool() {
@@ -929,6 +938,7 @@ public final class BuildJob {
         if (mining) {
             tag.putBoolean("mining", true);
             tag.putBoolean("mineAny", mineAny);
+            tag.putBoolean("mineVoid", mineVoid);
             if (mineTool != null && !mineTool.isEmpty() && registries != null) {
                 tag.put("mineTool", mineTool.save(registries));
             }
@@ -1094,6 +1104,7 @@ public final class BuildJob {
         }
         job.mining = tag.getBoolean("mining");
         job.mineAny = tag.getBoolean("mineAny");
+        job.mineVoid = tag.getBoolean("mineVoid");
         if (registries != null && tag.contains("mineTool")) {
             job.mineTool = ItemStack.parseOptional(registries, tag.getCompound("mineTool"));
         }

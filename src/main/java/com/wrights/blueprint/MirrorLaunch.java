@@ -301,11 +301,20 @@ public final class MirrorLaunch {
         BlockPos min = new BlockPos(minX, minY, minZ);
         BlockPos max = new BlockPos(maxX, maxY, maxZ);
         Schematic schematic = new Schematic(UUID.randomUUID(), "Mine", sizeX, sizeY, sizeZ, entries, min, max, level.dimension().location().toString(), 0, 0, 0, true);
-        JobManager.startMirrorMine(player, schematic, origin, payload.any(), miningTool(player));
+        boolean voiding = payload.voidBlocks() && WrightsConfig.allowVoidBlocks();
+        JobManager.startMirrorMine(player, schematic, origin, payload.any(), voiding, miningTool(player));
     }
 
-    /** Breaks the block with the tool that started the job. Drops go to that player. */
-    public static void harvest(ServerPlayer player, ServerLevel level, BlockPos pos, ItemStack tool) {
+    /** Breaks the block with the tool that started the job. Void removes it with no drops. */
+    public static void harvest(ServerPlayer player, ServerLevel level, BlockPos pos, ItemStack tool, boolean voiding) {
+        if (voiding) {
+            BlockEntity stored = level.getBlockEntity(pos);
+            if (stored instanceof net.minecraft.world.Container container) {
+                container.clearContent();
+            }
+            level.setBlock(pos, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS | net.minecraft.world.level.block.Block.UPDATE_SUPPRESS_DROPS);
+            return;
+        }
         BlockState state = level.getBlockState(pos);
         BlockEntity entity = level.getBlockEntity(pos);
         ItemStack used = tool == null ? ItemStack.EMPTY : tool;

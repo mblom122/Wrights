@@ -179,6 +179,9 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.BooleanValue MIRROR_MINE_ANY = BUILDER
             .comment("When true, mirror mining breaks any plain block. When false, only the same block.")
             .define("mirrorMineAny", false);
+    public static final ModConfigSpec.BooleanValue MIRROR_MINE_VOID = BUILDER
+            .comment("When true, mirrored mining removes the blocks and drops nothing.")
+            .define("mirrorMineVoid", false);
     public static final ModConfigSpec.IntValue MIRROR_PATTERN = BUILDER
             .comment("0 is 2 copies, 1 is 4, 2 is 8, 3 is 16.")
             .defineInRange("mirrorPattern", 0, 0, 3);
@@ -619,6 +622,15 @@ public final class WrightsClientConfig {
 
     public static void setMirrorMineAny(boolean any) {
         MIRROR_MINE_ANY.set(any);
+        save();
+    }
+
+    public static boolean mirrorMineVoid() {
+        return MIRROR_MINE_VOID.get();
+    }
+
+    public static void setMirrorMineVoid(boolean voiding) {
+        MIRROR_MINE_VOID.set(voiding);
         save();
     }
 

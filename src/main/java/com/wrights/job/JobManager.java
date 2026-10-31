@@ -712,7 +712,7 @@ public final class JobManager {
     }
 
     /** One wright job that breaks every mirrored copy. Drops follow the tool that started it. */
-    public static boolean startMirrorMine(ServerPlayer player, Schematic schematic, BlockPos anchor, boolean any, ItemStack tool) {
+    public static boolean startMirrorMine(ServerPlayer player, Schematic schematic, BlockPos anchor, boolean any, boolean voiding, ItemStack tool) {
         if (player == null || schematic == null || schematic.blockCount() == 0) {
             if (player != null) {
                 Messages.actionBar(player, "message.wrights.mine_none");
@@ -732,6 +732,7 @@ public final class JobManager {
         job.setClip(schematic.sizeX(), schematic.sizeY(), schematic.sizeZ());
         job.setMining(true);
         job.setMineAny(any);
+        job.setMineVoid(voiding);
         job.setMineTool(tool);
         job.setBlueprintName("Mine");
         job.setAnchor(anchor == null ? origin : anchor);
@@ -3713,7 +3714,7 @@ public final class JobManager {
             job.skippedOne();
             return PlaceResult.DONE;
         }
-        com.wrights.blueprint.MirrorLaunch.harvest(player, level, pos, job.mineTool());
+        com.wrights.blueprint.MirrorLaunch.harvest(player, level, pos, job.mineTool(), job.mineVoid());
         job.placedOne();
         return PlaceResult.DONE;
     }
