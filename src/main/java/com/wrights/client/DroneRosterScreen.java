@@ -219,11 +219,11 @@ public class DroneRosterScreen extends Screen {
 
     private void drawWright(GuiGraphics graphics, WrightRow row, int x, int y, int width, int mouseX, int mouseY, int clipTop, int clipBottom) {
         boolean hover = mouseX >= x && mouseX < x + width && mouseY >= Math.max(y, clipTop) && mouseY < Math.min(y + ROW, clipBottom);
-        boolean picked = row.unit.equals(selected);
         if (row.unit == null) {
             graphics.drawString(this.font, row.name, x + 8, y + 6, WrightsUi.MUTED, false);
             return;
         }
+        boolean picked = row.unit.equals(selected);
         if (picked) {
             graphics.fill(x + 2, y + 1, x + width - 2, y + ROW - 1, 0xFF24384A);
             graphics.fill(x + 2, y + 1, x + 4, y + ROW - 1, WrightsUi.COPPER);
