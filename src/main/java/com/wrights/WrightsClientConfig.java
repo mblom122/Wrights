@@ -46,6 +46,15 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.IntValue QUEUE_EDGE_BLUE = BUILDER
             .comment("Outline color of a queued build, blue channel.")
             .defineInRange("queueEdgeBlue", 151, 0, 255);
+    public static final ModConfigSpec.IntValue PLACE_EDGE_RED = BUILDER
+            .comment("Outline color of the build you are about to place, red channel.")
+            .defineInRange("placeEdgeRed", 196, 0, 255);
+    public static final ModConfigSpec.IntValue PLACE_EDGE_GREEN = BUILDER
+            .comment("Outline color of the build you are about to place, green channel.")
+            .defineInRange("placeEdgeGreen", 122, 0, 255);
+    public static final ModConfigSpec.IntValue PLACE_EDGE_BLUE = BUILDER
+            .comment("Outline color of the build you are about to place, blue channel.")
+            .defineInRange("placeEdgeBlue", 58, 0, 255);
     public static final ModConfigSpec.IntValue GHOST_TRANSPARENCY = BUILDER
             .comment("How see-through blueprint blocks are in the world, from 0 to 100 percent. 0 is solid and 100 is invisible.")
             .defineInRange("ghostTransparency", 50, 0, 100);
@@ -156,6 +165,10 @@ public final class WrightsClientConfig {
         return (QUEUE_EDGE_RED.get() << 16) | (QUEUE_EDGE_GREEN.get() << 8) | QUEUE_EDGE_BLUE.get();
     }
 
+    public static int placeEdgeRgb() {
+        return (PLACE_EDGE_RED.get() << 16) | (PLACE_EDGE_GREEN.get() << 8) | PLACE_EDGE_BLUE.get();
+    }
+
     public static float wallAlpha() {
         return 1.0F - WALL_TRANSPARENCY.get() / 100.0F;
     }
@@ -190,6 +203,13 @@ public final class WrightsClientConfig {
         QUEUE_EDGE_RED.set((rgb >> 16) & 255);
         QUEUE_EDGE_GREEN.set((rgb >> 8) & 255);
         QUEUE_EDGE_BLUE.set(rgb & 255);
+        save();
+    }
+
+    public static void setPlaceEdgeRgb(int rgb) {
+        PLACE_EDGE_RED.set((rgb >> 16) & 255);
+        PLACE_EDGE_GREEN.set((rgb >> 8) & 255);
+        PLACE_EDGE_BLUE.set(rgb & 255);
         save();
     }
 

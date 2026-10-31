@@ -188,6 +188,7 @@ public class WrightsMenuScreen extends Screen {
     private int wallSwatchY;
     private int edgeSwatchY;
     private int queueEdgeSwatchY;
+    private int placeEdgeSwatchY;
     private int markerX;
     private int markerY;
     private int markerW;
@@ -827,6 +828,8 @@ public class WrightsMenuScreen extends Screen {
         placeField(edgePercent, edgeSliderX + edgeSliderW + 8, edgeSliderY - 4);
         local += 22;
         queueEdgeSwatchY = optionY(local - 2);
+        local += 22;
+        placeEdgeSwatchY = optionY(local - 2);
         local += 20;
         ghostSliderX = controls;
         ghostSliderY = optionY(local);
@@ -923,6 +926,7 @@ public class WrightsMenuScreen extends Screen {
                 "menu.wrights.wall_transparency",
                 "menu.wrights.edge_color",
                 "menu.wrights.queue_edge",
+                "menu.wrights.place_edge",
                 "menu.wrights.edge_opacity",
                 "menu.wrights.ghost_transparency",
                 "menu.wrights.corner_markers",
@@ -966,6 +970,8 @@ public class WrightsMenuScreen extends Screen {
         drawSwatches(graphics, swatchX, edgeSwatchY, WrightsClientConfig.edgeRgb());
         graphics.drawString(this.font, Component.translatable("menu.wrights.queue_edge"), x, queueEdgeSwatchY + 2, WrightsUi.MUTED, false);
         drawSwatches(graphics, swatchX, queueEdgeSwatchY, WrightsClientConfig.queueEdgeRgb());
+        graphics.drawString(this.font, Component.translatable("menu.wrights.place_edge"), x, placeEdgeSwatchY + 2, WrightsUi.MUTED, false);
+        drawSwatches(graphics, swatchX, placeEdgeSwatchY, WrightsClientConfig.placeEdgeRgb());
         drawSlider(graphics, x, edgeSliderY, edgeSliderX, edgeSliderW, WrightsClientConfig.EDGE_OPACITY.get(), 100, Component.translatable("menu.wrights.edge_opacity"));
         graphics.drawString(this.font, "%", edgePercent.getX() + 34, edgeSliderY, WrightsUi.TEXT, false);
         Component ghostLabel = Component.translatable("menu.wrights.ghost_transparency");
@@ -1453,7 +1459,7 @@ public class WrightsMenuScreen extends Screen {
                 if (overOptionHelp(mouseX, mouseY)) {
                     return true;
                 }
-                if (pickSwatch(mouseX, mouseY, wallSwatchY, 0) || pickSwatch(mouseX, mouseY, edgeSwatchY, 1) || pickSwatch(mouseX, mouseY, queueEdgeSwatchY, 2)) {
+                if (pickSwatch(mouseX, mouseY, wallSwatchY, 0) || pickSwatch(mouseX, mouseY, edgeSwatchY, 1) || pickSwatch(mouseX, mouseY, queueEdgeSwatchY, 2) || pickSwatch(mouseX, mouseY, placeEdgeSwatchY, 3)) {
                     return true;
                 }
                 if (mouseX >= markerX && mouseX < markerX + markerW && mouseY >= markerY && mouseY < markerY + 16) {
@@ -1730,8 +1736,10 @@ public class WrightsMenuScreen extends Screen {
                     WrightsClientConfig.setWallRgb(color);
                 } else if (which == 1) {
                     WrightsClientConfig.setEdgeRgb(color);
-                } else {
+                } else if (which == 2) {
                     WrightsClientConfig.setQueueEdgeRgb(color);
+                } else {
+                    WrightsClientConfig.setPlaceEdgeRgb(color);
                 }
                 return true;
             }

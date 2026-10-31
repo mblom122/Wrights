@@ -140,6 +140,7 @@
   "menu.wrights.wall_transparency": "Wall transparency",
   "menu.wrights.edge_color": "Edge color",
   "menu.wrights.queue_edge": "Queue border",
+  "menu.wrights.place_edge": "Place border",
   "menu.wrights.edge_opacity": "Edge strength",
   "menu.wrights.ghost_transparency": "Ghost blocks",
   "menu.wrights.ghost_hint": "How see-through blueprint blocks are in the world.",

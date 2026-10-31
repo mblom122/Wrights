@@ -446,9 +446,13 @@ public final class SelectionRenderer {
                 anchor.getX() - WrightsClientState.pivotX + WrightsClientState.viewX,
                 anchor.getY() - WrightsClientState.pivotY + WrightsClientState.viewY,
                 anchor.getZ() - WrightsClientState.pivotZ + WrightsClientState.viewZ);
-        drawBox(pose, lines, box, camera, 0.45F, 0.78F, 1.0F, pulse);
+        int place = com.wrights.WrightsClientConfig.placeEdgeRgb();
+        float placeRed = com.wrights.WrightsClientConfig.channel(place, 16);
+        float placeGreen = com.wrights.WrightsClientConfig.channel(place, 8);
+        float placeBlue = com.wrights.WrightsClientConfig.channel(place, 0);
+        drawBox(pose, lines, box, camera, placeRed, placeGreen, placeBlue, pulse);
         AABB marker = new AABB(anchor.getX(), anchor.getY(), anchor.getZ(), anchor.getX() + 1.0D, anchor.getY() + 1.0D, anchor.getZ() + 1.0D);
-        drawBox(pose, lines, marker, camera, 0.49F, 0.71F, 1.0F, 1.0F);
+        drawBox(pose, lines, marker, camera, placeRed, placeGreen, placeBlue, 1.0F);
         buffers.endBatch(RenderType.lines());
     }
 
