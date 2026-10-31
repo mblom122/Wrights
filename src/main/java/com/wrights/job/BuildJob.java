@@ -1,7 +1,9 @@
 package com.wrights.job;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import net.minecraft.core.BlockPos;
@@ -171,6 +173,14 @@ public final class BuildJob {
 
     public void skippedOne() {
         skipped++;
+    }
+
+    /** Schematic indexes already counted as skipped. Not saved; a reload may count one of them once more. */
+    private final Set<Integer> retired = new HashSet<>();
+
+    /** True the first time this block is given up on. Later passes must not count it again. */
+    public boolean retire(int index) {
+        return retired.add(index);
     }
 
     public int skippedSpecial() {

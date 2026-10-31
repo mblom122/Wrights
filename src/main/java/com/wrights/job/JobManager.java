@@ -1065,7 +1065,9 @@ public final class JobManager {
                 continue;
             }
             if (falling(level, schematic, job, entry) == Falling.SKIP) {
-                job.skippedOne();
+                if (job.retire(index)) {
+                    job.skippedOne();
+                }
                 markSolo(job, index);
                 continue;
             }
@@ -2639,11 +2641,10 @@ public final class JobManager {
             if (!satisfied(level, job, entry)) {
                 Falling hold = falling(level, schematic, job, entry);
                 if (hold == Falling.SKIP) {
-                    job.skippedOne();
-                    noteProgress(schematic, job, hand, entry, index);
-                    if (!hand.rescan) {
-                        job.advance();
+                    if (job.retire(index)) {
+                        job.skippedOne();
                     }
+                    noteProgress(schematic, job, hand, entry, index);
                     budget[0]--;
                     continue;
                 }
@@ -2775,7 +2776,13 @@ public final class JobManager {
                 waiting = true;
                 continue;
             }
-            if (hold != Falling.SKIP && !canPay(player, level, job, hand, entry)) {
+            if (hold == Falling.SKIP) {
+                if (job.retire(i)) {
+                    job.skippedOne();
+                }
+                continue;
+            }
+            if (!canPay(player, level, job, hand, entry)) {
                 shortItems = true;
                 continue;
             }
