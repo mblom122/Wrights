@@ -711,6 +711,53 @@ public final class JobManager {
         return true;
     }
 
+    /** One wright job that breaks every mirrored copy. Drops follow the tool that started it. */
+    public static boolean startMirrorMine(ServerPlayer player, Schematic schematic, BlockPos anchor, boolean any, ItemStack tool) {
+        if (player == null || schematic == null || schematic.blockCount() == 0) {
+            if (player != null) {
+                Messages.actionBar(player, "message.wrights.mine_none");
+            }
+            return false;
+        }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        library.putSchematic(schematic);
+        BlockPos origin = schematic.sourceMin();
+        BuildJob job = BuildJob.paste(
+                player.getUUID(),
+                player.getUUID(),
+                player.level().dimension(),
+                origin,
+                schematic.id(),
+                schematic.blockCount());
+        job.setClip(schematic.sizeX(), schematic.sizeY(), schematic.sizeZ());
+        job.setMining(true);
+        job.setMineAny(any);
+        job.setMineTool(tool);
+        job.setBlueprintName("Mine");
+        job.setAnchor(anchor == null ? origin : anchor);
+        if (!instant(player) && freeUnits(player, library, job, 1).isEmpty()) {
+            int blocks = Math.max(1, schematic.blockCount());
+            int room = Math.min(blocks, WrightsConfig.maxWrightsPerJob());
+            job.setCrewQuota(room);
+            job.setQueued(true);
+            library.addJob(job);
+            Messages.actionBar(player, "message.wrights.queued", room);
+            BlueprintNetwork.syncJobs(player);
+            return true;
+        }
+        if (!instant(player) && !assignCrew(player, job, schematic, 0)) {
+            library.removeSchematic(schematic.id());
+            return false;
+        }
+        library.addJob(job);
+        if (player.level() instanceof ServerLevel level && !instant(player) && !job.hasCrew()) {
+            ensureDrone(level, player, job, origin);
+        }
+        launched(player, job);
+        BlueprintNetwork.syncJobs(player);
+        return true;
+    }
+
     private static boolean hasCopy(SchematicLibrary library, UUID playerId) {
         for (BuildJob job : library.jobsFor(playerId)) {
             if (job.kind() == BuildJob.Kind.COPY) {
@@ -1087,7 +1134,7 @@ public final class JobManager {
                 markSolo(job, index);
                 continue;
             }
-            PlaceResult placed = placeOne(level, player, job, pos, entry, false);
+            PlaceResult placed = actOne(level, player, job, pos, entry, false, null);
             if (placed == PlaceResult.PAUSE) {
                 job.setWaitKind(BuildJob.WAIT_CHUNK);
                 if (job.tickMessage()) {
@@ -1368,6 +1415,19 @@ public final class JobManager {
         int placed = job.placed();
         int skipped = job.skipped();
         archive(library, job, false);
+        if (job.mining()) {
+            BlueprintNetwork.clearJobHologram(player, job.id());
+            BlueprintNetwork.jobDone(player, finishedName(library, job), job.elapsedSeconds());
+            BlueprintNetwork.syncJobs(player);
+            if (placed == 0 && skipped > 0) {
+                Messages.actionBar(player, "message.wrights.all_skipped");
+            } else if (placed == 0) {
+                Messages.actionBar(player, "message.wrights.mine_none");
+            } else {
+                Messages.actionBar(player, "message.wrights.mine_done", placed, skipped);
+            }
+            return;
+        }
         library.schematic(job.schematicId())
                 .filter(schematic -> schematic.ephemeral() && com.wrights.blueprint.Mirror.marksBlocks(schematic.name()))
                 .ifPresentOrElse(
@@ -2503,7 +2563,7 @@ public final class JobManager {
                     job.advance();
                     continue;
                 }
-                PlaceResult placed = placeOne(level, player, job, pos, entry, false, hand);
+                PlaceResult placed = actOne(level, player, job, pos, entry, false, hand);
                 if (placed == PlaceResult.PAUSE) {
                     job.setWaitKind(BuildJob.WAIT_CHUNK);
                     waitingChunk = true;
@@ -2680,6 +2740,9 @@ public final class JobManager {
         }
         if (!level.isLoaded(pos)) {
             return false;
+        }
+        if (job.mining()) {
+            return !com.wrights.blueprint.MirrorLaunch.accepts(level, pos, entry.state().getBlock(), job.mineAny());
         }
         if (skippedContent(job, entry)) {
             return true;
@@ -2909,7 +2972,7 @@ public final class JobManager {
     }
 
     private static boolean canPay(ServerPlayer player, ServerLevel level, BuildJob job, BuildJob.Hand hand, Schematic.Entry entry) {
-        if (entry.secondary() || freePlace(player)) {
+        if (job.mining() || entry.secondary() || freePlace(player)) {
             return true;
         }
         Item payment = com.wrights.util.BlockFilters.payment(entry.state());
@@ -2923,6 +2986,9 @@ public final class JobManager {
     }
 
     private static Falling falling(ServerLevel level, Schematic schematic, BuildJob job, Schematic.Entry entry) {
+        if (job.mining()) {
+            return Falling.READY;
+        }
         if (BlockFilters.falls(entry.state())) {
             return fallingAt(level, schematic, job, entry, new HashSet<>());
         }
@@ -3581,7 +3647,7 @@ public final class JobManager {
                 if (!level.isLoaded(pos)) {
                     level.getChunkAt(pos);
                 }
-                PlaceResult placed = placeOne(level, player, job, pos, entry, true);
+                PlaceResult placed = actOne(level, player, job, pos, entry, true, null);
                 if (placed == PlaceResult.PAUSE) {
                     library.setDirty();
                     return;
@@ -3621,6 +3687,35 @@ public final class JobManager {
             removeOne(level, player, job, pos, refund, true);
         }
         finishUndo(server, library, player, job);
+    }
+
+    private static PlaceResult actOne(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos pos, Schematic.Entry entry, boolean quiet, BuildJob.Hand hand) {
+        if (job.mining()) {
+            return mineOne(level, player, job, pos, entry);
+        }
+        return placeOne(level, player, job, pos, entry, quiet, hand);
+    }
+
+    /** Breaks one mirrored block and sends its drops to the player who started the job. */
+    private static PlaceResult mineOne(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos pos, Schematic.Entry entry) {
+        if (level.isOutsideBuildHeight(pos)) {
+            job.skippedOne();
+            return PlaceResult.DONE;
+        }
+        if (!level.isLoaded(pos)) {
+            if (WrightsConfig.REQUIRE_CHUNKS_LOADED.getAsBoolean()) {
+                return PlaceResult.PAUSE;
+            }
+            job.skippedOne();
+            return PlaceResult.DONE;
+        }
+        if (!level.mayInteract(player, pos) || !com.wrights.blueprint.MirrorLaunch.accepts(level, pos, entry.state().getBlock(), job.mineAny())) {
+            job.skippedOne();
+            return PlaceResult.DONE;
+        }
+        com.wrights.blueprint.MirrorLaunch.harvest(player, level, pos, job.mineTool());
+        job.placedOne();
+        return PlaceResult.DONE;
     }
 
     private static PlaceResult placeOne(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos pos, Schematic.Entry entry, boolean quiet) {

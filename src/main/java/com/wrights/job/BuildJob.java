@@ -8,6 +8,7 @@ import java.util.UUID;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderGetter;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -16,6 +17,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -62,6 +64,9 @@ public final class BuildJob {
     private Phase phase = Phase.RUNNING;
     private int messageDelay;
     private String blueprintName;
+    private boolean mining;
+    private boolean mineAny;
+    private ItemStack mineTool = ItemStack.EMPTY;
     private boolean copyFluids;
     private boolean copyNbtBlocks;
     private boolean copyNbtSettings;
@@ -391,6 +396,30 @@ public final class BuildJob {
 
     public void setBlueprintName(String blueprintName) {
         this.blueprintName = blueprintName;
+    }
+
+    public boolean mining() {
+        return mining;
+    }
+
+    public void setMining(boolean mining) {
+        this.mining = mining;
+    }
+
+    public boolean mineAny() {
+        return mineAny;
+    }
+
+    public void setMineAny(boolean mineAny) {
+        this.mineAny = mineAny;
+    }
+
+    public ItemStack mineTool() {
+        return mineTool;
+    }
+
+    public void setMineTool(ItemStack mineTool) {
+        this.mineTool = mineTool == null || mineTool.isEmpty() ? ItemStack.EMPTY : mineTool.copy();
     }
 
     public boolean copyFluids() {
@@ -807,7 +836,7 @@ public final class BuildJob {
                 && pos.getZ() >= min.getZ() && pos.getZ() <= max.getZ();
     }
 
-    public CompoundTag save() {
+    public CompoundTag save(HolderLookup.Provider registries) {
         CompoundTag tag = new CompoundTag();
         tag.putUUID("id", id);
         tag.putUUID("owner", owner);
@@ -897,6 +926,13 @@ public final class BuildJob {
         if (blueprintName != null) {
             tag.putString("blueprintName", blueprintName);
         }
+        if (mining) {
+            tag.putBoolean("mining", true);
+            tag.putBoolean("mineAny", mineAny);
+            if (mineTool != null && !mineTool.isEmpty() && registries != null) {
+                tag.put("mineTool", mineTool.save(registries));
+            }
+        }
         tag.putBoolean("copyFluids", copyFluids);
         tag.putBoolean("copyNbtBlocks", copyNbtBlocks);
         tag.putBoolean("copyNbtSettings", copyNbtSettings);
@@ -967,7 +1003,7 @@ public final class BuildJob {
         return tag;
     }
 
-    public static BuildJob load(CompoundTag tag, HolderGetter<Block> blocks) {
+    public static BuildJob load(CompoundTag tag, HolderGetter<Block> blocks, HolderLookup.Provider registries) {
         ResourceLocation dimensionId = ResourceLocation.parse(tag.getString("dimension"));
         ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, dimensionId);
         BuildJob job = new BuildJob(
@@ -1055,6 +1091,11 @@ public final class BuildJob {
         }
         if (tag.contains("blueprintName")) {
             job.blueprintName = tag.getString("blueprintName");
+        }
+        job.mining = tag.getBoolean("mining");
+        job.mineAny = tag.getBoolean("mineAny");
+        if (registries != null && tag.contains("mineTool")) {
+            job.mineTool = ItemStack.parseOptional(registries, tag.getCompound("mineTool"));
         }
         job.copyFluids = tag.getBoolean("copyFluids");
         job.copyNbtBlocks = tag.getBoolean("copyNbtBlocks");

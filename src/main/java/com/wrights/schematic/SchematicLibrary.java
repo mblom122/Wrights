@@ -55,7 +55,7 @@ public final class SchematicLibrary extends SavedData {
         }
         ListTag jobs = tag.getList("jobs", Tag.TAG_COMPOUND);
         for (int i = 0; i < jobs.size(); i++) {
-            BuildJob job = BuildJob.load(jobs.getCompound(i), blocks);
+            BuildJob job = BuildJob.load(jobs.getCompound(i), blocks, registries);
             library.jobs.put(job.id(), job);
             library.jobsByPlayer.computeIfAbsent(job.owner(), id -> new ArrayList<>()).add(job.id());
         }
@@ -103,7 +103,7 @@ public final class SchematicLibrary extends SavedData {
         tag.put("schematics", schematics);
         ListTag jobs = new ListTag();
         for (BuildJob job : this.jobs.values()) {
-            jobs.add(job.save());
+            jobs.add(job.save(registries));
         }
         tag.put("jobs", jobs);
         tag.putInt("historyClock", historyClock);

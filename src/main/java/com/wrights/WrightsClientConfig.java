@@ -174,14 +174,11 @@ public final class WrightsClientConfig {
             .comment("When true, a mirrored block copy replaces whatever is already there. When false, that spot is skipped unless it is air.")
             .define("mirrorReplace", false);
     public static final ModConfigSpec.BooleanValue MIRROR_MINE = BUILDER
-            .comment("When true, breaking a block also breaks the mirrored copies.")
+            .comment("When true, breaking a block queues the mirrored copies as one wright mining job.")
             .define("mirrorMine", false);
     public static final ModConfigSpec.BooleanValue MIRROR_MINE_ANY = BUILDER
             .comment("When true, mirror mining breaks any plain block. When false, only the same block.")
             .define("mirrorMineAny", false);
-    public static final ModConfigSpec.BooleanValue MIRROR_MINE_SILK = BUILDER
-            .comment("When true, mirrored blocks drop as the block itself. When false, they use the tool's normal drops without silk touch.")
-            .define("mirrorMineSilk", false);
     public static final ModConfigSpec.IntValue MIRROR_PATTERN = BUILDER
             .comment("0 is 2 copies, 1 is 4, 2 is 8, 3 is 16.")
             .defineInRange("mirrorPattern", 0, 0, 3);
@@ -622,15 +619,6 @@ public final class WrightsClientConfig {
 
     public static void setMirrorMineAny(boolean any) {
         MIRROR_MINE_ANY.set(any);
-        save();
-    }
-
-    public static boolean mirrorMineSilk() {
-        return MIRROR_MINE_SILK.get();
-    }
-
-    public static void setMirrorMineSilk(boolean silk) {
-        MIRROR_MINE_SILK.set(silk);
         save();
     }
 

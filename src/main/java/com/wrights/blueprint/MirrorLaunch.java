@@ -1,5 +1,6 @@
 package com.wrights.blueprint;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -258,22 +259,77 @@ public final class MirrorLaunch {
         Direction face = Direction.from3DDataValue(Mth.clamp(payload.anchorFace(), 0, 5));
         int pattern = WrightsConfig.allowedPattern(payload.pattern());
         int axes = WrightsConfig.allowedAxes(payload.axes());
-        ItemStack tool = mineTool(player, level, payload.silk());
+        List<BlockPos> copies = new ArrayList<>();
+        int minX = Integer.MAX_VALUE;
+        int minY = Integer.MAX_VALUE;
+        int minZ = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE;
+        int maxY = Integer.MIN_VALUE;
+        int maxZ = Integer.MIN_VALUE;
         for (BlockPos copy : Mirror.copiesOf(origin, payload.anchor(), face, pattern, axes)) {
             if (!level.isLoaded(copy) || !level.mayInteract(player, copy) || !accepts(level, copy, mined.getBlock(), payload.any())) {
                 continue;
             }
-            BlockState state = level.getBlockState(copy);
-            BlockEntity entity = level.getBlockEntity(copy);
-            Set<UUID> already = player.getAbilities().instabuild ? Set.of() : nearbyItems(level, copy);
-            if (!player.getAbilities().instabuild) {
-                net.minecraft.world.level.block.Block.dropResources(state, level, copy, entity, player, tool);
-            }
-            level.destroyBlock(copy, false, player);
-            if (!player.getAbilities().instabuild) {
-                claimDrops(player, level, copy, already);
-            }
+            copies.add(copy.immutable());
+            minX = Math.min(minX, copy.getX());
+            minY = Math.min(minY, copy.getY());
+            minZ = Math.min(minZ, copy.getZ());
+            maxX = Math.max(maxX, copy.getX());
+            maxY = Math.max(maxY, copy.getY());
+            maxZ = Math.max(maxZ, copy.getZ());
         }
+        if (copies.isEmpty()) {
+            com.wrights.util.Messages.actionBar(player, "message.wrights.mine_none");
+            return;
+        }
+        int sizeX = maxX - minX + 1;
+        int sizeY = maxY - minY + 1;
+        int sizeZ = maxZ - minZ + 1;
+        if (sizeX > Short.MAX_VALUE || sizeY > Short.MAX_VALUE || sizeZ > Short.MAX_VALUE) {
+            com.wrights.util.Messages.actionBar(player, "message.wrights.mine_none");
+            return;
+        }
+        List<Schematic.Entry> entries = new ArrayList<>(copies.size());
+        for (BlockPos copy : copies) {
+            entries.add(new Schematic.Entry(
+                    (short) (copy.getX() - minX),
+                    (short) (copy.getY() - minY),
+                    (short) (copy.getZ() - minZ),
+                    level.getBlockState(copy),
+                    false));
+        }
+        BlockPos min = new BlockPos(minX, minY, minZ);
+        BlockPos max = new BlockPos(maxX, maxY, maxZ);
+        Schematic schematic = new Schematic(UUID.randomUUID(), "Mine", sizeX, sizeY, sizeZ, entries, min, max, level.dimension().location().toString(), 0, 0, 0, true);
+        JobManager.startMirrorMine(player, schematic, origin, payload.any(), miningTool(player));
+    }
+
+    /** Breaks the block with the tool that started the job. Drops go to that player. */
+    public static void harvest(ServerPlayer player, ServerLevel level, BlockPos pos, ItemStack tool) {
+        BlockState state = level.getBlockState(pos);
+        BlockEntity entity = level.getBlockEntity(pos);
+        ItemStack used = tool == null ? ItemStack.EMPTY : tool;
+        Set<UUID> already = player.getAbilities().instabuild ? Set.of() : nearbyItems(level, pos);
+        if (!player.getAbilities().instabuild) {
+            net.minecraft.world.level.block.Block.dropResources(state, level, pos, entity, player, used);
+        }
+        level.destroyBlock(pos, false, player);
+        if (!player.getAbilities().instabuild) {
+            claimDrops(player, level, pos, already);
+        }
+    }
+
+    /** The tool that mined the block. Its enchantments, including a modded silk touch, decide the drops. */
+    private static ItemStack miningTool(ServerPlayer player) {
+        ItemStack main = player.getMainHandItem();
+        if (!(main.getItem() instanceof ControllerItem) && !main.isEmpty()) {
+            return main.copy();
+        }
+        ItemStack off = player.getOffhandItem();
+        if (!(off.getItem() instanceof ControllerItem) && !off.isEmpty()) {
+            return off.copy();
+        }
+        return ItemStack.EMPTY;
     }
 
     /** Item entities already sitting on the block, so the new drops can be told apart. */
@@ -321,25 +377,5 @@ public final class MirrorLaunch {
             return !(state.getBlock() instanceof net.minecraft.world.level.block.EntityBlock);
         }
         return state.getBlock() == mined;
-    }
-
-    private static ItemStack mineTool(ServerPlayer player, ServerLevel level, boolean silk) {
-        var enchantments = level.registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.ENCHANTMENT);
-        var silkTouch = enchantments.getOrThrow(net.minecraft.world.item.enchantment.Enchantments.SILK_TOUCH);
-        if (silk) {
-            ItemStack stack = new ItemStack(net.minecraft.world.item.Items.DIAMOND_PICKAXE);
-            stack.enchant(silkTouch, 1);
-            return stack;
-        }
-        ItemStack held = player.getMainHandItem();
-        net.minecraft.world.item.enchantment.ItemEnchantments current = held.getOrDefault(net.minecraft.core.component.DataComponents.ENCHANTMENTS, net.minecraft.world.item.enchantment.ItemEnchantments.EMPTY);
-        if (current.getLevel(silkTouch) <= 0) {
-            return held;
-        }
-        ItemStack copy = held.copy();
-        net.minecraft.world.item.enchantment.ItemEnchantments.Mutable mutable = new net.minecraft.world.item.enchantment.ItemEnchantments.Mutable(current);
-        mutable.set(silkTouch, 0);
-        copy.set(net.minecraft.core.component.DataComponents.ENCHANTMENTS, mutable.toImmutable());
-        return copy;
     }
 }

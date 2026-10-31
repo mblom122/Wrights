@@ -1587,7 +1587,6 @@ public class WrightsMenuScreen extends Screen {
     private int mirrorOnY;
     private int mirrorMineY = -1;
     private int mirrorMineModeY = -1;
-    private int mirrorSilkY = -1;
     private int mirrorHighlightX;
     private int mirrorHighlightY = -1;
     private int mirrorHighlightW;
@@ -1702,7 +1701,6 @@ public class WrightsMenuScreen extends Screen {
         y += 16;
         mirrorMineY = -1;
         mirrorMineModeY = -1;
-        mirrorSilkY = -1;
         if (WrightsClientConfig.mirrorBlocks() && WrightsConfig.allowMirrorMine()) {
             mirrorMineY = y;
             drawMirrorToggle(graphics, mouseX, mouseY, x, y, WrightsClientConfig.mirrorMine(), "menu.wrights.mirror_mine", "menu.wrights.mirror_mine_hint", true);
@@ -1714,9 +1712,6 @@ public class WrightsMenuScreen extends Screen {
                 drawChoice(graphics, mouseX, mouseY, x + 16, y, half, 22, !any, "menu.wrights.mirror_mine_same");
                 drawChoice(graphics, mouseX, mouseY, x + 16 + half + gap, y, w - 16 - half - gap, 22, any, "menu.wrights.mirror_mine_any");
                 y += 28;
-                mirrorSilkY = y;
-                drawMirrorToggle(graphics, mouseX, mouseY, x + 16, y, WrightsClientConfig.mirrorMineSilk(), "menu.wrights.mirror_mine_silk", "menu.wrights.mirror_mine_silk_hint", true);
-                y += 16;
             }
         }
         y += 6;
@@ -1926,10 +1921,6 @@ public class WrightsMenuScreen extends Screen {
                 WrightsClientConfig.setMirrorMineAny(true);
                 return true;
             }
-        }
-        if (mirrorSilkY >= 0 && hitMirrorToggle(mouseX, mouseY, x + 16, mirrorSilkY, "menu.wrights.mirror_mine_silk")) {
-            WrightsClientConfig.setMirrorMineSilk(!WrightsClientConfig.mirrorMineSilk());
-            return true;
         }
         if (mirrorHighlightY >= 0 && mouseX >= mirrorHighlightX && mouseX < mirrorHighlightX + mirrorHighlightW && mouseY >= mirrorHighlightY && mouseY < mirrorHighlightY + 18) {
             String dimension = this.minecraft != null && this.minecraft.level != null ? this.minecraft.level.dimension().location().toString() : "";

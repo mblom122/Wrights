@@ -197,8 +197,7 @@ public final class WrightsInput {
                 com.wrights.WrightsClientConfig.MIRROR_FACE.get(),
                 com.wrights.WrightsClientConfig.MIRROR_PATTERN.get(),
                 com.wrights.WrightsClientConfig.MIRROR_AXES.get(),
-                com.wrights.WrightsClientConfig.mirrorMineAny(),
-                com.wrights.WrightsClientConfig.mirrorMineSilk()));
+                com.wrights.WrightsClientConfig.mirrorMineAny()));
     }
 
     @SubscribeEvent
