@@ -1655,7 +1655,7 @@ public final class JobManager {
             BlueprintNetwork.syncJobs(player);
             return;
         }
-        if (add && claimedByOther(library, player.getUUID(), job.id(), unitId)) {
+        if (add && claimedByOther(player, library, job.id(), unitId)) {
             Messages.actionBar(player, "message.wrights.drones_busy");
             BlueprintNetwork.syncJobs(player);
             return;
@@ -1783,16 +1783,34 @@ public final class JobManager {
         return job.kind() == BuildJob.Kind.PASTE && !job.finished();
     }
 
-    private static boolean claimedByOther(SchematicLibrary library, UUID owner, UUID jobId, UUID unitId) {
-        for (BuildJob other : library.jobsFor(owner)) {
-            if (other.id().equals(jobId) || !usesDrones(other) || other.awaitingDrones()) {
+    private static boolean claimedByOther(ServerPlayer player, SchematicLibrary library, UUID jobId, UUID unitId) {
+        for (BuildJob other : library.jobsFor(player.getUUID())) {
+            if ((jobId != null && other.id().equals(jobId)) || !usesDrones(other) || other.awaitingDrones()) {
                 continue;
             }
-            if (other.crewUnits().contains(unitId)) {
-                return true;
+            if (!other.crewUnits().contains(unitId)) {
+                continue;
             }
+            // Home and waiting on items: the wright is not on the build, so another job may take it.
+            if (other.waitKind() == BuildJob.WAIT_ITEMS && !unitIsOut(player, other, unitId)) {
+                continue;
+            }
+            return true;
         }
         return false;
+    }
+
+    private static boolean unitIsOut(ServerPlayer player, BuildJob job, UUID unitId) {
+        int index = job.crewUnits().indexOf(unitId);
+        if (index < 0 || index >= job.hands().size() || player.getServer() == null) {
+            return false;
+        }
+        UUID entityId = job.hands().get(index).entityId;
+        if (entityId == null) {
+            return false;
+        }
+        ServerLevel level = player.getServer().getLevel(job.dimension());
+        return level != null && level.getEntity(entityId) instanceof DroneEntity drone && drone.isAlive();
     }
 
     /** A personal port counts while you are near the build. A block port counts while its area meets the build. */
@@ -1895,7 +1913,7 @@ public final class JobManager {
         boolean playerFirst = com.wrights.blueprint.BlueprintSessions.get(player).portPlayerFirst();
         BlockPos[] box = jobBox(job);
         boolean near = WrightHomes.playerCovers(player, job.dimension(), box[0], box[1]);
-        return WrightHomes.freeFor(player, level, box[0], box[1], near, playerFirst, id -> !claimedByOther(library, player.getUUID(), job.id(), id), limit);
+        return WrightHomes.freeFor(player, level, box[0], box[1], near, playerFirst, id -> !claimedByOther(player, library, job.id(), id), limit);
     }
 
     private static List<UUID> pickResume(ServerPlayer player, SchematicLibrary library, BuildJob job, int wanted) {
@@ -1914,7 +1932,7 @@ public final class JobManager {
         if (level != null) {
             BlockPos[] box = jobBox(job);
             boolean near = WrightHomes.playerCovers(player, job.dimension(), box[0], box[1]);
-            for (WrightHomes.FreeWright free : WrightHomes.freeFor(player, level, box[0], box[1], near, true, id -> !claimedByOther(library, player.getUUID(), job.id(), id), Integer.MAX_VALUE)) {
+            for (WrightHomes.FreeWright free : WrightHomes.freeFor(player, level, box[0], box[1], near, true, id -> !claimedByOther(player, library, job.id(), id), Integer.MAX_VALUE)) {
                 if (free.personal()) {
                     personal.add(free);
                 } else {
@@ -1999,10 +2017,10 @@ public final class JobManager {
         return null;
     }
 
-    /** Wrights near the player that are not already out on a job. */
+    /** Wrights near the player that are not out on a job. Home wrights waiting on items count as free. */
     public static int freeWrightCount(ServerPlayer player) {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
-        return WrightHomes.countUnits(player, id -> !claimedByOther(library, player.getUUID(), null, id));
+        return WrightHomes.countUnits(player, id -> !claimedByOther(player, library, null, id));
     }
 
     /** Wrights in the worn port and in nearby placed wrightports, including ones already out. */
@@ -2016,6 +2034,7 @@ public final class JobManager {
         List<BlockPos> homes = new ArrayList<>();
         ServerLevel jobLevel = player.getServer().getLevel(job.dimension());
         for (UUID unitId : ids) {
+            releaseHomeWaiter(player, library, unitId, job.id());
             WrightHomes.FreeWright found = WrightHomes.locate(jobLevel, player, unitId, job.min());
             if (found == null) {
                 continue;
@@ -2289,7 +2308,7 @@ public final class JobManager {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         BlockPos[] box = jobBox(job);
         boolean near = WrightHomes.playerCovers(player, job.dimension(), box[0], box[1]);
-        WrightHomes.Reach reach = WrightHomes.reach(player, level, box[0], box[1], near, id -> !claimedByOther(library, player.getUUID(), job.id(), id));
+        WrightHomes.Reach reach = WrightHomes.reach(player, level, box[0], box[1], near, id -> !claimedByOther(player, library, job.id(), id));
         int owned = (near ? reach.personal() : 0) + reach.portWrights();
         int free = (near ? reach.personalFree() : 0) + reach.portFree();
         if (owned > 0 && free == 0) {
@@ -2353,6 +2372,7 @@ public final class JobManager {
         List<Integer> speeds = new ArrayList<>();
         List<UUID> ids = new ArrayList<>();
         for (WrightHomes.FreeWright unit : units) {
+            releaseHomeWaiter(player, library, unit.unit().id(), job.id());
             speeds.add(WrightTier.clamp(unit.unit().speed()));
             ids.add(unit.unit().id());
         }
@@ -4416,9 +4436,27 @@ public final class JobManager {
         return best;
     }
 
-    private static void moveUnit(ServerPlayer player, SchematicLibrary library, BuildJob source, BuildJob target, UUID unitId) {
+    /** Takes a wright that went home to wait for items off that job, so a new job can have it. */
+    private static void releaseHomeWaiter(ServerPlayer player, SchematicLibrary library, UUID unitId, UUID keepJob) {
+        for (BuildJob other : new ArrayList<>(library.jobsFor(player.getUUID()))) {
+            if (keepJob != null && other.id().equals(keepJob)) {
+                continue;
+            }
+            if (!usesDrones(other) || other.awaitingDrones() || other.waitKind() != BuildJob.WAIT_ITEMS) {
+                continue;
+            }
+            if (!other.crewUnits().contains(unitId) || unitIsOut(player, other, unitId)) {
+                continue;
+            }
+            leaveCrew(player, library, other, unitId);
+        }
+    }
+
+    private static void leaveCrew(ServerPlayer player, SchematicLibrary library, BuildJob source, UUID unitId) {
         List<UUID> from = new ArrayList<>(source.crewUnits());
-        from.remove(unitId);
+        if (!from.remove(unitId)) {
+            return;
+        }
         int quota = Math.max(source.crewQuota(), from.size() + 1);
         if (from.isEmpty()) {
             sendHome(player.getServer(), player, source);
@@ -4434,6 +4472,11 @@ public final class JobManager {
             source.setPaused(false);
             source.clearHold();
         }
+        library.setDirty();
+    }
+
+    private static void moveUnit(ServerPlayer player, SchematicLibrary library, BuildJob source, BuildJob target, UUID unitId) {
+        leaveCrew(player, library, source, unitId);
         List<UUID> to = new ArrayList<>(target.crewUnits());
         if (!to.contains(unitId)) {
             to.add(unitId);

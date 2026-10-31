@@ -2411,12 +2411,19 @@ public class WrightsMenuScreen extends Screen {
             }
         }
         Set<UUID> busy = new HashSet<>();
+        int stalledOut = 0;
         for (BlueprintPayloads.JobLine job : WrightsClientState.jobs) {
-            if (!job.finished()) {
+            if (job.finished()) {
+                continue;
+            }
+            if (job.waitKind() == com.wrights.job.BuildJob.WAIT_ITEMS) {
+                // Home wrights on a stalled job are waiting on items, not out working.
+                stalledOut += Math.max(0, job.drones());
+            } else {
                 busy.addAll(job.crew());
             }
         }
-        return new int[] { Math.max(0, owned - busy.size()), owned };
+        return new int[] { Math.max(0, owned - busy.size() - stalledOut), owned };
     }
 
     private boolean hitWide(double mouseX, double mouseY, int right, int y, int width) {
