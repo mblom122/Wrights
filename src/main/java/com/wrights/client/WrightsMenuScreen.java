@@ -98,7 +98,6 @@ public class WrightsMenuScreen extends Screen {
     private WrightsButton discardButton;
     private WrightsButton resumeButton;
     private WrightsButton previewButton;
-    private WrightsButton stopButton;
     private WrightsButton materialsButton;
     private int detailSplit;
     private UUID modelAsked;
@@ -359,11 +358,6 @@ public class WrightsMenuScreen extends Screen {
         closeButton = add(new WrightsButton(detailX + detailW - detailButtonW, bottom, detailButtonW, 18, Component.translatable("menu.wrights.close"), button -> onClose()));
         renameButton = add(new WrightsButton(detailX + Math.max(48, detailW - 78), detailSplit + 52, 74, 14, Component.translatable("menu.wrights.rename"), button -> rename()));
         materialsButton = add(new WrightsButton(detailX + 4, detailSplit + 72, Math.max(40, detailW - 8), 16, Component.translatable("menu.wrights.materials"), button -> openMaterials()));
-        stopButton = add(new WrightsButton(detailX + 4, detailSplit + 92, Math.max(40, detailW - 8), 16, Component.translatable("menu.wrights.stop"), button -> {
-            if (requireTool()) {
-                PacketDistributor.sendToServer(new BlueprintPayloads.StopJob());
-            }
-        }));
         discardButton = add(new WrightsButton(panelX + 14, panelY + panelH - 48, 92, 16, Component.translatable("menu.wrights.discard"), button -> discard()));
         resumeButton = add(new WrightsButton(panelX + 14, panelY + panelH - 68, 92, 16, Component.translatable("menu.wrights.resume"), button -> closeKeepingMode()));
         previewButton = add(new WrightsButton(panelX + 14, panelY + panelH - 48, 92, 16, Component.translatable("menu.wrights.cancel_preview"), button -> cancelPreview()));
@@ -550,13 +544,6 @@ public class WrightsMenuScreen extends Screen {
         if (previewButton != null) {
             previewButton.visible = building && WrightsClientState.mode == WrightsClientState.Mode.BUILD;
         }
-        if (stopButton != null) {
-            stopButton.visible = building && WrightsClientState.busy;
-            stopButton.active = WrightsClientState.busy && tool;
-            stopButton.setX(detailX + 4);
-            stopButton.setY(detailSplit + 92);
-            stopButton.setWidth(Math.max(40, detailW - 8));
-        }
         if (newButton != null) {
             newButton.active = tool;
         }
@@ -732,9 +719,6 @@ public class WrightsMenuScreen extends Screen {
         }
         drawScope(graphics, mouseX, mouseY);
         drawTabs(graphics, mouseX, mouseY);
-        if (WrightsClientState.busy && !WrightsClientState.libraryGlobal) {
-            graphics.drawString(this.font, Component.translatable("menu.wrights.busy"), detailX, headingY, WrightsUi.COPPER, false);
-        }
         renderList(graphics, mouseX, mouseY);
         renderDetail(graphics);
         if (!toolHeld() && buildButton != null && buildButton.visible) {

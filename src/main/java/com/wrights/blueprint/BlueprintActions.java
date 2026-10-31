@@ -458,16 +458,13 @@ public final class BlueprintActions {
             return;
         }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
-        if (library.isInUse(id)) {
-            Messages.actionBar(player, "message.wrights.blueprint_in_use");
-            return;
-        }
         Schematic schematic = library.schematic(id).orElse(null);
         if (schematic == null) {
             Messages.actionBar(player, "message.wrights.blueprint_missing");
             BlueprintNetwork.syncLibrary(player);
             return;
         }
+        library.detachJobs(id);
         library.removeSchematic(id);
         Messages.actionBar(player, "message.wrights.blueprint_deleted", schematic.name());
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
@@ -600,10 +597,6 @@ public final class BlueprintActions {
         }
         if (toGlobal) {
             SchematicLibrary library = SchematicLibrary.get(player.getServer());
-            if (library.isInUse(id)) {
-                Messages.actionBar(player, "message.wrights.blueprint_in_use");
-                return;
-            }
             Schematic schematic = library.schematic(id).orElse(null);
             if (schematic == null || schematic.ephemeral()) {
                 Messages.actionBar(player, "message.wrights.blueprint_missing");
@@ -618,6 +611,7 @@ public final class BlueprintActions {
             names.put(newId, name);
             store.shelf().placeAfter(newId, false, null, null, names);
             store.markShelfChanged();
+            library.detachJobs(id);
             library.removeSchematic(id);
             BlueprintSessions.get(player).setLibraryGlobal(true);
             Messages.actionBar(player, "message.wrights.moved_to_global", name);

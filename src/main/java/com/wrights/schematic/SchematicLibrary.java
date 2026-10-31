@@ -199,6 +199,34 @@ public final class SchematicLibrary extends SavedData {
         return false;
     }
 
+    /**
+     * Keep active jobs running when a library blueprint is deleted or moved by
+     * pointing them at an ephemeral snapshot of the same blocks.
+     */
+    public void detachJobs(UUID schematicId) {
+        if (schematicId == null || !isInUse(schematicId)) {
+            return;
+        }
+        Schematic schematic = schematics.get(schematicId);
+        if (schematic == null) {
+            return;
+        }
+        Schematic snap = schematic.ephemeralCopy();
+        schematics.put(snap.id(), snap);
+        for (BuildJob job : jobs.values()) {
+            if (job.finished()) {
+                continue;
+            }
+            if (schematicId.equals(job.schematicId())) {
+                job.setSchematicId(snap.id());
+            }
+            if (schematicId.equals(job.resultSchematicId())) {
+                job.setResultSchematicId(snap.id());
+            }
+        }
+        setDirty();
+    }
+
     public Optional<BuildJob> job(UUID id) {
         return Optional.ofNullable(jobs.get(id));
     }

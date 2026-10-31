@@ -209,6 +209,10 @@ public final class BuildJob {
         return schematicId;
     }
 
+    public void setSchematicId(UUID schematicId) {
+        this.schematicId = schematicId;
+    }
+
     public UUID resultSchematicId() {
         return resultSchematicId;
     }
