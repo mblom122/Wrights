@@ -35,6 +35,8 @@ import appeng.api.networking.crafting.ICraftingService;
 import appeng.api.networking.crafting.ICraftingSubmitResult;
 import appeng.api.networking.security.IActionSource;
 import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.AEKey;
+import appeng.api.stacks.KeyCounter;
 import appeng.api.storage.MEStorage;
 
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -247,41 +249,78 @@ public final class Ae2DigitalAccess implements DigitalAccess {
             tell(server, player, craft, "message.wrights.digital_offline");
             return;
         }
-        boolean missing = plan.simulation() || !plan.missingItems().isEmpty();
-        boolean noCpu = false;
-        if (!missing) {
+        // A plan with no CPU is marked "simulated" and lists ingredients it did not reserve.
+        // Those lines are not proof the network is empty, so check the stored stock directly.
+        boolean shortStock = ingredientShort(grid, plan, craft.key.item);
+        boolean noCpu = !cpuFree(grid.getCraftingService(), plan);
+        if (!plan.simulation()) {
             ICraftingSubmitResult result = grid.getCraftingService().submitJob(plan, null, null, false, craft.source);
             if (result.successful()) {
                 ACCEPTED_UNTIL.put(craft.key, server.getTickCount() + 40L);
                 return;
             }
             CraftingSubmitErrorCode code = result.errorCode();
-            if (code == CraftingSubmitErrorCode.MISSING_INGREDIENT || code == CraftingSubmitErrorCode.INCOMPLETE_PLAN) {
-                missing = true;
-            } else if (code == CraftingSubmitErrorCode.NO_CPU_FOUND
+            if (code == CraftingSubmitErrorCode.NO_CPU_FOUND
                     || code == CraftingSubmitErrorCode.NO_SUITABLE_CPU_FOUND
                     || code == CraftingSubmitErrorCode.CPU_BUSY
                     || code == CraftingSubmitErrorCode.CPU_OFFLINE
                     || code == CraftingSubmitErrorCode.CPU_TOO_SMALL) {
                 noCpu = true;
-            } else {
+            } else if (code == CraftingSubmitErrorCode.MISSING_INGREDIENT) {
+                shortStock = true;
+            } else if (code != CraftingSubmitErrorCode.INCOMPLETE_PLAN) {
                 tell(server, player, craft, "message.wrights.digital_craft_failed");
                 return;
             }
         }
-        if (missing) {
-            noCpu = noCpu || !cpuFree(grid.getCraftingService(), plan);
-        }
         ItemStack stack = new ItemStack(craft.key.item);
-        if (missing && noCpu) {
+        if (shortStock && noCpu) {
             tell(server, player, craft, "message.wrights.digital_craft_blocked", stack.getHoverName());
-        } else if (missing) {
+        } else if (shortStock) {
             tell(server, player, craft, "message.wrights.digital_craft_materials", stack.getHoverName());
         } else if (noCpu) {
             tell(server, player, craft, "message.wrights.digital_craft_cpu", stack.getHoverName());
         } else {
             tell(server, player, craft, "message.wrights.digital_craft_failed");
         }
+    }
+
+    /** True when a non-output ingredient in the plan is actually absent from network storage. */
+    private static boolean ingredientShort(IGrid grid, ICraftingPlan plan, Item requested) {
+        KeyCounter missing = plan.missingItems();
+        if (missing == null || missing.isEmpty()) {
+            return false;
+        }
+        KeyCounter stored = grid.getStorageService().getCachedInventory();
+        for (var entry : missing) {
+            long need = entry.getLongValue();
+            if (need <= 0L) {
+                continue;
+            }
+            AEKey key = entry.getKey();
+            if (key instanceof AEItemKey itemKey && itemKey.getItem() == requested) {
+                continue;
+            }
+            if (available(stored, key) < need) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static long available(KeyCounter stored, AEKey key) {
+        if (!(key instanceof AEItemKey itemKey)) {
+            return stored.get(key);
+        }
+        long total = 0L;
+        for (var entry : stored) {
+            if (entry.getKey() instanceof AEItemKey storedItem
+                    && storedItem.getItem() == itemKey.getItem()
+                    && entry.getLongValue() > 0L) {
+                total += entry.getLongValue();
+            }
+        }
+        return total;
     }
 
     private static void tell(MinecraftServer server, ServerPlayer player, PendingCraft craft, String key, Object... args) {
