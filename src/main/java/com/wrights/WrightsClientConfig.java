@@ -179,6 +179,9 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.IntValue MIRROR_AXES = BUILDER
             .comment("0 uses the clicked face and the pattern. Otherwise bit 1 is X, bit 2 is Y, and bit 4 is Z, mirrored through the middle of the anchor block.")
             .defineInRange("mirrorAxes", 0, 0, 7);
+    public static final ModConfigSpec.IntValue MIRROR_AXIS_PICK = BUILDER
+            .comment("Last X, Y, and Z mix. Restored when Axis mode is chosen again. Bit 1 is X, bit 2 is Y, bit 4 is Z.")
+            .defineInRange("mirrorAxisPick", 1, 0, 7);
     public static final ModConfigSpec.IntValue MIRROR_FACE = BUILDER
             .defineInRange("mirrorFace", 0, 0, 5);
     public static final ModConfigSpec.IntValue MIRROR_X = BUILDER
@@ -597,17 +600,54 @@ public final class WrightsClientConfig {
 
     public static void setMirrorPattern(int pattern) {
         MIRROR_PATTERN.set(Mirror.clampPattern(pattern));
+        rememberAxes();
         MIRROR_AXES.set(0);
         save();
     }
 
     public static void setMirrorAxes(int axes) {
-        MIRROR_AXES.set(axes & 7);
+        int mask = axes & 7;
+        MIRROR_AXES.set(mask);
+        if (mask != 0) {
+            MIRROR_AXIS_PICK.set(mask);
+        }
+        save();
+    }
+
+    /** Anchored face. The last axis mix is kept for the next time Axis mode is chosen. */
+    public static void setMirrorStyleAnchored() {
+        rememberAxes();
+        MIRROR_AXES.set(0);
+        save();
+    }
+
+    /** Axis mode. Restores the last X, Y, and Z mix, or X when none was chosen. */
+    public static void setMirrorStyleAxes() {
+        int mask = MIRROR_AXES.get() & 7;
+        if (mask == 0) {
+            mask = MIRROR_AXIS_PICK.get() & 7;
+            if (mask == 0) {
+                mask = Mirror.AXIS_X;
+            }
+            MIRROR_AXES.set(mask);
+            MIRROR_AXIS_PICK.set(mask);
+        }
         save();
     }
 
     public static void toggleMirrorAxis(int bit) {
-        setMirrorAxes(MIRROR_AXES.get() ^ (bit & 7));
+        int next = (MIRROR_AXES.get() ^ (bit & 7)) & 7;
+        if (next == 0) {
+            return;
+        }
+        setMirrorAxes(next);
+    }
+
+    private static void rememberAxes() {
+        int mask = MIRROR_AXES.get() & 7;
+        if (mask != 0) {
+            MIRROR_AXIS_PICK.set(mask);
+        }
     }
 
     public static void cycleMirrorPattern() {
