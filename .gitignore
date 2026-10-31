@@ -32,6 +32,10 @@ bin/
 ### Mac OS ###
 .DS_Store
 
+### Python ###
+__pycache__/
+*.pyc
+
 ### Minecraft Modding ###
 run/
 modpack/mods/*.jar
