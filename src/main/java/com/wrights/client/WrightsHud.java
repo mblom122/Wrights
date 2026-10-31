@@ -96,7 +96,8 @@ public final class WrightsHud {
             if (aimed == null) {
                 line = Component.translatable("hud.wrights.jobs_explain");
             } else {
-                String title = aimed.undoing() ? "hud.wrights.job_undoing" : aimed.paused() ? "hud.wrights.job_paused" : "hud.wrights.job_building";
+                boolean stalled = aimed.waitKind() == com.wrights.job.BuildJob.WAIT_ITEMS;
+                String title = aimed.undoing() ? "hud.wrights.job_undoing" : aimed.paused() ? "hud.wrights.job_paused" : stalled ? "hud.wrights.job_stalled" : "hud.wrights.job_building";
                 line = Component.translatable(title, aimed.name());
                 String time = WrightsClientState.timeLeft(aimed);
                 int percent = WrightsClientState.percent(aimed);

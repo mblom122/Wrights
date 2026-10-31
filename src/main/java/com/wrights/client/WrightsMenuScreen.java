@@ -1978,7 +1978,7 @@ public class WrightsMenuScreen extends Screen {
         lines.add(jobStatusText(job).getVisualOrderText());
         lines.add(progressLine(job).getVisualOrderText());
         Component wait = WrightsClientState.jobWait(job);
-        if (wait != null) {
+        if (wait != null && job.waitKind() != com.wrights.job.BuildJob.WAIT_ITEMS) {
             lines.add(wait.getVisualOrderText());
         }
         String skipped = skippedLine(job);
@@ -2021,6 +2021,9 @@ public class WrightsMenuScreen extends Screen {
         }
         if (job.paused()) {
             return holdStatus(job.hold(), true);
+        }
+        if (job.waitKind() == com.wrights.job.BuildJob.WAIT_ITEMS) {
+            return "menu.wrights.stalled";
         }
         if (job.queued()) {
             return "menu.wrights.queued";
@@ -2076,6 +2079,9 @@ public class WrightsMenuScreen extends Screen {
         }
         if (job.paused()) {
             return 0xFFE0B060;
+        }
+        if (job.waitKind() == com.wrights.job.BuildJob.WAIT_ITEMS) {
+            return 0xFFE08A4A;
         }
         if (job.queued()) {
             return 0xFF7EB6FF;

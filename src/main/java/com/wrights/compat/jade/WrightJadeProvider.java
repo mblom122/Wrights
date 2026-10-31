@@ -71,7 +71,8 @@ public enum WrightJadeProvider implements IEntityComponentProvider, StreamServer
             PAUSED("jade.wrights.paused"),
             UNDOING("jade.wrights.undoing"),
             SAVING("jade.wrights.saving"),
-            WAITING("jade.wrights.waiting");
+            WAITING("jade.wrights.waiting"),
+            STALLED("jade.wrights.stalled");
 
             private final String key;
 
@@ -100,6 +101,8 @@ public enum WrightJadeProvider implements IEntityComponentProvider, StreamServer
                 kind = Kind.PAUSED;
             } else if (job.kind() == BuildJob.Kind.COPY) {
                 kind = Kind.SAVING;
+            } else if (job.waitKind() == BuildJob.WAIT_ITEMS) {
+                kind = Kind.STALLED;
             } else if (job.awaitingDrones()) {
                 kind = Kind.WAITING;
             } else {

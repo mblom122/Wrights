@@ -274,6 +274,7 @@
   "menu.wrights.instant": "Instant",
   "menu.wrights.drone_pace": "Wright",
   "menu.wrights.paused": "Paused",
+  "menu.wrights.stalled": "Stalled · missing items",
   "menu.wrights.hold_no_wrights": "Paused · no wrights",
   "menu.wrights.hold_player": "Too far away",
   "menu.wrights.hold_port": "Wrightport too far",
@@ -454,12 +455,13 @@
   "hud.wrights.job_time_under": "Took under a second",
   "hud.wrights.job_building": "Building %s",
   "hud.wrights.job_paused": "Paused · %s",
+  "hud.wrights.job_stalled": "Stalled · %s",
   "hud.wrights.job_undoing": "Undoing %s",
   "hud.wrights.job_detail": "%s/%s · %s%% · skipped %s",
   "hud.wrights.job_detail_time": "%s/%s · %s%% · skipped %s · %s left",
   "hud.wrights.wait_floor": "Waiting for the block underneath",
   "hud.wrights.wait_chunk": "Waiting for the chunk to load",
-  "hud.wrights.wait_items": "Waiting for items",
+  "hud.wrights.wait_items": "Missing items",
   "hud.wrights.main_modes": "Mode",
   "hud.wrights.main_new": "New",
   "hud.wrights.main_build": "Build",
@@ -729,6 +731,7 @@
   "jade.wrights.undoing": "Undoing %s",
   "jade.wrights.saving": "Saving %s",
   "jade.wrights.waiting": "Waiting · %s",
+  "jade.wrights.stalled": "Stalled · %s",
   "jade.wrights.size": "%s × %s × %s"
 }
 

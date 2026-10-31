@@ -63,10 +63,12 @@ public class JobActionScreen extends Screen {
         }
         String name = this.font.plainSubstrByWidth(job.name(), 208);
         graphics.drawString(this.font, name, panelX + 16, panelY + 12, WrightsUi.COPPER, false);
+        boolean stalled = !job.paused() && job.waitKind() == com.wrights.job.BuildJob.WAIT_ITEMS;
         String status = job.undoing()
                 ? "menu.wrights.undoing"
-                : job.paused() ? "menu.wrights.paused" : "menu.wrights.running";
-        graphics.drawString(this.font, Component.translatable(status), panelX + 16, panelY + 28, job.paused() ? 0xFFE0B060 : WrightsUi.TEXT, false);
+                : job.paused() ? "menu.wrights.paused" : stalled ? "menu.wrights.stalled" : "menu.wrights.running";
+        int statusColor = job.paused() ? 0xFFE0B060 : stalled ? 0xFFE08A4A : WrightsUi.TEXT;
+        graphics.drawString(this.font, Component.translatable(status), panelX + 16, panelY + 28, statusColor, false);
         int percent = job.finished() ? 100 : WrightsClientState.percent(job);
         graphics.drawString(this.font, Component.translatable("menu.wrights.job_percent", percent, job.done(), job.total()), panelX + 16, panelY + 44, WrightsUi.MUTED, false);
         graphics.drawString(this.font, Component.translatable("menu.wrights.job_drone_count", job.crew().size()), panelX + 16, panelY + 60, WrightsUi.TEXT, false);
