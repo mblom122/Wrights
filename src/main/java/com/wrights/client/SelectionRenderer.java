@@ -196,15 +196,14 @@ public final class SelectionRenderer {
         int axes = WrightsConfig.allowedAxes(WrightsClientConfig.MIRROR_AXES.get());
         float pulse = 0.55F + 0.45F * (float) Math.sin(System.currentTimeMillis() / 220.0D);
         VertexConsumer fill = buffers.getBuffer(RenderType.debugFilledBox());
-        for (Direction plane : Mirror.planes(face, axes)) {
-            AABB slab = faceSlab(anchor, plane);
+        for (AABB slab : mirrorSlabs(anchor, face, axes)) {
             AABB local = slab.move(-camera.x, -camera.y, -camera.z);
             LevelRenderer.addChainedFilledBoxVertices(pose, fill, local.minX, local.minY, local.minZ, local.maxX, local.maxY, local.maxZ, 0.35F, 0.78F, 0.74F, 0.18F + 0.10F * pulse);
         }
         buffers.endBatch(RenderType.debugFilledBox());
         VertexConsumer lines = buffers.getBuffer(RenderType.lines());
-        for (Direction plane : Mirror.planes(face, axes)) {
-            drawBox(pose, lines, faceSlab(anchor, plane), camera, 0.45F, 0.92F, 0.86F, 0.85F + 0.15F * pulse);
+        for (AABB slab : mirrorSlabs(anchor, face, axes)) {
+            drawBox(pose, lines, slab, camera, 0.45F, 0.92F, 0.86F, 0.85F + 0.15F * pulse);
         }
         if (WrightsConfig.allowMirrorBlueprints() && !WrightsClientConfig.mirrorBlocks() && WrightsClientConfig.mirrorArmed(here) && WrightsClientState.mode == WrightsClientState.Mode.BUILD && WrightsClientState.anchor != null && WrightsClientState.buildId != null) {
             BlockPos origin = WrightsClientState.anchor.offset(-WrightsClientState.pivotX, -WrightsClientState.pivotY, -WrightsClientState.pivotZ);
@@ -213,6 +212,41 @@ public final class SelectionRenderer {
             }
         }
         buffers.endBatch(RenderType.lines());
+    }
+
+    /** Face mode draws the clicked side. Axis mode draws a plane through the middle of the anchor block. */
+    private static java.util.List<AABB> mirrorSlabs(BlockPos anchor, Direction face, int axes) {
+        java.util.List<AABB> slabs = new java.util.ArrayList<>();
+        int mask = axes & 7;
+        if (mask == 0) {
+            slabs.add(faceSlab(anchor, face));
+            return slabs;
+        }
+        if ((mask & Mirror.AXIS_X) != 0) {
+            slabs.add(centerSlab(anchor, Direction.Axis.X));
+        }
+        if ((mask & Mirror.AXIS_Y) != 0) {
+            slabs.add(centerSlab(anchor, Direction.Axis.Y));
+        }
+        if ((mask & Mirror.AXIS_Z) != 0) {
+            slabs.add(centerSlab(anchor, Direction.Axis.Z));
+        }
+        return slabs;
+    }
+
+    private static AABB centerSlab(BlockPos anchor, Direction.Axis axis) {
+        double x0 = anchor.getX();
+        double y0 = anchor.getY();
+        double z0 = anchor.getZ();
+        double x1 = x0 + 1.0D;
+        double y1 = y0 + 1.0D;
+        double z1 = z0 + 1.0D;
+        double thin = 0.03D;
+        return switch (axis) {
+            case X -> new AABB(x0 + 0.5D - thin, y0, z0, x0 + 0.5D + thin, y1, z1);
+            case Y -> new AABB(x0, y0 + 0.5D - thin, z0, x1, y0 + 0.5D + thin, z1);
+            case Z -> new AABB(x0, y0, z0 + 0.5D - thin, x1, y1, z0 + 0.5D + thin);
+        };
     }
 
     /** Face mode draws the clicked side. Axis mode draws a plane through the middle of the anchor block. */

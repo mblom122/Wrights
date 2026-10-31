@@ -177,7 +177,7 @@ public final class WrightsClientConfig {
             .comment("0 is 2 copies, 1 is 4, 2 is 8, 3 is 16.")
             .defineInRange("mirrorPattern", 0, 0, 3);
     public static final ModConfigSpec.IntValue MIRROR_AXES = BUILDER
-            .comment("0 uses the anchor face. Otherwise bit 1 is X, bit 2 is Y, and bit 4 is Z. More than one bit mirrors on each of those axes.")
+            .comment("0 uses the clicked face and the pattern. Otherwise bit 1 is X, bit 2 is Y, and bit 4 is Z, mirrored through the middle of the anchor block.")
             .defineInRange("mirrorAxes", 0, 0, 7);
     public static final ModConfigSpec.IntValue MIRROR_FACE = BUILDER
             .defineInRange("mirrorFace", 0, 0, 5);
@@ -597,6 +597,7 @@ public final class WrightsClientConfig {
 
     public static void setMirrorPattern(int pattern) {
         MIRROR_PATTERN.set(Mirror.clampPattern(pattern));
+        MIRROR_AXES.set(0);
         save();
     }
 

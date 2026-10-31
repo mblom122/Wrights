@@ -249,7 +249,7 @@ public final class Mirror {
     private static List<Shot> shots(BlockPos anchor, Direction face, int pattern, boolean shapes, int axes) {
         List<Shot> shots = new ArrayList<>();
         if ((axes & 7) != 0) {
-            shots.addAll(axisShots(anchor, face, axes & 7, shapes));
+            shots.addAll(axisShots(anchor, axes & 7, shapes));
             return shots;
         }
         int patternId = clampPattern(pattern);
@@ -294,17 +294,17 @@ public final class Mirror {
         return shots;
     }
 
-    /** Every non-empty mix of the chosen axes. The anchor block stays on the near side of each plane. */
-    private static List<Shot> axisShots(BlockPos anchor, Direction face, int mask, boolean shapes) {
-        List<Direction> chosen = new ArrayList<>();
+    /** Every non-empty mix of the chosen axes. Each plane cuts through the middle of the anchor block. */
+    private static List<Shot> axisShots(BlockPos anchor, int mask, boolean shapes) {
+        List<Direction.Axis> chosen = new ArrayList<>();
         if ((mask & AXIS_X) != 0) {
-            chosen.add(axisFace(face, Direction.Axis.X));
+            chosen.add(Direction.Axis.X);
         }
         if ((mask & AXIS_Y) != 0) {
-            chosen.add(axisFace(face, Direction.Axis.Y));
+            chosen.add(Direction.Axis.Y);
         }
         if ((mask & AXIS_Z) != 0) {
-            chosen.add(axisFace(face, Direction.Axis.Z));
+            chosen.add(Direction.Axis.Z);
         }
         List<Shot> shots = new ArrayList<>();
         int count = chosen.size();
@@ -318,7 +318,7 @@ public final class Mirror {
                         if ((bits & (1 << i)) == 0) {
                             continue;
                         }
-                        at = reflect(at, anchor, chosen.get(i));
+                        at = reflectCenter(at, anchor, chosen.get(i));
                         if (at == null) {
                             return null;
                         }
@@ -334,7 +334,7 @@ public final class Mirror {
                     BlockState styled = state;
                     for (int i = 0; i < count; i++) {
                         if ((bits & (1 << i)) != 0) {
-                            styled = flipAxis(styled, chosen.get(i).getAxis());
+                            styled = flipAxis(styled, chosen.get(i));
                         }
                     }
                     return styled;
@@ -363,6 +363,22 @@ public final class Mirror {
             public BlockState restyle(BlockState state) {
                 return shapes ? flipAxis(state, face.getAxis()) : state;
             }
+        };
+    }
+
+    /** Reflect through the middle of the anchor block, so a block two steps away lands two steps the other way. */
+    private static BlockPos reflectCenter(BlockPos pos, BlockPos anchor, Direction.Axis axis) {
+        int anchorValue = axis.choose(anchor.getX(), anchor.getY(), anchor.getZ());
+        int value = axis.choose(pos.getX(), pos.getY(), pos.getZ());
+        long mirrored = anchorValue * 2L - value;
+        if (mirrored > Integer.MAX_VALUE || mirrored < Integer.MIN_VALUE) {
+            return null;
+        }
+        int next = (int) mirrored;
+        return switch (axis) {
+            case X -> new BlockPos(next, pos.getY(), pos.getZ());
+            case Y -> new BlockPos(pos.getX(), next, pos.getZ());
+            case Z -> new BlockPos(pos.getX(), pos.getY(), next);
         };
     }
 
