@@ -197,14 +197,14 @@ public final class SelectionRenderer {
         int pattern = WrightsConfig.allowedPattern(WrightsClientConfig.MIRROR_PATTERN.get());
         float pulse = 0.55F + 0.45F * (float) Math.sin(System.currentTimeMillis() / 220.0D);
         VertexConsumer fill = buffers.getBuffer(RenderType.debugFilledBox());
-        for (AABB slab : mirrorSlabs(anchor, face, axes, pattern)) {
+        for (AABB slab : mirrorSlabs(anchor, face, axes)) {
             AABB local = slab.move(-camera.x, -camera.y, -camera.z);
             LevelRenderer.addChainedFilledBoxVertices(pose, fill, local.minX, local.minY, local.minZ, local.maxX, local.maxY, local.maxZ, 0.35F, 0.78F, 0.74F, 0.18F + 0.10F * pulse);
         }
         buffers.endBatch(RenderType.debugFilledBox());
         VertexConsumer lines = buffers.getBuffer(RenderType.lines());
         float lineAlpha = 0.85F + 0.15F * pulse;
-        for (AABB slab : mirrorSlabs(anchor, face, axes, pattern)) {
+        for (AABB slab : mirrorSlabs(anchor, face, axes)) {
             drawBox(pose, lines, slab, camera, 0.45F, 0.92F, 0.86F, lineAlpha);
         }
         if ((axes & 7) == 0) {
@@ -219,19 +219,12 @@ public final class SelectionRenderer {
         buffers.endBatch(RenderType.lines());
     }
 
-    /** Face mode marks the clicked side and cuts through the middle. Axis mode draws a plane through that middle. */
-    private static java.util.List<AABB> mirrorSlabs(BlockPos anchor, Direction face, int axes, int pattern) {
+    /** Face mode marks the clicked side inside the block. Axis mode draws a plane through the middle. */
+    private static java.util.List<AABB> mirrorSlabs(BlockPos anchor, Direction face, int axes) {
         java.util.List<AABB> slabs = new java.util.ArrayList<>();
         int mask = axes & 7;
         if (mask == 0) {
             slabs.add(faceSlab(anchor, face));
-            slabs.add(centerSlab(anchor, face.getAxis()));
-            if (Mirror.clampPattern(pattern) == Mirror.CROSS) {
-                Direction.Axis second = face.getAxis() == Direction.Axis.X ? Direction.Axis.Z : Direction.Axis.X;
-                if (second != face.getAxis()) {
-                    slabs.add(centerSlab(anchor, second));
-                }
-            }
             return slabs;
         }
         if ((mask & Mirror.AXIS_X) != 0) {
@@ -268,14 +261,14 @@ public final class SelectionRenderer {
         double x1 = x0 + 1.0D;
         double y1 = y0 + 1.0D;
         double z1 = z0 + 1.0D;
-        double thin = 0.12D;
+        double thin = 0.24D;
         return switch (face) {
-            case EAST -> new AABB(x1, y0, z0, x1 + thin, y1, z1);
-            case WEST -> new AABB(x0 - thin, y0, z0, x0, y1, z1);
-            case UP -> new AABB(x0, y1, z0, x1, y1 + thin, z1);
-            case DOWN -> new AABB(x0, y0 - thin, z0, x1, y0, z1);
-            case SOUTH -> new AABB(x0, y0, z1, x1, y1, z1 + thin);
-            case NORTH -> new AABB(x0, y0, z0 - thin, x1, y1, z0);
+            case EAST -> new AABB(x1 - thin, y0, z0, x1, y1, z1);
+            case WEST -> new AABB(x0, y0, z0, x0 + thin, y1, z1);
+            case UP -> new AABB(x0, y1 - thin, z0, x1, y1, z1);
+            case DOWN -> new AABB(x0, y0, z0, x1, y0 + thin, z1);
+            case SOUTH -> new AABB(x0, y0, z1 - thin, x1, y1, z1);
+            case NORTH -> new AABB(x0, y0, z0, x1, y1, z0 + thin);
         };
     }
 
