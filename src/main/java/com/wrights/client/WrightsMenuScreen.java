@@ -93,6 +93,7 @@ public class WrightsMenuScreen extends Screen {
     private WrightsButton importButton;
     private WrightsButton moveButton;
     private WrightsButton buildButton;
+    private WrightsButton closeButton;
     private WrightsButton renameButton;
     private WrightsButton discardButton;
     private WrightsButton resumeButton;
@@ -355,7 +356,7 @@ public class WrightsMenuScreen extends Screen {
         newButton = add(new WrightsButton(listX + importW + gap + moveW + gap, bottom, otherW, 18, Component.translatable("menu.wrights.new"), button -> newBlueprint()));
         int detailButtonW = 58;
         buildButton = add(new WrightsButton(detailX + detailW - 120, bottom, detailButtonW, 18, Component.translatable("menu.wrights.build"), button -> build()));
-        addRenderableWidget(new WrightsButton(detailX + detailW - detailButtonW, bottom, detailButtonW, 18, Component.translatable("menu.wrights.close"), button -> onClose()));
+        closeButton = add(new WrightsButton(detailX + detailW - detailButtonW, bottom, detailButtonW, 18, Component.translatable("menu.wrights.close"), button -> onClose()));
         renameButton = add(new WrightsButton(detailX + Math.max(48, detailW - 78), detailSplit + 52, 74, 14, Component.translatable("menu.wrights.rename"), button -> rename()));
         materialsButton = add(new WrightsButton(detailX + 4, detailSplit + 72, Math.max(40, detailW - 8), 16, Component.translatable("menu.wrights.materials"), button -> openMaterials()));
         stopButton = add(new WrightsButton(detailX + 4, detailSplit + 92, Math.max(40, detailW - 8), 16, Component.translatable("menu.wrights.stop"), button -> {
@@ -514,6 +515,7 @@ public class WrightsMenuScreen extends Screen {
         }
         boolean capture = WrightsClientState.mode == WrightsClientState.Mode.CAPTURE;
         boolean building = !options && !jobsPage && !infoPage && !managePage && !mirrorPage;
+        placeClose(building);
         search.setX(listX);
         search.setY(searchY);
         int sortW = sortButton == null ? 0 : sortButton.getWidth();
@@ -640,15 +642,15 @@ public class WrightsMenuScreen extends Screen {
         if (mirrorPage && !options && !jobsPage && !infoPage && !managePage) {
             int x = listX - 2;
             int width = panelX + panelW - 12 - x;
-            WrightsUi.inset(graphics, x, panelY + 34, width, panelH - 48);
+            int top = panelY + 34;
+            WrightsUi.inset(graphics, x, top, width, wideCardBottom() - top);
             return;
         }
         if (options || jobsPage || infoPage || managePage) {
             int x = listX - 2;
             int width = panelX + panelW - 12 - x;
             int top = jobsPage ? jobsInsetY() : panelY + 34;
-            int height = jobsPage ? jobsInsetH() : panelH - 68;
-            WrightsUi.inset(graphics, x, top, width, height);
+            WrightsUi.inset(graphics, x, top, width, wideCardBottom() - top);
             return;
         }
         WrightsUi.inset(graphics, listX - 2, listY - 2, listW + 4, listH + 4);
@@ -1452,6 +1454,7 @@ public class WrightsMenuScreen extends Screen {
     private int mirrorSettingsY;
     private int mirrorAllY;
     private int mirrorShapesY;
+    private int mirrorReplaceY = -1;
     private int mirrorOnY;
     private int mirrorClearY;
     private int mirrorBodyX;
@@ -1502,6 +1505,12 @@ public class WrightsMenuScreen extends Screen {
         mirrorShapesY = y;
         drawMirrorToggle(graphics, mouseX, mouseY, x, y, WrightsClientConfig.MIRROR_SHAPES.get(), "menu.wrights.mirror_shapes", "menu.wrights.mirror_shapes_hint", true);
         y += 16;
+        mirrorReplaceY = -1;
+        if (WrightsClientConfig.mirrorBlocks()) {
+            mirrorReplaceY = y;
+            drawMirrorToggle(graphics, mouseX, mouseY, x, y, WrightsClientConfig.mirrorReplace(), "menu.wrights.mirror_replace", "menu.wrights.mirror_replace_hint", true);
+            y += 16;
+        }
         mirrorOnY = y;
         drawMirrorToggle(graphics, mouseX, mouseY, x, y, WrightsClientConfig.MIRROR_ON.get(), "menu.wrights.mirror_on", "menu.wrights.mirror_on_hint", true);
         y += 22;
@@ -1641,6 +1650,10 @@ public class WrightsMenuScreen extends Screen {
         }
         if (hitMirrorToggle(mouseX, mouseY, x, mirrorShapesY, "menu.wrights.mirror_shapes")) {
             WrightsClientConfig.setMirrorShapes(!WrightsClientConfig.MIRROR_SHAPES.get());
+            return true;
+        }
+        if (mirrorReplaceY >= 0 && hitMirrorToggle(mouseX, mouseY, x, mirrorReplaceY, "menu.wrights.mirror_replace")) {
+            WrightsClientConfig.setMirrorReplace(!WrightsClientConfig.mirrorReplace());
             return true;
         }
         if (hitMirrorToggle(mouseX, mouseY, x, mirrorOnY, "menu.wrights.mirror_on")) {
@@ -2070,6 +2083,9 @@ public class WrightsMenuScreen extends Screen {
             return super.mouseClicked(mouseX, mouseY, button);
         }
         if (mirrorPage && buildingPage()) {
+            if (overWidget(mouseX, mouseY)) {
+                return super.mouseClicked(mouseX, mouseY, button);
+            }
             if (button == 0) {
                 clickMirror(mouseX, mouseY);
             }
@@ -2381,6 +2397,26 @@ public class WrightsMenuScreen extends Screen {
     private static final int ACT_MANAGE = -1;
     private static final int ACT_MARK = -2;
     private int jobStride = JOB_BODY + JOB_CREW + JOB_BUTTON + 6;
+
+    /** Bottom of the full-width page card, with room for Close inside it. */
+    private int wideCardBottom() {
+        return panelY + panelH - 6;
+    }
+
+    private void placeClose(boolean blueprintPage) {
+        if (closeButton == null) {
+            return;
+        }
+        closeButton.visible = true;
+        if (blueprintPage) {
+            closeButton.setX(detailX + detailW - closeButton.getWidth());
+            closeButton.setY(panelY + panelH - 26);
+            return;
+        }
+        int right = panelX + panelW - 12;
+        closeButton.setX(right - 10 - closeButton.getWidth());
+        closeButton.setY(wideCardBottom() - 8 - closeButton.getHeight());
+    }
 
     private int jobsInsetY() {
         return panelY + 38;
@@ -3908,7 +3944,7 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private int manageH() {
-        return panelH - 68;
+        return Math.max(80, wideCardBottom() - 8 - 18 - 8 - manageY());
     }
 
     private int portBarX() {
