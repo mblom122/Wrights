@@ -181,10 +181,12 @@ public final class Ae2DigitalAccess implements DigitalAccess {
         if ((accepted != null && now < accepted) || PENDING.containsKey(craftKey)) {
             return true;
         }
+        // A player source reads getAvailableStacks(), which is empty while a terminal is
+        // already listing the network. The cache is the stock the terminal is showing.
         IActionSource src = IActionSource.ofPlayer(player);
         Future<ICraftingPlan> future = grid.getCraftingService().beginCraftingCalculation(
                 level,
-                () -> src,
+                IActionSource::empty,
                 key,
                 amount,
                 CalculationStrategy.CRAFT_LESS);
@@ -278,7 +280,7 @@ public final class Ae2DigitalAccess implements DigitalAccess {
             tell(server, player, craft, "message.wrights.digital_craft_blocked", stack.getHoverName());
         } else if (shortStock) {
             tell(server, player, craft, "message.wrights.digital_craft_materials", stack.getHoverName());
-        } else if (noCpu) {
+        } else if (noCpu || grid.getCraftingService().getCpus().isEmpty()) {
             tell(server, player, craft, "message.wrights.digital_craft_cpu", stack.getHoverName());
         } else {
             tell(server, player, craft, "message.wrights.digital_craft_failed");
