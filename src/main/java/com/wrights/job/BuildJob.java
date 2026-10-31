@@ -269,6 +269,15 @@ public final class BuildJob {
         this.queued = queued;
     }
 
+    /** Missing blocks wait for items instead of being skipped. The build stays queued while this is on. */
+    public boolean deferSupplies() {
+        return deferSupplies;
+    }
+
+    public void setDeferSupplies(boolean deferSupplies) {
+        this.deferSupplies = deferSupplies;
+    }
+
     /** Keeps the largest crew this job was given, so a later resume can refill it. */
     public boolean rememberCrewQuota(int count) {
         if (count > crewQuota) {
@@ -509,6 +518,8 @@ public final class BuildJob {
     private int crewQuota;
     /** Waiting for wrights. It only accepts homes that can reach the build. */
     private boolean queued;
+    /** Survival queue: place blocks as items arrive, and keep the queued ghost until the job ends. */
+    private boolean deferSupplies;
     private boolean finished;
     private boolean stopped;
     private boolean undone;
@@ -709,6 +720,7 @@ public final class BuildJob {
         paused = false;
         awaitDrones = false;
         queued = false;
+        deferSupplies = false;
         cursor = 0;
         pasteProbe = 0;
         placed = 0;
@@ -867,6 +879,7 @@ public final class BuildJob {
         tag.putBoolean("awaitDrones", awaitDrones);
         tag.putInt("crewQuota", crewQuota);
         tag.putBoolean("queued", queued);
+        tag.putBoolean("deferSupplies", deferSupplies);
         tag.putBoolean("finished", finished);
         tag.putBoolean("stopped", stopped);
         tag.putBoolean("undone", undone);
@@ -1014,6 +1027,7 @@ public final class BuildJob {
         job.awaitDrones = tag.getBoolean("awaitDrones");
         job.crewQuota = Math.max(0, tag.getInt("crewQuota"));
         job.queued = tag.getBoolean("queued");
+        job.deferSupplies = tag.getBoolean("deferSupplies");
         job.finished = tag.getBoolean("finished");
         job.stopped = tag.getBoolean("stopped");
         job.undone = tag.getBoolean("undone");

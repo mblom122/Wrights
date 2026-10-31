@@ -1095,7 +1095,8 @@ public final class BlueprintActions {
             library.putSchematic(snapshot);
             buildSchematicId = snapshot.id();
         }
-        if (!JobManager.startBlueprintBuild(player, buildSchematicId, origin, sx, sy, sz, drones, placeFluids, voidBlocks, voidFluids, voidNbt, playerFirst, queue) && snapshot != null) {
+        boolean deferSupplies = force && queue && !player.getAbilities().instabuild && !player.isSpectator();
+        if (!JobManager.startBlueprintBuild(player, buildSchematicId, origin, sx, sy, sz, drones, placeFluids, voidBlocks, voidFluids, voidNbt, playerFirst, queue, deferSupplies) && snapshot != null) {
             library.removeSchematic(snapshot.id());
         }
         BlueprintNetwork.syncLibrary(player);

@@ -599,6 +599,10 @@ public final class JobManager {
     }
 
     public static boolean startBlueprintBuild(ServerPlayer player, UUID schematicId, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean supplyPlayerFirst, boolean queue) {
+        return startBlueprintBuild(player, schematicId, origin, sizeX, sizeY, sizeZ, drones, placeFluids, voidBlocks, voidFluids, voidNbt, supplyPlayerFirst, queue, false);
+    }
+
+    public static boolean startBlueprintBuild(ServerPlayer player, UUID schematicId, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean supplyPlayerFirst, boolean queue, boolean deferSupplies) {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         Schematic schematic = library.schematic(schematicId).orElse(null);
         if (schematic == null || schematic.blockCount() == 0) {
@@ -632,6 +636,9 @@ public final class JobManager {
             }
             job.setCrewQuota(wanted);
             job.setQueued(true);
+            if (deferSupplies) {
+                job.setDeferSupplies(true);
+            }
             library.addJob(job);
             Messages.actionBar(player, "message.wrights.queued", wanted);
             BlueprintNetwork.showJobHologram(player, job, schematic);
@@ -641,7 +648,20 @@ public final class JobManager {
         if (!instant(player) && !assignCrew(player, job, schematic, drones)) {
             return false;
         }
+        if (deferSupplies && !instant(player)) {
+            job.setDeferSupplies(true);
+            job.setQueued(true);
+            if (job.crewQuota() <= 0) {
+                job.setCrewQuota(Math.max(1, job.hands().size()));
+            }
+        }
         library.addJob(job);
+        if (job.deferSupplies()) {
+            Messages.actionBar(player, "message.wrights.queued", Math.max(1, job.crewQuota()));
+            BlueprintNetwork.showJobHologram(player, job, schematic);
+            BlueprintNetwork.syncJobs(player);
+            return true;
+        }
         if (player.level() instanceof ServerLevel level && !instant(player) && !job.hasCrew()) {
             ensureDrone(level, player, job, origin);
         }
@@ -1788,7 +1808,7 @@ public final class JobManager {
             }
             library.setDirty();
         }
-        if (job.queued() && job.hasCrew() && job.crewUnits().size() >= quota) {
+        if (job.queued() && !job.deferSupplies() && job.hasCrew() && job.crewUnits().size() >= quota) {
             job.setQueued(false);
             library.setDirty();
             Messages.actionBar(player, "message.wrights.queue_ready", job.crewUnits().size());
@@ -3392,6 +3412,9 @@ public final class JobManager {
             return PlaceResult.DONE;
         } else if (!freePlace(player) && payment != null) {
             if (!hasItem(player, level, job, payment)) {
+                if (job.deferSupplies()) {
+                    return PlaceResult.WAIT;
+                }
                 if (job.supplyPos() != null && supply(level, player, job) == null && job.tickMessage()) {
                     Messages.actionBar(player, "message.wrights.supply_missing");
                 }

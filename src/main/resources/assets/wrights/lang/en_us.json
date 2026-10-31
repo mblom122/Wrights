@@ -267,6 +267,7 @@
   "menu.wrights.supply_order_chest_hint": "A bound chest is used first. Your inventory fills in what the chest does not have.",
   "menu.wrights.build_anyway": "Build anyway",
   "menu.wrights.need_hint": "Short items are listed first, then items you already have. Build anyway places what you have.",
+  "menu.wrights.need_hint_queue": "Build anyway queues the build. Wrights place blocks as the items arrive.",
   "menu.wrights.build_speed_locked": "Survival always uses wrights.",
   "menu.wrights.instant": "Instant",
   "menu.wrights.drone_pace": "Wright",

@@ -14,6 +14,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.neoforged.neoforge.network.PacketDistributor;
 
+import com.wrights.WrightsClientConfig;
 import com.wrights.network.BlueprintPayloads;
 
 public class MaterialsScreen extends Screen {
@@ -122,7 +123,8 @@ public class MaterialsScreen extends Screen {
         Component title = Component.translatable(shortage ? "menu.wrights.need_title" : "menu.wrights.materials_title");
         graphics.drawString(this.font, title, panelX + 14, panelY + 8, WrightsUi.COPPER, false);
         boolean creative = this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild && !this.minecraft.player.isSpectator();
-        String hintKey = creative ? "menu.wrights.materials_creative" : shortage ? "menu.wrights.need_hint" : digitalBound ? "menu.wrights.materials_hint_digital" : "menu.wrights.materials_hint";
+        boolean queue = WrightsClientConfig.QUEUE_JOBS.get();
+        String hintKey = creative ? "menu.wrights.materials_creative" : shortage ? (queue ? "menu.wrights.need_hint_queue" : "menu.wrights.need_hint") : digitalBound ? "menu.wrights.materials_hint_digital" : "menu.wrights.materials_hint";
         Component hint = Component.translatable(hintKey);
         graphics.drawString(this.font, this.font.plainSubstrByWidth(hint.getString(), panelW - 28), panelX + 14, panelY + 20, WrightsUi.MUTED, false);
         if (!loaded) {
