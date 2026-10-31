@@ -61,7 +61,7 @@ public final class WrightsHud {
                 if (WrightsClientState.hasBox()) {
                     line = volumeLine();
                     sub = Component.translatable("hud.wrights.shape_open");
-                    note = Component.translatable("hud.wrights.shape_again");
+                    note = Component.translatable("hud.wrights.resize_side");
                 } else {
                     line = Component.translatable("hud.wrights.box_idle");
                     sub = Component.translatable("hud.wrights.mode_how");
@@ -75,7 +75,7 @@ public final class WrightsHud {
             } else {
                 line = volumeLine();
                 sub = Component.translatable("hud.wrights.shape_open");
-                note = Component.translatable("hud.wrights.shape_again");
+                note = Component.translatable("hud.wrights.resize_side");
             }
         } else if (WrightsClientState.mode == WrightsClientState.Mode.SAVING) {
             line = Component.translatable("hud.wrights.saving", WrightsClientState.name);
