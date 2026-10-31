@@ -200,9 +200,10 @@ public final class SelectionRenderer {
         AABB border = new AABB(anchor).inflate(0.02D);
         java.util.List<AABB> slabs = faceMode ? java.util.List.of(faceSlab(border, face)) : mirrorSlabs(anchor, face, axes);
         VertexConsumer fill = buffers.getBuffer(RenderType.debugFilledBox());
+        float alpha = faceMode ? 0.19F + (pulse - 0.10F) / 0.90F * 0.46F : 0.18F + 0.10F * pulse;
         for (AABB slab : slabs) {
             AABB local = slab.move(-camera.x, -camera.y, -camera.z);
-            LevelRenderer.addChainedFilledBoxVertices(pose, fill, local.minX, local.minY, local.minZ, local.maxX, local.maxY, local.maxZ, 0.35F, 0.78F, 0.74F, 0.18F + 0.10F * pulse);
+            LevelRenderer.addChainedFilledBoxVertices(pose, fill, local.minX, local.minY, local.minZ, local.maxX, local.maxY, local.maxZ, 0.35F, 0.78F, 0.74F, alpha);
         }
         buffers.endBatch(RenderType.debugFilledBox());
         VertexConsumer lines = buffers.getBuffer(RenderType.lines());
