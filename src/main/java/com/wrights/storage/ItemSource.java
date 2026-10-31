@@ -196,6 +196,36 @@ public final class ItemSource {
         DigitalNetworks.extract(player, level, link, item, 1L);
     }
 
+    /**
+     * A placed wrightport never draws on a player inventory. Its chest, then the shared digital store.
+     */
+    public static boolean hasForPort(ServerPlayer player, ServerLevel level, Item item, Container chest, DigitalLink link) {
+        if (player.getAbilities().instabuild) {
+            return true;
+        }
+        if (chest != null && holds(chest, item)) {
+            return true;
+        }
+        if (DigitalNetworks.count(level, link, item) > 0L) {
+            return true;
+        }
+        if (DigitalNetworks.craftable(level, link, item)) {
+            DigitalNetworks.requestCraft(player, level, link, item, 1L);
+        }
+        return false;
+    }
+
+    public static void consumeForPort(ServerPlayer player, ServerLevel level, Item item, Container chest, DigitalLink link) {
+        if (player.getAbilities().instabuild) {
+            return;
+        }
+        if (chest != null && takeOne(chest, item)) {
+            chest.setChanged();
+            return;
+        }
+        DigitalNetworks.extract(player, level, link, item, 1L);
+    }
+
     public static long jobSupplyCount(ServerPlayer player, ServerLevel level, Container chest, DigitalLink link, Item item) {
         long total = 0L;
         if (chest != null) {

@@ -83,6 +83,8 @@ public final class WrightsClientState {
     public static boolean concealed;
     public static boolean follow;
     public static boolean bindSupply;
+    /** Placed wrightport waiting for a chest click. Null when not binding. */
+    public static BlockPos bindPort;
     public static boolean supplyBound;
     public static BlockPos supplyPos;
     public static long supplyHighlightUntil;
@@ -470,6 +472,7 @@ public final class WrightsClientState {
         CaptureStyle[] styles = CaptureStyle.values();
         captureStyle = styles[Math.max(0, Math.min(styles.length - 1, style))];
         resumeSent = false;
+        bindPort = null;
         updateFlags();
     }
 
@@ -1151,6 +1154,19 @@ public final class WrightsClientState {
         }
         int step = alt ? 64 : shift ? 16 : 1;
         return Mth.clamp(current + Integer.signum(direction) * step, min, max);
+    }
+
+    public static void beginPortChest(BlockPos port) {
+        bindPort = port == null ? null : port.immutable();
+    }
+
+    public static void finishPortChest(BlockPos chest) {
+        if (bindPort == null || chest == null) {
+            bindPort = null;
+            return;
+        }
+        PacketDistributor.sendToServer(new BlueprintPayloads.BindPortChest(bindPort, chest, false));
+        bindPort = null;
     }
 
     public static void finishSupplyBind(BlockPos pos) {

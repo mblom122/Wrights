@@ -1075,6 +1075,8 @@ public final class BuildJob {
         public boolean idle;
         /** This tick the only work left is a block another wright has to place first. Not saved. */
         public boolean waitingOnOthers;
+        /** Home because every block it can reach needs an item its supply does not have. Not saved. */
+        public boolean awaitingItems;
         public UUID entityId;
         public BlockPos lastPos;
         /** Null = personal wrightport (player back). Set = placed wrightport block. */

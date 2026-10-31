@@ -130,6 +130,22 @@ public final class WrightsInput {
         if (!event.getLevel().isClientSide()) {
             return;
         }
+        if (WrightsClientState.bindPort != null && Minecraft.getInstance().screen == null) {
+            event.setCanceled(true);
+            event.setUseBlock(TriState.FALSE);
+            event.setUseItem(TriState.FALSE);
+            if (event.getEntity().isShiftKeyDown()) {
+                WrightsClientState.bindPort = null;
+                event.getEntity().displayClientMessage(net.minecraft.network.chat.Component.translatable("message.wrights.port_chest_cancel"), true);
+                return;
+            }
+            if (SelectionRenderer.isSupplyContainer(event.getLevel(), event.getPos())) {
+                WrightsClientState.finishPortChest(event.getPos());
+            } else {
+                event.getEntity().displayClientMessage(net.minecraft.network.chat.Component.translatable("message.wrights.supply_not_container"), true);
+            }
+            return;
+        }
         if (!com.wrights.item.ControllerItem.isHeld(event.getEntity())) {
             return;
         }
@@ -176,6 +192,14 @@ public final class WrightsInput {
     @SubscribeEvent
     public static void onItem(PlayerInteractEvent.RightClickItem event) {
         if (!event.getLevel().isClientSide()) {
+            return;
+        }
+        if (WrightsClientState.bindPort != null && Minecraft.getInstance().screen == null) {
+            event.setCanceled(true);
+            if (event.getEntity().isShiftKeyDown()) {
+                WrightsClientState.bindPort = null;
+                event.getEntity().displayClientMessage(net.minecraft.network.chat.Component.translatable("message.wrights.port_chest_cancel"), true);
+            }
             return;
         }
         if (!com.wrights.item.ControllerItem.isHeld(event.getEntity())) {

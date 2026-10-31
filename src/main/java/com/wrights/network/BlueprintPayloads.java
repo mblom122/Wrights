@@ -1274,6 +1274,22 @@ public final class BlueprintPayloads {
         }
     }
 
+    public record BindPortChest(BlockPos port, BlockPos chest, boolean clear) implements CustomPacketPayload {
+        public static final Type<BindPortChest> TYPE = payloadType("bind_port_chest");
+        public static final StreamCodec<RegistryFriendlyByteBuf, BindPortChest> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeBlockPos(value.port);
+                    buf.writeBlockPos(value.chest);
+                    buf.writeBoolean(value.clear);
+                },
+                buf -> new BindPortChest(buf.readBlockPos(), buf.readBlockPos(), buf.readBoolean()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public record BindSupply(BlockPos pos, boolean clear) implements CustomPacketPayload {
         public static final Type<BindSupply> TYPE = payloadType("bind_supply");
         public static final StreamCodec<RegistryFriendlyByteBuf, BindSupply> STREAM_CODEC = StreamCodec.of(

@@ -7,6 +7,7 @@ import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.Connection;
 import net.minecraft.network.chat.Component;
@@ -48,6 +49,8 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
     private String ownerName = "";
     /** Short name chosen for this port. Blank keeps the plain Wrightport label. */
     private String label = "";
+    /** Container this port's wrights may pull from. It has to stay inside the port boundary. */
+    private BlockPos supplyChest;
 
     public WrightportBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.WRIGHTPORT.get(), pos, state);
@@ -98,6 +101,16 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
 
     public String label() {
         return label == null ? "" : label;
+    }
+
+    public BlockPos supplyChest() {
+        return supplyChest;
+    }
+
+    public void setSupplyChest(BlockPos pos) {
+        this.supplyChest = pos == null ? null : pos.immutable();
+        setChanged();
+        sync();
     }
 
     public void setLabel(String name) {
@@ -247,6 +260,9 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
         if (!label().isBlank()) {
             tag.putString("Label", label());
         }
+        if (supplyChest != null) {
+            tag.put("SupplyChest", NbtUtils.writeBlockPos(supplyChest));
+        }
     }
 
     @Override
@@ -265,6 +281,7 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
             ownerName = tag.getString("OwnerName");
         }
         label = tag.contains("Label") ? cleanLabel(tag.getString("Label")) : "";
+        supplyChest = tag.contains("SupplyChest") ? NbtUtils.readBlockPos(tag, "SupplyChest").orElse(null) : null;
     }
 
     @Override

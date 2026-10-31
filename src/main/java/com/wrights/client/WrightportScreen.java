@@ -22,6 +22,7 @@ import com.wrights.network.BlueprintPayloads;
 public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> implements ManageHost {
     private final WrightManagePanel manage = new WrightManagePanel();
     private WrightsButton boundaryButton;
+    private WrightsButton chestButton;
     private EditBox nameBox;
     private String sentName = "";
 
@@ -45,6 +46,15 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
             }
         });
         addRenderableWidget(boundaryButton);
+        chestButton = new WrightsButton(0, 0, 88, 16, Component.translatable("screen.wrights.port_chest"), button -> {
+            if (getMinecraft().player != null && net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
+                PacketDistributor.sendToServer(new BlueprintPayloads.BindPortChest(menu.pos(), net.minecraft.core.BlockPos.ZERO, true));
+                return;
+            }
+            WrightsClientState.beginPortChest(menu.pos());
+            getMinecraft().setScreen(null);
+        });
+        addRenderableWidget(chestButton);
         nameBox = new EditBox(this.font, 0, 0, 140, 16, Component.translatable("screen.wrights.name"));
         nameBox.setMaxLength(32);
         nameBox.setHint(Component.translatable("screen.wrights.name"));
@@ -107,7 +117,7 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
             graphics.drawString(this.font, title, leftPos + 12, topPos + 12, WrightsUi.TEXT, false);
         }
         Component owner = port.ownerLabel();
-        int limit = imageWidth - 24;
+        int limit = imageWidth - 24 - (chestButton != null && chestButton.visible ? chestButton.getWidth() + 8 : 0);
         graphics.drawString(this.font, this.font.plainSubstrByWidth(owner.getString(), Math.max(24, limit)), leftPos + 12, topPos + 28, WrightsUi.MUTED, false);
     }
 
@@ -118,6 +128,16 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         boundaryButton.setX(leftPos + imageWidth - 16 - boundaryButton.getWidth());
         boundaryButton.setY(topPos + 8);
         boundaryButton.setPicked(WrightportBounds.showing(menu.pos()));
+        if (chestButton != null) {
+            boolean mine = canRename();
+            chestButton.setShown(mine);
+            chestButton.setX(boundaryButton.getX());
+            chestButton.setY(boundaryButton.getY() + 18);
+            boolean bound = getMinecraft().level != null
+                    && getMinecraft().level.getBlockEntity(menu.pos()) instanceof WrightportBlockEntity port
+                    && port.supplyChest() != null;
+            chestButton.setPicked(bound);
+        }
     }
 
     @Override

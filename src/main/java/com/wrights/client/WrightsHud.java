@@ -38,7 +38,10 @@ public final class WrightsHud {
         Component sub = null;
         Component note = null;
         Component task = taskLine();
-        if (WrightsClientState.mode == WrightsClientState.Mode.CAPTURE) {
+        if (WrightsClientState.bindPort != null) {
+            line = Component.translatable("hud.wrights.port_chest");
+            sub = Component.translatable("hud.wrights.port_chest_sub");
+        } else if (WrightsClientState.mode == WrightsClientState.Mode.CAPTURE) {
             boolean box = WrightsClientState.captureStyle == WrightsClientState.CaptureStyle.BOX;
             boolean move = WrightsClientState.captureStyle == WrightsClientState.CaptureStyle.MOVE;
             if (move && WrightsClientState.moveGrabbed && WrightsClientState.hasBox()) {

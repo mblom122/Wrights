@@ -106,6 +106,7 @@ public final class JobManager {
                 library.setDirty();
             }
         }
+        lendStocked(server, library);
         if (server.getTickCount() % 10 == 0) {
             java.util.Set<java.util.UUID> owners = new java.util.HashSet<>();
             for (BuildJob job : library.jobs()) {
@@ -317,6 +318,35 @@ public final class JobManager {
         library.setSupply(player.getUUID(), net.minecraft.core.GlobalPos.of(level.dimension(), pos));
         BlueprintNetwork.syncSupply(player);
         Messages.actionBar(player, "message.wrights.supply_chest");
+    }
+
+    /** Each placed wrightport keeps its own chest, and that chest has to sit inside the port boundary. */
+    public static void bindPortChest(ServerPlayer player, BlockPos portPos, BlockPos chestPos, boolean clear) {
+        if (!(player.level() instanceof ServerLevel level)) {
+            return;
+        }
+        if (portPos == null || !(level.getBlockEntity(portPos) instanceof com.wrights.block.WrightportBlockEntity port)) {
+            return;
+        }
+        if (port.owner() != null && !port.owner().equals(player.getUUID())) {
+            Messages.actionBar(player, "message.wrights.port_chest_owner");
+            return;
+        }
+        if (clear || chestPos == null) {
+            port.setSupplyChest(null);
+            Messages.actionBar(player, "message.wrights.port_chest_cleared");
+            return;
+        }
+        if (!level.mayInteract(player, chestPos) || containerAt(level, chestPos) == null) {
+            Messages.actionBar(player, "message.wrights.supply_not_container");
+            return;
+        }
+        if (!com.wrights.drone.WrightHomes.portCovers(level.dimension(), portPos, level.dimension(), chestPos)) {
+            Messages.actionBar(player, "message.wrights.port_chest_far");
+            return;
+        }
+        port.setSupplyChest(chestPos);
+        Messages.actionBar(player, "message.wrights.port_chest_bound");
     }
 
     private static void archive(SchematicLibrary library, BuildJob job, boolean stopped) {
@@ -976,9 +1006,15 @@ public final class JobManager {
             return;
         }
         job.workedTick();
-        int at = nextSolo(level, schematic, job);
+        int at = nextSolo(level, player, schematic, job);
         if (at == SUPPORT_WAIT) {
             job.setWaitKind(BuildJob.WAIT_FLOOR);
+            library.setDirty();
+            return;
+        }
+        if (at == NEED_ITEMS) {
+            job.setWaitKind(BuildJob.WAIT_ITEMS);
+            parkSolo(level, player, job);
             library.setDirty();
             return;
         }
@@ -1006,9 +1042,14 @@ public final class JobManager {
         }
         int budget = WrightsConfig.BLOCKS_PER_TICK.getAsInt();
         for (int i = 0; i < budget; i++) {
-            int index = i == 0 ? at : nextSolo(level, schematic, job);
+            int index = i == 0 ? at : nextSolo(level, player, schematic, job);
             if (index == SUPPORT_WAIT) {
                 job.setWaitKind(BuildJob.WAIT_FLOOR);
+                break;
+            }
+            if (index == NEED_ITEMS) {
+                job.setWaitKind(BuildJob.WAIT_ITEMS);
+                parkSolo(level, player, job);
                 break;
             }
             if (index < 0) {
@@ -1442,6 +1483,8 @@ public final class JobManager {
 
     /** A falling block is not ready yet, so the wright should keep working and come back. */
     private static final int SUPPORT_WAIT = -3;
+    /** Every block this wright can reach needs an item its supply does not have yet. */
+    private static final int NEED_ITEMS = -4;
 
     private static boolean instant(ServerPlayer player) {
         if (!player.getAbilities().instabuild || player.isSpectator()) {
@@ -1780,10 +1823,24 @@ public final class JobManager {
             ids.add(id);
         }
         int need = quota - ids.size();
+        Owed owed = null;
+        if (need > 0 && level != null && job.schematicId() != null) {
+            Schematic schematic = library.schematic(job.schematicId()).orElse(null);
+            if (schematic != null) {
+                owed = owed(level, schematic, job);
+                if (owed.idle() && ids.isEmpty()) {
+                    finishPaste(player.getServer(), library, player, job);
+                    return;
+                }
+            }
+        }
         if (need > 0 && level != null) {
-            for (WrightHomes.FreeWright free : freeUnits(player, library, job, need)) {
+            for (WrightHomes.FreeWright free : freeUnits(player, library, job, Integer.MAX_VALUE)) {
                 UUID id = free.unit().id();
                 if (ids.contains(id) || !coversJob(player, job, free.homePort())) {
+                    continue;
+                }
+                if (owed != null && !owed.allows(player, level, job, free.homePort())) {
                     continue;
                 }
                 ids.add(id);
@@ -2316,21 +2373,30 @@ public final class JobManager {
                 continue;
             }
             hand.waitingOnOthers = false;
-            int index = nextWork(level, schematic, job, hand, skipBudget);
+            int index = nextWork(level, player, schematic, job, hand, skipBudget);
             if (index == -2) {
                 scanning = true;
                 continue;
             }
             if (index == SUPPORT_WAIT) {
                 waiting = true;
+                hand.awaitingItems = false;
                 hand.waitingOnOthers = true;
                 hand.idle = false;
                 continue;
             }
+            if (index == NEED_ITEMS) {
+                waiting = true;
+                waitingItems = true;
+                parkForItems(level, player, hand);
+                continue;
+            }
             if (index < 0) {
+                hand.awaitingItems = false;
                 hand.idle = true;
                 continue;
             }
+            hand.awaitingItems = false;
             hand.idle = false;
             working = true;
             Schematic.Entry next = schematic.entry(index);
@@ -2351,7 +2417,7 @@ public final class JobManager {
             }
             int budget = placeBudget(hand);
             for (int n = 0; n < budget; n++) {
-                int at = nextWork(level, schematic, job, hand, skipBudget);
+                int at = nextWork(level, player, schematic, job, hand, skipBudget);
                 if (at == -2) {
                     scanning = true;
                     break;
@@ -2359,6 +2425,12 @@ public final class JobManager {
                 if (at == SUPPORT_WAIT) {
                     waiting = true;
                     hand.waitingOnOthers = true;
+                    break;
+                }
+                if (at == NEED_ITEMS) {
+                    waiting = true;
+                    waitingItems = true;
+                    parkForItems(level, player, hand);
                     break;
                 }
                 if (at < 0) {
@@ -2378,7 +2450,7 @@ public final class JobManager {
                     job.advance();
                     continue;
                 }
-                PlaceResult placed = placeOne(level, player, job, pos, entry, false);
+                PlaceResult placed = placeOne(level, player, job, pos, entry, false, hand);
                 if (placed == PlaceResult.PAUSE) {
                     job.setWaitKind(BuildJob.WAIT_CHUNK);
                     waitingChunk = true;
@@ -2402,9 +2474,12 @@ public final class JobManager {
         parkWaiters(level, player, job, working);
         if (!working && !scanning) {
             for (BuildJob.Hand hand : job.hands()) {
-                int peek = nextInLane(level, schematic, job, hand);
+                int peek = nextInLane(level, player, schematic, job, hand);
                 if (peek == SUPPORT_WAIT) {
                     waiting = true;
+                } else if (peek == NEED_ITEMS) {
+                    waiting = true;
+                    waitingItems = true;
                 } else if (peek >= 0) {
                     working = true;
                     break;
@@ -2545,12 +2620,12 @@ public final class JobManager {
         return level.getBlockState(pos).equals(entry.state());
     }
 
-    private static int nextWork(ServerLevel level, Schematic schematic, BuildJob job, BuildJob.Hand hand, int[] budget) {
+    private static int nextWork(ServerLevel level, ServerPlayer player, Schematic schematic, BuildJob job, BuildJob.Hand hand, int[] budget) {
         int seen = -1;
         while (budget[0] > 0) {
-            int index = nextInLane(level, schematic, job, hand);
-            if (index == SUPPORT_WAIT) {
-                return SUPPORT_WAIT;
+            int index = nextInLane(level, player, schematic, job, hand);
+            if (index == SUPPORT_WAIT || index == NEED_ITEMS) {
+                return index;
             }
             if (index < 0) {
                 hand.rescan = false;
@@ -2583,14 +2658,14 @@ public final class JobManager {
                 job.advance();
             }
         }
-        int rest = nextInLane(level, schematic, job, hand);
-        if (rest == SUPPORT_WAIT) {
-            return SUPPORT_WAIT;
+        int rest = nextInLane(level, player, schematic, job, hand);
+        if (rest == SUPPORT_WAIT || rest == NEED_ITEMS) {
+            return rest;
         }
         return rest < 0 ? -1 : -2;
     }
 
-    private static int nextInLane(ServerLevel level, Schematic schematic, BuildJob job, BuildJob.Hand hand) {
+    private static int nextInLane(ServerLevel level, ServerPlayer player, Schematic schematic, BuildJob job, BuildJob.Hand hand) {
         if (hand.slices.isEmpty()) {
             for (BuildJob.Hand other : job.hands()) {
                 if (!other.slices.isEmpty()) {
@@ -2598,22 +2673,34 @@ public final class JobManager {
                 }
             }
             java.util.function.Predicate<Schematic.Entry> lane = entry -> CrewSplit.lane(entry.x(), entry.y(), entry.z(), hand.lanes, job.spanX(), job.spanY(), job.spanZ()) == hand.lane;
-            int found = scan(level, schematic, job, hand.cursor, hand.probe, lane);
+            int found = scan(level, player, schematic, job, hand, hand.cursor, hand.probe, lane);
             if (found < 0 && Math.max(hand.cursor, hand.probe) > hand.cursor) {
                 hand.probe = hand.cursor;
-                found = scan(level, schematic, job, hand.cursor, hand.cursor, lane);
+                found = prefer(found, scan(level, player, schematic, job, hand, hand.cursor, hand.cursor, lane));
             }
             if (found >= 0) {
                 hand.probe = found;
+                return found;
+            }
+            if (found == NEED_ITEMS || found == SUPPORT_WAIT) {
+                int borrowed = borrowWork(level, player, schematic, job, hand);
+                if (borrowed >= 0) {
+                    return borrowed;
+                }
             }
             return found;
         }
         int best = -1;
         boolean waiting = false;
+        boolean shortItems = false;
         for (BuildJob.Slice slice : hand.slices) {
-            int found = scanSlice(level, schematic, job, slice);
+            int found = scanSlice(level, player, schematic, job, hand, slice);
             if (found == SUPPORT_WAIT) {
                 waiting = true;
+                continue;
+            }
+            if (found == NEED_ITEMS) {
+                shortItems = true;
                 continue;
             }
             if (found >= 0 && (best < 0 || found < best)) {
@@ -2623,17 +2710,26 @@ public final class JobManager {
         if (best >= 0) {
             return best;
         }
+        if (waiting || shortItems) {
+            int borrowed = borrowWork(level, player, schematic, job, hand);
+            if (borrowed >= 0) {
+                return borrowed;
+            }
+        }
+        if (shortItems) {
+            return NEED_ITEMS;
+        }
         return waiting ? SUPPORT_WAIT : -1;
     }
 
-    private static int scanSlice(ServerLevel level, Schematic schematic, BuildJob job, BuildJob.Slice slice) {
+    private static int scanSlice(ServerLevel level, ServerPlayer player, Schematic schematic, BuildJob job, BuildJob.Hand hand, BuildJob.Slice slice) {
         int start = Math.max(slice.cursor, slice.probe);
         java.util.function.Predicate<Schematic.Entry> include = entry -> slice.contains(entry.x(), entry.y(), entry.z());
-        int found = scan(level, schematic, job, slice.cursor, start, include);
+        int found = scan(level, player, schematic, job, hand, slice.cursor, start, include);
         // A falling block can sit ahead of the floor it needs. Look back once so that floor is still placed.
-        if ((found == -1 || found == SUPPORT_WAIT) && start > slice.cursor) {
+        if (found < 0 && start > slice.cursor) {
             slice.probe = slice.cursor;
-            found = scan(level, schematic, job, slice.cursor, slice.cursor, include);
+            found = prefer(found, scan(level, player, schematic, job, hand, slice.cursor, slice.cursor, include));
         }
         if (found >= 0) {
             slice.probe = found;
@@ -2641,12 +2737,28 @@ public final class JobManager {
         return found;
     }
 
+    /** A later look that finds a real block wins. A missing item is remembered when the look-back finds nothing else. */
+    private static int prefer(int first, int wrapped) {
+        if (wrapped >= 0) {
+            return wrapped;
+        }
+        if (first == NEED_ITEMS || wrapped == NEED_ITEMS) {
+            return NEED_ITEMS;
+        }
+        if (first == SUPPORT_WAIT || wrapped == SUPPORT_WAIT) {
+            return SUPPORT_WAIT;
+        }
+        return wrapped;
+    }
+
     /**
      * Next block this range can act on. A falling block whose floor is not down yet is left in place,
-     * so the wright can build that floor and wrap back to the sand or gravel.
+     * so the wright can build that floor and wrap back to the sand or gravel. A block this supply cannot
+     * pay for is left in place too, and the scan keeps looking.
      */
-    private static int scan(ServerLevel level, Schematic schematic, BuildJob job, int cursor, int start, java.util.function.Predicate<Schematic.Entry> include) {
+    private static int scan(ServerLevel level, ServerPlayer player, Schematic schematic, BuildJob job, BuildJob.Hand hand, int cursor, int start, java.util.function.Predicate<Schematic.Entry> include) {
         boolean waiting = false;
+        boolean shortItems = false;
         for (int i = Math.max(0, start); i < schematic.blockCount(); i++) {
             Schematic.Entry entry = schematic.entry(i);
             if (!include.test(entry)) {
@@ -2658,13 +2770,74 @@ public final class JobManager {
                 }
                 continue;
             }
-            if (falling(level, schematic, job, entry) == Falling.WAIT) {
+            Falling hold = falling(level, schematic, job, entry);
+            if (hold == Falling.WAIT) {
                 waiting = true;
+                continue;
+            }
+            if (hold != Falling.SKIP && !canPay(player, level, job, hand, entry)) {
+                shortItems = true;
                 continue;
             }
             return i;
         }
+        if (shortItems) {
+            return NEED_ITEMS;
+        }
         return waiting ? SUPPORT_WAIT : -1;
+    }
+
+    /** Another part of this build that this wright can pay for, when its own part is short. */
+    private static int borrowWork(ServerLevel level, ServerPlayer player, Schematic schematic, BuildJob job, BuildJob.Hand hand) {
+        for (int i = 0; i < schematic.blockCount(); i++) {
+            Schematic.Entry entry = schematic.entry(i);
+            if (job.outsideClip(entry) || satisfied(level, job, entry)) {
+                continue;
+            }
+            if (falling(level, schematic, job, entry) != Falling.READY) {
+                continue;
+            }
+            if (!canPay(player, level, job, hand, entry)) {
+                continue;
+            }
+            if (heldByOther(level, player, job, hand, entry)) {
+                continue;
+            }
+            return i;
+        }
+        return -1;
+    }
+
+    private static boolean heldByOther(ServerLevel level, ServerPlayer player, BuildJob job, BuildJob.Hand hand, Schematic.Entry entry) {
+        for (BuildJob.Hand other : job.hands()) {
+            if (other == hand || other.awaitingItems || !ownsEntry(job, other, entry)) {
+                continue;
+            }
+            if (canPay(player, level, job, other, entry)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean ownsEntry(BuildJob job, BuildJob.Hand hand, Schematic.Entry entry) {
+        if (hand.slices.isEmpty()) {
+            return CrewSplit.lane(entry.x(), entry.y(), entry.z(), hand.lanes, job.spanX(), job.spanY(), job.spanZ()) == hand.lane;
+        }
+        for (BuildJob.Slice slice : hand.slices) {
+            if (slice.contains(entry.x(), entry.y(), entry.z())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean canPay(ServerPlayer player, ServerLevel level, BuildJob job, BuildJob.Hand hand, Schematic.Entry entry) {
+        if (entry.secondary() || freePlace(player)) {
+            return true;
+        }
+        Item payment = com.wrights.util.BlockFilters.payment(entry.state());
+        return payment == null || hasItem(player, level, job, hand, payment);
     }
 
     private enum Falling {
@@ -2797,12 +2970,12 @@ public final class JobManager {
         return false;
     }
 
-    private static int nextSolo(ServerLevel level, Schematic schematic, BuildJob job) {
+    private static int nextSolo(ServerLevel level, ServerPlayer player, Schematic schematic, BuildJob job) {
         int start = Math.max(job.cursor(), job.pasteProbe());
-        int found = scan(level, schematic, job, job.cursor(), start, entry -> true);
-        if ((found == -1 || found == SUPPORT_WAIT) && start > job.cursor()) {
+        int found = scan(level, player, schematic, job, null, job.cursor(), start, entry -> true);
+        if (found < 0 && start > job.cursor()) {
             job.setPasteProbe(job.cursor());
-            found = scan(level, schematic, job, job.cursor(), job.cursor(), entry -> true);
+            found = prefer(found, scan(level, player, schematic, job, null, job.cursor(), job.cursor(), entry -> true));
         }
         if (found >= 0) {
             job.setPasteProbe(found);
@@ -3375,6 +3548,10 @@ public final class JobManager {
     }
 
     private static PlaceResult placeOne(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos pos, Schematic.Entry entry, boolean quiet) {
+        return placeOne(level, player, job, pos, entry, quiet, null);
+    }
+
+    private static PlaceResult placeOne(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos pos, Schematic.Entry entry, boolean quiet, BuildJob.Hand hand) {
         if (level.isOutsideBuildHeight(pos)) {
             job.skippedOne();
             return PlaceResult.DONE;
@@ -3427,15 +3604,8 @@ public final class JobManager {
             job.skippedOne();
             return PlaceResult.DONE;
         } else if (!freePlace(player) && payment != null) {
-            if (!hasItem(player, level, job, payment)) {
-                if (job.deferSupplies()) {
-                    return PlaceResult.WAIT;
-                }
-                if (job.supplyPos() != null && supply(level, player, job) == null && job.tickMessage()) {
-                    Messages.actionBar(player, "message.wrights.supply_missing");
-                }
-                job.skippedOne();
-                return PlaceResult.DONE;
+            if (!hasItem(player, level, job, hand, payment)) {
+                return PlaceResult.WAIT;
             }
         }
         if (BlockFilters.falls(state)) {
@@ -3468,7 +3638,7 @@ public final class JobManager {
         }
         boolean paid = !entry.secondary() && !freePlace(player) && payment != null;
         if (paid) {
-            consumeItem(player, level, job, payment);
+            consumeItem(player, level, job, hand, payment);
         }
         applyEntryNbt(level, player, pos, entry);
         job.recordPlaced(entry.x(), entry.y(), entry.z(), after, paid);
@@ -3566,17 +3736,54 @@ public final class JobManager {
     }
 
     private static boolean hasItem(ServerPlayer player, ServerLevel level, BuildJob job, Item item) {
+        return hasItem(player, level, job, null, item);
+    }
+
+    /**
+     * Personal wrights may use the player inventory. A placed port never does: only its own chest, inside its
+     * boundary, and the shared digital store.
+     */
+    private static boolean hasItem(ServerPlayer player, ServerLevel level, BuildJob job, BuildJob.Hand hand, Item item) {
+        com.wrights.storage.DigitalLink link = com.wrights.storage.ItemSource.linkOf(player);
+        if (hand != null && hand.homePort != null) {
+            return com.wrights.storage.ItemSource.hasForPort(player, level, item, portChest(level, hand.homePort), link);
+        }
         Container container = supply(level, player, job);
         boolean playerFirst = job.supplyPos() == null || job.supplyPlayerFirst();
-        com.wrights.storage.DigitalLink link = com.wrights.storage.ItemSource.linkOf(player);
         return com.wrights.storage.ItemSource.hasForJob(player, level, item, container, playerFirst, link);
     }
 
     private static void consumeItem(ServerPlayer player, ServerLevel level, BuildJob job, Item item) {
+        consumeItem(player, level, job, null, item);
+    }
+
+    private static void consumeItem(ServerPlayer player, ServerLevel level, BuildJob job, BuildJob.Hand hand, Item item) {
+        com.wrights.storage.DigitalLink link = com.wrights.storage.ItemSource.linkOf(player);
+        if (hand != null && hand.homePort != null) {
+            com.wrights.storage.ItemSource.consumeForPort(player, level, item, portChest(level, hand.homePort), link);
+            return;
+        }
         Container container = supply(level, player, job);
         boolean playerFirst = job.supplyPos() == null || job.supplyPlayerFirst();
-        com.wrights.storage.DigitalLink link = com.wrights.storage.ItemSource.linkOf(player);
         com.wrights.storage.ItemSource.consumeForJob(player, level, item, container, playerFirst, link);
+    }
+
+    /** The chest bound to this port, when it is still inside that port's chunk square. */
+    private static Container portChest(ServerLevel level, BlockPos portPos) {
+        if (portPos == null || !level.isLoaded(portPos)) {
+            return null;
+        }
+        if (!(level.getBlockEntity(portPos) instanceof com.wrights.block.WrightportBlockEntity port)) {
+            return null;
+        }
+        BlockPos chestPos = port.supplyChest();
+        if (chestPos == null || !level.isLoaded(chestPos)) {
+            return null;
+        }
+        if (!com.wrights.drone.WrightHomes.portCovers(level.dimension(), portPos, level.dimension(), chestPos)) {
+            return null;
+        }
+        return containerAt(level, chestPos);
     }
 
     private static boolean holds(Container container, Item item) {
@@ -4072,6 +4279,195 @@ public final class JobManager {
             return;
         }
         drone.moveTo(work.x, work.y, work.z, player == null ? 0.0F : player.getYRot(), 0.0F);
+    }
+
+    private static void parkForItems(ServerLevel level, ServerPlayer player, BuildJob.Hand hand) {
+        hand.awaitingItems = true;
+        hand.idle = false;
+        hand.waitingOnOthers = false;
+        if (hand.entityId == null) {
+            return;
+        }
+        recall(level, player, hand.entityId, 0, 1, hand.homePort);
+        hand.entityId = null;
+    }
+
+    private static void parkSolo(ServerLevel level, ServerPlayer player, BuildJob job) {
+        if (job.droneId() == null) {
+            return;
+        }
+        recall(level, player, job.droneId(), 0, 1, null);
+        job.setDroneId(null);
+    }
+
+    /**
+     * A wright with nothing left it can pay for on this job can join another build that its supply can continue.
+     */
+    private static void lendStocked(MinecraftServer server, SchematicLibrary library) {
+        if (server.getTickCount() % 20 != 0) {
+            return;
+        }
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            boolean moved = false;
+            for (BuildJob job : new ArrayList<>(library.jobsFor(player.getUUID()))) {
+                if (moved || job.finished() || job.paused() || job.undoing() || job.kind() != BuildJob.Kind.PASTE || !job.hasCrew()) {
+                    continue;
+                }
+                ServerLevel level = server.getLevel(job.dimension());
+                Schematic schematic = job.schematicId() == null ? null : library.schematic(job.schematicId()).orElse(null);
+                if (level == null || schematic == null) {
+                    continue;
+                }
+                List<UUID> units = job.crewUnits();
+                for (int i = 0; i < job.hands().size() && i < units.size(); i++) {
+                    BuildJob.Hand hand = job.hands().get(i);
+                    if (!hand.awaitingItems || hand.entityId != null) {
+                        continue;
+                    }
+                    BuildJob target = lendTarget(server, library, player, job, hand);
+                    if (target == null) {
+                        continue;
+                    }
+                    moveUnit(player, library, job, target, units.get(i));
+                    moved = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    private static BuildJob lendTarget(MinecraftServer server, SchematicLibrary library, ServerPlayer player, BuildJob source, BuildJob.Hand hand) {
+        int cap = WrightsConfig.maxWrightsPerJob();
+        BuildJob best = null;
+        for (BuildJob job : library.jobsFor(player.getUUID())) {
+            if (job == source || job.finished() || job.undoing() || job.kind() != BuildJob.Kind.PASTE) {
+                continue;
+            }
+            if (job.crewUnits().size() >= cap || !coversJob(player, job, hand.homePort)) {
+                continue;
+            }
+            ServerLevel level = server.getLevel(job.dimension());
+            Schematic schematic = job.schematicId() == null ? null : library.schematic(job.schematicId()).orElse(null);
+            if (level == null || schematic == null) {
+                continue;
+            }
+            int room = placeableBlocks(schematic, job);
+            if (job.crewUnits().size() >= Math.min(room, cap)) {
+                continue;
+            }
+            Owed owed = owed(level, schematic, job);
+            if (!owed.allows(player, level, job, hand.homePort)) {
+                continue;
+            }
+            boolean waiting = job.queued() || !job.hasCrew();
+            if (!waiting) {
+                for (BuildJob.Hand other : job.hands()) {
+                    if (other.awaitingItems) {
+                        waiting = true;
+                        break;
+                    }
+                }
+            }
+            if (waiting) {
+                return job;
+            }
+            if (best == null) {
+                best = job;
+            }
+        }
+        return best;
+    }
+
+    private static void moveUnit(ServerPlayer player, SchematicLibrary library, BuildJob source, BuildJob target, UUID unitId) {
+        List<UUID> from = new ArrayList<>(source.crewUnits());
+        from.remove(unitId);
+        int quota = Math.max(source.crewQuota(), from.size() + 1);
+        if (from.isEmpty()) {
+            sendHome(player.getServer(), player, source);
+            source.clearAssigned();
+            source.setCrewQuota(Math.max(1, quota));
+            source.setQueued(true);
+            source.setPaused(false);
+            source.clearHold();
+        } else {
+            placeCrew(player, library, source, from);
+            source.setCrewQuota(Math.max(source.crewQuota(), quota));
+            source.setQueued(true);
+            source.setPaused(false);
+            source.clearHold();
+        }
+        List<UUID> to = new ArrayList<>(target.crewUnits());
+        if (!to.contains(unitId)) {
+            to.add(unitId);
+        }
+        placeCrew(player, library, target, to);
+        target.setPaused(false);
+        target.clearHold();
+        if (target.crewQuota() < target.crewUnits().size()) {
+            target.setCrewQuota(target.crewUnits().size());
+        }
+        library.setDirty();
+    }
+
+    /** What is still unplaced, and whether any of it needs no item. */
+    private static Owed owed(ServerLevel level, Schematic schematic, BuildJob job) {
+        Owed owed = new Owed();
+        int count = Math.min(job.total(), schematic.blockCount());
+        for (int i = 0; i < count; i++) {
+            Schematic.Entry entry = schematic.entry(i);
+            if (job.outsideClip(entry) || satisfied(level, job, entry)) {
+                continue;
+            }
+            if (!level.isLoaded(job.min().offset(entry.x(), entry.y(), entry.z()))) {
+                owed.open = true;
+                continue;
+            }
+            Falling hold = falling(level, schematic, job, entry);
+            if (hold == Falling.WAIT) {
+                owed.pending = true;
+                continue;
+            }
+            if (hold == Falling.SKIP || entry.secondary()) {
+                owed.open = true;
+                continue;
+            }
+            Item payment = com.wrights.util.BlockFilters.payment(entry.state());
+            if (payment == null) {
+                owed.open = true;
+                continue;
+            }
+            if (owed.items.size() < 64 && !owed.items.contains(payment)) {
+                owed.items.add(payment);
+            }
+        }
+        return owed;
+    }
+
+    private static final class Owed {
+        boolean open;
+        boolean pending;
+        final List<Item> items = new ArrayList<>();
+
+        boolean idle() {
+            return !open && !pending && items.isEmpty();
+        }
+
+        boolean allows(ServerPlayer player, ServerLevel level, BuildJob job, BlockPos home) {
+            if (open) {
+                return true;
+            }
+            if (items.isEmpty()) {
+                return false;
+            }
+            BuildJob.Hand hand = new BuildJob.Hand();
+            hand.homePort = home;
+            for (Item item : items) {
+                if (hasItem(player, level, job, hand, item)) {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 
     private static void sendHome(MinecraftServer server, ServerPlayer player, BuildJob job) {
