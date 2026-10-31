@@ -80,11 +80,11 @@ public final class SelectionRenderer {
         boolean adjust = minecraft.screen instanceof BlueprintAdjustScreen;
         boolean gui = minecraft.screen != null;
         boolean capture = WrightsClientState.mode == WrightsClientState.Mode.CAPTURE || WrightsClientState.mode == WrightsClientState.Mode.SAVING;
-        if (!capture) {
-            drawActiveBuilds(pose, buffers, camera, minecraft, !gui);
-        }
         if (!ControllerItem.isHeld(player)) {
             return;
+        }
+        if (!capture) {
+            drawActiveBuilds(pose, buffers, camera, minecraft, !gui);
         }
         if ((adjust || !gui) && capture) {
             drawCapture(pose, buffers, camera);
