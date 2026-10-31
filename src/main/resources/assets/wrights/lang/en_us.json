@@ -100,6 +100,7 @@
   "menu.wrights.title": "Wrights",
   "menu.wrights.subtitle": "Wrights for the work you point at",
   "menu.wrights.need_controller": "Hold controller to build or run jobs",
+  "menu.wrights.controller_needed": "Controller needed",
   "menu.wrights.scope_world": "World",
   "menu.wrights.scope_global": "Global",
   "menu.wrights.to_global": "To Global",

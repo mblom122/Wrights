@@ -653,7 +653,7 @@ public class WrightsMenuScreen extends Screen {
         graphics.drawString(this.font, Component.translatable("menu.wrights.title"), panelX + 16, panelY + 10, WrightsUi.COPPER, false);
         graphics.drawString(this.font, Component.translatable("menu.wrights.subtitle"), panelX + 16, panelY + 22, WrightsUi.MUTED, false);
         if (!toolHeld()) {
-            graphics.drawString(this.font, Component.translatable("menu.wrights.need_controller"), panelX + 150, panelY + 10, WrightsUi.MUTED, false);
+            drawNeedController(graphics);
         }
         drawTask(graphics, Component.translatable("menu.wrights.building"), !options && !jobsPage && !infoPage && !managePage, false, panelY + 46);
         drawTask(graphics, Component.translatable("menu.wrights.jobs"), jobsPage, false, panelY + 72);
@@ -689,9 +689,34 @@ public class WrightsMenuScreen extends Screen {
         }
         renderList(graphics, mouseX, mouseY);
         renderDetail(graphics);
+        if (!toolHeld() && buildButton != null && buildButton.visible) {
+            Component needed = Component.translatable("menu.wrights.controller_needed");
+            int textW = this.font.width(needed);
+            int labelX = buildButton.getX() + buildButton.getWidth() / 2 - textW / 2;
+            int minX = detailX + 4;
+            int maxX = detailX + detailW - 4 - textW;
+            labelX = Mth.clamp(labelX, minX, Math.max(minX, maxX));
+            graphics.drawString(this.font, needed, labelX, buildButton.getY() - 11, 0xFFFF5555, false);
+        }
         if (sortOpen) {
             renderSortMenu(graphics, mouseX, mouseY);
         }
+    }
+
+    private void drawNeedController(GuiGraphics graphics) {
+        Component label = Component.translatable("menu.wrights.need_controller");
+        float scale = 1.5F;
+        int width = this.font.width(label);
+        int room = panelW - 160;
+        if (width > 0 && width * scale > room) {
+            scale = Math.max(1.0F, room / (float) width);
+        }
+        var pose = graphics.pose();
+        pose.pushPose();
+        pose.translate(panelX + 148, panelY + 7, 0);
+        pose.scale(scale, scale, 1.0F);
+        graphics.drawString(this.font, label, 0, 0, 0xFFFF5555, false);
+        pose.popPose();
     }
 
     private void drawTask(GuiGraphics graphics, Component label, boolean active, boolean soon, int y) {
