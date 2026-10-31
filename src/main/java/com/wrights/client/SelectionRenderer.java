@@ -70,6 +70,7 @@ public final class SelectionRenderer {
         MultiBufferSource.BufferSource buffers = minecraft.renderBuffers().bufferSource();
         drawPortBounds(pose, buffers, camera, minecraft);
         drawPortGlow(pose, buffers, camera, minecraft);
+        drawMarkedPorts(pose, buffers, camera, minecraft);
         if (!ControllerItem.isHeld(player)) {
             return;
         }
@@ -90,7 +91,6 @@ public final class SelectionRenderer {
             drawActiveBuilds(pose, buffers, camera, minecraft, !gui);
         }
         drawMarkedJobs(pose, buffers, camera, minecraft);
-        drawMarkedPorts(pose, buffers, camera, minecraft);
     }
 
     public static BlockPos supplyTarget(Minecraft minecraft) {
@@ -255,39 +255,28 @@ public final class SelectionRenderer {
     }
 
     private static void drawMarkedPorts(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
-        if (WrightsClientState.markedPorts.isEmpty() || minecraft.level == null || WrightsClientState.placedPorts.isEmpty()) {
+        if (WrightsClientState.markedPorts.isEmpty() || minecraft.level == null || minecraft.player == null || WrightsClientState.placedPorts.isEmpty()) {
             return;
         }
         String here = minecraft.level.dimension().location().toString();
-        boolean any = false;
-        for (BlueprintPayloads.PlacedPort port : WrightsClientState.placedPorts) {
-            if (here.equals(port.dimension()) && WrightsClientState.portMarked(port.dimension(), port.pos())) {
-                any = true;
-                break;
-            }
-        }
-        if (!any) {
-            return;
-        }
         float pulse = 0.65F + 0.35F * (float) Math.sin(System.currentTimeMillis() / 180.0D);
-        VertexConsumer fill = buffers.getBuffer(RenderType.debugFilledBox());
+        VertexConsumer lines = buffers.getBuffer(RenderType.lines());
+        boolean any = false;
+        Vec3 eye = minecraft.player.getEyePosition();
         for (BlueprintPayloads.PlacedPort port : WrightsClientState.placedPorts) {
             if (!here.equals(port.dimension()) || !WrightsClientState.portMarked(port.dimension(), port.pos())) {
                 continue;
             }
-            AABB local = new AABB(port.pos()).inflate(0.02D).move(-camera.x, -camera.y, -camera.z);
-            LevelRenderer.addChainedFilledBoxVertices(
-                    pose, fill, local.minX, local.minY, local.minZ, local.maxX, local.maxY, local.maxZ,
-                    0.24F, 0.86F, 0.36F, 0.14F + 0.08F * pulse);
+            drawBox(pose, lines, WrightportBounds.cube(port.pos()), camera, 0.30F, 0.92F, 0.42F, pulse);
+            AABB block = new AABB(port.pos()).inflate(0.12D);
+            drawBox(pose, lines, block, camera, 0.55F, 1.0F, 0.62F, 1.0F);
+            drawBox(pose, lines, block.inflate(0.08D), camera, 0.85F, 1.0F, 0.55F, pulse);
+            drawLine(pose, lines, camera, eye, Vec3.atCenterOf(port.pos()), 0.45F, 1.0F, 0.55F, pulse);
+            any = true;
         }
-        buffers.endBatch(RenderType.debugFilledBox());
-        VertexConsumer lines = buffers.getBuffer(RenderType.lines());
-        for (BlueprintPayloads.PlacedPort port : WrightsClientState.placedPorts) {
-            if (here.equals(port.dimension()) && WrightsClientState.portMarked(port.dimension(), port.pos())) {
-                drawBox(pose, lines, new AABB(port.pos()).inflate(0.02D), camera, 0.24F, 0.86F, 0.36F, pulse);
-            }
+        if (any) {
+            buffers.endBatch(RenderType.lines());
         }
-        buffers.endBatch(RenderType.lines());
     }
 
     private static boolean markedHere(BlueprintPayloads.JobLine job, String dimension) {

@@ -145,7 +145,7 @@ public final class PlacedPortManage {
             WrightLedger.get(player.getServer()).forget(level.dimension(), pos);
             return null;
         }
-        if (port.owner() != null && !port.owner().equals(player.getUUID())) {
+        if (port.owner() == null || !port.owner().equals(player.getUUID())) {
             return null;
         }
         return port;

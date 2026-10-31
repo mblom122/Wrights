@@ -243,7 +243,15 @@ public final class WrightsClientState {
     }
 
     public static void applyPlacedPorts(List<BlueprintPayloads.PlacedPort> ports) {
-        placedPorts = List.copyOf(ports == null ? List.of() : ports);
+        List<BlueprintPayloads.PlacedPort> mine = new ArrayList<>();
+        if (ports != null) {
+            for (BlueprintPayloads.PlacedPort port : ports) {
+                if (port != null && !port.unowned()) {
+                    mine.add(port);
+                }
+            }
+        }
+        placedPorts = List.copyOf(mine);
         Set<String> live = new HashSet<>();
         for (BlueprintPayloads.PlacedPort port : placedPorts) {
             live.add(portMark(port.dimension(), port.pos()));

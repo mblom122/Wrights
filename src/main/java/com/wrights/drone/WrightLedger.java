@@ -102,16 +102,19 @@ public final class WrightLedger extends SavedData {
         }
     }
 
-    /** Ports this player owns, plus ones placed before owners existed. */
+    /** Ports this player placed. Unowned and other players' ports stay out of the list. */
     public List<Placed> listed(UUID owner) {
         List<Placed> list = new ArrayList<>();
+        if (owner == null) {
+            return list;
+        }
         for (Map.Entry<Key, Port> entry : ports.entrySet()) {
             UUID holder = entry.getValue().owner;
-            if (holder != null && !holder.equals(owner)) {
+            if (holder == null || !holder.equals(owner)) {
                 continue;
             }
             String name = entry.getValue().name == null ? "" : entry.getValue().name;
-            list.add(new Placed(entry.getKey().dimension, BlockPos.of(entry.getKey().pos), entry.getValue().units, holder == null, name));
+            list.add(new Placed(entry.getKey().dimension, BlockPos.of(entry.getKey().pos), entry.getValue().units, false, name));
         }
         list.sort((a, b) -> {
             int dim = a.dimension.compareTo(b.dimension);
