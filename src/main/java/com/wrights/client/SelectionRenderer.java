@@ -421,6 +421,10 @@ public final class SelectionRenderer {
             if (!markedHere(job, here)) {
                 continue;
             }
+            if (job.cellMarks()) {
+                markCells(pose, fill, null, camera, job, pulse, true);
+                continue;
+            }
             AABB local = markedBox(job).move(-camera.x, -camera.y, -camera.z);
             LevelRenderer.addChainedFilledBoxVertices(
                     pose, fill, local.minX, local.minY, local.minZ, local.maxX, local.maxY, local.maxZ,
@@ -429,11 +433,46 @@ public final class SelectionRenderer {
         buffers.endBatch(RenderType.debugFilledBox());
         VertexConsumer lines = buffers.getBuffer(RenderType.lines());
         for (BlueprintPayloads.JobLine job : WrightsClientState.jobs) {
-            if (markedHere(job, here)) {
-                drawBox(pose, lines, markedBox(job), camera, 0.98F, 0.86F, 0.32F, pulse);
+            if (!markedHere(job, here)) {
+                continue;
             }
+            if (job.cellMarks()) {
+                markCells(pose, null, lines, camera, job, pulse, false);
+                continue;
+            }
+            drawBox(pose, lines, markedBox(job), camera, 0.98F, 0.86F, 0.32F, pulse);
         }
         buffers.endBatch(RenderType.lines());
+    }
+
+    /** Mirror jobs mark each placed block. The bounding box would cover the empty space between copies. */
+    private static void markCells(PoseStack pose, VertexConsumer fill, VertexConsumer lines, Vec3 camera, BlueprintPayloads.JobLine job, float pulse, boolean fillPass) {
+        WrightsClientState.ActiveBuild build = WrightsClientState.activeBuilds.get(job.id());
+        if (build == null) {
+            return;
+        }
+        double range = rangeSqr();
+        for (WrightsClientState.Ghost ghost : build.ghosts()) {
+            if (ghost.x() >= build.clipX() || ghost.y() >= build.clipY() || ghost.z() >= build.clipZ()) {
+                continue;
+            }
+            BlockPos world = build.origin().offset(ghost.x(), ghost.y(), ghost.z());
+            double dx = world.getX() + 0.5D - camera.x;
+            double dy = world.getY() + 0.5D - camera.y;
+            double dz = world.getZ() + 0.5D - camera.z;
+            if (dx * dx + dy * dy + dz * dz > range) {
+                continue;
+            }
+            AABB box = new AABB(world).inflate(0.04D);
+            if (fillPass) {
+                AABB local = box.move(-camera.x, -camera.y, -camera.z);
+                LevelRenderer.addChainedFilledBoxVertices(
+                        pose, fill, local.minX, local.minY, local.minZ, local.maxX, local.maxY, local.maxZ,
+                        0.95F, 0.82F, 0.28F, 0.22F + 0.12F * pulse);
+            } else {
+                drawBox(pose, lines, box, camera, 0.98F, 0.86F, 0.32F, pulse);
+            }
+        }
     }
 
     private static void drawPortGlow(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
@@ -717,6 +756,9 @@ public final class SelectionRenderer {
             if (!build.dimension().isEmpty() && !build.dimension().equals(here)) {
                 continue;
             }
+            if (cellMarks(entry.getKey())) {
+                continue;
+            }
             BlockPos origin = build.origin();
             AABB box = new AABB(origin.getX(), origin.getY(), origin.getZ(), origin.getX() + build.clipX(), origin.getY() + build.clipY(), origin.getZ() + build.clipZ());
             boolean queued = queuedBuild(entry.getKey());
@@ -731,6 +773,15 @@ public final class SelectionRenderer {
         if (boxed) {
             buffers.endBatch(RenderType.lines());
         }
+    }
+
+    private static boolean cellMarks(java.util.UUID id) {
+        for (com.wrights.network.BlueprintPayloads.JobLine job : WrightsClientState.jobs) {
+            if (job.id().equals(id)) {
+                return job.cellMarks();
+            }
+        }
+        return false;
     }
 
     private static boolean queuedBuild(java.util.UUID id) {

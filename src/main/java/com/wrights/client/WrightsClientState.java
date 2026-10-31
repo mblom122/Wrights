@@ -184,7 +184,7 @@ public final class WrightsClientState {
             } else {
                 activeBuilds.remove(payload.jobId());
             }
-        } else if (finishedJob(payload.jobId())) {
+        } else if (finishedJob(payload.jobId()) && !cellMarksJob(payload.jobId())) {
             activeBuilds.remove(payload.jobId());
         } else {
             List<Ghost> ghosts = new ArrayList<>();
@@ -214,9 +214,18 @@ public final class WrightsClientState {
         }
         paces.keySet().retainAll(seen);
         markedJobs.retainAll(seen);
-        if (activeBuilds.keySet().removeIf(WrightsClientState::finishedJob)) {
+        if (activeBuilds.keySet().removeIf(id -> finishedJob(id) && !cellMarksJob(id))) {
             rebuildActiveCells();
         }
+    }
+
+    private static boolean cellMarksJob(UUID id) {
+        for (BlueprintPayloads.JobLine job : jobs) {
+            if (job.id().equals(id)) {
+                return job.cellMarks();
+            }
+        }
+        return false;
     }
 
     private static boolean finishedJob(UUID id) {

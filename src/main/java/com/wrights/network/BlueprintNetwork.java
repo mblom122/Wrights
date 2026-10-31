@@ -768,9 +768,20 @@ public final class BlueprintNetwork {
                     labelPort(player, job),
                     job.queued(),
                     job.crewQuota(),
-                    jobSourceName(player, job)));
+                    jobSourceName(player, job),
+                    cellMarks(library, job)));
         }
         PacketDistributor.sendToPlayer(player, new BlueprintPayloads.JobSync(lines));
+    }
+
+    /** Mirror jobs are a sparse set of blocks, so the client marks those cells instead of the bounding box. */
+    private static boolean cellMarks(com.wrights.schematic.SchematicLibrary library, BuildJob job) {
+        if (job.schematicId() == null) {
+            return false;
+        }
+        return library.schematic(job.schematicId())
+                .filter(schematic -> schematic.ephemeral() && com.wrights.blueprint.Mirror.marksBlocks(schematic.name()))
+                .isPresent();
     }
 
     /** Wrights still out on the build. Ones already sent home are not counted. */
@@ -894,7 +905,10 @@ public final class BlueprintNetwork {
     }
 
     public static void showJobHologram(ServerPlayer player, BuildJob job, Schematic schematic) {
-        if (job.finished() || schematic == null) {
+        if (schematic == null) {
+            return;
+        }
+        if (job.finished() && !(schematic.ephemeral() && com.wrights.blueprint.Mirror.marksBlocks(schematic.name()))) {
             return;
         }
         java.util.List<BlueprintPayloads.Bit> bits = hologramBits(job, schematic);
@@ -936,7 +950,7 @@ public final class BlueprintNetwork {
         PacketDistributor.sendToPlayer(player, BlueprintPayloads.JobHologram.clearAll());
         com.wrights.schematic.SchematicLibrary library = com.wrights.schematic.SchematicLibrary.get(player.getServer());
         for (com.wrights.job.BuildJob job : library.jobsFor(player.getUUID())) {
-            if (job.finished() || job.kind() != com.wrights.job.BuildJob.Kind.PASTE || job.schematicId() == null) {
+            if (job.kind() != com.wrights.job.BuildJob.Kind.PASTE || job.schematicId() == null) {
                 continue;
             }
             library.schematic(job.schematicId()).ifPresent(schematic -> showJobHologram(player, job, schematic));

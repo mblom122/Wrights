@@ -235,6 +235,30 @@ public final class Mirror {
         return new Placed(schematic, min);
     }
 
+    /** Mirror copies share one sparse schematic, so the preview marks each block instead of the bounding box. */
+    public static boolean marksBlocks(String name) {
+        if (name == null || name.isBlank()) {
+            return false;
+        }
+        if (name.equals("Mirror") || name.endsWith(" · mirror")) {
+            return true;
+        }
+        int cut = name.lastIndexOf(" · ");
+        if (cut <= 0) {
+            return false;
+        }
+        String tail = name.substring(cut + 3);
+        if (tail.isEmpty()) {
+            return false;
+        }
+        for (int i = 0; i < tail.length(); i++) {
+            if (!Character.isDigit(tail.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static String mirrorName(String name) {
         if (name == null || name.isBlank()) {
             return "Mirror";

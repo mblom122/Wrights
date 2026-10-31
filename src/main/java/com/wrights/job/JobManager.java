@@ -1343,6 +1343,7 @@ public final class JobManager {
         int returned = job.returned();
         job.markUndone();
         archive(library, job, false);
+        BlueprintNetwork.clearJobHologram(player, job.id());
         BlueprintNetwork.syncJobs(player);
         if (removed <= 0) {
             Messages.actionBar(player, "message.wrights.undo_none");
@@ -1367,7 +1368,11 @@ public final class JobManager {
         int placed = job.placed();
         int skipped = job.skipped();
         archive(library, job, false);
-        com.wrights.network.BlueprintNetwork.clearJobHologram(player, job.id());
+        library.schematic(job.schematicId())
+                .filter(schematic -> schematic.ephemeral() && com.wrights.blueprint.Mirror.marksBlocks(schematic.name()))
+                .ifPresentOrElse(
+                        schematic -> com.wrights.network.BlueprintNetwork.showJobHologram(player, job, schematic),
+                        () -> com.wrights.network.BlueprintNetwork.clearJobHologram(player, job.id()));
         com.wrights.network.BlueprintNetwork.jobDone(player, finishedName(library, job), job.elapsedSeconds());
         com.wrights.network.BlueprintNetwork.syncJobs(player);
         if (placed == 0 && skipped > 0) {

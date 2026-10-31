@@ -699,7 +699,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record JobLine(UUID id, String name, int done, int total, int skipped, boolean paused, boolean saving, boolean finished, boolean canUndo, boolean undoing, boolean stopped, boolean undone, String dimension, BlockPos anchor, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, List<UUID> crew, int workedTicks, int hold, int waitKind, int source, BlockPos sourcePort, boolean labelPort, boolean queued, int quota, String sourceName) {
+    public record JobLine(UUID id, String name, int done, int total, int skipped, boolean paused, boolean saving, boolean finished, boolean canUndo, boolean undoing, boolean stopped, boolean undone, String dimension, BlockPos anchor, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, List<UUID> crew, int workedTicks, int hold, int waitKind, int source, BlockPos sourcePort, boolean labelPort, boolean queued, int quota, String sourceName, boolean cellMarks) {
         public void write(RegistryFriendlyByteBuf buf) {
             buf.writeUUID(id);
             buf.writeUtf(name, 48);
@@ -733,6 +733,7 @@ public final class BlueprintPayloads {
             buf.writeBoolean(queued);
             buf.writeVarInt(quota);
             buf.writeUtf(sourceName == null ? "" : sourceName, 32);
+            buf.writeBoolean(cellMarks);
         }
 
         public static JobLine read(RegistryFriendlyByteBuf buf) {
@@ -765,7 +766,8 @@ public final class BlueprintPayloads {
                     buf.readBoolean(),
                     buf.readBoolean(),
                     buf.readVarInt(),
-                    buf.readUtf(32));
+                    buf.readUtf(32),
+                    buf.readBoolean());
         }
 
         private static List<UUID> readCrew(RegistryFriendlyByteBuf buf) {
