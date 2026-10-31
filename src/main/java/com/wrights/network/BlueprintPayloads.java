@@ -1859,6 +1859,37 @@ public final class BlueprintPayloads {
         }
     }
 
+    public record MirrorPlace(BlockPos pos, int face, double x, double y, double z, boolean mirror, BlockPos anchor, int anchorFace, int pattern, boolean shapes, boolean enabled, boolean copyNbt, boolean copySettings, boolean copyAll) implements CustomPacketPayload {
+        public static final Type<MirrorPlace> TYPE = payloadType("mirror_place");
+        public static final StreamCodec<RegistryFriendlyByteBuf, MirrorPlace> STREAM_CODEC = StreamCodec.of((buf, value) -> value.write(buf), MirrorPlace::read);
+
+        public void write(RegistryFriendlyByteBuf buf) {
+            buf.writeBlockPos(pos);
+            buf.writeVarInt(face);
+            buf.writeDouble(x);
+            buf.writeDouble(y);
+            buf.writeDouble(z);
+            buf.writeBoolean(mirror);
+            buf.writeBlockPos(anchor);
+            buf.writeVarInt(anchorFace);
+            buf.writeVarInt(pattern);
+            buf.writeBoolean(shapes);
+            buf.writeBoolean(enabled);
+            buf.writeBoolean(copyNbt);
+            buf.writeBoolean(copySettings);
+            buf.writeBoolean(copyAll);
+        }
+
+        public static MirrorPlace read(RegistryFriendlyByteBuf buf) {
+            return new MirrorPlace(buf.readBlockPos(), buf.readVarInt(), buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readBoolean(), buf.readBlockPos(), buf.readVarInt(), buf.readVarInt(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean());
+        }
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     private static void writeBlob(RegistryFriendlyByteBuf buf, byte[] data) {
         byte[] bytes = data == null ? new byte[0] : data;
         buf.writeVarInt(bytes.length);

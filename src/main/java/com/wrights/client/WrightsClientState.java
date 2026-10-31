@@ -1459,6 +1459,7 @@ public final class WrightsClientState {
     private static void selectMirrorTool() {
         selectBuildTool(false);
         mirrorAim = true;
+        WrightsClientConfig.setMirrorBlocks(true);
     }
 
     private static void selectBuildTool(boolean bind) {

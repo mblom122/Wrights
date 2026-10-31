@@ -120,7 +120,7 @@ public final class SelectionRenderer {
         buffers.endBatch(RenderType.debugFilledBox());
         VertexConsumer lines = buffers.getBuffer(RenderType.lines());
         drawBox(pose, lines, slab, camera, 0.45F, 0.92F, 0.86F, 0.85F + 0.15F * pulse);
-        if (WrightsClientConfig.mirrorArmed(here) && WrightsClientState.mode == WrightsClientState.Mode.BUILD && WrightsClientState.anchor != null && WrightsClientState.buildId != null) {
+        if (!WrightsClientConfig.mirrorBlocks() && WrightsClientConfig.mirrorArmed(here) && WrightsClientState.mode == WrightsClientState.Mode.BUILD && WrightsClientState.anchor != null && WrightsClientState.buildId != null) {
             BlockPos origin = WrightsClientState.anchor.offset(-WrightsClientState.pivotX, -WrightsClientState.pivotY, -WrightsClientState.pivotZ);
             for (AABB copy : Mirror.volumes(origin, WrightsClientState.viewX, WrightsClientState.viewY, WrightsClientState.viewZ, anchor, face, WrightsClientConfig.MIRROR_PATTERN.get())) {
                 drawBox(pose, lines, copy, camera, 0.35F, 0.78F, 0.74F, 0.55F);

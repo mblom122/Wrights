@@ -19,7 +19,6 @@ import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import com.wrights.WrightsMod;
 import com.wrights.WrightsClientConfig;
 import com.wrights.blueprint.BoxEdits;
-import com.wrights.blueprint.Mirror;
 
 @EventBusSubscriber(modid = WrightsMod.MOD_ID, value = Dist.CLIENT)
 public final class WrightsHud {
@@ -268,7 +267,7 @@ public final class WrightsHud {
         Component fresh = Component.translatable("hud.wrights.tool_new");
         Component bind = Component.translatable("hud.wrights.tool_bind");
         Component mirror = Component.translatable("hud.wrights.tool_mirror");
-        Component mirrorMark = Component.translatable(mirrorPatternKey());
+        Component mirrorMark = Component.translatable(WrightsClientConfig.mirrorBlocks() ? "menu.wrights.mirror_blocks" : "menu.wrights.mirror_blueprints");
         Component selected = Component.translatable("hud.wrights.mode_selected");
         Component corners = Component.translatable("hud.wrights.mode_corners");
         Component box = Component.translatable("hud.wrights.mode_box");
@@ -328,22 +327,12 @@ public final class WrightsHud {
         }
     }
 
-    private static String mirrorPatternKey() {
-        int pattern = WrightsClientConfig.MIRROR_PATTERN.get();
-        if (pattern == Mirror.EIGHT) {
-            return "menu.wrights.mirror_eight";
-        }
-        if (pattern == Mirror.CROSS) {
-            return "menu.wrights.mirror_cross";
-        }
-        return "menu.wrights.mirror_pair";
-    }
-
     private static String mirrorFooter(Minecraft minecraft) {
-        if (minecraft.level != null && WrightsClientConfig.mirrorPlaced(minecraft.level.dimension().location().toString())) {
-            return "hud.wrights.mirror_ready";
+        boolean placed = minecraft.level != null && WrightsClientConfig.mirrorPlaced(minecraft.level.dimension().location().toString());
+        if (WrightsClientConfig.mirrorBlocks()) {
+            return placed ? "hud.wrights.mirror_blocks_ready" : "hud.wrights.mirror_blocks_explain";
         }
-        return "hud.wrights.mirror_explain";
+        return placed ? "hud.wrights.mirror_blueprint_ready" : "hud.wrights.mirror_blueprint_explain";
     }
 
     private static void drawToolRow(GuiGraphics graphics, Minecraft minecraft, int x, int y, int width, boolean on, Component label, Component selected) {

@@ -13,6 +13,10 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
@@ -179,7 +183,7 @@ public final class WrightsInput {
             event.setCanceled(true);
             event.setUseBlock(TriState.FALSE);
             event.setUseItem(TriState.FALSE);
-            useBuildClick(event.getEntity(), event.getPos(), event.getFace());
+            useBuildClick(event.getEntity(), event.getPos(), event.getFace(), event.getHitVec());
             return;
         }
         if (WrightsClientState.mode == WrightsClientState.Mode.JOBS && Minecraft.getInstance().screen == null) {
@@ -226,7 +230,7 @@ public final class WrightsInput {
             if (boundThisClick) {
                 return;
             }
-            useBuildClick(event.getEntity(), null, null);
+            useBuildClick(event.getEntity(), null, null, null);
             return;
         }
         if (WrightsClientState.mode == WrightsClientState.Mode.JOBS && Minecraft.getInstance().screen == null) {
@@ -264,22 +268,12 @@ public final class WrightsInput {
                 new BlueprintPayloads.LibraryRequest(WrightsClientState.libraryGlobal));
     }
 
-    private static void useBuildClick(net.minecraft.world.entity.player.Player player, BlockPos pos, Direction face) {
+    private static void useBuildClick(net.minecraft.world.entity.player.Player player, BlockPos pos, Direction face, BlockHitResult hit) {
         if (pos != null) {
             boundThisClick = true;
         }
         if (WrightsClientState.mirrorAim) {
-            if (player.isShiftKeyDown()) {
-                com.wrights.WrightsClientConfig.cycleMirrorPattern();
-                player.displayClientMessage(Component.translatable("message.wrights.mirror_pattern", Component.translatable(mirrorPatternKey())), true);
-                return;
-            }
-            if (pos != null && face != null) {
-                WrightsClientState.setMirrorAnchor(pos, face);
-                player.displayClientMessage(Component.translatable("message.wrights.mirror_set", Component.translatable("menu.wrights.face." + face.getName())), true);
-            } else {
-                player.displayClientMessage(Component.translatable("message.wrights.mirror_look"), true);
-            }
+            useMirrorClick(player, pos, face, hit);
             return;
         }
         if (WrightsClientState.buildId == null) {
@@ -314,15 +308,66 @@ public final class WrightsInput {
         WrightsClientState.tryBuild();
     }
 
-    private static String mirrorPatternKey() {
-        int pattern = com.wrights.WrightsClientConfig.MIRROR_PATTERN.get();
-        if (pattern == com.wrights.blueprint.Mirror.EIGHT) {
-            return "menu.wrights.mirror_eight";
+    private static void useMirrorClick(net.minecraft.world.entity.player.Player player, BlockPos pos, Direction face, BlockHitResult hit) {
+        if (player.isShiftKeyDown()) {
+            if (pos != null && face != null) {
+                WrightsClientState.setMirrorAnchor(pos, face);
+                player.displayClientMessage(Component.translatable("message.wrights.mirror_set", Component.translatable("menu.wrights.face." + face.getName())), true);
+            } else {
+                com.wrights.WrightsClientConfig.clearMirror();
+                player.displayClientMessage(Component.translatable("message.wrights.mirror_cleared"), true);
+            }
+            return;
         }
-        if (pattern == com.wrights.blueprint.Mirror.CROSS) {
-            return "menu.wrights.mirror_cross";
+        if (com.wrights.WrightsClientConfig.mirrorBlocks()) {
+            if (pos == null || face == null) {
+                player.displayClientMessage(Component.translatable("message.wrights.mirror_look"), true);
+                return;
+            }
+            if (blockHand(player) == null) {
+                player.displayClientMessage(Component.translatable("message.wrights.mirror_need_block"), true);
+                return;
+            }
+            Minecraft minecraft = Minecraft.getInstance();
+            String dimension = minecraft.level == null ? "" : minecraft.level.dimension().location().toString();
+            boolean armed = com.wrights.WrightsClientConfig.mirrorArmed(dimension);
+            Vec3 at = hit == null ? Vec3.atCenterOf(pos).relative(face, 0.5D) : hit.getLocation();
+            net.neoforged.neoforge.network.PacketDistributor.sendToServer(new BlueprintPayloads.MirrorPlace(
+                    pos,
+                    face.get3DDataValue(),
+                    at.x,
+                    at.y,
+                    at.z,
+                    armed,
+                    armed ? com.wrights.WrightsClientConfig.mirrorAnchor() : BlockPos.ZERO,
+                    com.wrights.WrightsClientConfig.MIRROR_FACE.get(),
+                    com.wrights.WrightsClientConfig.MIRROR_PATTERN.get(),
+                    com.wrights.WrightsClientConfig.MIRROR_SHAPES.get(),
+                    com.wrights.WrightsClientConfig.MIRROR_ON.get(),
+                    com.wrights.WrightsClientConfig.COPY_NBT_BLOCKS.get(),
+                    com.wrights.WrightsClientConfig.COPY_NBT_SETTINGS.get(),
+                    com.wrights.WrightsClientConfig.COPY_NBT_ALL.get()));
+            return;
         }
-        return "menu.wrights.mirror_pair";
+        if (WrightsClientState.buildId == null) {
+            Minecraft.getInstance().setScreen(new WrightsMenuScreen());
+            net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                    new BlueprintPayloads.LibraryRequest(WrightsClientState.libraryGlobal));
+            return;
+        }
+        WrightsClientState.tryBuild();
+    }
+
+    private static InteractionHand blockHand(net.minecraft.world.entity.player.Player player) {
+        boolean mainTool = player.getMainHandItem().getItem() instanceof com.wrights.item.ControllerItem;
+        boolean offTool = player.getOffhandItem().getItem() instanceof com.wrights.item.ControllerItem;
+        if (mainTool && player.getOffhandItem().getItem() instanceof BlockItem) {
+            return InteractionHand.OFF_HAND;
+        }
+        if (offTool && player.getMainHandItem().getItem() instanceof BlockItem) {
+            return InteractionHand.MAIN_HAND;
+        }
+        return null;
     }
 
     private static void openAimedJob() {

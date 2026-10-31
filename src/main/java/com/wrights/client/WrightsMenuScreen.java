@@ -136,6 +136,7 @@ public class WrightsMenuScreen extends Screen {
     private boolean managePage;
     private boolean mirrorPage;
     private static boolean savedMirror;
+    private Component mirrorTip;
     private final WrightManagePanel manage = new WrightManagePanel();
     private final ManageHost manageHost = new MenuManageHost();
     private int portKind = -1;
@@ -427,14 +428,14 @@ public class WrightsMenuScreen extends Screen {
         panelX = (this.width - panelW) / 2;
         panelY = (this.height - panelH) / 2;
         listX = panelX + 126;
-        headingY = panelY + 54;
-        searchY = panelY + 86;
-        listY = panelY + 108;
+        headingY = panelY + 36;
+        searchY = panelY + 68;
+        listY = panelY + 90;
         listW = Math.min(220, panelW - 300);
         if (listW < 120) {
             listW = Math.max(100, (panelW - 150) / 2);
         }
-        detailH = Math.max(ROW, panelH - 146);
+        detailH = Math.max(ROW, panelH - 128);
         listH = Math.max(ROW, detailH - 16);
         detailX = listX + listW + 8;
         detailY = listY;
@@ -639,7 +640,7 @@ public class WrightsMenuScreen extends Screen {
         if (mirrorPage && !options && !jobsPage && !infoPage && !managePage) {
             int x = listX - 2;
             int width = panelX + panelW - 12 - x;
-            WrightsUi.inset(graphics, x, panelY + 56, width, panelH - 70);
+            WrightsUi.inset(graphics, x, panelY + 34, width, panelH - 48);
             return;
         }
         if (options || jobsPage || infoPage || managePage) {
@@ -675,12 +676,15 @@ public class WrightsMenuScreen extends Screen {
         if (!toolHeld()) {
             drawNeedController(graphics);
         }
-        drawTask(graphics, Component.translatable("menu.wrights.building"), !options && !jobsPage && !infoPage && !managePage, false, panelY + 46);
-        drawTask(graphics, Component.translatable("menu.wrights.jobs"), jobsPage, false, panelY + 72);
-        drawTask(graphics, Component.translatable("menu.wrights.manage"), managePage, false, panelY + 98);
-        drawTask(graphics, Component.translatable("menu.wrights.mining"), false, true, panelY + 124);
-        drawTask(graphics, Component.translatable("menu.wrights.info"), infoPage, false, panelY + 150);
-        drawTask(graphics, Component.translatable("menu.wrights.options"), options, false, panelY + 176);
+        drawTask(graphics, Component.translatable("menu.wrights.building"), buildingPage(), false, taskBuildingY());
+        if (buildingPage()) {
+            drawBuildSubs(graphics);
+        }
+        drawTask(graphics, Component.translatable("menu.wrights.jobs"), jobsPage, false, taskJobsY());
+        drawTask(graphics, Component.translatable("menu.wrights.manage"), managePage, false, taskManageY());
+        drawTask(graphics, Component.translatable("menu.wrights.mining"), false, true, taskMiningY());
+        drawTask(graphics, Component.translatable("menu.wrights.info"), infoPage, false, taskInfoY());
+        drawTask(graphics, Component.translatable("menu.wrights.options"), options, false, taskOptionsY());
         if (options) {
             renderOptions(graphics, mouseX, mouseY);
             return;
@@ -706,9 +710,12 @@ public class WrightsMenuScreen extends Screen {
             return;
         }
 
-        drawBuildStrip(graphics, mouseX, mouseY);
         if (mirrorPage) {
             renderMirror(graphics, mouseX, mouseY);
+            if (mirrorTip != null) {
+                graphics.renderTooltip(this.font, mirrorTip, mouseX, mouseY);
+                mirrorTip = null;
+            }
             return;
         }
         drawScope(graphics, mouseX, mouseY);
@@ -1400,76 +1407,135 @@ public class WrightsMenuScreen extends Screen {
         }
     }
 
-    private int stripX() {
-        return listX;
+    private int taskBuildingY() {
+        return panelY + 46;
     }
 
-    private int stripY() {
-        return panelY + 36;
+    private int taskBlueprintsY() {
+        return panelY + 70;
     }
 
-    private int stripW() {
-        return Math.max(40, panelX + panelW - 12 - listX);
+    private int taskMirrorY() {
+        return panelY + 90;
     }
 
-    private void drawBuildStrip(GuiGraphics graphics, int mouseX, int mouseY) {
-        int x = stripX();
-        int y = stripY();
-        int width = stripW();
-        int half = width / 2;
-        drawStripChip(graphics, mouseX, mouseY, x, y, half - 2, !mirrorPage, "menu.wrights.sub_blueprints");
-        drawStripChip(graphics, mouseX, mouseY, x + half, y, width - half, mirrorPage, "menu.wrights.sub_mirror");
+    private int taskJobsY() {
+        return buildingPage() ? panelY + 114 : panelY + 72;
     }
 
-    private void drawStripChip(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int w, boolean on, String key) {
-        boolean hover = mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + 16;
-        graphics.fill(x, y, x + w, y + 16, on ? 0xFF24384A : (hover ? 0xFF223445 : 0xFF1C2A37));
-        graphics.fill(x, y + 14, x + w, y + 16, on ? WrightsUi.COPPER : 0xFF1C2A37);
-        String label = this.font.plainSubstrByWidth(Component.translatable(key).getString(), w - 8);
-        graphics.drawString(this.font, label, x + (w - this.font.width(label)) / 2, y + 4, on ? WrightsUi.TEXT : WrightsUi.MUTED, false);
+    private int taskManageY() {
+        return buildingPage() ? panelY + 140 : panelY + 98;
     }
 
-    private boolean clickBuildStrip(double mouseX, double mouseY) {
-        int x = stripX();
-        int y = stripY();
-        int width = stripW();
-        if (mouseY < y || mouseY >= y + 16 || mouseX < x || mouseX >= x + width) {
-            return false;
-        }
-        boolean mirror = mouseX >= x + width / 2;
-        if (mirror == mirrorPage) {
-            return true;
-        }
-        mirrorPage = mirror;
-        savedMirror = mirror;
-        sortOpen = false;
-        setFocused(null);
-        refresh();
-        return true;
+    private int taskMiningY() {
+        return buildingPage() ? panelY + 166 : panelY + 124;
     }
 
+    private int taskInfoY() {
+        return buildingPage() ? panelY + 192 : panelY + 150;
+    }
+
+    private int taskOptionsY() {
+        return buildingPage() ? panelY + 218 : panelY + 176;
+    }
+
+    private void drawBuildSubs(GuiGraphics graphics) {
+        int railTop = taskBuildingY() + 22;
+        int railBot = taskMirrorY() + 18;
+        graphics.fill(panelX + 22, railTop, panelX + 24, railBot, WrightsUi.COPPER_DIM);
+        drawSubTask(graphics, Component.translatable("menu.wrights.sub_blueprints"), !mirrorPage, taskBlueprintsY());
+        drawSubTask(graphics, Component.translatable("menu.wrights.sub_mirror"), mirrorPage, taskMirrorY());
+    }
+
+    private void drawSubTask(GuiGraphics graphics, Component label, boolean active, int y) {
+        int x = panelX + 30;
+        graphics.fill(x, y, x + 84, y + 18, active ? 0xFF24384A : 0xFF141C24);
+        graphics.fill(x, y, x + 2, y + 18, active ? WrightsUi.TEAL : WrightsUi.COPPER_DIM);
+        String text = this.font.plainSubstrByWidth(label.getString(), 74);
+        graphics.drawString(this.font, text, x + 8, y + 5, active ? WrightsUi.TEXT : WrightsUi.MUTED, false);
+    }
+
+    private boolean hitSub(double mouseX, double mouseY, int y) {
+        return mouseX >= panelX + 30 && mouseX < panelX + 114 && mouseY >= y && mouseY < y + 18;
+    }
+
+    private int mirrorModeY;
     private int mirrorCardY;
     private int mirrorCardW;
-    private int mirrorSwitchY;
+    private int mirrorNbtY;
+    private int mirrorSettingsY;
+    private int mirrorAllY;
+    private int mirrorShapesY;
+    private int mirrorOnY;
     private int mirrorClearY;
     private int mirrorBodyX;
     private int mirrorBodyW;
+    private final List<HelpSpot> mirrorHelps = new ArrayList<>();
 
     private void renderMirror(GuiGraphics graphics, int mouseX, int mouseY) {
+        mirrorHelps.clear();
+        mirrorTip = null;
         int x = listX + 8;
-        int y = panelY + 68;
-        int w = Math.max(80, panelX + panelW - 28 - listX);
+        int y = panelY + 44;
+        int w = Math.max(120, panelX + panelW - 28 - listX);
         mirrorBodyX = x;
         mirrorBodyW = w;
         graphics.drawString(this.font, Component.translatable("menu.wrights.mirror_title"), x, y, WrightsUi.COPPER, false);
         y += 14;
-        y = drawWrapped(graphics, Component.translatable("menu.wrights.mirror_lead"), x, y, w, WrightsUi.MUTED);
-        y += 8;
+        graphics.drawString(this.font, Component.translatable("menu.wrights.mirror_mode"), x, y, WrightsUi.MUTED, false);
+        y += 12;
+        int gap = 6;
+        int modeW = (w - gap) / 2;
+        mirrorModeY = y;
+        drawChoice(graphics, mouseX, mouseY, x, y, modeW, 28, WrightsClientConfig.mirrorBlocks(), "menu.wrights.mirror_blocks", "menu.wrights.mirror_blocks_hint");
+        drawChoice(graphics, mouseX, mouseY, x + modeW + gap, y, w - modeW - gap, 28, !WrightsClientConfig.mirrorBlocks(), "menu.wrights.mirror_blueprints", "menu.wrights.mirror_blueprints_hint");
+        y += 36;
+        graphics.drawString(this.font, Component.translatable("menu.wrights.mirror_pattern"), x, y, WrightsUi.MUTED, false);
+        y += 12;
+        int cardW = Math.max(40, (w - gap * 2) / 3);
+        mirrorCardY = y;
+        mirrorCardW = cardW;
+        drawChoice(graphics, mouseX, mouseY, x, y, cardW, 36, WrightsClientConfig.MIRROR_PATTERN.get() == com.wrights.blueprint.Mirror.PAIR, "menu.wrights.mirror_pair", "menu.wrights.mirror_pair_hint");
+        drawChoice(graphics, mouseX, mouseY, x + cardW + gap, y, cardW, 36, WrightsClientConfig.MIRROR_PATTERN.get() == com.wrights.blueprint.Mirror.CROSS, "menu.wrights.mirror_cross", "menu.wrights.mirror_cross_hint");
+        drawChoice(graphics, mouseX, mouseY, x + (cardW + gap) * 2, y, cardW, 36, WrightsClientConfig.MIRROR_PATTERN.get() == com.wrights.blueprint.Mirror.EIGHT, "menu.wrights.mirror_eight", "menu.wrights.mirror_eight_hint");
+        y += 44;
+        mirrorNbtY = y;
+        drawMirrorToggle(graphics, mouseX, mouseY, x, y, WrightsClientConfig.COPY_NBT_BLOCKS.get(), "screen.wrights.copy_nbt_blocks", "screen.wrights.copy_nbt_blocks_hint", true);
+        y += 16;
+        mirrorSettingsY = y;
+        boolean settingsOn = WrightsConfig.copySettings();
+        String settingsHint = settingsOn
+                ? (WrightsConfig.copySettingsWhitelist() ? "screen.wrights.copy_nbt_settings_whitelist_hint" : "screen.wrights.copy_nbt_settings_hint")
+                : "screen.wrights.copy_off_hint";
+        drawMirrorToggle(graphics, mouseX, mouseY, x, y, mirrorSettingsChosen(), "screen.wrights.copy_nbt_settings", settingsHint, WrightsClientConfig.COPY_NBT_BLOCKS.get() && settingsOn);
+        y += 16;
+        mirrorAllY = y;
+        String allHint = WrightsConfig.copyAll() ? "screen.wrights.copy_nbt_all_hint" : "screen.wrights.copy_off_hint";
+        drawMirrorToggle(graphics, mouseX, mouseY, x, y, mirrorAllChosen(), "screen.wrights.copy_nbt_all", allHint, WrightsClientConfig.COPY_NBT_BLOCKS.get() && mirrorAllUsable());
+        y += 16;
+        mirrorShapesY = y;
+        drawMirrorToggle(graphics, mouseX, mouseY, x, y, WrightsClientConfig.MIRROR_SHAPES.get(), "menu.wrights.mirror_shapes", "menu.wrights.mirror_shapes_hint", true);
+        y += 16;
+        mirrorOnY = y;
+        drawMirrorToggle(graphics, mouseX, mouseY, x, y, WrightsClientConfig.MIRROR_ON.get(), "menu.wrights.mirror_on", "menu.wrights.mirror_on_hint", true);
+        y += 22;
+        drawMirrorStatus(graphics, x, y, w);
+        y += 40;
+        mirrorClearY = y;
+        boolean clearOn = WrightsClientConfig.MIRROR_SET.get();
+        boolean clearHover = clearOn && mouseX >= x && mouseX < x + 108 && mouseY >= y && mouseY < y + 18 && !overMirrorHelp(mouseX, mouseY);
+        graphics.fill(x, y, x + 108, y + 18, clearOn ? (clearHover ? 0xFF5A3030 : 0xFF3A2428) : 0xFF1C2A37);
+        String clear = this.font.plainSubstrByWidth(Component.translatable("menu.wrights.mirror_clear").getString(), 80);
+        graphics.drawString(this.font, clear, x + 8, y + 5, clearOn ? WrightsUi.RED : WrightsUi.MUTED, false);
+        drawHelpBox(graphics, mouseX, mouseY, x + 112, y + 3, "menu.wrights.mirror_clear_hint");
+    }
+
+    private void drawMirrorStatus(GuiGraphics graphics, int x, int y, int w) {
         String dimension = this.minecraft != null && this.minecraft.level != null ? this.minecraft.level.dimension().location().toString() : "";
         boolean placed = WrightsClientConfig.mirrorPlaced(dimension);
         boolean armed = WrightsClientConfig.mirrorArmed(dimension);
-        graphics.fill(x, y, x + w, y + 36, 0xFF101820);
-        graphics.fill(x, y, x + 2, y + 36, placed ? WrightsUi.TEAL : WrightsUi.COPPER_DIM);
+        graphics.fill(x, y, x + w, y + 34, 0xFF101820);
+        graphics.fill(x, y, x + 2, y + 34, placed ? WrightsUi.TEAL : WrightsUi.COPPER_DIM);
         if (!WrightsClientConfig.MIRROR_SET.get()) {
             drawWrapped(graphics, Component.translatable("menu.wrights.mirror_none"), x + 10, y + 6, w - 16, WrightsUi.TEXT);
         } else if (!placed) {
@@ -1479,54 +1545,63 @@ public class WrightsMenuScreen extends Screen {
             Direction face = Direction.from3DDataValue(WrightsClientConfig.MIRROR_FACE.get());
             graphics.drawString(this.font, Component.translatable("menu.wrights.mirror_anchor", anchor.getX(), anchor.getY(), anchor.getZ(), Component.translatable("menu.wrights.face." + face.getName())), x + 10, y + 6, WrightsUi.TEXT, false);
             int copies = com.wrights.blueprint.Mirror.copyCount(WrightsClientConfig.MIRROR_PATTERN.get());
-            graphics.drawString(this.font, Component.translatable(armed ? "menu.wrights.mirror_copies" : "menu.wrights.mirror_paused", copies), x + 10, y + 20, armed ? WrightsUi.TEAL : WrightsUi.MUTED, false);
-        }
-        y += 44;
-        int gap = 6;
-        int cardW = Math.max(40, (w - gap * 2) / 3);
-        mirrorCardY = y;
-        mirrorCardW = cardW;
-        drawPatternCard(graphics, mouseX, mouseY, x, y, cardW, com.wrights.blueprint.Mirror.PAIR, "menu.wrights.mirror_pair", "menu.wrights.mirror_pair_hint");
-        drawPatternCard(graphics, mouseX, mouseY, x + cardW + gap, y, cardW, com.wrights.blueprint.Mirror.CROSS, "menu.wrights.mirror_cross", "menu.wrights.mirror_cross_hint");
-        drawPatternCard(graphics, mouseX, mouseY, x + (cardW + gap) * 2, y, cardW, com.wrights.blueprint.Mirror.EIGHT, "menu.wrights.mirror_eight", "menu.wrights.mirror_eight_hint");
-        y += 62;
-        mirrorSwitchY = y;
-        drawSwitch(graphics, mouseX, mouseY, x, y, w, "menu.wrights.mirror_on", WrightsClientConfig.MIRROR_ON.get());
-        y += 26;
-        drawSwitch(graphics, mouseX, mouseY, x, y, w, "menu.wrights.mirror_shapes", WrightsClientConfig.MIRROR_SHAPES.get());
-        y += 30;
-        mirrorClearY = y;
-        boolean clearOn = WrightsClientConfig.MIRROR_SET.get();
-        boolean clearHover = clearOn && mouseX >= x && mouseX < x + 108 && mouseY >= y && mouseY < y + 18;
-        graphics.fill(x, y, x + 108, y + 18, clearOn ? (clearHover ? 0xFF5A3030 : 0xFF3A2428) : 0xFF1C2A37);
-        String clear = this.font.plainSubstrByWidth(Component.translatable("menu.wrights.mirror_clear").getString(), 100);
-        graphics.drawString(this.font, clear, x + (108 - this.font.width(clear)) / 2, y + 5, clearOn ? WrightsUi.RED : WrightsUi.MUTED, false);
-        y += 28;
-        int limit = panelY + panelH - 28;
-        if (y < limit) {
-            drawWrapped(graphics, Component.translatable("menu.wrights.mirror_steps"), x, y, w, WrightsUi.MUTED);
+            graphics.drawString(this.font, Component.translatable(armed ? "menu.wrights.mirror_copies" : "menu.wrights.mirror_paused", copies), x + 10, y + 18, armed ? WrightsUi.TEAL : WrightsUi.MUTED, false);
         }
     }
 
-    private void drawPatternCard(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int w, int pattern, String title, String hint) {
-        boolean on = WrightsClientConfig.MIRROR_PATTERN.get() == pattern;
-        boolean hover = mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + 54;
-        graphics.fill(x, y, x + w, y + 54, on ? 0xFF24384A : (hover ? 0xFF223445 : 0xFF1C2A37));
+    private void drawChoice(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int w, int h, boolean on, String title, String hint) {
+        boolean hover = mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h && !overMirrorHelp(mouseX, mouseY);
+        graphics.fill(x, y, x + w, y + h, on ? 0xFF24384A : (hover ? 0xFF223445 : 0xFF1C2A37));
         graphics.fill(x, y, x + w, y + 2, on ? WrightsUi.TEAL : WrightsUi.COPPER_DIM);
-        graphics.drawString(this.font, Component.translatable(title), x + 6, y + 8, on ? WrightsUi.TEXT : WrightsUi.MUTED, false);
-        drawWrapped(graphics, Component.translatable(hint), x + 6, y + 22, w - 12, WrightsUi.MUTED);
+        String label = this.font.plainSubstrByWidth(Component.translatable(title).getString(), Math.max(8, w - 22));
+        graphics.drawString(this.font, label, x + 6, y + (h - 8) / 2, on ? WrightsUi.TEXT : WrightsUi.MUTED, false);
+        drawHelpBox(graphics, mouseX, mouseY, x + w - 16, y + (h - 12) / 2, hint);
     }
 
-    private void drawSwitch(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int w, String key, boolean on) {
-        boolean hover = mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + 22;
-        graphics.fill(x, y, x + w, y + 22, hover ? 0xFF223445 : 0xFF1C2A37);
-        graphics.fill(x, y, x + 2, y + 22, on ? WrightsUi.TEAL : WrightsUi.COPPER_DIM);
-        String label = this.font.plainSubstrByWidth(Component.translatable(key).getString(), w - 48);
-        graphics.drawString(this.font, label, x + 10, y + 7, WrightsUi.TEXT, false);
-        int knobX = x + w - 36;
-        graphics.fill(knobX, y + 5, knobX + 28, y + 17, on ? 0xFF1E4A44 : 0xFF2A3540);
-        int dotX = on ? knobX + 16 : knobX + 3;
-        graphics.fill(dotX, y + 7, dotX + 9, y + 15, on ? WrightsUi.TEAL : WrightsUi.MUTED);
+    private void drawMirrorToggle(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, boolean on, String label, String hint, boolean enabled) {
+        int box = enabled ? 0xFF18222C : 0xFF12171C;
+        int border = !enabled ? 0xFF2A343C : on ? WrightsUi.COPPER : 0xFF3D4E5E;
+        graphics.fill(x, y, x + 12, y + 12, box);
+        WrightsUi.border(graphics, x, y, 12, 12, border);
+        if (on && enabled) {
+            graphics.fill(x + 3, y + 3, x + 9, y + 9, WrightsUi.COPPER);
+        }
+        Component title = Component.translatable(label);
+        graphics.drawString(this.font, title, x + 16, y + 2, enabled ? WrightsUi.TEXT : WrightsUi.MUTED, false);
+        drawHelpBox(graphics, mouseX, mouseY, x + 16 + this.font.width(title) + 4, y, hint);
+    }
+
+    private void drawHelpBox(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, String hint) {
+        mirrorHelps.add(new HelpSpot(x, y));
+        boolean over = mouseX >= x && mouseX < x + 12 && mouseY >= y && mouseY < y + 12;
+        graphics.fill(x, y, x + 12, y + 12, 0xFF18222C);
+        WrightsUi.border(graphics, x, y, 12, 12, over ? WrightsUi.COPPER : 0xFF3D4E5E);
+        graphics.drawCenteredString(this.font, "?", x + 6, y + 2, over ? WrightsUi.COPPER : WrightsUi.MUTED);
+        if (over) {
+            mirrorTip = Component.translatable(hint);
+        }
+    }
+
+    private boolean overMirrorHelp(double mouseX, double mouseY) {
+        for (HelpSpot spot : mirrorHelps) {
+            if (mouseX >= spot.x() && mouseX < spot.x() + 12 && mouseY >= spot.y() && mouseY < spot.y() + 12) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean mirrorSettingsChosen() {
+        return WrightsConfig.copySettings() && WrightsClientConfig.COPY_NBT_SETTINGS.get() && !mirrorAllChosen();
+    }
+
+    private boolean mirrorAllChosen() {
+        return mirrorAllUsable() && WrightsClientConfig.COPY_NBT_ALL.get();
+    }
+
+    private boolean mirrorAllUsable() {
+        return WrightsConfig.copyAll() && this.minecraft != null && this.minecraft.player != null
+                && this.minecraft.player.getAbilities().instabuild && !this.minecraft.player.isSpectator();
     }
 
     private int drawWrapped(GuiGraphics graphics, Component text, int x, int y, int width, int color) {
@@ -1538,24 +1613,54 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private boolean clickMirror(double mouseX, double mouseY) {
+        if (overMirrorHelp(mouseX, mouseY)) {
+            return true;
+        }
         if (mirrorCardW <= 0) {
             return false;
         }
         int x = mirrorBodyX;
         int gap = 6;
-        if (mouseY >= mirrorCardY && mouseY < mirrorCardY + 54) {
+        int modeW = (mirrorBodyW - gap) / 2;
+        if (mouseY >= mirrorModeY && mouseY < mirrorModeY + 28) {
+            if (mouseX >= x && mouseX < x + modeW) {
+                WrightsClientConfig.setMirrorBlocks(true);
+                return true;
+            }
+            if (mouseX >= x + modeW + gap && mouseX < x + mirrorBodyW) {
+                WrightsClientConfig.setMirrorBlocks(false);
+                return true;
+            }
+        }
+        if (mouseY >= mirrorCardY && mouseY < mirrorCardY + 36) {
             int index = (int) ((mouseX - x) / (mirrorCardW + gap));
             if (index >= 0 && index < 3 && mouseX < x + (mirrorCardW + gap) * index + mirrorCardW) {
                 WrightsClientConfig.setMirrorPattern(index);
                 return true;
             }
         }
-        if (mouseY >= mirrorSwitchY && mouseY < mirrorSwitchY + 22 && mouseX >= x && mouseX < x + mirrorBodyW) {
-            WrightsClientConfig.setMirrorOn(!WrightsClientConfig.MIRROR_ON.get());
+        if (hitMirrorToggle(mouseX, mouseY, x, mirrorNbtY, "screen.wrights.copy_nbt_blocks")) {
+            WrightsClientConfig.setCopyNbtBlocks(!WrightsClientConfig.COPY_NBT_BLOCKS.get());
             return true;
         }
-        if (mouseY >= mirrorSwitchY + 26 && mouseY < mirrorSwitchY + 48 && mouseX >= x && mouseX < x + mirrorBodyW) {
+        if (hitMirrorToggle(mouseX, mouseY, x, mirrorSettingsY, "screen.wrights.copy_nbt_settings")) {
+            if (WrightsClientConfig.COPY_NBT_BLOCKS.get() && WrightsConfig.copySettings()) {
+                WrightsClientConfig.setCopyNbtSettings(!WrightsClientConfig.COPY_NBT_SETTINGS.get());
+            }
+            return true;
+        }
+        if (hitMirrorToggle(mouseX, mouseY, x, mirrorAllY, "screen.wrights.copy_nbt_all")) {
+            if (WrightsClientConfig.COPY_NBT_BLOCKS.get() && mirrorAllUsable()) {
+                WrightsClientConfig.setCopyNbtAll(!WrightsClientConfig.COPY_NBT_ALL.get());
+            }
+            return true;
+        }
+        if (hitMirrorToggle(mouseX, mouseY, x, mirrorShapesY, "menu.wrights.mirror_shapes")) {
             WrightsClientConfig.setMirrorShapes(!WrightsClientConfig.MIRROR_SHAPES.get());
+            return true;
+        }
+        if (hitMirrorToggle(mouseX, mouseY, x, mirrorOnY, "menu.wrights.mirror_on")) {
+            WrightsClientConfig.setMirrorOn(!WrightsClientConfig.MIRROR_ON.get());
             return true;
         }
         if (WrightsClientConfig.MIRROR_SET.get() && mouseX >= x && mouseX < x + 108 && mouseY >= mirrorClearY && mouseY < mirrorClearY + 18) {
@@ -1563,6 +1668,11 @@ public class WrightsMenuScreen extends Screen {
             return true;
         }
         return false;
+    }
+
+    private boolean hitMirrorToggle(double mouseX, double mouseY, int x, int y, String label) {
+        int width = 16 + this.font.width(Component.translatable(label));
+        return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 12;
     }
 
     private void drawScope(GuiGraphics graphics, int mouseX, int mouseY) {
@@ -1797,16 +1907,35 @@ public class WrightsMenuScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 0 && hitTask(mouseX, mouseY, panelY + 46)) {
+        if (button == 0 && buildingPage() && hitSub(mouseX, mouseY, taskBlueprintsY())) {
+            mirrorPage = false;
+            savedMirror = false;
+            sortOpen = false;
+            setFocused(null);
+            refresh();
+            return true;
+        }
+        if (button == 0 && buildingPage() && hitSub(mouseX, mouseY, taskMirrorY())) {
+            mirrorPage = true;
+            savedMirror = true;
+            sortOpen = false;
+            setFocused(null);
+            refresh();
+            return true;
+        }
+        if (button == 0 && hitTask(mouseX, mouseY, taskBuildingY())) {
+            boolean stay = buildingPage();
             leaveManage();
             options = false;
             jobsPage = false;
             infoPage = false;
-            mirrorPage = savedMirror;
+            if (!stay) {
+                mirrorPage = savedMirror;
+            }
             refresh();
             return true;
         }
-        if (button == 0 && hitTask(mouseX, mouseY, panelY + 72)) {
+        if (button == 0 && hitTask(mouseX, mouseY, taskJobsY())) {
             rememberStrip();
             leaveManage();
             options = false;
@@ -1817,7 +1946,7 @@ public class WrightsMenuScreen extends Screen {
             PacketDistributor.sendToServer(new BlueprintPayloads.PlacedPortsAsk());
             return true;
         }
-        if (button == 0 && hitTask(mouseX, mouseY, panelY + 98)) {
+        if (button == 0 && hitTask(mouseX, mouseY, taskManageY())) {
             rememberStrip();
             options = false;
             jobsPage = false;
@@ -1833,7 +1962,7 @@ public class WrightsMenuScreen extends Screen {
             sendHold(manageTab == 0);
             return true;
         }
-        if (button == 0 && hitTask(mouseX, mouseY, panelY + 150)) {
+        if (button == 0 && hitTask(mouseX, mouseY, taskInfoY())) {
             rememberStrip();
             leaveManage();
             options = false;
@@ -1844,7 +1973,7 @@ public class WrightsMenuScreen extends Screen {
             refresh();
             return true;
         }
-        if (button == 0 && hitTask(mouseX, mouseY, panelY + 176)) {
+        if (button == 0 && hitTask(mouseX, mouseY, taskOptionsY())) {
             rememberStrip();
             leaveManage();
             options = true;
@@ -1961,9 +2090,6 @@ public class WrightsMenuScreen extends Screen {
                 }
             }
             return super.mouseClicked(mouseX, mouseY, button);
-        }
-        if (button == 0 && buildingPage() && clickBuildStrip(mouseX, mouseY)) {
-            return true;
         }
         if (mirrorPage && buildingPage()) {
             if (button == 0) {

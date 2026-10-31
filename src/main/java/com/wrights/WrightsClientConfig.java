@@ -162,6 +162,9 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.BooleanValue MIRROR_ON = BUILDER
             .comment("When true, a placed blueprint also starts the mirrored copies.")
             .define("mirrorOn", true);
+    public static final ModConfigSpec.BooleanValue MIRROR_BLOCKS = BUILDER
+            .comment("When true, mirror places the block in the other hand. When false, it mirrors a blueprint.")
+            .define("mirrorBlocks", true);
     public static final ModConfigSpec.BooleanValue MIRROR_SET = BUILDER
             .define("mirrorSet", false);
     public static final ModConfigSpec.BooleanValue MIRROR_SHAPES = BUILDER
@@ -560,6 +563,15 @@ public final class WrightsClientConfig {
 
     public static void setMirrorOn(boolean on) {
         MIRROR_ON.set(on);
+        save();
+    }
+
+    public static boolean mirrorBlocks() {
+        return MIRROR_BLOCKS.get();
+    }
+
+    public static void setMirrorBlocks(boolean blocks) {
+        MIRROR_BLOCKS.set(blocks);
         save();
     }
 
