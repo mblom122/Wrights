@@ -15,18 +15,29 @@ import com.wrights.drone.Swarm;
 import com.wrights.drone.WrightTier;
 import com.wrights.network.BlueprintPayloads;
 
+/** Moves wrights between jobs. The window stays put, and each list scrolls on its own. */
 public class DroneRosterScreen extends Screen {
-    private static final int PANEL_W = 360;
+    private static final int PANEL_W = 372;
+    private static final int ROW = 20;
+    private static final int HEADER = 46;
+    private static final int MOVE_H = 78;
+    private static final int FOOTER = 32;
+    private static final int SECTION_HEAD = 18;
     private static final UUID FREE = new UUID(0L, 0L);
 
     private final Screen parent;
-    private final List<DroneRow> drones = new ArrayList<>();
+    private final List<WrightRow> freeRows = new ArrayList<>();
+    private final List<WrightRow> busyRows = new ArrayList<>();
     private final List<Choice> choices = new ArrayList<>();
-    private int selected;
+    private UUID selected = FREE;
     private int panelX;
     private int panelY;
     private int panelH;
-    private int scroll;
+    private int freeScroll;
+    private int busyScroll;
+    private int moveScroll;
+    private int drag;
+    private int dragGrab;
     private WrightsButton back;
 
     public DroneRosterScreen(Screen parent) {
@@ -36,20 +47,17 @@ public class DroneRosterScreen extends Screen {
 
     @Override
     protected void init() {
-        panelX = (this.width - PANEL_W) / 2;
+        place();
         rebuild();
-        back = new WrightsButton(panelX + 16, panelY + panelH - 28, PANEL_W - 32, 16, Component.translatable("screen.wrights.back"), button -> onClose());
-        addRenderableWidget(back);
+        back = addRenderableWidget(new WrightsButton(
+                panelX + 12, panelY + panelH - 26, PANEL_W - 24, 16,
+                Component.translatable("screen.wrights.back"), button -> onClose()));
     }
 
     @Override
     public void tick() {
         super.tick();
-        int previous = panelH;
         rebuild();
-        if (back != null && previous != panelH) {
-            back.setY(panelY + panelH - 28);
-        }
     }
 
     @Override
@@ -61,52 +69,81 @@ public class DroneRosterScreen extends Screen {
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
-        graphics.drawString(this.font, this.title, panelX + 16, panelY + 10, WrightsUi.COPPER, false);
-        int[] pool = pool();
-        graphics.drawString(this.font, Component.translatable("menu.wrights.drones_pool", pool[0], pool[1]), panelX + 16, panelY + 24, WrightsUi.MUTED, false);
-        if (drones.isEmpty()) {
-            graphics.drawString(this.font, Component.translatable("screen.wrights.hangar_empty"), panelX + 16, panelY + 48, WrightsUi.MUTED, false);
-            return;
-        }
-        for (int i = 0; i < drones.size(); i++) {
-            DroneRow row = drones.get(i);
-            if (i == selected) {
-                graphics.fill(panelX + 10, row.y - 3, panelX + PANEL_W - 10, row.y + 12, 0xA0C47A3A);
-            }
-            graphics.drawString(this.font, this.font.plainSubstrByWidth(row.name, 88), panelX + 16, row.y, WrightsUi.TEXT, false);
-            Component tierName = Component.translatable(WrightTier.nameKey(row.tier));
-            graphics.drawString(this.font, tierName, panelX + 108, row.y, WrightTier.textColor(row.tier), false);
-            graphics.drawString(this.font, this.font.plainSubstrByWidth(row.where, 80), panelX + PANEL_W - 96, row.y, WrightsUi.TEXT, false);
-        }
-        graphics.drawString(this.font, Component.translatable("screen.wrights.move_to"), panelX + 16, moveY() - 14, WrightsUi.TEXT, false);
-        for (Choice choice : choices) {
-            boolean hover = mouseX >= choice.x && mouseX < choice.x + choice.w && mouseY >= choice.y && mouseY < choice.y + 16;
-            int fill = choice.current ? 0xFF2A4054 : (hover ? 0xFF3A5164 : 0xFF24384A);
-            graphics.fill(choice.x, choice.y, choice.x + choice.w, choice.y + 16, fill);
-            String label = this.font.plainSubstrByWidth(choice.label, choice.w - 6);
-            graphics.drawString(this.font, label, choice.x + (choice.w - this.font.width(label)) / 2, choice.y + 4, WrightsUi.TEXT, false);
-        }
+        graphics.drawString(this.font, this.title, panelX + 16, panelY + 8, WrightsUi.COPPER, false);
+        Component summary = Component.translatable("screen.wrights.roster_split", freeCount(), busyCount());
+        graphics.drawString(this.font, summary, panelX + 16, panelY + 22, WrightsUi.MUTED, false);
+        drawList(graphics, freeWell(), "screen.wrights.drones_available", freeCount(), WrightsUi.GREEN, freeRows, freeScroll, 1, mouseX, mouseY);
+        drawList(graphics, busyWell(), "screen.wrights.roster_on_job", busyCount(), WrightsUi.COPPER, busyRows, busyScroll, 2, mouseX, mouseY);
+        drawMoves(graphics, mouseX, mouseY);
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        for (int i = 0; i < drones.size(); i++) {
-            DroneRow row = drones.get(i);
-            if (mouseX >= panelX + 10 && mouseX < panelX + PANEL_W - 10 && mouseY >= row.y - 3 && mouseY < row.y + 12) {
-                selected = i;
-                rebuild();
+        if (button == 0) {
+            if (clickList(freeWell(), freeRows, true, mouseX, mouseY)) {
                 return true;
             }
-        }
-        for (Choice choice : choices) {
-            if (mouseX >= choice.x && mouseX < choice.x + choice.w && mouseY >= choice.y && mouseY < choice.y + 16) {
-                if (!choice.current && selected >= 0 && selected < drones.size()) {
-                    PacketDistributor.sendToServer(new BlueprintPayloads.MoveDrone(drones.get(selected).unit, choice.job));
-                }
+            if (clickList(busyWell(), busyRows, false, mouseX, mouseY)) {
+                return true;
+            }
+            if (clickMove(mouseX, mouseY)) {
                 return true;
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (drag != 0 && button == 0) {
+            if (drag == 3) {
+                moveScroll = Mth.clamp((int) (mouseY - dragGrab - moveListY()), 0, moveMax());
+            } else {
+                boolean free = drag == 1;
+                Well well = free ? freeWell() : busyWell();
+                List<WrightRow> rows = free ? freeRows : busyRows;
+                int listY = well.y + SECTION_HEAD;
+                int listH = listH(well);
+                int max = maxScroll(rows, listH);
+                int thumb = Math.max(12, listH * listH / (listH + Math.max(1, max)));
+                int travel = Math.max(1, listH - thumb);
+                int next = (int) ((mouseY - dragGrab - listY) * max / travel);
+                if (free) {
+                    freeScroll = Mth.clamp(next, 0, max);
+                } else {
+                    busyScroll = Mth.clamp(next, 0, max);
+                }
+            }
+            return true;
+        }
+        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (button == 0) {
+            drag = 0;
+        }
+        return super.mouseReleased(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        int delta = (int) Math.signum(scrollY) * ROW;
+        if (inside(mouseX, mouseY, freeWell())) {
+            freeScroll = Mth.clamp(freeScroll - delta, 0, maxScroll(freeRows, listH(freeWell())));
+            return true;
+        }
+        if (inside(mouseX, mouseY, busyWell())) {
+            busyScroll = Mth.clamp(busyScroll - delta, 0, maxScroll(busyRows, listH(busyWell())));
+            return true;
+        }
+        Well move = moveWell();
+        if (inside(mouseX, mouseY, move)) {
+            moveScroll = Mth.clamp(moveScroll - delta, 0, moveMax());
+            return true;
+        }
+        return true;
     }
 
     @Override
@@ -121,100 +158,331 @@ public class DroneRosterScreen extends Screen {
         return false;
     }
 
-    @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        int max = Math.max(0, panelH - Math.max(96, this.height - 16));
-        int next = Mth.clamp(scroll - (int) Math.signum(scrollY) * 16, 0, max);
-        if (next != scroll) {
-            scroll = next;
+    private void place() {
+        panelH = Mth.clamp(this.height - 24, 280, 460);
+        panelX = (this.width - PANEL_W) / 2;
+        panelY = Math.max(8, (this.height - panelH) / 2);
+    }
+
+    private int bodyTop() {
+        return panelY + HEADER;
+    }
+
+    private int bodyHeight() {
+        return panelH - HEADER - MOVE_H - FOOTER;
+    }
+
+    private Well freeWell() {
+        int height = (bodyHeight() - 8) / 2;
+        return new Well(panelX + 12, bodyTop(), PANEL_W - 24, height);
+    }
+
+    private Well busyWell() {
+        Well free = freeWell();
+        return new Well(free.x, free.y + free.h + 8, free.w, free.h);
+    }
+
+    private Well moveWell() {
+        return new Well(panelX + 12, panelY + panelH - FOOTER - MOVE_H, PANEL_W - 24, MOVE_H);
+    }
+
+    private static int listH(Well well) {
+        return well.h - SECTION_HEAD - 4;
+    }
+
+    private void drawList(GuiGraphics graphics, Well well, String title, int count, int accent, List<WrightRow> rows, int scroll, int dragId, int mouseX, int mouseY) {
+        WrightsUi.inset(graphics, well.x, well.y, well.w, well.h);
+        graphics.fill(well.x + 1, well.y + 1, well.x + well.w - 1, well.y + SECTION_HEAD, 0xFF15202B);
+        graphics.fill(well.x + 1, well.y + 1, well.x + 3, well.y + SECTION_HEAD, accent);
+        graphics.drawString(this.font, Component.translatable(title), well.x + 10, well.y + 5, WrightsUi.TEXT, false);
+        String countText = Integer.toString(count);
+        graphics.drawString(this.font, countText, well.x + well.w - 8 - this.font.width(countText), well.y + 5, accent, false);
+        int listX = well.x + 4;
+        int listY = well.y + SECTION_HEAD;
+        int listW = well.w - 8;
+        int view = listH(well);
+        boolean bar = rows.size() * ROW > view;
+        int contentRight = listX + listW - (bar ? 8 : 0);
+        graphics.enableScissor(listX, listY, contentRight, listY + view);
+        int y = listY - scroll;
+        for (WrightRow row : rows) {
+            if (y + ROW >= listY && y < listY + view) {
+                drawWright(graphics, row, listX, y, contentRight - listX, mouseX, mouseY, listY, listY + view);
+            }
+            y += ROW;
+        }
+        graphics.disableScissor();
+        if (bar) {
+            drawBar(graphics, listX + listW - 6, listY, view, scroll, Math.max(0, rows.size() * ROW - view), mouseX, mouseY, drag == dragId);
+        }
+    }
+
+    private void drawWright(GuiGraphics graphics, WrightRow row, int x, int y, int width, int mouseX, int mouseY, int clipTop, int clipBottom) {
+        boolean hover = mouseX >= x && mouseX < x + width && mouseY >= Math.max(y, clipTop) && mouseY < Math.min(y + ROW, clipBottom);
+        boolean picked = row.unit.equals(selected);
+        if (row.unit == null) {
+            graphics.drawString(this.font, row.name, x + 8, y + 6, WrightsUi.MUTED, false);
+            return;
+        }
+        if (picked) {
+            graphics.fill(x + 2, y + 1, x + width - 2, y + ROW - 1, 0xFF24384A);
+            graphics.fill(x + 2, y + 1, x + 4, y + ROW - 1, WrightsUi.COPPER);
+        } else if (hover) {
+            graphics.fill(x + 2, y + 1, x + width - 2, y + ROW - 1, 0xFF1C2C3A);
+        }
+        int textRight = x + width - 8;
+        int cursor = textRight;
+        if (!row.where.isEmpty()) {
+            int whereW = Math.min(this.font.width(row.where), Math.max(24, width / 2));
+            graphics.drawString(this.font, this.font.plainSubstrByWidth(row.where, whereW), textRight - whereW, y + 6, WrightsUi.MUTED, false);
+            cursor = textRight - whereW - 6;
+        }
+        if (!row.tierName.isEmpty()) {
+            int tierW = this.font.width(row.tierName);
+            graphics.drawString(this.font, row.tierName, cursor - tierW, y + 6, WrightTier.textColor(row.tier), false);
+            cursor -= tierW + 6;
+        }
+        int nameW = Math.max(24, cursor - (x + 8));
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(row.name, nameW), x + 8, y + 6, WrightsUi.TEXT, false);
+    }
+
+    private void drawMoves(GuiGraphics graphics, int mouseX, int mouseY) {
+        Well well = moveWell();
+        WrightsUi.inset(graphics, well.x, well.y, well.w, well.h);
+        graphics.fill(well.x + 1, well.y + 1, well.x + well.w - 1, well.y + SECTION_HEAD, 0xFF15202B);
+        graphics.fill(well.x + 1, well.y + 1, well.x + 3, well.y + SECTION_HEAD, WrightsUi.GOLD);
+        graphics.drawString(this.font, Component.translatable("screen.wrights.move_to"), well.x + 10, well.y + 5, WrightsUi.TEXT, false);
+        int listX = well.x + 6;
+        int listY = well.y + SECTION_HEAD + 4;
+        int listW = well.w - 12;
+        int listH = well.h - SECTION_HEAD - 8;
+        if (selected.equals(FREE) || findRow(selected) == null) {
+            graphics.drawString(this.font, Component.translatable("screen.wrights.roster_pick"), listX, listY + 4, WrightsUi.MUTED, false);
+            return;
+        }
+        int content = moveContent();
+        boolean bar = content > listH;
+        int right = listX + listW - (bar ? 8 : 0);
+        graphics.enableScissor(listX, listY, right, listY + listH);
+        for (Choice choice : choices) {
+            int y = listY + choice.y - moveScroll;
+            if (y + 16 < listY || y > listY + listH) {
+                continue;
+            }
+            boolean hover = mouseX >= listX + choice.x && mouseX < listX + choice.x + choice.w && mouseY >= y && mouseY < y + 16;
+            int fill = choice.current ? 0xFF2A4054 : (hover ? 0xFF2C3E52 : 0xFF1A2633);
+            graphics.fill(listX + choice.x, y, listX + choice.x + choice.w, y + 16, fill);
+            int edge = choice.current ? WrightsUi.COPPER : (hover ? WrightsUi.GOLD : 0xFF3D4E5E);
+            WrightsUi.border(graphics, listX + choice.x, y, choice.w, 16, edge);
+            String label = this.font.plainSubstrByWidth(choice.label, choice.w - 8);
+            graphics.drawString(this.font, label, listX + choice.x + (choice.w - this.font.width(label)) / 2, y + 4, WrightsUi.TEXT, false);
+        }
+        graphics.disableScissor();
+        if (bar) {
+            drawBar(graphics, listX + listW - 6, listY, listH, moveScroll, moveMax(), mouseX, mouseY, drag == 3);
+        }
+    }
+
+    private boolean clickList(Well well, List<WrightRow> rows, boolean free, double mouseX, double mouseY) {
+        if (!inside(mouseX, mouseY, well)) {
+            return false;
+        }
+        int listX = well.x + 4;
+        int listY = well.y + SECTION_HEAD;
+        int listW = well.w - 8;
+        int view = listH(well);
+        int scroll = free ? freeScroll : busyScroll;
+        boolean bar = rows.size() * ROW > view;
+        if (bar && mouseX >= listX + listW - 8) {
+            int max = maxScroll(rows, view);
+            int thumb = Math.max(12, view * view / (view + Math.max(1, max)));
+            int thumbY = listY + Math.max(1, view - thumb) * scroll / Math.max(1, max);
+            if (mouseY >= thumbY && mouseY < thumbY + thumb) {
+                drag = free ? 1 : 2;
+                dragGrab = (int) mouseY - thumbY;
+            } else {
+                int next = mouseY < thumbY ? scroll - view : scroll + view;
+                if (free) {
+                    freeScroll = Mth.clamp(next, 0, max);
+                } else {
+                    busyScroll = Mth.clamp(next, 0, max);
+                }
+            }
+            return true;
+        }
+        int index = ((int) mouseY - listY + scroll) / ROW;
+        if (index >= 0 && index < rows.size() && rows.get(index).unit != null) {
+            selected = rows.get(index).unit;
+            moveScroll = 0;
             rebuild();
-            if (back != null) {
-                back.setY(panelY + panelH - 28);
+        }
+        return true;
+    }
+
+    private boolean clickMove(double mouseX, double mouseY) {
+        Well well = moveWell();
+        if (!inside(mouseX, mouseY, well) || selected.equals(FREE) || findRow(selected) == null) {
+            return false;
+        }
+        int listX = well.x + 6;
+        int listY = well.y + SECTION_HEAD + 4;
+        int listW = well.w - 12;
+        int view = well.h - SECTION_HEAD - 8;
+        if (moveContent() > view && mouseX >= listX + listW - 8) {
+            int max = moveMax();
+            int thumb = Math.max(12, view * view / (view + Math.max(1, max)));
+            int thumbY = listY + Math.max(1, view - thumb) * moveScroll / Math.max(1, max);
+            if (mouseY >= thumbY && mouseY < thumbY + thumb) {
+                drag = 3;
+                dragGrab = (int) mouseY - thumbY;
+            } else {
+                moveScroll = Mth.clamp(mouseY < thumbY ? moveScroll - view : moveScroll + view, 0, max);
+            }
+            return true;
+        }
+        int localY = (int) mouseY - listY + moveScroll;
+        for (Choice choice : choices) {
+            if (mouseX >= listX + choice.x && mouseX < listX + choice.x + choice.w && localY >= choice.y && localY < choice.y + 16) {
+                if (!choice.current) {
+                    PacketDistributor.sendToServer(new BlueprintPayloads.MoveDrone(selected, choice.job));
+                }
+                return true;
             }
         }
         return true;
     }
 
+    private void drawBar(GuiGraphics graphics, int x, int y, int height, int scroll, int max, int mouseX, int mouseY, boolean dragging) {
+        graphics.fill(x, y, x + 4, y + height, 0xFF0A1218);
+        if (max <= 0) {
+            return;
+        }
+        int thumb = Math.max(12, height * height / (height + max));
+        int travel = Math.max(1, height - thumb);
+        int thumbY = y + travel * Mth.clamp(scroll, 0, max) / max;
+        boolean hover = mouseX >= x - 2 && mouseX < x + 8 && mouseY >= thumbY && mouseY < thumbY + thumb;
+        graphics.fill(x, thumbY, x + 4, thumbY + thumb, hover || dragging ? WrightsUi.COPPER : 0xFF3D4E5E);
+    }
+
     private void rebuild() {
-        Swarm swarm = swarm();
-        UUID keep = selected >= 0 && selected < drones.size() ? drones.get(selected).unit : null;
-        drones.clear();
+        UUID keep = selected;
+        freeRows.clear();
+        busyRows.clear();
         choices.clear();
-        int y = panelY + 44;
+        Swarm swarm = swarm();
         for (int i = 0; i < swarm.units().size(); i++) {
             Swarm.Unit unit = swarm.units().get(i);
             String where = assignment(unit.id());
-            drones.add(new DroneRow(unit.id(), y, unit.title(i + 1).getString(), WrightTier.clamp(unit.speed()), where == null ? Component.translatable("screen.wrights.drone_free").getString() : where));
-            y += 16;
-            if (keep != null && unit.id().equals(keep)) {
-                selected = drones.size() - 1;
+            WrightRow row = new WrightRow(unit.id(), unit.title(i + 1).getString(), WrightTier.clamp(unit.speed()), where == null ? "" : where);
+            if (where == null) {
+                freeRows.add(row);
+            } else {
+                busyRows.add(row);
             }
         }
-        if (drones.isEmpty()) {
-            selected = 0;
-            panelH = 96;
-            panelY = Math.max(8, (this.height - panelH) / 2);
+        if (freeRows.isEmpty()) {
+            freeRows.add(WrightRow.note(Component.translatable("screen.wrights.drones_none_free").getString()));
+        }
+        if (busyRows.isEmpty()) {
+            busyRows.add(WrightRow.note(Component.translatable("screen.wrights.roster_none_busy").getString()));
+        }
+        if (findRow(keep) == null) {
+            selected = FREE;
+        }
+        layoutChoices();
+        freeScroll = Mth.clamp(freeScroll, 0, maxScroll(freeRows, listH(freeWell())));
+        busyScroll = Mth.clamp(busyScroll, 0, maxScroll(busyRows, listH(busyWell())));
+        moveScroll = Mth.clamp(moveScroll, 0, moveMax());
+    }
+
+    private void layoutChoices() {
+        if (selected.equals(FREE) || findRow(selected) == null) {
             return;
         }
-        if (keep == null) {
-            selected = 0;
-        }
-        if (selected >= drones.size()) {
-            selected = drones.size() - 1;
-        }
-        y += 22;
-        UUID currentJob = jobOf(drones.get(selected).unit);
-        int x = panelX + 16;
-        int rowY = y;
-        choices.add(place(x, rowY, Component.translatable("screen.wrights.drone_make_free").getString(), FREE, currentJob == null));
+        UUID current = jobOf(selected);
+        int x = 0;
+        int y = 0;
+        int limit = PANEL_W - 24 - 18;
+        choices.add(choice(x, y, Component.translatable("screen.wrights.drone_make_free").getString(), FREE, current == null));
         x += choices.get(0).w + 4;
         for (BlueprintPayloads.JobLine job : WrightsClientState.jobs) {
             if (job.finished() || job.saving()) {
                 continue;
             }
-            String label = job.name();
-            int w = Mth.clamp(this.font.width(label) + 12, 52, 120);
-            if (x + w > panelX + PANEL_W - 16) {
-                x = panelX + 16;
-                rowY += 20;
+            int w = Mth.clamp(this.font.width(job.name()) + 12, 52, 140);
+            if (x > 0 && x + w > limit) {
+                x = 0;
+                y += 20;
             }
-            choices.add(place(x, rowY, label, job.id(), job.id().equals(currentJob)));
+            choices.add(choice(x, y, job.name(), job.id(), job.id().equals(current)));
             x += w + 4;
         }
-        panelH = rowY - panelY + 52;
-        int view = Math.max(96, this.height - 16);
-        scroll = Mth.clamp(scroll, 0, Math.max(0, panelH - view));
-        int nextY = panelH > view ? 8 - scroll : Math.max(8, (this.height - panelH) / 2);
-        int shift = nextY - panelY;
-        if (shift != 0) {
-            panelY = nextY;
-            for (DroneRow row : drones) {
-                row.y += shift;
-            }
-            for (Choice choice : choices) {
-                choice.y += shift;
-            }
-        }
     }
 
-    private int moveY() {
-        return choices.isEmpty() ? panelY + 48 : choices.get(0).y;
-    }
-
-    private Choice place(int x, int y, String label, UUID job, boolean current) {
-        int w = Mth.clamp(this.font.width(label) + 12, 52, 120);
+    private Choice choice(int x, int y, String label, UUID job, boolean current) {
+        int w = Mth.clamp(this.font.width(label) + 12, 52, 140);
         return new Choice(job, x, y, w, label, current);
     }
 
-    private int[] pool() {
-        int total = swarm().units().size();
-        int working = 0;
-        for (BlueprintPayloads.JobLine job : WrightsClientState.jobs) {
-            if (!job.finished() && !job.saving()) {
-                working += job.crew().size();
+    private int moveContent() {
+        int bottom = 0;
+        for (Choice choice : choices) {
+            bottom = Math.max(bottom, choice.y + 16);
+        }
+        return bottom;
+    }
+
+    private int moveMax() {
+        return Math.max(0, moveContent() - (MOVE_H - SECTION_HEAD - 8));
+    }
+
+    private int moveListY() {
+        return moveWell().y + SECTION_HEAD + 4;
+    }
+
+    private int busyCount() {
+        int count = 0;
+        for (WrightRow row : busyRows) {
+            if (row.unit != null) {
+                count++;
             }
         }
-        return new int[] {working, total};
+        return count;
+    }
+
+    private int freeCount() {
+        int count = 0;
+        for (WrightRow row : freeRows) {
+            if (row.unit != null) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private WrightRow findRow(UUID unit) {
+        if (unit == null || unit.equals(FREE)) {
+            return null;
+        }
+        for (WrightRow row : freeRows) {
+            if (unit.equals(row.unit)) {
+                return row;
+            }
+        }
+        for (WrightRow row : busyRows) {
+            if (unit.equals(row.unit)) {
+                return row;
+            }
+        }
+        return null;
+    }
+
+    private static int maxScroll(List<WrightRow> rows, int view) {
+        return Math.max(0, rows.size() * ROW - view);
+    }
+
+    private static boolean inside(double mouseX, double mouseY, Well well) {
+        return mouseX >= well.x && mouseX < well.x + well.w && mouseY >= well.y && mouseY < well.y + well.h;
     }
 
     private String assignment(UUID unit) {
@@ -239,26 +507,33 @@ public class DroneRosterScreen extends Screen {
         return this.minecraft == null || this.minecraft.player == null ? Swarm.EMPTY : Wrightports.swarm(this.minecraft.player);
     }
 
-    private static final class DroneRow {
-        private final UUID unit;
-        private int y;
-        private final String name;
-        private final int tier;
-        private final String where;
+    private record Well(int x, int y, int w, int h) {
+    }
 
-        private DroneRow(UUID unit, int y, String name, int tier, String where) {
+    private static final class WrightRow {
+        private final UUID unit;
+        private final String name;
+        private final String tierName;
+        private final String where;
+        private final int tier;
+
+        private WrightRow(UUID unit, String name, int tier, String where) {
             this.unit = unit;
-            this.y = y;
             this.name = name;
             this.tier = tier;
-            this.where = where;
+            this.tierName = unit == null || tier <= 0 ? "" : Component.translatable(WrightTier.nameKey(tier)).getString();
+            this.where = where == null ? "" : where;
+        }
+
+        private static WrightRow note(String name) {
+            return new WrightRow(null, name, 0, "");
         }
     }
 
     private static final class Choice {
         private final UUID job;
         private final int x;
-        private int y;
+        private final int y;
         private final int w;
         private final String label;
         private final boolean current;

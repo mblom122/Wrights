@@ -984,7 +984,7 @@ public final class JobManager {
         if (job.queued()) {
             topUpQueued(player, library, job);
             if (!job.hasCrew()) {
-                job.setWaitKind(BuildJob.WAIT_NONE);
+                job.setWaitKind(shortOnItems(player, library, job) ? BuildJob.WAIT_ITEMS : BuildJob.WAIT_NONE);
                 return;
             }
         }
@@ -1019,6 +1019,7 @@ public final class JobManager {
         if (at == NEED_ITEMS) {
             job.setWaitKind(BuildJob.WAIT_ITEMS);
             parkSolo(level, player, job);
+            releaseStalledHome(player, library, job);
             library.setDirty();
             return;
         }
@@ -1054,6 +1055,7 @@ public final class JobManager {
             if (index == NEED_ITEMS) {
                 job.setWaitKind(BuildJob.WAIT_ITEMS);
                 parkSolo(level, player, job);
+                releaseStalledHome(player, library, job);
                 break;
             }
             if (index < 0) {
@@ -2530,6 +2532,9 @@ public final class JobManager {
             reason = BuildJob.WAIT_FLOOR;
         }
         job.setWaitKind(reason);
+        if (reason == BuildJob.WAIT_ITEMS) {
+            releaseStalledHome(player, library, job);
+        }
         if (!working && !scanning && !waiting) {
             finishPaste(level.getServer(), library, player, job);
         } else if (waitingChunk && job.tickMessage()) {
@@ -4434,6 +4439,86 @@ public final class JobManager {
             }
         }
         return best;
+    }
+
+    /**
+     * A stalled job does not keep wrights that have gone home. The wanted count stays, and whoever is free
+     * when the items arrive can continue it.
+     */
+    private static void releaseStalledHome(ServerPlayer player, SchematicLibrary library, BuildJob job) {
+        if (player == null || job.paused() || job.finished() || job.waitKind() != BuildJob.WAIT_ITEMS) {
+            return;
+        }
+        List<UUID> units = job.crewUnits();
+        if (units.isEmpty()) {
+            return;
+        }
+        List<UUID> keepIds = new ArrayList<>();
+        List<BuildJob.Hand> keepHands = new ArrayList<>();
+        List<BuildJob.Slice> spare = new ArrayList<>();
+        for (int i = 0; i < units.size(); i++) {
+            BuildJob.Hand hand = i < job.hands().size() ? job.hands().get(i) : null;
+            if (unitIsOut(player, job, units.get(i))) {
+                keepIds.add(units.get(i));
+                if (hand != null) {
+                    keepHands.add(hand);
+                }
+            } else if (hand != null) {
+                spare.addAll(hand.slices);
+            }
+        }
+        if (keepIds.size() == units.size()) {
+            return;
+        }
+        int quota = Math.max(1, Math.max(job.crewQuota(), units.size()));
+        if (keepIds.isEmpty()) {
+            sendHome(player.getServer(), player, job);
+            job.clearAssigned();
+            job.setCrewQuota(quota);
+            job.setQueued(true);
+            job.setPaused(false);
+            job.clearHold();
+            job.setWaitKind(BuildJob.WAIT_ITEMS);
+            library.setDirty();
+            return;
+        }
+        if (!spare.isEmpty() && !keepHands.isEmpty()) {
+            keepHands.get(0).slices.addAll(spare);
+        }
+        job.hands().clear();
+        job.hands().addAll(keepHands);
+        for (int i = 0; i < job.hands().size(); i++) {
+            BuildJob.Hand hand = job.hands().get(i);
+            hand.lane = i;
+            hand.lanes = job.hands().size();
+        }
+        job.setCrewUnits(keepIds);
+        job.setCrewQuota(quota);
+        job.setPaused(false);
+        job.clearHold();
+        library.setDirty();
+    }
+
+    /** True when the blocks still open need items that no free wright can pay for yet. */
+    private static boolean shortOnItems(ServerPlayer player, SchematicLibrary library, BuildJob job) {
+        ServerLevel level = player.getServer() == null ? null : player.getServer().getLevel(job.dimension());
+        if (level == null || job.schematicId() == null) {
+            return false;
+        }
+        Schematic schematic = library.schematic(job.schematicId()).orElse(null);
+        if (schematic == null) {
+            return false;
+        }
+        Owed owed = owed(level, schematic, job);
+        if (owed.idle() || owed.open || owed.items.isEmpty()) {
+            return false;
+        }
+        for (WrightHomes.FreeWright free : freeUnits(player, library, job, Integer.MAX_VALUE)) {
+            if (owed.allows(player, level, job, free.homePort())) {
+                return false;
+            }
+        }
+        return !owed.allows(player, level, job, null);
     }
 
     /** Takes a wright that went home to wait for items off that job, so a new job can have it. */
