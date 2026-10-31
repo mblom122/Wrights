@@ -170,6 +170,9 @@ public class WrightsMenuScreen extends Screen {
     private int manageAllWidth;
     private int manageAllRight;
     private int manageAllY;
+    private boolean clearJobs;
+    private int clearJobWidth;
+    private int clearJobRight;
     private boolean workAllPaused;
     private int drag;
     private int wallSliderX;
@@ -1393,6 +1396,9 @@ public class WrightsMenuScreen extends Screen {
             return true;
         }
         if (managePage) {
+            if (button == 0 && clickClearPortHighlights(mouseX, mouseY)) {
+                return true;
+            }
             if (button == 0 && clickManageTabs(mouseX, mouseY)) {
                 return true;
             }
@@ -1878,6 +1884,9 @@ public class WrightsMenuScreen extends Screen {
         workPauseRight = right - workRemoveWidth - 4;
         doneRemoveWidth = workRemoveWidth;
         doneRemoveRight = right;
+        clearJobs = !WrightsClientState.markedJobs.isEmpty();
+        clearJobWidth = jobButtonWidth("menu.wrights.clear_highlights");
+        clearJobRight = manageAllRight - manageAllWidth - 4;
     }
 
     private int jobGroupHeight(int rows) {
@@ -1895,9 +1904,13 @@ public class WrightsMenuScreen extends Screen {
         hoveredJob = null;
         prepareJobs();
         int[] pool = dronePool();
-        String drones = this.font.plainSubstrByWidth(Component.translatable("menu.wrights.wrights_available", pool[0], pool[1]).getString(), Math.max(40, jobW - manageAllWidth - 8));
+        int reserved = manageAllWidth + 8 + (clearJobs ? clearJobWidth + 4 : 0);
+        String drones = this.font.plainSubstrByWidth(Component.translatable("menu.wrights.wrights_available", pool[0], pool[1]).getString(), Math.max(40, jobW - reserved));
         graphics.drawString(this.font, drones, jobX, manageAllY + 4, WrightsUi.TEXT, false);
         drawJobButton(graphics, manageAllRight, manageAllY, "menu.wrights.manage_all", mouseX, mouseY, manageAllWidth);
+        if (clearJobs) {
+            drawJobButton(graphics, clearJobRight, manageAllY, "menu.wrights.clear_highlights", mouseX, mouseY, clearJobWidth, 0xFFF2D48A);
+        }
         int rowX = jobX + 4;
         int rowW = jobW - 8;
         int activeJobs = 0;
@@ -2275,6 +2288,10 @@ public class WrightsMenuScreen extends Screen {
                 return true;
             }
             this.minecraft.setScreen(new DroneRosterScreen(null));
+            return true;
+        }
+        if (clearJobs && hitWide(mouseX, mouseY, clearJobRight, manageAllY, clearJobWidth)) {
+            WrightsClientState.markedJobs.clear();
             return true;
         }
         if (!workingJobs.isEmpty()) {
@@ -3484,6 +3501,22 @@ public class WrightsMenuScreen extends Screen {
         int personalW = manageTabWidth(0);
         drawManageTab(graphics, mouseX, mouseY, x, y, personalW, 0);
         drawManageTab(graphics, mouseX, mouseY, x + personalW + 4, y, manageTabWidth(1), 1);
+        if (manageTab == 1 && !WrightsClientState.markedPorts.isEmpty()) {
+            int width = jobButtonWidth("menu.wrights.clear_highlights");
+            drawJobButton(graphics, x + portBarW(), y, "menu.wrights.clear_highlights", mouseX, mouseY, width, 0xFFF2D48A);
+        }
+    }
+
+    private boolean clickClearPortHighlights(double mouseX, double mouseY) {
+        if (manageTab != 1 || WrightsClientState.markedPorts.isEmpty()) {
+            return false;
+        }
+        int width = jobButtonWidth("menu.wrights.clear_highlights");
+        if (!hitWide(mouseX, mouseY, portBarX() + portBarW(), portBarY(), width)) {
+            return false;
+        }
+        WrightsClientState.markedPorts.clear();
+        return true;
     }
 
     private void drawManageTab(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int w, int index) {

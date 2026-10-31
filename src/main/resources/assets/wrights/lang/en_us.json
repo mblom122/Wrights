@@ -249,6 +249,7 @@
   "menu.wrights.job_eta": "%s%%  ·  %s / %s  ·  %s left",
   "menu.wrights.mark": "Highlight",
   "menu.wrights.mark_on": "Highlighted",
+  "menu.wrights.clear_highlights": "Remove all highlights",
   "menu.wrights.visit": "Go",
   "menu.wrights.remove": "Remove",
   "menu.wrights.completed": "Completed",
