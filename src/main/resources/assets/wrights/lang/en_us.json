@@ -62,6 +62,8 @@
   "message.wrights.digital_craft_materials": "Not enough materials in the network to craft %s",
   "message.wrights.digital_craft_cpu": "No free crafting CPU to craft %s",
   "message.wrights.digital_craft_blocked": "Not enough materials, and no free crafting CPU, to craft %s",
+  "message.wrights.digital_craft_crafter": "No free crafter to craft %s",
+  "message.wrights.digital_craft_blocked_crafter": "Not enough materials, and no free crafter, to craft %s",
   "message.wrights.digital_craft_failed": "Could not request that craft from the network",
   "message.wrights.bind_aim": "Right-click a chest, barrel, or shulker",
   "message.wrights.paste_missing": "That copy is no longer available",

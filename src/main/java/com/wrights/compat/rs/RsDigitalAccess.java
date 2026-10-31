@@ -1,9 +1,11 @@
 package com.wrights.compat.rs;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import net.minecraft.core.BlockPos;
@@ -17,9 +19,15 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
+import com.refinedmods.refinedstorage.api.autocrafting.Pattern;
+import com.refinedmods.refinedstorage.api.autocrafting.PatternRepository;
 import com.refinedmods.refinedstorage.api.autocrafting.calculation.CancellationToken;
+import com.refinedmods.refinedstorage.api.autocrafting.calculation.CraftingCalculatorImpl;
+import com.refinedmods.refinedstorage.api.autocrafting.task.TaskPlanCraftingCalculatorListener;
 import com.refinedmods.refinedstorage.api.network.Network;
 import com.refinedmods.refinedstorage.api.network.autocrafting.AutocraftingNetworkComponent;
+import com.refinedmods.refinedstorage.api.network.autocrafting.PatternProvider;
+import com.refinedmods.refinedstorage.api.network.impl.node.patternprovider.PatternProviderNetworkNode;
 import com.refinedmods.refinedstorage.api.network.storage.StorageNetworkComponent;
 import com.refinedmods.refinedstorage.api.core.Action;
 import com.refinedmods.refinedstorage.api.resource.ResourceAmount;
@@ -168,6 +176,18 @@ public final class RsDigitalAccess implements DigitalAccess {
         if (quiet != null) {
             QUIET_UNTIL.remove(craftKey);
         }
+        ItemStack named = new ItemStack(item);
+        boolean crafter = crafterActive(crafting, key);
+        if (!crafter) {
+            boolean missing = !canPlan(network, crafting, key, amount);
+            quiet(level, craftKey);
+            if (missing) {
+                DigitalNetworks.explainCraftFailure(player, "message.wrights.digital_craft_blocked_crafter", named.getHoverName());
+            } else {
+                DigitalNetworks.explainCraftFailure(player, "message.wrights.digital_craft_crafter", named.getHoverName());
+            }
+            return false;
+        }
         Actor actor = new PlayerActor(player);
         AutocraftingNetworkComponent.EnsureResult result;
         try {
@@ -183,11 +203,79 @@ public final class RsDigitalAccess implements DigitalAccess {
         }
         quiet(level, craftKey);
         if (result == AutocraftingNetworkComponent.EnsureResult.MISSING_RESOURCES) {
-            DigitalNetworks.explainCraftFailure(player, "message.wrights.digital_craft_materials", new ItemStack(item).getHoverName());
+            DigitalNetworks.explainCraftFailure(player, "message.wrights.digital_craft_materials", named.getHoverName());
         } else {
             DigitalNetworks.explainCraftFailure(player, "message.wrights.digital_craft_failed");
         }
         return false;
+    }
+
+    /** An autocrafter holds the pattern. It can take the job only while that block is active. */
+    private static boolean crafterActive(AutocraftingNetworkComponent crafting, ResourceKey key) {
+        List<Pattern> patterns = crafting.getPatternsByOutput(key);
+        if (patterns.isEmpty()) {
+            return false;
+        }
+        for (Pattern pattern : patterns) {
+            PatternProvider provider = crafting.getProviderByPattern(pattern);
+            if (provider instanceof PatternProviderNetworkNode node) {
+                if (node.isActive()) {
+                    return true;
+                }
+            } else if (provider != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Plans on this thread and does not start a task. An empty plan means the network
+     * cannot supply the ingredients.
+     */
+    private static boolean canPlan(Network network, AutocraftingNetworkComponent crafting, ResourceKey key, long amount) {
+        StorageNetworkComponent storage = network.getComponent(StorageNetworkComponent.class);
+        CraftingCalculatorImpl calculator = new CraftingCalculatorImpl(new PatternView(crafting), storage);
+        try {
+            return TaskPlanCraftingCalculatorListener.calculatePlan(calculator, key, amount, CancellationToken.NONE).isPresent();
+        } catch (RuntimeException ex) {
+            return false;
+        }
+    }
+
+    private static final class PatternView implements PatternRepository {
+        private final AutocraftingNetworkComponent crafting;
+
+        private PatternView(AutocraftingNetworkComponent crafting) {
+            this.crafting = crafting;
+        }
+
+        @Override
+        public void add(Pattern pattern, int priority) {
+        }
+
+        @Override
+        public void update(Pattern pattern, int priority) {
+        }
+
+        @Override
+        public void remove(Pattern pattern) {
+        }
+
+        @Override
+        public Collection<Pattern> getByOutput(ResourceKey resource) {
+            return crafting.getPatternsByOutput(resource);
+        }
+
+        @Override
+        public Set<ResourceKey> getOutputs() {
+            return crafting.getOutputs();
+        }
+
+        @Override
+        public Set<Pattern> getAll() {
+            return crafting.getPatterns();
+        }
     }
 
     private static void quiet(ServerLevel level, CraftKey key) {
