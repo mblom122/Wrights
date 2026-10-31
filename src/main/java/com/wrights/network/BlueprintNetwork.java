@@ -847,19 +847,35 @@ public final class BlueprintNetwork {
         if (job.finished() || schematic == null) {
             return;
         }
-        java.util.List<BlueprintPayloads.Bit> bits = new java.util.ArrayList<>();
-        if (schematic != null && schematic.blockCount() <= com.wrights.WrightsConfig.maxPreviewBlocks()) {
-            for (Schematic.Entry entry : schematic.entries()) {
-                if (job.outsideClip(entry)) {
-                    continue;
-                }
-                bits.add(new BlueprintPayloads.Bit(entry.x(), entry.y(), entry.z(), net.minecraft.world.level.block.Block.getId(entry.state())));
-            }
-        }
+        java.util.List<BlueprintPayloads.Bit> bits = hologramBits(job, schematic);
         int clipX = job.clipX() == Integer.MAX_VALUE ? schematic.sizeX() : job.clipX();
         int clipY = job.clipY() == Integer.MAX_VALUE ? schematic.sizeY() : job.clipY();
         int clipZ = job.clipZ() == Integer.MAX_VALUE ? schematic.sizeZ() : job.clipZ();
-        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.JobHologram(job.id(), job.min(), clipX, clipY, clipZ, false, bits));
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.JobHologram(job.id(), job.min(), clipX, clipY, clipZ, false, bits, job.dimension().location().toString()));
+    }
+
+    /** Keeps a big build under the packet cap by stepping through it, so the ghost still shows. */
+    private static java.util.List<BlueprintPayloads.Bit> hologramBits(BuildJob job, Schematic schematic) {
+        int limit = Math.max(1, com.wrights.WrightsConfig.maxPreviewBlocks());
+        int count = 0;
+        for (Schematic.Entry entry : schematic.entries()) {
+            if (!job.outsideClip(entry)) {
+                count++;
+            }
+        }
+        int step = Math.max(1, (count + limit - 1) / limit);
+        java.util.List<BlueprintPayloads.Bit> bits = new java.util.ArrayList<>(Math.min(count, limit));
+        int seen = 0;
+        for (Schematic.Entry entry : schematic.entries()) {
+            if (job.outsideClip(entry)) {
+                continue;
+            }
+            if (seen % step == 0) {
+                bits.add(new BlueprintPayloads.Bit(entry.x(), entry.y(), entry.z(), net.minecraft.world.level.block.Block.getId(entry.state())));
+            }
+            seen++;
+        }
+        return bits;
     }
 
     public static void clearJobHologram(ServerPlayer player, java.util.UUID jobId) {

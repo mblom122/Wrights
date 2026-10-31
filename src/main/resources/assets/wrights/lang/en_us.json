@@ -227,6 +227,8 @@
   "menu.wrights.port_hotbar": "Hotbar %s",
   "menu.wrights.port_bag": "Inventory %s",
   "menu.wrights.jobs_working": "Working",
+  "menu.wrights.jobs_working_count": "Working (%s)",
+  "menu.wrights.jobs_finished_count": "Finished (%s)",
   "menu.wrights.drones_pool": "Working %s / %s total",
   "menu.wrights.job_drone_count": "Wrights %s",
   "menu.wrights.job_drone_queued": "Wrights %s / %s",

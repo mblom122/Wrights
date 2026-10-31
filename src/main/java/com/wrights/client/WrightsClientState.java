@@ -150,7 +150,7 @@ public final class WrightsClientState {
     public record Ghost(int x, int y, int z, float r, float g, float b, int stateId) {
     }
 
-    public record ActiveBuild(BlockPos origin, int clipX, int clipY, int clipZ, List<Ghost> ghosts) {
+    public record ActiveBuild(BlockPos origin, int clipX, int clipY, int clipZ, List<Ghost> ghosts, String dimension) {
     }
 
     public static final Map<UUID, ActiveBuild> activeBuilds = new LinkedHashMap<>();
@@ -183,7 +183,7 @@ public final class WrightsClientState {
                 }
                 ghosts.add(new Ghost(Short.toUnsignedInt(bit.x()), Short.toUnsignedInt(bit.y()), Short.toUnsignedInt(bit.z()), 1.0F, 1.0F, 1.0F, bit.stateId()));
             }
-            activeBuilds.put(payload.jobId(), new ActiveBuild(payload.origin(), payload.clipX(), payload.clipY(), payload.clipZ(), ghosts));
+            activeBuilds.put(payload.jobId(), new ActiveBuild(payload.origin(), payload.clipX(), payload.clipY(), payload.clipZ(), ghosts, payload.dimension()));
         }
         rebuildActiveCells();
     }

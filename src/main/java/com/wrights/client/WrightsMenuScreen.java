@@ -37,7 +37,6 @@ public class WrightsMenuScreen extends Screen {
     private static final int PORT_ROWS = 8;
     private static int savedPage = PAGE_BUILDING;
     private static int savedScroll;
-    private static int savedJobScroll;
     private static int savedHistoryScroll;
     private static int savedOptionScroll;
     private static String savedSearch = "";
@@ -142,6 +141,7 @@ public class WrightsMenuScreen extends Screen {
     private boolean holding;
     private int holdTicker;
     private int jobScroll;
+    private UUID leadJob;
     private int historyScroll;
     private final List<BlueprintPayloads.JobLine> workingJobs = new ArrayList<>();
     private final List<BlueprintPayloads.JobLine> finishedJobs = new ArrayList<>();
@@ -268,7 +268,7 @@ public class WrightsMenuScreen extends Screen {
             managePage = savedPage == PAGE_MANAGE;
         }
         scroll = savedScroll;
-        jobScroll = savedJobScroll;
+        jobScroll = 0;
         historyScroll = savedHistoryScroll;
         optionScroll = savedOptionScroll;
         infoScroll = savedInfoScroll;
@@ -370,7 +370,6 @@ public class WrightsMenuScreen extends Screen {
         savedPage = managePage ? PAGE_MANAGE : jobsPage ? PAGE_JOBS : options ? PAGE_OPTIONS : infoPage ? PAGE_INFO : PAGE_BUILDING;
         sendHold(false);
         savedScroll = scroll;
-        savedJobScroll = jobScroll;
         savedHistoryScroll = historyScroll;
         savedOptionScroll = optionScroll;
         savedInfoScroll = infoScroll;
@@ -1804,7 +1803,7 @@ public class WrightsMenuScreen extends Screen {
             if (job.finished()) {
                 finishedJobs.add(job);
             } else {
-                workingJobs.add(job);
+                workingJobs.add(0, job);
                 if (!job.paused()) {
                     workAllPaused = false;
                 }
@@ -1850,6 +1849,15 @@ public class WrightsMenuScreen extends Screen {
         doneHeaderY = doneGroupY + 2;
         doneListY = doneGroupY + JOB_HEADER + 4;
         doneRows = doneOpen ? Math.max(1, (doneBlock - JOB_HEADER - 8) / JOB_ROW) : 0;
+        if (!workingJobs.isEmpty()) {
+            UUID lead = workingJobs.get(0).id();
+            if (leadJob != null && !leadJob.equals(lead)) {
+                jobScroll = 0;
+            }
+            leadJob = lead;
+        } else {
+            leadJob = null;
+        }
         jobScroll = Mth.clamp(jobScroll, 0, Math.max(0, workingJobs.size() - workRows));
         historyScroll = Mth.clamp(historyScroll, 0, Math.max(0, finishedJobs.size() - doneRows));
         int right = jobX + jobW - 6;
@@ -1881,7 +1889,10 @@ public class WrightsMenuScreen extends Screen {
         drawJobButton(graphics, manageAllRight, manageAllY, "menu.wrights.manage_all", mouseX, mouseY, manageAllWidth);
         int rowX = jobX + 4;
         int rowW = jobW - 8;
-        drawJobGroup(graphics, jobX, workGroupY, jobW, workGroupH, "menu.wrights.jobs_working", workingJobs.isEmpty() ? "menu.wrights.jobs_working_empty" : null, workingJobs.isEmpty() ? 0 : workPauseWidth + workRemoveWidth + 18);
+        Component workTitle = workingJobs.size() > workRows
+                ? Component.translatable("menu.wrights.jobs_working_count", workingJobs.size())
+                : Component.translatable("menu.wrights.jobs_working");
+        drawJobGroup(graphics, jobX, workGroupY, jobW, workGroupH, workTitle, workingJobs.isEmpty() ? Component.translatable("menu.wrights.jobs_working_empty") : null, workingJobs.isEmpty() ? 0 : workPauseWidth + workRemoveWidth + 18);
         if (!workingJobs.isEmpty()) {
             drawJobButton(graphics, workRemoveRight, workHeaderY, "menu.wrights.remove_all", mouseX, mouseY, workRemoveWidth);
             drawJobButton(graphics, workPauseRight, workHeaderY, workAllPaused ? "menu.wrights.resume_all" : "menu.wrights.pause_all", mouseX, mouseY, workPauseWidth);
@@ -1889,7 +1900,10 @@ public class WrightsMenuScreen extends Screen {
                 drawJobRow(graphics, mouseX, mouseY, rowX, rowW, workListY + row * JOB_ROW, workingJobs.get(jobScroll + row));
             }
         }
-        drawJobGroup(graphics, jobX, doneGroupY, jobW, doneGroupH, "menu.wrights.jobs_finished", finishedJobs.isEmpty() ? "menu.wrights.jobs_finished_empty" : null, finishedJobs.isEmpty() ? 0 : doneRemoveWidth + 14);
+        Component doneTitle = finishedJobs.size() > doneRows
+                ? Component.translatable("menu.wrights.jobs_finished_count", finishedJobs.size())
+                : Component.translatable("menu.wrights.jobs_finished");
+        drawJobGroup(graphics, jobX, doneGroupY, jobW, doneGroupH, doneTitle, finishedJobs.isEmpty() ? Component.translatable("menu.wrights.jobs_finished_empty") : null, finishedJobs.isEmpty() ? 0 : doneRemoveWidth + 14);
         if (!finishedJobs.isEmpty()) {
             drawJobButton(graphics, doneRemoveRight, doneHeaderY, "menu.wrights.remove_all", mouseX, mouseY, doneRemoveWidth);
             for (int row = 0; row < doneRows && historyScroll + row < finishedJobs.size(); row++) {
@@ -1901,16 +1915,16 @@ public class WrightsMenuScreen extends Screen {
         }
     }
 
-    private void drawJobGroup(GuiGraphics graphics, int x, int y, int width, int height, String title, String empty, int reserved) {
+    private void drawJobGroup(GuiGraphics graphics, int x, int y, int width, int height, Component title, Component empty, int reserved) {
         graphics.fill(x, y, x + width, y + height, 0xFF101820);
         WrightsUi.border(graphics, x, y, width, height, 0xFF3A4C5C);
         graphics.fill(x + 1, y + 1, x + width - 1, y + JOB_HEADER, 0xFF1C2A36);
         graphics.fill(x + 1, y + 1, x + 3, y + JOB_HEADER, WrightsUi.COPPER);
         graphics.fill(x + 1, y + JOB_HEADER - 1, x + width - 1, y + JOB_HEADER, 0xFF31404E);
-        String heading = this.font.plainSubstrByWidth(Component.translatable(title).getString(), Math.max(40, width - reserved - 12));
+        String heading = this.font.plainSubstrByWidth(title.getString(), Math.max(40, width - reserved - 12));
         graphics.drawString(this.font, heading, x + 10, y + 6, WrightsUi.TEXT, false);
         if (empty != null) {
-            graphics.drawString(this.font, Component.translatable(empty), x + 10, y + JOB_HEADER + 6, WrightsUi.MUTED, false);
+            graphics.drawString(this.font, empty, x + 10, y + JOB_HEADER + 6, WrightsUi.MUTED, false);
         }
     }
 

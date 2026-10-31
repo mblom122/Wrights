@@ -71,13 +71,16 @@ public final class SelectionRenderer {
         drawPortBounds(pose, buffers, camera, minecraft);
         drawPortGlow(pose, buffers, camera, minecraft);
         drawMarkedPorts(pose, buffers, camera, minecraft);
-        if (!ControllerItem.isHeld(player)) {
-            return;
-        }
         boolean placing = minecraft.screen instanceof PlacementScreen;
         boolean adjust = minecraft.screen instanceof BlueprintAdjustScreen;
         boolean gui = minecraft.screen != null;
         boolean capture = WrightsClientState.mode == WrightsClientState.Mode.CAPTURE || WrightsClientState.mode == WrightsClientState.Mode.SAVING;
+        if (!capture) {
+            drawActiveBuilds(pose, buffers, camera, minecraft, !gui);
+        }
+        if (!ControllerItem.isHeld(player)) {
+            return;
+        }
         if ((adjust || !gui) && capture) {
             drawCapture(pose, buffers, camera);
             drawCaptureGhosts(pose, buffers, camera, minecraft);
@@ -86,9 +89,6 @@ public final class SelectionRenderer {
         }
         if ((!gui || placing) && WrightsClientState.mode == WrightsClientState.Mode.BUILD && (WrightsClientState.bindSupply || WrightsClientState.supplyBound)) {
             drawSupplyMarkers(pose, buffers, camera, minecraft);
-        }
-        if (!capture) {
-            drawActiveBuilds(pose, buffers, camera, minecraft, !gui);
         }
         drawMarkedJobs(pose, buffers, camera, minecraft);
     }
@@ -453,8 +453,12 @@ public final class SelectionRenderer {
         }
         BlockRenderDispatcher renderer = minecraft.getBlockRenderer();
         boolean any = false;
+        String here = minecraft.level.dimension().location().toString();
         if (models) {
             for (WrightsClientState.ActiveBuild build : WrightsClientState.activeBuilds.values()) {
+                if (!build.dimension().isEmpty() && !build.dimension().equals(here)) {
+                    continue;
+                }
                 var ghosts = build.ghosts();
                 prepare(ghosts.size());
                 int count = 0;
@@ -499,6 +503,9 @@ public final class SelectionRenderer {
         boolean boxed = false;
         for (var entry : WrightsClientState.activeBuilds.entrySet()) {
             WrightsClientState.ActiveBuild build = entry.getValue();
+            if (!build.dimension().isEmpty() && !build.dimension().equals(here)) {
+                continue;
+            }
             BlockPos origin = build.origin();
             AABB box = new AABB(origin.getX(), origin.getY(), origin.getZ(), origin.getX() + build.clipX(), origin.getY() + build.clipY(), origin.getZ() + build.clipZ());
             boolean queued = queuedBuild(entry.getKey());
