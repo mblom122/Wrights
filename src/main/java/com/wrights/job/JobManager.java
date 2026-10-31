@@ -734,7 +734,7 @@ public final class JobManager {
         job.setMineAny(any);
         job.setMineVoid(voiding);
         job.setMineTool(tool);
-        job.setBlueprintName("Mine");
+        job.setBlueprintName("Mirror - Mine");
         job.setAnchor(anchor == null ? origin : anchor);
         if (!instant(player) && freeUnits(player, library, job, 1).isEmpty()) {
             int blocks = Math.max(1, schematic.blockCount());

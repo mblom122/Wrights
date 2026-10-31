@@ -300,7 +300,7 @@ public final class MirrorLaunch {
         }
         BlockPos min = new BlockPos(minX, minY, minZ);
         BlockPos max = new BlockPos(maxX, maxY, maxZ);
-        Schematic schematic = new Schematic(UUID.randomUUID(), "Mine", sizeX, sizeY, sizeZ, entries, min, max, level.dimension().location().toString(), 0, 0, 0, true);
+        Schematic schematic = new Schematic(UUID.randomUUID(), "Mirror - Mine", sizeX, sizeY, sizeZ, entries, min, max, level.dimension().location().toString(), 0, 0, 0, true);
         boolean voiding = payload.voidBlocks() && WrightsConfig.allowVoidBlocks();
         JobManager.startMirrorMine(player, schematic, origin, payload.any(), voiding, miningTool(player));
     }
