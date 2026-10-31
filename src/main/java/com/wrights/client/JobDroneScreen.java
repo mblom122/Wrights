@@ -15,17 +15,26 @@ import com.wrights.drone.Swarm;
 import com.wrights.drone.WrightTier;
 import com.wrights.network.BlueprintPayloads;
 
+/** Assigns wrights to one job. The window stays put; each list scrolls on its own. */
 public class JobDroneScreen extends Screen {
-    private static final int PANEL_W = 300;
-    private static final int ROW = 16;
+    private static final int PANEL_W = 372;
+    private static final int ROW = 20;
+    private static final int HEADER = 52;
+    private static final int FOOTER = 36;
+    private static final int SECTION_HEAD = 18;
+    private static final int BUTTON_W = 52;
 
     private final UUID id;
     private final Screen parent;
-    private final List<Row> rows = new ArrayList<>();
+    private final List<Entry> assigned = new ArrayList<>();
+    private final List<Entry> others = new ArrayList<>();
     private int panelX;
     private int panelY;
     private int panelH;
-    private int scroll;
+    private int onScroll;
+    private int otherScroll;
+    private int drag;
+    private int dragGrab;
     private WrightsButton back;
 
     public JobDroneScreen(UUID id, Screen parent) {
@@ -36,10 +45,11 @@ public class JobDroneScreen extends Screen {
 
     @Override
     protected void init() {
-        panelX = (this.width - PANEL_W) / 2;
+        place();
         rebuild();
-        back = new WrightsButton(panelX + 16, panelY + panelH - 28, PANEL_W - 32, 16, Component.translatable("screen.wrights.back"), button -> onClose());
-        addRenderableWidget(back);
+        back = addRenderableWidget(new WrightsButton(
+                panelX + 12, panelY + panelH - 26, PANEL_W - 24, 16,
+                Component.translatable("screen.wrights.back"), button -> onClose()));
     }
 
     @Override
@@ -50,11 +60,7 @@ public class JobDroneScreen extends Screen {
             onClose();
             return;
         }
-        int previous = panelH;
         rebuild();
-        if (previous != panelH && back != null) {
-            back.setY(panelY + panelH - 28);
-        }
     }
 
     @Override
@@ -70,46 +76,65 @@ public class JobDroneScreen extends Screen {
         if (job == null) {
             return;
         }
-        graphics.drawString(this.font, this.title, panelX + 16, panelY + 10, WrightsUi.COPPER, false);
-        graphics.drawString(this.font, this.font.plainSubstrByWidth(job.name(), PANEL_W - 32), panelX + 16, panelY + 24, WrightsUi.TEXT, false);
-        int[] pool = pool();
-        graphics.drawString(this.font, Component.translatable("menu.wrights.drones_pool", pool[0], pool[1]), panelX + 16, panelY + 38, WrightsUi.MUTED, false);
-        for (Row row : rows) {
-            if (row.header) {
-                graphics.drawString(this.font, Component.translatable(row.label), panelX + 16, row.y, WrightsUi.TEXT, false);
-                continue;
-            }
-            graphics.drawString(this.font, this.font.plainSubstrByWidth(row.label, 150), panelX + 16, row.y, WrightsUi.TEXT, false);
-            if (row.tier > 0) {
-                Component tierName = Component.translatable(WrightTier.nameKey(row.tier));
-                graphics.drawString(this.font, tierName, panelX + 150, row.y, WrightTier.textColor(row.tier), false);
-            } else if (!row.stat.isEmpty()) {
-                graphics.drawString(this.font, this.font.plainSubstrByWidth(row.stat, 90), panelX + 150, row.y, WrightsUi.MUTED, false);
-            }
-            if (row.action != null) {
-                int x = panelX + PANEL_W - 68;
-                boolean hover = mouseX >= x && mouseX < x + 52 && mouseY >= row.y - 3 && mouseY < row.y + 13;
-                graphics.fill(x, row.y - 3, x + 52, row.y + 13, hover ? 0xFF3A5164 : 0xFF24384A);
-                String action = Component.translatable(row.action).getString();
-                graphics.drawString(this.font, action, x + (52 - this.font.width(action)) / 2, row.y, WrightsUi.TEXT, false);
-            }
-        }
+        graphics.drawString(this.font, this.title, panelX + 16, panelY + 8, WrightsUi.COPPER, false);
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(job.name(), PANEL_W - 32), panelX + 16, panelY + 20, WrightsUi.TEXT, false);
+        int busy = busyCount();
+        int free = freeCount();
+        Component summary = busy == 0
+                ? Component.translatable("screen.wrights.drone_split", assigned.size(), free)
+                : Component.translatable("screen.wrights.drone_split_busy", assigned.size(), free, busy);
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(summary.getString(), PANEL_W - 32), panelX + 16, panelY + 32, WrightsUi.MUTED, false);
+
+        Well onJob = onJobWell();
+        Well available = availableWell();
+        drawSection(graphics, onJob, "screen.wrights.drones_on_job", crewCount(assigned), WrightsUi.COPPER, assigned, onScroll, mouseX, mouseY);
+        drawSection(graphics, available, "screen.wrights.drones_available", free, WrightsUi.GREEN, others, otherScroll, mouseX, mouseY);
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        for (Row row : rows) {
-            if (row.header || row.unit == null || row.action == null) {
-                continue;
+        if (button == 0) {
+            if (clickWell(onJobWell(), assigned, true, mouseX, mouseY)) {
+                return true;
             }
-            int x = panelX + PANEL_W - 68;
-            if (mouseX >= x && mouseX < x + 52 && mouseY >= row.y - 3 && mouseY < row.y + 13) {
-                boolean add = "screen.wrights.drone_add".equals(row.action);
-                PacketDistributor.sendToServer(new BlueprintPayloads.SetJobDrones(id, row.unit, add));
+            if (clickWell(availableWell(), others, false, mouseX, mouseY)) {
                 return true;
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (drag != 0 && button == 0) {
+            scrollFromThumb(drag == 1, mouseY);
+            return true;
+        }
+        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (button == 0) {
+            drag = 0;
+        }
+        return super.mouseReleased(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        int delta = (int) Math.signum(scrollY) * ROW;
+        Well onJob = onJobWell();
+        Well available = availableWell();
+        if (inside(mouseX, mouseY, onJob)) {
+            onScroll = Mth.clamp(onScroll - delta, 0, maxScroll(assigned, onJob));
+            return true;
+        }
+        if (inside(mouseX, mouseY, available)) {
+            otherScroll = Mth.clamp(otherScroll - delta, 0, maxScroll(others, available));
+            return true;
+        }
+        return true;
     }
 
     @Override
@@ -124,28 +149,182 @@ public class JobDroneScreen extends Screen {
         return false;
     }
 
-    @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        int max = Math.max(0, panelH - Math.max(96, this.height - 16));
-        int next = Mth.clamp(scroll - (int) Math.signum(scrollY) * 16, 0, max);
-        if (next != scroll) {
-            scroll = next;
-            rebuild();
-            if (back != null) {
-                back.setY(panelY + panelH - 28);
+    private void place() {
+        panelH = Mth.clamp(this.height - 24, 240, 420);
+        panelX = (this.width - PANEL_W) / 2;
+        panelY = Math.max(8, (this.height - panelH) / 2);
+    }
+
+    private Well onJobWell() {
+        int top = panelY + HEADER;
+        int body = panelH - HEADER - FOOTER;
+        int height = (body - 8) / 2;
+        return new Well(panelX + 12, top, PANEL_W - 24, height);
+    }
+
+    private Well availableWell() {
+        Well onJob = onJobWell();
+        return new Well(onJob.x, onJob.y + onJob.h + 8, onJob.w, onJob.h);
+    }
+
+    private void drawSection(GuiGraphics graphics, Well well, String title, int count, int accent, List<Entry> rows, int scroll, int mouseX, int mouseY) {
+        WrightsUi.inset(graphics, well.x, well.y, well.w, well.h);
+        graphics.fill(well.x + 1, well.y + 1, well.x + well.w - 1, well.y + SECTION_HEAD, 0xFF15202B);
+        graphics.fill(well.x + 1, well.y + 1, well.x + 3, well.y + SECTION_HEAD, accent);
+        Component heading = Component.translatable(title);
+        graphics.drawString(this.font, heading, well.x + 10, well.y + 5, WrightsUi.TEXT, false);
+        String countText = Integer.toString(count);
+        graphics.drawString(this.font, countText, well.x + well.w - 8 - this.font.width(countText), well.y + 5, accent, false);
+
+        int listX = well.x + 4;
+        int listY = well.y + SECTION_HEAD;
+        int listW = well.w - 8;
+        int listH = well.h - SECTION_HEAD - 4;
+        boolean bar = rows.size() * ROW > listH;
+        int contentRight = listX + listW - (bar ? 8 : 0);
+        graphics.enableScissor(listX, listY, contentRight, listY + listH);
+        int y = listY - scroll;
+        for (int i = 0; i < rows.size(); i++) {
+            if (y + ROW >= listY && y < listY + listH) {
+                drawEntry(graphics, rows.get(i), i, listX, y, contentRight - listX, mouseX, mouseY, listY, listY + listH);
             }
+            y += ROW;
         }
+        graphics.disableScissor();
+        if (bar) {
+            drawBar(graphics, listX + listW - 6, listY, listH, scroll, maxScroll(rows, well), mouseX, mouseY, rows == assigned ? drag == 1 : drag == 2);
+        }
+    }
+
+    private void drawEntry(GuiGraphics graphics, Entry entry, int index, int x, int y, int width, int mouseX, int mouseY, int clipTop, int clipBottom) {
+        boolean hover = mouseX >= x && mouseX < x + width && mouseY >= Math.max(y, clipTop) && mouseY < Math.min(y + ROW, clipBottom);
+        if (entry.divider) {
+            int labelW = this.font.width(entry.name);
+            graphics.drawString(this.font, entry.name, x + 8, y + 6, WrightsUi.MUTED, false);
+            graphics.fill(x + 14 + labelW, y + 9, x + width - 8, y + 10, 0xFF31404E);
+            return;
+        }
+        if (hover && entry.unit != null) {
+            graphics.fill(x + 2, y + 1, x + width - 2, y + ROW - 1, 0xFF1C2C3A);
+        } else if ((index & 1) == 0 && entry.unit != null) {
+            graphics.fill(x + 2, y + 1, x + width - 2, y + ROW - 1, 0xFF101820);
+        }
+        int buttonX = x + width - 6 - BUTTON_W;
+        int textRight = entry.action == null ? x + width - 8 : buttonX - 6;
+        int cursor = textRight;
+        if (!entry.detail.isEmpty()) {
+            int detailW = Math.min(this.font.width(entry.detail), Math.max(24, textRight - (x + 8) - 72));
+            graphics.drawString(this.font, this.font.plainSubstrByWidth(entry.detail, detailW), textRight - detailW, y + 6, WrightsUi.MUTED, false);
+            cursor = textRight - detailW - 6;
+        }
+        if (!entry.tierName.isEmpty()) {
+            int tierW = this.font.width(entry.tierName);
+            graphics.drawString(this.font, entry.tierName, cursor - tierW, y + 6, WrightTier.textColor(entry.tier), false);
+            cursor -= tierW + 6;
+        }
+        int nameW = Math.max(24, cursor - (x + 8));
+        int nameColor = entry.unit == null ? WrightsUi.MUTED : WrightsUi.TEXT;
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(entry.name, nameW), x + 8, y + 6, nameColor, false);
+        if (entry.action != null) {
+            boolean add = "screen.wrights.drone_add".equals(entry.action);
+            int by = y + 3;
+            boolean onButton = hover && mouseX >= buttonX && mouseX < buttonX + BUTTON_W;
+            graphics.fill(buttonX, by, buttonX + BUTTON_W, by + 14, onButton ? 0xFF2C3E52 : 0xFF1A2633);
+            int edge = add ? (onButton ? WrightsUi.GREEN : 0xFF2F6A4C) : (onButton ? WrightsUi.RED : 0xFF8E4048);
+            WrightsUi.border(graphics, buttonX, by, BUTTON_W, 14, edge);
+            String action = Component.translatable(entry.action).getString();
+            graphics.drawString(this.font, action, buttonX + (BUTTON_W - this.font.width(action)) / 2, by + 3, add ? WrightsUi.GREEN : WrightsUi.RED, false);
+        }
+    }
+
+    private void drawBar(GuiGraphics graphics, int x, int y, int height, int scroll, int max, int mouseX, int mouseY, boolean dragging) {
+        graphics.fill(x, y, x + 4, y + height, 0xFF0A1218);
+        if (max <= 0) {
+            return;
+        }
+        int thumb = Math.max(12, height * height / (height + max));
+        int travel = Math.max(1, height - thumb);
+        int thumbY = y + travel * Mth.clamp(scroll, 0, max) / max;
+        boolean hover = mouseX >= x - 2 && mouseX < x + 8 && mouseY >= thumbY && mouseY < thumbY + thumb;
+        graphics.fill(x, thumbY, x + 4, thumbY + thumb, hover || dragging ? WrightsUi.COPPER : 0xFF3D4E5E);
+    }
+
+    private boolean clickWell(Well well, List<Entry> rows, boolean assignedList, double mouseX, double mouseY) {
+        if (!inside(mouseX, mouseY, well)) {
+            return false;
+        }
+        int listX = well.x + 4;
+        int listY = well.y + SECTION_HEAD;
+        int listW = well.w - 8;
+        int listH = well.h - SECTION_HEAD - 4;
+        int scroll = assignedList ? onScroll : otherScroll;
+        boolean bar = rows.size() * ROW > listH;
+        if (bar && mouseX >= listX + listW - 8) {
+            int max = maxScroll(rows, well);
+            int thumb = Math.max(12, listH * listH / (listH + max));
+            int travel = Math.max(1, listH - thumb);
+            int thumbY = listY + travel * scroll / max;
+            if (mouseY >= thumbY && mouseY < thumbY + thumb) {
+                drag = assignedList ? 1 : 2;
+                dragGrab = (int) mouseY - thumbY;
+            } else {
+                int next = mouseY < thumbY ? scroll - listH : scroll + listH;
+                setScroll(assignedList, Mth.clamp(next, 0, max));
+            }
+            return true;
+        }
+        int index = ((int) mouseY - listY + scroll) / ROW;
+        if (index < 0 || index >= rows.size()) {
+            return true;
+        }
+        Entry entry = rows.get(index);
+        if (entry.unit == null || entry.action == null) {
+            return true;
+        }
+        int contentRight = listX + listW - (bar ? 8 : 0);
+        int buttonX = contentRight - 6 - BUTTON_W;
+        if (mouseX < buttonX || mouseX >= buttonX + BUTTON_W) {
+            return true;
+        }
+        boolean add = "screen.wrights.drone_add".equals(entry.action);
+        PacketDistributor.sendToServer(new BlueprintPayloads.SetJobDrones(id, entry.unit, add));
         return true;
     }
 
+    private void scrollFromThumb(boolean assignedList, double mouseY) {
+        Well well = assignedList ? onJobWell() : availableWell();
+        List<Entry> rows = assignedList ? assigned : others;
+        int listY = well.y + SECTION_HEAD;
+        int listH = well.h - SECTION_HEAD - 4;
+        int max = maxScroll(rows, well);
+        int thumb = Math.max(12, listH * listH / (listH + Math.max(1, max)));
+        int travel = Math.max(1, listH - thumb);
+        int next = (int) ((mouseY - dragGrab - listY) * max / travel);
+        setScroll(assignedList, Mth.clamp(next, 0, max));
+    }
+
+    private void setScroll(boolean assignedList, int value) {
+        if (assignedList) {
+            onScroll = value;
+        } else {
+            otherScroll = value;
+        }
+    }
+
+    private static int maxScroll(List<Entry> rows, Well well) {
+        int listH = well.h - SECTION_HEAD - 4;
+        return Math.max(0, rows.size() * ROW - listH);
+    }
+
+    private static boolean inside(double mouseX, double mouseY, Well well) {
+        return mouseX >= well.x && mouseX < well.x + well.w && mouseY >= well.y && mouseY < well.y + well.h;
+    }
+
     private void rebuild() {
-        rows.clear();
+        assigned.clear();
+        others.clear();
         BlueprintPayloads.JobLine job = live();
         Swarm swarm = swarm();
-        int y = 56;
-        rows.add(Row.header(y, "screen.wrights.drones_on_job"));
-        y += 14;
-        int shown = 0;
         if (job != null) {
             for (UUID unit : job.crew()) {
                 Swarm.Unit found = find(swarm, unit);
@@ -153,19 +332,14 @@ public class JobDroneScreen extends Screen {
                 String label = found == null
                         ? Component.translatable("screen.wrights.drone_missing").getString()
                         : found.title(number).getString();
-                rows.add(new Row(unit, y, label, "", "screen.wrights.drone_remove", found == null ? 0 : WrightTier.clamp(found.speed())));
-                y += ROW;
-                shown++;
+                assigned.add(Entry.wright(unit, label, found == null ? 0 : WrightTier.clamp(found.speed()), "", "screen.wrights.drone_remove"));
             }
         }
-        if (shown == 0) {
-            rows.add(new Row(null, y, Component.translatable("screen.wrights.drones_none_on").getString(), "", null));
-            y += ROW;
+        if (assigned.isEmpty()) {
+            assigned.add(Entry.note(Component.translatable("screen.wrights.drones_none_on").getString()));
         }
-        y += 6;
-        rows.add(Row.header(y, "screen.wrights.drones_available"));
-        y += 14;
         int free = 0;
+        List<Entry> busy = new ArrayList<>();
         for (int i = 0; i < swarm.units().size(); i++) {
             Swarm.Unit unit = swarm.units().get(i);
             if (job != null && job.crew().contains(unit.id())) {
@@ -173,33 +347,53 @@ public class JobDroneScreen extends Screen {
             }
             String other = otherJob(unit.id());
             String label = unit.title(i + 1).getString();
-            String stat = other == null ? "" : Component.translatable("screen.wrights.drone_on_other", other).getString();
-            rows.add(new Row(unit.id(), y, label, stat, other == null ? "screen.wrights.drone_add" : null, other == null ? WrightTier.clamp(unit.speed()) : 0));
-            y += ROW;
-            free++;
-        }
-        if (free == 0) {
-            rows.add(new Row(null, y, Component.translatable("screen.wrights.drones_none_free").getString(), "", null));
-            y += ROW;
-        }
-        panelH = y + 36;
-        int view = Math.max(96, this.height - 16);
-        scroll = Mth.clamp(scroll, 0, Math.max(0, panelH - view));
-        panelY = panelH > view ? 8 - scroll : Math.max(8, (this.height - panelH) / 2);
-        for (Row row : rows) {
-            row.y += panelY;
-        }
-    }
-
-    private int[] pool() {
-        int total = swarm().units().size();
-        int used = 0;
-        for (BlueprintPayloads.JobLine job : WrightsClientState.jobs) {
-            if (!job.finished() && !job.saving()) {
-                used += job.crew().size();
+            int tier = WrightTier.clamp(unit.speed());
+            if (other == null) {
+                others.add(Entry.wright(unit.id(), label, tier, "", "screen.wrights.drone_add"));
+                free++;
+            } else {
+                busy.add(Entry.wright(unit.id(), label, tier, Component.translatable("screen.wrights.drone_on_other", other).getString(), null));
             }
         }
-        return new int[] {used, total};
+        if (free == 0) {
+            others.add(0, Entry.note(Component.translatable("screen.wrights.drones_none_free").getString()));
+        }
+        if (!busy.isEmpty()) {
+            others.add(Entry.divider(Component.translatable("screen.wrights.drones_on_other_header").getString()));
+            others.addAll(busy);
+        }
+        onScroll = Mth.clamp(onScroll, 0, maxScroll(assigned, onJobWell()));
+        otherScroll = Mth.clamp(otherScroll, 0, maxScroll(others, availableWell()));
+    }
+
+    private int freeCount() {
+        int count = 0;
+        for (Entry entry : others) {
+            if ("screen.wrights.drone_add".equals(entry.action)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private int busyCount() {
+        int count = 0;
+        for (Entry entry : others) {
+            if (entry.unit != null && entry.action == null && !entry.divider) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static int crewCount(List<Entry> rows) {
+        int count = 0;
+        for (Entry entry : rows) {
+            if (entry.unit != null) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private String otherJob(UUID unit) {
@@ -245,41 +439,39 @@ public class JobDroneScreen extends Screen {
         return 0;
     }
 
-    private static final class Row {
+    private record Well(int x, int y, int w, int h) {
+    }
+
+    private static final class Entry {
         private final UUID unit;
-        private int y;
-        private final String label;
-        private final String stat;
+        private final String name;
+        private final String tierName;
+        private final String detail;
         private final String action;
         private final int tier;
-        private final boolean header;
+        private final boolean divider;
 
-        private Row(UUID unit, int y, String label, String stat, String action) {
-            this(unit, y, label, stat, action, 0);
-        }
-
-        private Row(UUID unit, int y, String label, String stat, String action, int tier) {
+        private Entry(UUID unit, String name, int tier, String tierName, String detail, String action, boolean divider) {
             this.unit = unit;
-            this.y = y;
-            this.label = label;
-            this.stat = stat;
-            this.action = action;
+            this.name = name;
             this.tier = tier;
-            this.header = false;
+            this.tierName = tierName == null ? "" : tierName;
+            this.detail = detail == null ? "" : detail;
+            this.action = action;
+            this.divider = divider;
         }
 
-        private static Row header(int y, String key) {
-            return new Row(y, key);
+        private static Entry wright(UUID unit, String name, int tier, String detail, String action) {
+            String tierName = tier <= 0 ? "" : Component.translatable(WrightTier.nameKey(tier)).getString();
+            return new Entry(unit, name, tier, tierName, detail, action, false);
         }
 
-        private Row(int y, String key) {
-            this.unit = null;
-            this.y = y;
-            this.label = key;
-            this.stat = "";
-            this.action = null;
-            this.tier = 0;
-            this.header = true;
+        private static Entry note(String name) {
+            return new Entry(null, name, 0, "", "", null, false);
+        }
+
+        private static Entry divider(String name) {
+            return new Entry(null, name, 0, "", "", null, true);
         }
     }
 }
