@@ -17,6 +17,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
@@ -29,6 +30,7 @@ import com.wrights.schematic.SchematicLibrary;
 public class DroneEntity extends Entity {
     private static final EntityDataAccessor<String> JOB_ID = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Integer> TIER = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<ItemStack> CARRIED = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.ITEM_STACK);
 
     private boolean returning;
     private boolean stranded;
@@ -186,6 +188,16 @@ public class DroneEntity extends Entity {
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         builder.define(JOB_ID, "");
         builder.define(TIER, com.wrights.drone.WrightTier.BASE);
+        builder.define(CARRIED, ItemStack.EMPTY);
+    }
+
+    /** The drop this wright is bringing home. Empty while it is still on the way out. */
+    public ItemStack carried() {
+        return this.entityData.get(CARRIED);
+    }
+
+    public void setCarried(ItemStack stack) {
+        this.entityData.set(CARRIED, stack == null || stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1));
     }
 
     public int tier() {
@@ -344,6 +356,9 @@ public class DroneEntity extends Entity {
             com.wrights.job.JobManager.holdReturn(this.unitId);
         }
         this.unitName = tag.getString("UnitName");
+        if (tag.contains("Carried")) {
+            setCarried(ItemStack.parseOptional(this.registryAccess(), tag.getCompound("Carried")));
+        }
     }
 
     @Override
@@ -365,6 +380,9 @@ public class DroneEntity extends Entity {
         }
         if (this.unitName != null && !this.unitName.isBlank()) {
             tag.putString("UnitName", this.unitName);
+        }
+        if (!carried().isEmpty()) {
+            tag.put("Carried", carried().save(this.registryAccess()));
         }
     }
 

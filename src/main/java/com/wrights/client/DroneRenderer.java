@@ -12,17 +12,22 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
+import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
+import net.minecraft.world.item.ItemDisplayContext;
+import net.minecraft.world.item.ItemStack;
 
 public class DroneRenderer extends EntityRenderer<DroneEntity> {
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "textures/entity/drone.png");
     private final DroneModel model;
+    private final ItemRenderer items;
 
     public DroneRenderer(EntityRendererProvider.Context context) {
         super(context);
         this.model = new DroneModel(context.bakeLayer(WrightsClient.DRONE_LAYER));
+        this.items = context.getItemRenderer();
         this.shadowRadius = 0.2F;
     }
 
@@ -39,6 +44,15 @@ public class DroneRenderer extends EntityRenderer<DroneEntity> {
         this.model.renderToBuffer(pose, consumer, light, OverlayTexture.NO_OVERLAY, color);
         this.model.renderLens(pose, consumer, light, OverlayTexture.NO_OVERLAY);
         pose.popPose();
+        ItemStack carried = entity.carried();
+        if (!carried.isEmpty()) {
+            pose.pushPose();
+            pose.translate(0.0D, -0.35D, 0.0D);
+            pose.mulPose(Axis.YP.rotationDegrees((entity.tickCount + partialTick) * 3.0F));
+            pose.scale(0.55F, 0.55F, 0.55F);
+            this.items.renderStatic(carried, ItemDisplayContext.GROUND, light, OverlayTexture.NO_OVERLAY, pose, buffers, entity.level(), entity.getId());
+            pose.popPose();
+        }
         super.render(entity, yaw, partialTick, pose, buffers, light);
     }
 

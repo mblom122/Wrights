@@ -652,16 +652,16 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record JobHologram(UUID jobId, BlockPos origin, int clipX, int clipY, int clipZ, boolean clear, List<Bit> bits, String dimension) implements CustomPacketPayload {
+    public record JobHologram(UUID jobId, BlockPos origin, int clipX, int clipY, int clipZ, boolean clear, List<Bit> bits, String dimension, boolean mine) implements CustomPacketPayload {
         public static final Type<JobHologram> TYPE = payloadType("job_hologram");
         public static final StreamCodec<RegistryFriendlyByteBuf, JobHologram> STREAM_CODEC = StreamCodec.of((buf, value) -> value.write(buf), JobHologram::read);
 
         public static JobHologram clearAll() {
-            return new JobHologram(net.minecraft.Util.NIL_UUID, BlockPos.ZERO, 0, 0, 0, true, List.of(), "");
+            return new JobHologram(net.minecraft.Util.NIL_UUID, BlockPos.ZERO, 0, 0, 0, true, List.of(), "", false);
         }
 
         public static JobHologram clear(UUID jobId) {
-            return new JobHologram(jobId, BlockPos.ZERO, 0, 0, 0, true, List.of(), "");
+            return new JobHologram(jobId, BlockPos.ZERO, 0, 0, 0, true, List.of(), "", false);
         }
 
         public void write(RegistryFriendlyByteBuf buf) {
@@ -676,6 +676,7 @@ public final class BlueprintPayloads {
                 bit.write(buf);
             }
             buf.writeUtf(dimension == null ? "" : dimension, 64);
+            buf.writeBoolean(mine);
         }
 
         public static JobHologram read(RegistryFriendlyByteBuf buf) {
@@ -690,7 +691,7 @@ public final class BlueprintPayloads {
             for (int i = 0; i < count; i++) {
                 bits.add(Bit.read(buf));
             }
-            return new JobHologram(jobId, origin, clipX, clipY, clipZ, clear, bits, buf.readUtf(64));
+            return new JobHologram(jobId, origin, clipX, clipY, clipZ, clear, bits, buf.readUtf(64), buf.readBoolean());
         }
 
         @Override

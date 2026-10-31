@@ -305,27 +305,30 @@ public final class MirrorLaunch {
         JobManager.startMirrorMine(player, schematic, origin, payload.any(), voiding, miningTool(player));
     }
 
-    /** Breaks the block with the tool that started the job. Void removes it with no drops. */
-    public static void harvest(ServerPlayer player, ServerLevel level, BlockPos pos, ItemStack tool, boolean voiding) {
+    /** Breaks the block with the tool that started the job. The first drop is what the wright shows on the way home. */
+    public static ItemStack harvest(ServerPlayer player, ServerLevel level, BlockPos pos, ItemStack tool, boolean voiding) {
         if (voiding) {
             BlockEntity stored = level.getBlockEntity(pos);
             if (stored instanceof net.minecraft.world.Container container) {
                 container.clearContent();
             }
             level.setBlock(pos, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS | net.minecraft.world.level.block.Block.UPDATE_SUPPRESS_DROPS);
-            return;
+            return ItemStack.EMPTY;
         }
         BlockState state = level.getBlockState(pos);
         BlockEntity entity = level.getBlockEntity(pos);
         ItemStack used = tool == null ? ItemStack.EMPTY : tool;
-        Set<UUID> already = player.getAbilities().instabuild ? Set.of() : nearbyItems(level, pos);
-        if (!player.getAbilities().instabuild) {
+        boolean creative = player.getAbilities().instabuild;
+        Set<UUID> already = creative ? Set.of() : nearbyItems(level, pos);
+        if (!creative) {
             net.minecraft.world.level.block.Block.dropResources(state, level, pos, entity, player, used);
         }
         level.destroyBlock(pos, false, player);
-        if (!player.getAbilities().instabuild) {
-            claimDrops(player, level, pos, already);
+        if (creative) {
+            net.minecraft.world.item.Item item = state.getBlock().asItem();
+            return item == net.minecraft.world.item.Items.AIR ? ItemStack.EMPTY : new ItemStack(item);
         }
+        return claimDrops(player, level, pos, already);
     }
 
     /** The tool that mined the block. Its enchantments, including a modded silk touch, decide the drops. */
@@ -350,16 +353,21 @@ public final class MirrorLaunch {
         return ids;
     }
 
-    /** Mirror drops go into the inventory. Whatever does not fit lands at the player. */
-    private static void claimDrops(ServerPlayer player, ServerLevel level, BlockPos pos, Set<UUID> already) {
+    /** Mirror drops go into the inventory. Whatever does not fit lands at the player. The first drop is shown on the wright. */
+    private static ItemStack claimDrops(ServerPlayer player, ServerLevel level, BlockPos pos, Set<UUID> already) {
+        ItemStack shown = ItemStack.EMPTY;
         for (ItemEntity entity : level.getEntitiesOfClass(ItemEntity.class, new AABB(pos).inflate(1.0D))) {
             if (!entity.isAlive() || already.contains(entity.getUUID())) {
                 continue;
             }
             ItemStack stack = entity.getItem().copy();
             entity.discard();
+            if (shown.isEmpty() && !stack.isEmpty()) {
+                shown = stack.copyWithCount(1);
+            }
             giveOrDrop(player, stack);
         }
+        return shown;
     }
 
     private static void giveOrDrop(ServerPlayer player, ItemStack stack) {

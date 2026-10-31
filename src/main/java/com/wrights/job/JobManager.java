@@ -743,6 +743,7 @@ public final class JobManager {
             job.setQueued(true);
             library.addJob(job);
             Messages.actionBar(player, "message.wrights.queued", room);
+            BlueprintNetwork.showJobHologram(player, job, schematic);
             BlueprintNetwork.syncJobs(player);
             return true;
         }
@@ -755,6 +756,7 @@ public final class JobManager {
             ensureDrone(level, player, job, origin);
         }
         launched(player, job);
+        BlueprintNetwork.showJobHologram(player, job, schematic);
         BlueprintNetwork.syncJobs(player);
         return true;
     }
@@ -3692,15 +3694,16 @@ public final class JobManager {
 
     private static PlaceResult actOne(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos pos, Schematic.Entry entry, boolean quiet, BuildJob.Hand hand) {
         if (job.mining()) {
-            return mineOne(level, player, job, pos, entry);
+            return mineOne(level, player, job, pos, entry, hand);
         }
         return placeOne(level, player, job, pos, entry, quiet, hand);
     }
 
     /** Breaks one mirrored block and sends its drops to the player who started the job. */
-    private static PlaceResult mineOne(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos pos, Schematic.Entry entry) {
+    private static PlaceResult mineOne(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos pos, Schematic.Entry entry, BuildJob.Hand hand) {
         if (level.isOutsideBuildHeight(pos)) {
             job.skippedOne();
+            clearPlacedGhost(player, job, entry);
             return PlaceResult.DONE;
         }
         if (!level.isLoaded(pos)) {
@@ -3708,15 +3711,33 @@ public final class JobManager {
                 return PlaceResult.PAUSE;
             }
             job.skippedOne();
+            clearPlacedGhost(player, job, entry);
             return PlaceResult.DONE;
         }
         if (!level.mayInteract(player, pos) || !com.wrights.blueprint.MirrorLaunch.accepts(level, pos, entry.state().getBlock(), job.mineAny())) {
             job.skippedOne();
+            clearPlacedGhost(player, job, entry);
             return PlaceResult.DONE;
         }
-        com.wrights.blueprint.MirrorLaunch.harvest(player, level, pos, job.mineTool(), job.mineVoid());
+        ItemStack carried = com.wrights.blueprint.MirrorLaunch.harvest(player, level, pos, job.mineTool(), job.mineVoid());
+        showCarry(level, job, hand, carried);
+        clearPlacedGhost(player, job, entry);
         job.placedOne();
         return PlaceResult.DONE;
+    }
+
+    /** The wright that just mined keeps that drop visible until it docks. */
+    private static void showCarry(ServerLevel level, BuildJob job, BuildJob.Hand hand, ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return;
+        }
+        UUID id = hand != null && hand.entityId != null ? hand.entityId : job.droneId();
+        if (id == null) {
+            return;
+        }
+        if (level.getEntity(id) instanceof DroneEntity drone && drone.isAlive()) {
+            drone.setCarried(stack);
+        }
     }
 
     private static PlaceResult placeOne(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos pos, Schematic.Entry entry, boolean quiet) {

@@ -85,6 +85,7 @@ public final class SelectionRenderer {
         drawPortGlow(pose, buffers, camera, minecraft);
         drawMarkedPorts(pose, buffers, camera, minecraft);
         drawMirrorAnchorGlow(pose, buffers, camera, minecraft);
+        drawMineMarks(pose, buffers, camera, minecraft);
         boolean placing = minecraft.screen instanceof PlacementScreen;
         boolean adjust = minecraft.screen instanceof BlueprintAdjustScreen;
         boolean gui = minecraft.screen != null;
@@ -171,6 +172,43 @@ public final class SelectionRenderer {
             }
         }
         buffers.endBatch();
+    }
+
+    /** Red borders left on a mirror mine job until each block is broken. */
+    private static void drawMineMarks(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
+        if (minecraft.level == null || WrightsClientState.activeBuilds.isEmpty()) {
+            return;
+        }
+        String here = minecraft.level.dimension().location().toString();
+        boolean on = (System.currentTimeMillis() / 180L) % 2L == 0L;
+        float alpha = on ? 0.95F : 0.28F;
+        VertexConsumer lines = buffers.getBuffer(RenderType.lines());
+        boolean drawn = false;
+        for (WrightsClientState.ActiveBuild build : WrightsClientState.activeBuilds.values()) {
+            if (!build.mine() || (!build.dimension().isEmpty() && !build.dimension().equals(here))) {
+                continue;
+            }
+            for (WrightsClientState.Ghost ghost : build.ghosts()) {
+                if (ghost.x() >= build.clipX() || ghost.y() >= build.clipY() || ghost.z() >= build.clipZ()) {
+                    continue;
+                }
+                BlockPos world = build.origin().offset(ghost.x(), ghost.y(), ghost.z());
+                double dx = world.getX() + 0.5D - camera.x;
+                double dy = world.getY() + 0.5D - camera.y;
+                double dz = world.getZ() + 0.5D - camera.z;
+                if (dx * dx + dy * dy + dz * dz > rangeSqr()) {
+                    continue;
+                }
+                if (minecraft.level.hasChunkAt(world) && minecraft.level.getBlockState(world).isAir()) {
+                    continue;
+                }
+                drawBox(pose, lines, new AABB(world).inflate(0.02D), camera, 0.86F, 0.45F, 0.38F, alpha);
+                drawn = true;
+            }
+        }
+        if (drawn) {
+            buffers.endBatch(RenderType.lines());
+        }
     }
 
     /** Outlines the copies that mirror mining will break. */
@@ -756,6 +794,9 @@ public final class SelectionRenderer {
                 if (!build.dimension().isEmpty() && !build.dimension().equals(here)) {
                     continue;
                 }
+                if (build.mine()) {
+                    continue;
+                }
                 var ghosts = build.ghosts();
                 prepare(ghosts.size());
                 int count = 0;
@@ -803,7 +844,7 @@ public final class SelectionRenderer {
             if (!build.dimension().isEmpty() && !build.dimension().equals(here)) {
                 continue;
             }
-            if (cellMarks(entry.getKey())) {
+            if (build.mine() || cellMarks(entry.getKey())) {
                 continue;
             }
             BlockPos origin = build.origin();

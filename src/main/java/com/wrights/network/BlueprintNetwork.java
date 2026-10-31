@@ -929,7 +929,7 @@ public final class BlueprintNetwork {
         int clipX = job.clipX() == Integer.MAX_VALUE ? schematic.sizeX() : job.clipX();
         int clipY = job.clipY() == Integer.MAX_VALUE ? schematic.sizeY() : job.clipY();
         int clipZ = job.clipZ() == Integer.MAX_VALUE ? schematic.sizeZ() : job.clipZ();
-        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.JobHologram(job.id(), job.min(), clipX, clipY, clipZ, false, bits, job.dimension().location().toString()));
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.JobHologram(job.id(), job.min(), clipX, clipY, clipZ, false, bits, job.dimension().location().toString(), job.mining()));
     }
 
     /** Keeps a big build under the packet cap by stepping through it, so the ghost still shows. */
