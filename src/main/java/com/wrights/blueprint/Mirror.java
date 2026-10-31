@@ -226,10 +226,10 @@ public final class Mirror {
 
     /** Mirror copies share one sparse schematic, so the preview marks each block instead of the bounding box. */
     public static boolean marksBlocks(String name) {
-        if (name == null || name.isBlank()) {
+        if (name == null || name.isBlank() || name.startsWith("Mirror - Mine")) {
             return false;
         }
-        if (name.equals("Mirror") || name.endsWith(" · mirror")) {
+        if (name.equals("Mirror") || name.endsWith(" · mirror") || name.startsWith("Mirror - ")) {
             return true;
         }
         int cut = name.lastIndexOf(" · ");
@@ -248,7 +248,7 @@ public final class Mirror {
         return true;
     }
 
-    private static String mirrorName(String name) {
+    public static String mirrorName(String name) {
         if (name == null || name.isBlank()) {
             return "Mirror";
         }
@@ -269,8 +269,8 @@ public final class Mirror {
         if (name.length() > 40) {
             name = name.substring(0, 40).trim();
         }
-        if (name.isBlank() || name.equals("Mirror")) {
-            return "Mirror";
+        if (name.isBlank() || name.equals("Mirror") || name.startsWith("Mirror - ")) {
+            return name.isBlank() ? "Mirror" : name;
         }
         return name + " · mirror";
     }

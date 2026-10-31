@@ -57,6 +57,7 @@ public final class BlueprintNetwork {
         registrar.playToServer(BlueprintPayloads.DeployAsk.TYPE, BlueprintPayloads.DeployAsk.STREAM_CODEC, BlueprintNetwork::deployAsk);
         registrar.playToServer(BlueprintPayloads.SetJobDrones.TYPE, BlueprintPayloads.SetJobDrones.STREAM_CODEC, BlueprintNetwork::jobDrones);
         registrar.playToServer(BlueprintPayloads.MoveDrone.TYPE, BlueprintPayloads.MoveDrone.STREAM_CODEC, BlueprintNetwork::moveDrone);
+        registrar.playToServer(BlueprintPayloads.VisitWright.TYPE, BlueprintPayloads.VisitWright.STREAM_CODEC, BlueprintNetwork::visitWright);
         registrar.playToServer(BlueprintPayloads.HangarEdit.TYPE, BlueprintPayloads.HangarEdit.STREAM_CODEC, BlueprintNetwork::hangar);
         registrar.playToServer(BlueprintPayloads.HangarBatch.TYPE, BlueprintPayloads.HangarBatch.STREAM_CODEC, BlueprintNetwork::hangarBatch);
         registrar.playToServer(BlueprintPayloads.PortEdit.TYPE, BlueprintPayloads.PortEdit.STREAM_CODEC, BlueprintNetwork::portEdit);
@@ -97,6 +98,7 @@ public final class BlueprintNetwork {
         registrar.playToClient(BlueprintPayloads.JobHologram.TYPE, BlueprintPayloads.JobHologram.STREAM_CODEC, BlueprintNetwork::clientJobHologram);
         registrar.playToClient(BlueprintPayloads.JobGhostDrop.TYPE, BlueprintPayloads.JobGhostDrop.STREAM_CODEC, BlueprintNetwork::clientJobGhostDrop);
         registrar.playToClient(BlueprintPayloads.JobSync.TYPE, BlueprintPayloads.JobSync.STREAM_CODEC, BlueprintNetwork::clientJobs);
+        registrar.playToClient(BlueprintPayloads.WrightSpots.TYPE, BlueprintPayloads.WrightSpots.STREAM_CODEC, BlueprintNetwork::clientWrightSpots);
         registrar.playToClient(BlueprintPayloads.PlacedPorts.TYPE, BlueprintPayloads.PlacedPorts.STREAM_CODEC, BlueprintNetwork::clientPlacedPorts);
         registrar.playToClient(BlueprintPayloads.PortGlow.TYPE, BlueprintPayloads.PortGlow.STREAM_CODEC, BlueprintNetwork::clientPortGlow);
         registrar.playToClient(BlueprintPayloads.PlacedSwarm.TYPE, BlueprintPayloads.PlacedSwarm.STREAM_CODEC, BlueprintNetwork::clientPlacedSwarm);
@@ -372,6 +374,11 @@ public final class BlueprintNetwork {
         context.enqueueWork(() -> com.wrights.job.JobManager.moveDrone(player, payload.unit(), payload.job()));
     }
 
+    private static void visitWright(BlueprintPayloads.VisitWright payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> com.wrights.job.JobManager.visitWright(player, payload.unit()));
+    }
+
     private static void assign(BlueprintPayloads.SetAssign payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
         context.enqueueWork(() -> {
@@ -577,6 +584,13 @@ public final class BlueprintNetwork {
             return;
         }
         context.enqueueWork(() -> com.wrights.client.WrightsClientState.applyJobs(payload));
+    }
+
+    private static void clientWrightSpots(BlueprintPayloads.WrightSpots payload, IPayloadContext context) {
+        if (FMLEnvironment.dist != Dist.CLIENT) {
+            return;
+        }
+        context.enqueueWork(() -> com.wrights.client.WrightsClientState.applyWrightSpots(payload));
     }
 
     private static void clientSupply(BlueprintPayloads.SupplySync payload, IPayloadContext context) {
@@ -786,6 +800,7 @@ public final class BlueprintNetwork {
                     cellMarks(library, job)));
         }
         PacketDistributor.sendToPlayer(player, new BlueprintPayloads.JobSync(lines));
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.WrightSpots(com.wrights.job.JobManager.wrightSpots(player)));
     }
 
     /** Mirror jobs are a sparse set of blocks, so the client marks those cells instead of the bounding box. */

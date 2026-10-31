@@ -1,5 +1,7 @@
 package com.wrights.client;
 
+import java.util.UUID;
+
 import com.wrights.WrightsMod;
 import com.wrights.WrightsConfig;
 import com.wrights.WrightsClientConfig;
@@ -84,6 +86,7 @@ public final class SelectionRenderer {
         drawPortBounds(pose, buffers, camera, minecraft);
         drawPortGlow(pose, buffers, camera, minecraft);
         drawMarkedPorts(pose, buffers, camera, minecraft);
+        drawMarkedWrights(pose, buffers, camera, minecraft);
         drawMirrorAnchorGlow(pose, buffers, camera, minecraft);
         drawMineMarks(pose, buffers, camera, minecraft);
         boolean placing = minecraft.screen instanceof PlacementScreen;
@@ -597,6 +600,51 @@ public final class SelectionRenderer {
             drawBox(pose, lines, block, camera, 0.55F, 1.0F, 0.62F, 1.0F);
             drawBox(pose, lines, block.inflate(0.08D), camera, 0.85F, 1.0F, 0.55F, pulse);
             drawGuide(pose, lines, camera, body, new AABB(port.pos()), 0.45F, 1.0F, 0.55F, pulse);
+            any = true;
+        }
+        if (any) {
+            buffers.endBatch(RenderType.lines());
+        }
+    }
+
+    /** A blinking box and a guide line on each highlighted wright, including one whose flyer is already gone. */
+    private static void drawMarkedWrights(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
+        if (WrightsClientState.markedWrights.isEmpty() || minecraft.level == null || minecraft.player == null) {
+            return;
+        }
+        String here = minecraft.level.dimension().location().toString();
+        boolean on = (System.currentTimeMillis() / 180L) % 2L == 0L;
+        float alpha = on ? 1.0F : 0.2F;
+        VertexConsumer fill = buffers.getBuffer(RenderType.debugFilledBox());
+        boolean filled = false;
+        for (UUID unit : WrightsClientState.markedWrights) {
+            BlueprintPayloads.WrightSpot spot = WrightsClientState.wrightSpot(unit);
+            if (spot == null || spot.pos() == null || !here.equals(spot.dimension())) {
+                continue;
+            }
+            AABB box = new AABB(spot.pos()).inflate(0.12D);
+            AABB local = box.move(-camera.x, -camera.y, -camera.z);
+            LevelRenderer.addChainedFilledBoxVertices(
+                    pose, fill, local.minX, local.minY, local.minZ, local.maxX, local.maxY, local.maxZ,
+                    0.95F, 0.82F, 0.28F, on ? 0.28F : 0.06F);
+            filled = true;
+        }
+        buffers.endBatch(RenderType.debugFilledBox());
+        if (!filled) {
+            return;
+        }
+        VertexConsumer lines = buffers.getBuffer(RenderType.lines());
+        boolean any = false;
+        AABB body = minecraft.player.getBoundingBox();
+        for (UUID unit : WrightsClientState.markedWrights) {
+            BlueprintPayloads.WrightSpot spot = WrightsClientState.wrightSpot(unit);
+            if (spot == null || spot.pos() == null || !here.equals(spot.dimension())) {
+                continue;
+            }
+            AABB box = new AABB(spot.pos()).inflate(0.12D);
+            drawBox(pose, lines, box, camera, 0.98F, 0.86F, 0.32F, alpha);
+            drawBox(pose, lines, box.inflate(0.08D), camera, 1.0F, 0.94F, 0.55F, alpha * 0.7F);
+            drawGuide(pose, lines, camera, body, box, 0.98F, 0.86F, 0.32F, alpha);
             any = true;
         }
         if (any) {

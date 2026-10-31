@@ -135,7 +135,7 @@ public final class MirrorLaunch {
             }
         }
         Schematic.Entry entry = new Schematic.Entry((short) 0, (short) 0, (short) 0, state, BlockFilters.isSecondary(state), nbt, full);
-        Schematic source = new Schematic(UUID.randomUUID(), "Mirror", 1, 1, 1, List.of(entry), placed, placed, "", 0, 0, 0, true);
+        Schematic source = new Schematic(UUID.randomUUID(), blockMirrorName(state), 1, 1, 1, List.of(entry), placed, placed, "", 0, 0, 0, true);
         Direction plane = Direction.from3DDataValue(Mth.clamp(payload.anchorFace(), 0, 5));
         List<Mirror.Placed> copies = Mirror.place(source, placed, 1, 1, 1, payload.anchor(), plane, WrightsConfig.allowedPattern(payload.pattern()), payload.shapes(), WrightsConfig.allowedAxes(payload.axes()));
         if (copies.isEmpty()) {
@@ -165,6 +165,15 @@ public final class MirrorLaunch {
         Stamp stamp = new Stamp(tick, target.immutable());
         Stamp previous = LAST_PLACE.put(player.getUUID(), stamp);
         return previous != null && previous.tick == tick && previous.pos.equals(target);
+    }
+
+    /** Block mirrors are named after the block, so they are not mistaken for a mirrored blueprint. */
+    private static String blockMirrorName(BlockState state) {
+        String label = state == null ? "" : state.getBlock().getName().getString();
+        if (label.length() > 28) {
+            label = label.substring(0, 28).trim();
+        }
+        return label.isBlank() ? "Mirror" : "Mirror - " + label;
     }
 
     private static InteractionHand blockHand(ServerPlayer player) {
@@ -212,7 +221,7 @@ public final class MirrorLaunch {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         Mirror.Placed united = Mirror.unite(copies);
         if (united != null) {
-            Schematic schematic = united.schematic();
+            Schematic schematic = united.schematic().withName(Mirror.mirrorName(united.schematic().name()));
             library.putSchematic(schematic);
             boolean ok = JobManager.startBlueprintBuild(player, schematic.id(), united.origin(), schematic.sizeX(), schematic.sizeY(), schematic.sizeZ(), drones, placeFluids, voidBlocks, voidFluids, voidNbt, playerFirst, queue, deferSupplies, placeNbt, placeSettings, placeAll);
             if (ok) {
@@ -222,7 +231,7 @@ public final class MirrorLaunch {
         }
         int started = 0;
         for (Mirror.Placed placed : copies) {
-            Schematic schematic = placed.schematic();
+            Schematic schematic = placed.schematic().withName(Mirror.mirrorName(placed.schematic().name()));
             library.putSchematic(schematic);
             boolean ok = JobManager.startBlueprintBuild(player, schematic.id(), placed.origin(), schematic.sizeX(), schematic.sizeY(), schematic.sizeZ(), drones, placeFluids, voidBlocks, voidFluids, voidNbt, playerFirst, queue, deferSupplies, placeNbt, placeSettings, placeAll);
             if (!ok) {

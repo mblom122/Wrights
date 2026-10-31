@@ -168,6 +168,8 @@ public final class WrightsClientState {
     public static final Map<UUID, ActiveBuild> activeBuilds = new LinkedHashMap<>();
     public static final Set<Long> activeCells = new HashSet<>();
     public static final Set<UUID> markedJobs = new HashSet<>();
+    public static final Set<UUID> markedWrights = new HashSet<>();
+    public static Map<UUID, BlueprintPayloads.WrightSpot> wrightSpots = Map.of();
     public static List<BlueprintPayloads.PlacedPort> placedPorts = List.of();
     public static final Set<String> markedPorts = new HashSet<>();
     public static String placedDim = "";
@@ -317,6 +319,80 @@ public final class WrightsClientState {
         if (!markedJobs.add(id)) {
             markedJobs.remove(id);
         }
+    }
+
+    public static void applyWrightSpots(BlueprintPayloads.WrightSpots payload) {
+        Map<UUID, BlueprintPayloads.WrightSpot> next = new HashMap<>();
+        if (payload != null && payload.spots() != null) {
+            for (BlueprintPayloads.WrightSpot spot : payload.spots()) {
+                if (spot != null && spot.unit() != null) {
+                    next.put(spot.unit(), spot);
+                }
+            }
+        }
+        wrightSpots = next;
+        markedWrights.retainAll(next.keySet());
+    }
+
+    public static BlueprintPayloads.WrightSpot wrightSpot(UUID unit) {
+        return unit == null ? null : wrightSpots.get(unit);
+    }
+
+    public static boolean wrightMarked(UUID unit) {
+        return unit != null && markedWrights.contains(unit);
+    }
+
+    public static void toggleWright(UUID unit) {
+        if (unit == null || !markedWrights.add(unit)) {
+            if (unit != null) {
+                markedWrights.remove(unit);
+            }
+        }
+    }
+
+    public static String jobStatusKey(BlueprintPayloads.JobLine job) {
+        if (job == null) {
+            return "menu.wrights.running";
+        }
+        if (job.undoing()) {
+            return "menu.wrights.undoing";
+        }
+        if (job.finished()) {
+            if (job.stopped()) {
+                return "menu.wrights.stopped";
+            }
+            if (job.undone()) {
+                return "menu.wrights.undone";
+            }
+            return "menu.wrights.completed";
+        }
+        if (job.saving()) {
+            return "menu.wrights.saving";
+        }
+        if (job.paused()) {
+            return holdStatusKey(job.hold(), true);
+        }
+        if (job.waitKind() == com.wrights.job.BuildJob.WAIT_ITEMS) {
+            return "menu.wrights.stalled";
+        }
+        if (job.queued()) {
+            return "menu.wrights.queued";
+        }
+        if (job.hold() != com.wrights.job.BuildJob.HOLD_NONE && job.hold() != com.wrights.job.BuildJob.HOLD_MANUAL) {
+            return holdStatusKey(job.hold(), false);
+        }
+        return "menu.wrights.running";
+    }
+
+    public static String holdStatusKey(int hold, boolean paused) {
+        return switch (hold) {
+            case com.wrights.job.BuildJob.HOLD_NO_WRIGHTS -> "menu.wrights.hold_no_wrights";
+            case com.wrights.job.BuildJob.HOLD_PLAYER_RANGE -> paused ? "menu.wrights.hold_player" : "menu.wrights.hold_waiting_player";
+            case com.wrights.job.BuildJob.HOLD_PORT_RANGE -> "menu.wrights.hold_port";
+            case com.wrights.job.BuildJob.HOLD_DIMENSION -> "menu.wrights.hold_dimension";
+            case com.wrights.job.BuildJob.HOLD_CHUNK -> "menu.wrights.hold_chunk";
+            default -> "menu.wrights.paused";
+        };
     }
 
     public static int percent(BlueprintPayloads.JobLine job) {
@@ -1372,7 +1448,7 @@ public final class WrightsClientState {
 
     private static boolean mirrorSend() {
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.level == null) {
+        if (minecraft.level == null || WrightsClientConfig.mirrorBlocks()) {
             return false;
         }
         return WrightsConfig.allowMirrorBlueprints() && WrightsClientConfig.mirrorArmed(minecraft.level.dimension().location().toString());

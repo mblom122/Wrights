@@ -24,6 +24,8 @@ public class DroneRosterScreen extends Screen {
     private static final int FOOTER = 32;
     private static final int SECTION_HEAD = 18;
     private static final UUID FREE = new UUID(0L, 0L);
+    private static final UUID MARK = new UUID(0L, 1L);
+    private static final UUID GO = new UUID(0L, 2L);
 
     private final Screen parent;
     private final List<WrightRow> freeRows = new ArrayList<>();
@@ -234,7 +236,7 @@ public class DroneRosterScreen extends Screen {
         int cursor = textRight;
         if (!row.where.isEmpty()) {
             int whereW = Math.min(this.font.width(row.where), Math.max(24, width / 2));
-            graphics.drawString(this.font, this.font.plainSubstrByWidth(row.where, whereW), textRight - whereW, y + 6, WrightsUi.MUTED, false);
+            graphics.drawString(this.font, this.font.plainSubstrByWidth(row.where, whereW), textRight - whereW, y + 6, row.whereColor, false);
             cursor = textRight - whereW - 6;
         }
         if (!row.tierName.isEmpty()) {
@@ -251,7 +253,12 @@ public class DroneRosterScreen extends Screen {
         WrightsUi.inset(graphics, well.x, well.y, well.w, well.h);
         graphics.fill(well.x + 1, well.y + 1, well.x + well.w - 1, well.y + SECTION_HEAD, 0xFF15202B);
         graphics.fill(well.x + 1, well.y + 1, well.x + 3, well.y + SECTION_HEAD, WrightsUi.GOLD);
-        graphics.drawString(this.font, Component.translatable("screen.wrights.move_to"), well.x + 10, well.y + 5, WrightsUi.TEXT, false);
+        String head = Component.translatable("screen.wrights.move_to").getString();
+        String detail = selectedDetail();
+        if (detail != null) {
+            head = detail;
+        }
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(head, well.w - 20), well.x + 10, well.y + 5, detail == null ? WrightsUi.TEXT : WrightsUi.GOLD, false);
         int listX = well.x + 6;
         int listY = well.y + SECTION_HEAD + 4;
         int listW = well.w - 12;
@@ -343,7 +350,12 @@ public class DroneRosterScreen extends Screen {
         int localY = (int) mouseY - listY + moveScroll;
         for (Choice choice : choices) {
             if (mouseX >= listX + choice.x && mouseX < listX + choice.x + choice.w && localY >= choice.y && localY < choice.y + 16) {
-                if (!choice.current) {
+                if (choice.job.equals(MARK)) {
+                    WrightsClientState.toggleWright(selected);
+                } else if (choice.job.equals(GO)) {
+                    PacketDistributor.sendToServer(new BlueprintPayloads.VisitWright(selected));
+                    onClose();
+                } else if (!choice.current) {
                     PacketDistributor.sendToServer(new BlueprintPayloads.MoveDrone(selected, choice.job));
                 }
                 return true;
@@ -373,7 +385,12 @@ public class DroneRosterScreen extends Screen {
         for (int i = 0; i < swarm.units().size(); i++) {
             Swarm.Unit unit = swarm.units().get(i);
             String where = assignment(unit.id());
-            WrightRow row = new WrightRow(unit.id(), unit.title(i + 1).getString(), WrightTier.clamp(unit.speed()), where == null ? "" : where);
+            String statusKey = statusKey(unit.id());
+            if (where != null && statusKey != null && !"menu.wrights.running".equals(statusKey)) {
+                where = where + " · " + Component.translatable(statusKey).getString();
+            }
+            int whereColor = "screen.wrights.roster_flying".equals(statusKey) ? WrightsUi.TEAL : (statusKey == null || "menu.wrights.running".equals(statusKey) ? WrightsUi.MUTED : WrightsUi.GOLD);
+            WrightRow row = new WrightRow(unit.id(), unit.title(i + 1).getString(), WrightTier.clamp(unit.speed()), where == null ? "" : where, whereColor);
             if (where == null) {
                 freeRows.add(row);
             } else {
@@ -403,8 +420,26 @@ public class DroneRosterScreen extends Screen {
         int x = 0;
         int y = 0;
         int limit = PANEL_W - 24 - 18;
+        if (current != null) {
+            boolean marked = WrightsClientState.wrightMarked(selected);
+            choices.add(choice(x, y, Component.translatable(marked ? "menu.wrights.mark_on" : "menu.wrights.mark").getString(), MARK, marked));
+            x += choices.get(0).w + 4;
+            if (creative()) {
+                int goW = Mth.clamp(this.font.width(Component.translatable("menu.wrights.visit").getString()) + 12, 52, 140);
+                if (x + goW > limit) {
+                    x = 0;
+                    y += 20;
+                }
+                choices.add(choice(x, y, Component.translatable("menu.wrights.visit").getString(), GO, false));
+                x += goW + 4;
+            }
+        }
+        if (x > 0 && x + 52 > limit) {
+            x = 0;
+            y += 20;
+        }
         choices.add(choice(x, y, Component.translatable("screen.wrights.drone_make_free").getString(), FREE, current == null));
-        x += choices.get(0).w + 4;
+        x += choices.get(choices.size() - 1).w + 4;
         for (BlueprintPayloads.JobLine job : WrightsClientState.jobs) {
             if (job.finished() || job.saving()) {
                 continue;
@@ -495,12 +530,60 @@ public class DroneRosterScreen extends Screen {
     }
 
     private UUID jobOf(UUID unit) {
+        BlueprintPayloads.JobLine job = jobLine(unit);
+        return job == null ? null : job.id();
+    }
+
+    private BlueprintPayloads.JobLine jobLine(UUID unit) {
         for (BlueprintPayloads.JobLine job : WrightsClientState.jobs) {
             if (!job.finished() && !job.saving() && job.crew().contains(unit)) {
-                return job.id();
+                return job;
             }
         }
         return null;
+    }
+
+    /** Why this wright is not placing blocks, or the running key when the job is moving. */
+    private String statusKey(UUID unit) {
+        BlueprintPayloads.JobLine job = jobLine(unit);
+        if (job == null) {
+            return null;
+        }
+        BlueprintPayloads.WrightSpot spot = WrightsClientState.wrightSpot(unit);
+        if (spot != null && spot.state() == 1) {
+            return "screen.wrights.roster_flying";
+        }
+        String key = WrightsClientState.jobStatusKey(job);
+        if (!"menu.wrights.running".equals(key)) {
+            return key;
+        }
+        if (spot != null && spot.state() == 2) {
+            return "screen.wrights.roster_missing";
+        }
+        return key;
+    }
+
+    private String selectedDetail() {
+        if (selected.equals(FREE)) {
+            return null;
+        }
+        BlueprintPayloads.JobLine job = jobLine(selected);
+        String key = statusKey(selected);
+        if (job == null || key == null) {
+            return null;
+        }
+        String status = Component.translatable(key).getString();
+        BlueprintPayloads.WrightSpot spot = WrightsClientState.wrightSpot(selected);
+        if (spot != null && spot.pos() != null) {
+            return Component.translatable("screen.wrights.roster_where", job.name(), status, spot.pos().getX(), spot.pos().getY(), spot.pos().getZ()).getString();
+        }
+        return Component.translatable("screen.wrights.roster_where_plain", job.name(), status).getString();
+    }
+
+    private boolean creative() {
+        return this.minecraft != null && this.minecraft.player != null
+                && this.minecraft.player.getAbilities().instabuild
+                && !this.minecraft.player.isSpectator();
     }
 
     private Swarm swarm() {
@@ -515,18 +598,20 @@ public class DroneRosterScreen extends Screen {
         private final String name;
         private final String tierName;
         private final String where;
+        private final int whereColor;
         private final int tier;
 
-        private WrightRow(UUID unit, String name, int tier, String where) {
+        private WrightRow(UUID unit, String name, int tier, String where, int whereColor) {
             this.unit = unit;
             this.name = name;
             this.tier = tier;
             this.tierName = unit == null || tier <= 0 ? "" : Component.translatable(WrightTier.nameKey(tier)).getString();
             this.where = where == null ? "" : where;
+            this.whereColor = whereColor;
         }
 
         private static WrightRow note(String name) {
-            return new WrightRow(null, name, 0, "");
+            return new WrightRow(null, name, 0, "", WrightsUi.MUTED);
         }
     }
 

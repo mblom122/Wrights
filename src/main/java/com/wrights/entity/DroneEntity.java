@@ -270,6 +270,9 @@ public class DroneEntity extends Entity {
         if (this.level().isClientSide || !(this.level() instanceof ServerLevel serverLevel)) {
             return;
         }
+        if (this.unitId != null) {
+            com.wrights.job.JobManager.noteFlyer(this.unitId, this);
+        }
         if (this.returning) {
             if (this.unitId != null) {
                 com.wrights.job.JobManager.holdReturn(this.unitId);

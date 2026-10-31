@@ -909,6 +909,49 @@ public final class BlueprintPayloads {
         }
     }
 
+    /** Where one wright on a job is, so it can be highlighted after the flyer is out of sight. 0 working, 1 flying home, 2 not out. */
+    public record WrightSpot(UUID unit, String dimension, BlockPos pos, int state) {
+    }
+
+    public record WrightSpots(List<WrightSpot> spots) implements CustomPacketPayload {
+        public static final Type<WrightSpots> TYPE = payloadType("wright_spots");
+        public static final StreamCodec<RegistryFriendlyByteBuf, WrightSpots> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeVarInt(value.spots.size());
+                    for (WrightSpot spot : value.spots) {
+                        buf.writeUUID(spot.unit);
+                        buf.writeUtf(spot.dimension == null ? "" : spot.dimension, 64);
+                        buf.writeBlockPos(spot.pos == null ? BlockPos.ZERO : spot.pos);
+                        buf.writeByte(spot.state);
+                    }
+                },
+                buf -> {
+                    int count = buf.readVarInt();
+                    List<WrightSpot> spots = new ArrayList<>(count);
+                    for (int i = 0; i < count; i++) {
+                        spots.add(new WrightSpot(buf.readUUID(), buf.readUtf(64), buf.readBlockPos(), buf.readByte()));
+                    }
+                    return new WrightSpots(spots);
+                });
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record VisitWright(UUID unit) implements CustomPacketPayload {
+        public static final Type<VisitWright> TYPE = payloadType("visit_wright");
+        public static final StreamCodec<RegistryFriendlyByteBuf, VisitWright> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> buf.writeUUID(value.unit),
+                buf -> new VisitWright(buf.readUUID()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public record DockToast(int docked, int dx, int dy, int dz, String port, int digital, int sx, int sy, int sz, int dropped, int gx, int gy, int gz) implements CustomPacketPayload {
         public static final Type<DockToast> TYPE = payloadType("dock_toast");
         public static final StreamCodec<RegistryFriendlyByteBuf, DockToast> STREAM_CODEC = StreamCodec.of(

@@ -2842,7 +2842,7 @@ public class WrightsMenuScreen extends Screen {
         workPauseRight = right - workRemoveWidth - 4;
         doneRemoveWidth = workRemoveWidth;
         doneRemoveRight = right;
-        clearJobs = !WrightsClientState.markedJobs.isEmpty();
+        clearJobs = !WrightsClientState.markedJobs.isEmpty() || !WrightsClientState.markedWrights.isEmpty();
         clearJobWidth = jobButtonWidth("menu.wrights.clear_highlights");
         clearJobRight = manageAllRight - manageAllWidth - 4;
     }
@@ -3191,45 +3191,7 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private String jobStatus(BlueprintPayloads.JobLine job) {
-        if (job.undoing()) {
-            return "menu.wrights.undoing";
-        }
-        if (job.finished()) {
-            if (job.stopped()) {
-                return "menu.wrights.stopped";
-            }
-            if (job.undone()) {
-                return "menu.wrights.undone";
-            }
-            return "menu.wrights.completed";
-        }
-        if (job.saving()) {
-            return "menu.wrights.saving";
-        }
-        if (job.paused()) {
-            return holdStatus(job.hold(), true);
-        }
-        if (job.waitKind() == com.wrights.job.BuildJob.WAIT_ITEMS) {
-            return "menu.wrights.stalled";
-        }
-        if (job.queued()) {
-            return "menu.wrights.queued";
-        }
-        if (job.hold() != com.wrights.job.BuildJob.HOLD_NONE && job.hold() != com.wrights.job.BuildJob.HOLD_MANUAL) {
-            return holdStatus(job.hold(), false);
-        }
-        return "menu.wrights.running";
-    }
-
-    private static String holdStatus(int hold, boolean paused) {
-        return switch (hold) {
-            case com.wrights.job.BuildJob.HOLD_NO_WRIGHTS -> "menu.wrights.hold_no_wrights";
-            case com.wrights.job.BuildJob.HOLD_PLAYER_RANGE -> paused ? "menu.wrights.hold_player" : "menu.wrights.hold_waiting_player";
-            case com.wrights.job.BuildJob.HOLD_PORT_RANGE -> "menu.wrights.hold_port";
-            case com.wrights.job.BuildJob.HOLD_DIMENSION -> "menu.wrights.hold_dimension";
-            case com.wrights.job.BuildJob.HOLD_CHUNK -> "menu.wrights.hold_chunk";
-            default -> "menu.wrights.paused";
-        };
+        return WrightsClientState.jobStatusKey(job);
     }
 
     private Component jobSource(BlueprintPayloads.JobLine job) {
@@ -3349,6 +3311,7 @@ public class WrightsMenuScreen extends Screen {
         }
         if (clearJobs && hitWide(mouseX, mouseY, clearJobRight, manageAllY, clearJobWidth)) {
             WrightsClientState.markedJobs.clear();
+            WrightsClientState.markedWrights.clear();
             return true;
         }
         if (clickJobBar(mouseX, mouseY, true)) {
