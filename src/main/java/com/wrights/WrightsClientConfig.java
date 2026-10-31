@@ -568,6 +568,11 @@ public final class WrightsClientConfig {
         return new BlockPos(MIRROR_X.get(), MIRROR_Y.get(), MIRROR_Z.get());
     }
 
+    public static void setMirrorFace(int face) {
+        MIRROR_FACE.set(clamp(face, 0, 5));
+        save();
+    }
+
     public static void setMirror(BlockPos pos, int face, String dimension) {
         MIRROR_SET.set(true);
         MIRROR_ON.set(true);

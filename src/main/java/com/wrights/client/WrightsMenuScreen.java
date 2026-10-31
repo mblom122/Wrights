@@ -1598,6 +1598,7 @@ public class WrightsMenuScreen extends Screen {
     private int mirrorMineY = -1;
     private int mirrorMineModeY = -1;
     private int mirrorMineVoidY = -1;
+    private int mirrorFaceY = -1;
     private int mirrorHighlightX;
     private int mirrorHighlightY = -1;
     private int mirrorHighlightW;
@@ -1742,8 +1743,8 @@ public class WrightsMenuScreen extends Screen {
             }
         }
         y += 6;
-        drawMirrorStatus(graphics, x, y, w);
-        y += 40;
+        int statusH = drawMirrorStatus(graphics, mouseX, mouseY, x, y, w);
+        y += statusH + 6;
         mirrorHighlightY = y;
         int buttonGap = 8;
         int clearW = Math.min(108, Math.max(72, (w - buttonGap) / 2));
@@ -1768,22 +1769,36 @@ public class WrightsMenuScreen extends Screen {
         mirrorClearY = y;
     }
 
-    private void drawMirrorStatus(GuiGraphics graphics, int x, int y, int w) {
+    private int drawMirrorStatus(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int w) {
         String dimension = this.minecraft != null && this.minecraft.level != null ? this.minecraft.level.dimension().location().toString() : "";
         boolean placed = WrightsClientConfig.mirrorPlaced(dimension);
         boolean armed = WrightsClientConfig.mirrorArmed(dimension);
-        WrightsUi.status(graphics, x, y, w, 34, placed ? WrightsUi.TEAL : WrightsUi.COPPER_DIM);
+        mirrorFaceY = -1;
+        int height = placed ? 52 : 34;
+        WrightsUi.status(graphics, x, y, w, height, placed ? WrightsUi.TEAL : WrightsUi.COPPER_DIM);
         if (!WrightsClientConfig.MIRROR_SET.get()) {
             drawWrapped(graphics, Component.translatable("menu.wrights.mirror_none"), x + 10, y + 6, w - 16, WrightsUi.TEXT);
         } else if (!placed) {
             drawWrapped(graphics, Component.translatable("menu.wrights.mirror_other_world"), x + 10, y + 6, w - 16, WrightsUi.TEXT);
         } else {
             net.minecraft.core.BlockPos anchor = WrightsClientConfig.mirrorAnchor();
-            Direction face = Direction.from3DDataValue(WrightsClientConfig.MIRROR_FACE.get());
-            graphics.drawString(this.font, Component.translatable("menu.wrights.mirror_anchor", anchor.getX(), anchor.getY(), anchor.getZ(), Component.translatable("menu.wrights.face." + face.getName())), x + 10, y + 6, WrightsUi.TEXT, false);
+            int face = WrightsClientConfig.MIRROR_FACE.get();
+            Direction shown = Direction.from3DDataValue(face);
+            graphics.drawString(this.font, Component.translatable("menu.wrights.mirror_anchor", anchor.getX(), anchor.getY(), anchor.getZ(), Component.translatable("menu.wrights.face." + shown.getName())), x + 10, y + 6, WrightsUi.TEXT, false);
             int copies = com.wrights.blueprint.Mirror.copyCount(WrightsClientConfig.MIRROR_PATTERN.get(), WrightsClientConfig.MIRROR_AXES.get());
             graphics.drawString(this.font, Component.translatable(armed ? "menu.wrights.mirror_copies" : "menu.wrights.mirror_paused", copies), x + 10, y + 18, armed ? WrightsUi.TEAL : WrightsUi.MUTED, false);
+            mirrorFaceY = y + 30;
+            int pad = 8;
+            int gap = 4;
+            int buttonW = (w - pad * 2 - gap * 5) / 6;
+            for (int i = 0; i < 6; i++) {
+                int bx = x + pad + i * (buttonW + gap);
+                int bw = i == 5 ? x + w - pad - bx : buttonW;
+                Direction side = Direction.from3DDataValue(i);
+                drawChoice(graphics, mouseX, mouseY, bx, mirrorFaceY, bw, 16, face == i, "menu.wrights.face." + side.getName());
+            }
         }
+        return height;
     }
 
     private void drawSectionLabel(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, String label, String hint) {
@@ -1953,6 +1968,19 @@ public class WrightsMenuScreen extends Screen {
         if (mirrorMineVoidY >= 0 && hitMirrorToggle(mouseX, mouseY, x + 16, mirrorMineVoidY, "menu.wrights.mirror_mine_void")) {
             WrightsClientConfig.setMirrorMineVoid(!WrightsClientConfig.mirrorMineVoid());
             return true;
+        }
+        if (mirrorFaceY >= 0 && mouseY >= mirrorFaceY && mouseY < mirrorFaceY + 16) {
+            int pad = 8;
+            int faceGap = 4;
+            int buttonW = (mirrorBodyW - pad * 2 - faceGap * 5) / 6;
+            for (int i = 0; i < 6; i++) {
+                int bx = x + pad + i * (buttonW + faceGap);
+                int bw = i == 5 ? x + mirrorBodyW - pad - bx : buttonW;
+                if (mouseX >= bx && mouseX < bx + bw) {
+                    WrightsClientConfig.setMirrorFace(i);
+                    return true;
+                }
+            }
         }
         if (mirrorHighlightY >= 0 && mouseX >= mirrorHighlightX && mouseX < mirrorHighlightX + mirrorHighlightW && mouseY >= mirrorHighlightY && mouseY < mirrorHighlightY + 18) {
             String dimension = this.minecraft != null && this.minecraft.level != null ? this.minecraft.level.dimension().location().toString() : "";
