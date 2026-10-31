@@ -30,7 +30,7 @@ public class DroneRosterScreen extends Screen {
     private WrightsButton back;
 
     public DroneRosterScreen(Screen parent) {
-        super(Component.translatable("screen.wrights.manage_all"));
+        super(Component.translatable("screen.wrights.manage_roster"));
         this.parent = parent;
     }
 
