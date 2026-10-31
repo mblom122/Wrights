@@ -131,7 +131,7 @@ public enum WrightJadeProvider implements IEntityComponentProvider, StreamServer
             } else {
                 kind = Kind.BUILDING;
             }
-            int done = job.undoing() ? job.undoTotal() - job.refundCount() : job.cursor();
+            int done = job.progressDone();
             int total = job.undoing() ? Math.max(1, job.undoTotal()) : job.total();
             int sizeX;
             int sizeY;
@@ -145,7 +145,7 @@ public enum WrightJadeProvider implements IEntityComponentProvider, StreamServer
                 sizeY = job.spanY();
                 sizeZ = job.spanZ();
             }
-            return new WrightStatus(nameOf(job, library), kind, done, total, job.skipped(), sizeX, sizeY, sizeZ);
+            return new WrightStatus(nameOf(job, library), kind, done, total, job.progressSkipped(), sizeX, sizeY, sizeZ);
         }
 
         private static String nameOf(BuildJob job, SchematicLibrary library) {

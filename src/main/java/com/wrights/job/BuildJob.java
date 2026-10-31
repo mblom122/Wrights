@@ -189,6 +189,26 @@ public final class BuildJob {
         skipped++;
     }
 
+    /** Placed + skipped, capped at the schematic size. Used for HUD progress (not the raw cursor). */
+    public int progressDone() {
+        if (undoing) {
+            return Math.max(0, undoTotal() - refundCount());
+        }
+        int total = Math.max(1, this.total);
+        long sum = (long) placed + (long) skipped;
+        if (sum < 0L || sum > total) {
+            return total;
+        }
+        return (int) sum;
+    }
+
+    /** Skipped cells for display, never more than the remaining schematic after placed. */
+    public int progressSkipped() {
+        int total = Math.max(0, this.total);
+        int placedSafe = Math.min(Math.max(0, placed), total);
+        return Math.min(Math.max(0, skipped), total - placedSafe);
+    }
+
     /** Schematic indexes already counted as skipped. Not saved; a reload may count one of them once more. */
     private final Set<Integer> retired = new HashSet<>();
 

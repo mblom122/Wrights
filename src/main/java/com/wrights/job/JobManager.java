@@ -2624,10 +2624,16 @@ public final class JobManager {
                 continue;
             }
             if (index < 0) {
-                hand.awaitingItems = false;
-                hand.idle = true;
-                publishHandStatus(level, player, schematic, job, hand, DroneEntity.WAIT_IDLE);
-                continue;
+                // Own share is empty — help another wright, or go idle and head home.
+                int borrowed = borrowWork(level, player, schematic, job, hand, true);
+                if (borrowed >= 0) {
+                    index = borrowed;
+                } else {
+                    hand.awaitingItems = false;
+                    hand.idle = true;
+                    publishHandStatus(level, player, schematic, job, hand, DroneEntity.WAIT_IDLE);
+                    continue;
+                }
             }
             hand.awaitingItems = false;
             hand.idle = false;
@@ -2692,7 +2698,6 @@ public final class JobManager {
                 }
                 if (job.outsideClip(entry)) {
                     noteProgress(schematic, job, hand, entry, at);
-                    job.advance();
                     continue;
                 }
                 PlaceResult placed = actOne(level, player, job, pos, entry, false, hand);
@@ -2714,11 +2719,10 @@ public final class JobManager {
                     break;
                 }
                 noteProgress(schematic, job, hand, entry, at);
-                job.advance();
             }
             publishHandStatus(level, player, schematic, job, hand, handStatus);
         }
-        shareWithIdle(job, schematic);
+        shareWithIdle(level, job, schematic);
         releaseIdle(level, player, job, schematic);
         parkWaiters(level, player, job, working);
         if (!working && !scanning) {
@@ -2920,9 +2924,6 @@ public final class JobManager {
             }
             budget[0]--;
             noteProgress(schematic, job, hand, entry, index);
-            if (!hand.rescan) {
-                job.advance();
-            }
         }
         int rest = nextInLane(level, player, schematic, job, hand);
         if (rest == SUPPORT_WAIT || rest == NEED_ITEMS) {
@@ -2948,11 +2949,10 @@ public final class JobManager {
                 hand.probe = found;
                 return found;
             }
-            if (found == NEED_ITEMS || found == SUPPORT_WAIT) {
-                int borrowed = borrowWork(level, player, schematic, job, hand);
-                if (borrowed >= 0) {
-                    return borrowed;
-                }
+            // Empty share, waiting on floor, or short on items — try helping another wright.
+            int borrowed = borrowWork(level, player, schematic, job, hand, found < 0);
+            if (borrowed >= 0) {
+                return borrowed;
             }
             return found;
         }
@@ -2976,11 +2976,9 @@ public final class JobManager {
         if (best >= 0) {
             return best;
         }
-        if (waiting || shortItems) {
-            int borrowed = borrowWork(level, player, schematic, job, hand);
-            if (borrowed >= 0) {
-                return borrowed;
-            }
+        int borrowed = borrowWork(level, player, schematic, job, hand, !waiting && !shortItems);
+        if (borrowed >= 0) {
+            return borrowed;
         }
         if (shortItems) {
             return NEED_ITEMS;
@@ -3061,8 +3059,12 @@ public final class JobManager {
         return waiting ? SUPPORT_WAIT : -1;
     }
 
-    /** Another part of this build that this wright can pay for, when its own part is short. */
-    private static int borrowWork(ServerLevel level, ServerPlayer player, Schematic schematic, BuildJob job, BuildJob.Hand hand) {
+    /**
+     * Another part of this build that this wright can pay for.
+     * {@code takeOwned} is true when this wright's own share is empty, so it may help with
+     * cells that still belong to another wright.
+     */
+    private static int borrowWork(ServerLevel level, ServerPlayer player, Schematic schematic, BuildJob job, BuildJob.Hand hand, boolean takeOwned) {
         for (int i = 0; i < schematic.blockCount(); i++) {
             Schematic.Entry entry = schematic.entry(i);
             if (job.outsideClip(entry) || satisfied(level, job, entry)) {
@@ -3074,7 +3076,7 @@ public final class JobManager {
             if (!canPay(player, level, job, hand, entry)) {
                 continue;
             }
-            if (heldByOther(level, player, job, hand, entry)) {
+            if (!takeOwned && heldByOther(level, player, job, hand, entry)) {
                 continue;
             }
             return i;
@@ -3084,7 +3086,7 @@ public final class JobManager {
 
     private static boolean heldByOther(ServerLevel level, ServerPlayer player, BuildJob job, BuildJob.Hand hand, Schematic.Entry entry) {
         for (BuildJob.Hand other : job.hands()) {
-            if (other == hand || other.awaitingItems || !ownsEntry(job, other, entry)) {
+            if (other == hand || other.idle || other.awaitingItems || other.waitingOnOthers || !ownsEntry(job, other, entry)) {
                 continue;
             }
             if (canPay(player, level, job, other, entry)) {
@@ -3393,6 +3395,10 @@ public final class JobManager {
         if (job.paused() && reason == DroneEntity.WAIT_NONE) {
             reason = DroneEntity.WAIT_PAUSED;
         }
+        if (reason == DroneEntity.WAIT_IDLE || reason == DroneEntity.WAIT_HOME || reason == DroneEntity.WAIT_SHELTER) {
+            drone.setWorkStatus(ItemStack.EMPTY, ItemStack.EMPTY, reason);
+            return;
+        }
         int[] targets = peekHandTargets(level, schematic, job, hand);
         ItemStack current = stackFor(schematic, targets[0]);
         ItemStack next = stackFor(schematic, targets[1]);
@@ -3400,19 +3406,21 @@ public final class JobManager {
     }
 
     /**
-     * First open cell this hand owns, then the one after it. Does not move cursors.
-     * Negative indexes mean none.
+     * First actionable cell this hand owns (or can help with), then the one after it.
+     * Does not move cursors. Negative indexes mean none.
      */
     private static int[] peekHandTargets(ServerLevel level, Schematic schematic, BuildJob job, BuildJob.Hand hand) {
         int current = -1;
         int next = -1;
         for (int i = 0; i < schematic.blockCount(); i++) {
             Schematic.Entry entry = schematic.entry(i);
-            if (!ownsEntry(job, hand, entry) || job.outsideClip(entry) || satisfied(level, job, entry)) {
+            if (job.outsideClip(entry) || satisfied(level, job, entry)) {
                 continue;
             }
-            Falling hold = falling(level, schematic, job, entry);
-            if (hold == Falling.SKIP) {
+            if (!ownsEntry(job, hand, entry) && countOpen(level, schematic, job, hand) > 0) {
+                continue;
+            }
+            if (falling(level, schematic, job, entry) != Falling.READY) {
                 continue;
             }
             if (current < 0) {
@@ -3556,7 +3564,7 @@ public final class JobManager {
         }
     }
 
-    private static void shareWithIdle(BuildJob job, Schematic schematic) {
+    private static void shareWithIdle(ServerLevel level, BuildJob job, Schematic schematic) {
         if (schematic == null || job.hands().size() < 2) {
             return;
         }
@@ -3574,7 +3582,7 @@ public final class JobManager {
         for (int n = 0; n < job.hands().size(); n++) {
             BuildJob.Hand receiver = null;
             for (BuildJob.Hand hand : job.hands()) {
-                if (countPaste(schematic, hand) == 0) {
+                if (countOpen(level, schematic, job, hand) == 0) {
                     receiver = hand;
                     break;
                 }
@@ -3583,8 +3591,8 @@ public final class JobManager {
             if (receiver == null) {
                 return;
             }
-            BuildJob.Slice donor = fullestPaste(job, schematic, receiver);
-            BuildJob.Slice half = donor == null ? null : splitPaste(schematic, donor);
+            BuildJob.Slice donor = fullestPaste(level, job, schematic, receiver);
+            BuildJob.Slice half = donor == null ? null : splitPaste(level, schematic, job, donor);
             if (half == null) {
                 return;
             }
@@ -3593,7 +3601,7 @@ public final class JobManager {
         }
     }
 
-    /** A wright with nothing left to place goes home. The ones still on their last blocks stay. */
+    /** A wright with nothing left to place (and nothing left to help with) goes home. */
     private static void releaseIdle(ServerLevel level, ServerPlayer player, BuildJob job, Schematic schematic) {
         if (schematic == null || job.hands().size() < 2) {
             return;
@@ -3601,7 +3609,7 @@ public final class JobManager {
         boolean busy = false;
         int going = 0;
         for (BuildJob.Hand hand : job.hands()) {
-            if (hand.idle && countPaste(schematic, hand) == 0) {
+            if (hand.idle && countOpen(level, schematic, job, hand) == 0) {
                 going++;
             } else if (!hand.idle) {
                 busy = true;
@@ -3612,7 +3620,7 @@ public final class JobManager {
         }
         int slot = 0;
         for (BuildJob.Hand hand : job.hands()) {
-            if (!hand.idle || countPaste(schematic, hand) > 0 || hand.entityId == null) {
+            if (!hand.idle || countOpen(level, schematic, job, hand) > 0 || hand.entityId == null) {
                 continue;
             }
             recall(level, player, hand.entityId, slot++, going, hand.homePort);
@@ -3689,14 +3697,6 @@ public final class JobManager {
         }
     }
 
-    private static int countPaste(Schematic schematic, BuildJob.Hand hand) {
-        int count = 0;
-        for (BuildJob.Slice slice : hand.slices) {
-            count += countPaste(schematic, slice);
-        }
-        return count;
-    }
-
     private static int countPaste(Schematic schematic, BuildJob.Slice slice) {
         int count = 0;
         for (int i = Math.max(0, slice.cursor); i < schematic.blockCount(); i++) {
@@ -3706,6 +3706,48 @@ public final class JobManager {
             }
         }
         return count;
+    }
+
+    /** Blocks still left to place or skip in this wright's slices. */
+    private static int countOpen(ServerLevel level, Schematic schematic, BuildJob job, BuildJob.Hand hand) {
+        int count = 0;
+        for (BuildJob.Slice slice : hand.slices) {
+            count += countOpen(level, schematic, job, slice);
+        }
+        if (!hand.slices.isEmpty()) {
+            return count;
+        }
+        for (int i = 0; i < schematic.blockCount(); i++) {
+            Schematic.Entry entry = schematic.entry(i);
+            if (!ownsEntry(job, hand, entry)) {
+                continue;
+            }
+            if (isOpenCell(level, schematic, job, entry)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static int countOpen(ServerLevel level, Schematic schematic, BuildJob job, BuildJob.Slice slice) {
+        int count = 0;
+        for (int i = 0; i < schematic.blockCount(); i++) {
+            Schematic.Entry entry = schematic.entry(i);
+            if (!slice.contains(entry.x(), entry.y(), entry.z())) {
+                continue;
+            }
+            if (isOpenCell(level, schematic, job, entry)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static boolean isOpenCell(ServerLevel level, Schematic schematic, BuildJob job, Schematic.Entry entry) {
+        if (job.outsideClip(entry) || satisfied(level, job, entry)) {
+            return false;
+        }
+        return falling(level, schematic, job, entry) != Falling.SKIP;
     }
 
     private static int countRefunds(BuildJob job, BuildJob.Hand hand) {
@@ -3726,7 +3768,7 @@ public final class JobManager {
         return count;
     }
 
-    private static BuildJob.Slice fullestPaste(BuildJob job, Schematic schematic, BuildJob.Hand except) {
+    private static BuildJob.Slice fullestPaste(ServerLevel level, BuildJob job, Schematic schematic, BuildJob.Hand except) {
         BuildJob.Slice donor = null;
         int most = 1;
         for (BuildJob.Hand hand : job.hands()) {
@@ -3734,7 +3776,7 @@ public final class JobManager {
                 continue;
             }
             for (BuildJob.Slice slice : hand.slices) {
-                int left = countPaste(schematic, slice);
+                int left = countOpen(level, schematic, job, slice);
                 if (left > most) {
                     most = left;
                     donor = slice;
@@ -3775,6 +3817,28 @@ public final class JobManager {
         for (int i = start; i < schematic.blockCount() && at < count; i++) {
             Schematic.Entry entry = schematic.entry(i);
             if (!slice.contains(entry.x(), entry.y(), entry.z())) {
+                continue;
+            }
+            xs[at] = entry.x();
+            ys[at] = entry.y();
+            zs[at] = entry.z();
+            at++;
+        }
+        return splitPoints(slice, xs, ys, zs, at);
+    }
+
+    private static BuildJob.Slice splitPaste(ServerLevel level, Schematic schematic, BuildJob job, BuildJob.Slice slice) {
+        int count = countOpen(level, schematic, job, slice);
+        if (count < 2) {
+            return null;
+        }
+        int[] xs = new int[count];
+        int[] ys = new int[count];
+        int[] zs = new int[count];
+        int at = 0;
+        for (int i = 0; i < schematic.blockCount() && at < count; i++) {
+            Schematic.Entry entry = schematic.entry(i);
+            if (!slice.contains(entry.x(), entry.y(), entry.z()) || !isOpenCell(level, schematic, job, entry)) {
                 continue;
             }
             xs[at] = entry.x();
@@ -4093,6 +4157,7 @@ public final class JobManager {
         if (paid) {
             consumeItem(player, level, job, hand, payment);
         }
+        boolean first = !job.isSettled(entry.x(), entry.y(), entry.z());
         applyEntryNbt(level, player, job, pos, entry);
         job.recordPlaced(entry.x(), entry.y(), entry.z(), after, paid);
         clearPlacedGhost(player, job, entry);
@@ -4101,14 +4166,19 @@ public final class JobManager {
             level.playSound(null, pos, state.getSoundType(level, pos, player).getPlaceSound(), SoundSource.BLOCKS, 1.0F, 1.0F);
             level.levelEvent(2001, pos, Block.getId(state));
         }
-        job.placedOne();
+        if (first) {
+            job.placedOne();
+        }
         return PlaceResult.DONE;
     }
 
     /** Count a skip once and mark the cell settled so wrap-back does not retry it. */
     private static PlaceResult skipCell(ServerPlayer player, BuildJob job, Schematic.Entry entry) {
-        job.skippedOne();
+        boolean first = !job.isSettled(entry.x(), entry.y(), entry.z());
         clearPlacedGhost(player, job, entry);
+        if (first) {
+            job.skippedOne();
+        }
         return PlaceResult.DONE;
     }
 
