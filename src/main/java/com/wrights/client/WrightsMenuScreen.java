@@ -2184,19 +2184,22 @@ public class WrightsMenuScreen extends Screen {
 
     private int jobColor(BlueprintPayloads.JobLine job) {
         if (job.finished() && job.stopped()) {
-            return 0xFFE07A7A;
+            return WrightsUi.RED;
         }
         if (job.finished() && !job.undone() && !job.undoing()) {
-            return 0xFF6FCF97;
+            return WrightsUi.GREEN;
         }
         if (job.paused()) {
-            return 0xFFE0B060;
+            return WrightsUi.GOLD;
         }
         if (job.waitKind() == com.wrights.job.BuildJob.WAIT_ITEMS) {
-            return 0xFFE08A4A;
+            return WrightsUi.TEAL;
         }
         if (job.queued()) {
-            return 0xFF7EB6FF;
+            return WrightsUi.BLUE;
+        }
+        if (job.hold() != com.wrights.job.BuildJob.HOLD_NONE && job.hold() != com.wrights.job.BuildJob.HOLD_MANUAL) {
+            return WrightsUi.TEAL;
         }
         return job.finished() ? WrightsUi.MUTED : WrightsUi.COPPER;
     }

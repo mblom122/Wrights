@@ -6,6 +6,11 @@ public final class WrightsUi {
     public static final int COPPER = 0xFFC47A3A;
     public static final int COPPER_DIM = 0xFF8C5A2A;
     public static final int BLUE = 0xFF7EB6FF;
+    public static final int GOLD = 0xFFE0B060;
+    public static final int GREEN = 0xFF6FCF97;
+    public static final int RED = 0xFFE07A7A;
+    /** A job that stopped on its own and will continue when the cause clears. */
+    public static final int TEAL = 0xFF5ED0C4;
     public static final int TEXT = 0xFFE7EEF4;
     public static final int MUTED = 0xFF93A1AD;
     public static final int PANEL = 0xF0101822;
