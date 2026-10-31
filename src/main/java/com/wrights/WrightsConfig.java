@@ -186,13 +186,13 @@ public final class WrightsConfig {
             .comment("Choosing X, Y, and Z in the mirror menu. Off keeps the axis from the anchor face.")
             .define("mirrorAxes", true);
     public static final ModConfigSpec.BooleanValue ALLOW_PATTERN_4 = BUILDER
-            .comment("The 4 x times mirror pattern.")
+            .comment("Copies above 2. Off caps the mirror slider at 2.")
             .define("mirrorPattern4", true);
     public static final ModConfigSpec.BooleanValue ALLOW_PATTERN_8 = BUILDER
-            .comment("The 8 x times mirror pattern.")
+            .comment("Copies above 4. Off caps the mirror slider at 4.")
             .define("mirrorPattern8", true);
     public static final ModConfigSpec.BooleanValue ALLOW_PATTERN_16 = BUILDER
-            .comment("The 16 x times mirror pattern.")
+            .comment("Copies above 8. Off caps the mirror slider at 8. On allows up to 32.")
             .define("mirrorPattern16", true);
     public static final ModConfigSpec.BooleanValue ALLOW_JOBS = BUILDER
             .comment("The jobs page.")
@@ -370,48 +370,22 @@ public final class WrightsConfig {
         return allowBlueprints() || allowMirror();
     }
 
-    public static boolean patternOn(int pattern) {
-        return switch (Mirror.clampPattern(pattern)) {
-            case Mirror.CROSS -> read(ALLOW_PATTERN_4, true);
-            case Mirror.EIGHT -> read(ALLOW_PATTERN_8, true);
-            case Mirror.SIXTEEN -> read(ALLOW_PATTERN_16, true);
-            default -> true;
-        };
+    /** Highest copy count the server still allows. */
+    public static int maxMirrorCopies() {
+        if (!read(ALLOW_PATTERN_4, true)) {
+            return 2;
+        }
+        if (!read(ALLOW_PATTERN_8, true)) {
+            return 4;
+        }
+        if (!read(ALLOW_PATTERN_16, true)) {
+            return 8;
+        }
+        return 32;
     }
 
-    public static int allowedPattern(int pattern) {
-        int id = Mirror.clampPattern(pattern);
-        if (patternOn(id)) {
-            return id;
-        }
-        int[] order = {Mirror.PAIR, Mirror.CROSS, Mirror.EIGHT, Mirror.SIXTEEN};
-        for (int candidate : order) {
-            if (patternOn(candidate)) {
-                return candidate;
-            }
-        }
-        return Mirror.PAIR;
-    }
-
-    public static int[] patternChoices() {
-        int[] all = {Mirror.PAIR, Mirror.CROSS, Mirror.EIGHT, Mirror.SIXTEEN};
-        int count = 0;
-        for (int id : all) {
-            if (patternOn(id)) {
-                count++;
-            }
-        }
-        int[] choices = new int[Math.max(1, count)];
-        int n = 0;
-        for (int id : all) {
-            if (patternOn(id)) {
-                choices[n++] = id;
-            }
-        }
-        if (n == 0) {
-            choices[0] = Mirror.PAIR;
-        }
-        return choices;
+    public static int allowedPattern(int copies) {
+        return Math.min(Mirror.clampCopies(copies), maxMirrorCopies());
     }
 
     public static int allowedAxes(int axes) {

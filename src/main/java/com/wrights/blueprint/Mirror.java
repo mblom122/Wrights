@@ -26,10 +26,6 @@ import com.wrights.schematic.Schematic;
  * The original build stays where the player put it. Each image is a new schematic.
  */
 public final class Mirror {
-    public static final int PAIR = 0;
-    public static final int CROSS = 1;
-    public static final int EIGHT = 2;
-    public static final int SIXTEEN = 3;
     public static final int AXIS_X = 1;
     public static final int AXIS_Y = 2;
     public static final int AXIS_Z = 4;
@@ -37,29 +33,21 @@ public final class Mirror {
     private Mirror() {
     }
 
-    public static int clampPattern(int pattern) {
-        if (pattern == CROSS || pattern == EIGHT || pattern == SIXTEEN) {
-            return pattern;
-        }
-        return PAIR;
+    public static int clampCopies(int copies) {
+        return Math.max(1, Math.min(32, copies));
     }
 
-    /** Original build plus the reflected ones. Axis bits replace the pattern when any are set. */
-    public static int copyCount(int pattern) {
-        return copyCount(pattern, 0);
+    /** Original build plus the reflected ones. Axis bits replace the copy count when any are set. */
+    public static int copyCount(int copies) {
+        return copyCount(copies, 0);
     }
 
-    public static int copyCount(int pattern, int axes) {
+    public static int copyCount(int copies, int axes) {
         int mask = axes & 7;
         if (mask != 0) {
             return 1 << Integer.bitCount(mask);
         }
-        return switch (clampPattern(pattern)) {
-            case SIXTEEN -> 16;
-            case EIGHT -> 8;
-            case CROSS -> 4;
-            default -> 2;
-        };
+        return clampCopies(copies);
     }
 
     /** Planes to draw. An empty axis mask keeps the face that was clicked. */
@@ -376,51 +364,15 @@ public final class Mirror {
             shots.addAll(axisShots(anchor, axes & 7, shapes));
             return shots;
         }
-        int patternId = clampPattern(pattern);
+        int copies = clampCopies(pattern);
         Direction.Axis axis = face.getAxis();
-        if (patternId == SIXTEEN) {
-            for (int step = 1; step <= 15; step++) {
-                int turn = step;
-                shots.add(new Shot() {
-                    @Override
-                    public BlockPos move(BlockPos pos) {
-                        return circle(pos, anchor, turn, axis);
-                    }
-
-                    @Override
-                    public BlockState restyle(BlockState state) {
-                        return shapes ? spinState(state, axis, Math.round(turn / 4.0F)) : state;
-                    }
-                });
-            }
-            return shots;
-        }
-        if (patternId == EIGHT) {
-            for (int step = 1; step <= 7; step++) {
-                int kind = step;
-                shots.add(new Shot() {
-                    @Override
-                    public BlockPos move(BlockPos pos) {
-                        return around(pos, anchor, kind, axis);
-                    }
-
-                    @Override
-                    public BlockState restyle(BlockState state) {
-                        return shapes ? styleEight(state, kind, axis) : state;
-                    }
-                });
-            }
-            return shots;
-        }
-        shots.add(faceShot(anchor, face, shapes));
-        if (clampPattern(pattern) == CROSS) {
-            Direction second = face.getAxis() == Direction.Axis.X ? Direction.SOUTH : Direction.EAST;
-            shots.add(faceShot(anchor, second, shapes));
+        for (int step = 1; step < copies; step++) {
+            int turn = step;
+            int total = copies;
             shots.add(new Shot() {
                 @Override
                 public BlockPos move(BlockPos pos) {
-                    BlockPos once = reflect(pos, anchor, face);
-                    return once == null ? null : reflect(once, anchor, second);
+                    return circle(pos, anchor, turn, total, axis);
                 }
 
                 @Override
@@ -428,7 +380,7 @@ public final class Mirror {
                     if (!shapes) {
                         return state;
                     }
-                    return flipAxis(flipAxis(state, face.getAxis()), second.getAxis());
+                    return spinState(state, axis, (int) Math.round(turn * 4.0D / total));
                 }
             });
         }
@@ -493,20 +445,6 @@ public final class Mirror {
         return Direction.get(Direction.AxisDirection.POSITIVE, axis);
     }
 
-    private static Shot faceShot(BlockPos anchor, Direction face, boolean shapes) {
-        return new Shot() {
-            @Override
-            public BlockPos move(BlockPos pos) {
-                return reflect(pos, anchor, face);
-            }
-
-            @Override
-            public BlockState restyle(BlockState state) {
-                return shapes ? flipAxis(state, face.getAxis()) : state;
-            }
-        };
-    }
-
     /** Reflect through the middle of the anchor block, so a block two steps away lands two steps the other way. */
     private static BlockPos reflectCenter(BlockPos pos, BlockPos anchor, Direction.Axis axis) {
         int anchorValue = axis.choose(anchor.getX(), anchor.getY(), anchor.getZ());
@@ -523,25 +461,23 @@ public final class Mirror {
         };
     }
 
-    /** The clicked face picks the axis. The plane cuts through the middle of the anchor block. */
-    private static BlockPos reflect(BlockPos pos, BlockPos anchor, Direction face) {
-        return reflectCenter(pos, anchor, face.getAxis());
-    }
-
-    /** Steps of 22.5 degrees around the middle, in the plane of the clicked face. Quarter turns stay on the grid. */
-    private static BlockPos circle(BlockPos pos, BlockPos anchor, int step, Direction.Axis axis) {
-        int turn = Math.floorMod(step, 16);
+    /** Even steps around the middle, in the plane of the clicked face. Quarter turns stay on the grid. */
+    private static BlockPos circle(BlockPos pos, BlockPos anchor, int step, int count, Direction.Axis axis) {
+        int total = Math.max(1, count);
+        int turn = Math.floorMod(step, total);
         int dx = pos.getX() - anchor.getX();
         int dy = pos.getY() - anchor.getY();
         int dz = pos.getZ() - anchor.getZ();
         int u = planeU(dx, dy, dz, axis);
         int v = planeV(dx, dy, dz, axis);
         int fixed = planeFixed(dx, dy, dz, axis);
-        if (turn % 4 == 0) {
-            int[] spun = spin2(u, v, turn / 4);
+        double quarter = turn * 4.0D / total;
+        double nearest = Math.rint(quarter);
+        if (Math.abs(quarter - nearest) < 1.0e-4D) {
+            int[] spun = spin2(u, v, (int) nearest);
             return assemble(anchor, axis, spun[0], spun[1], fixed);
         }
-        double angle = turn * (Math.PI / 8.0D);
+        double angle = turn * (Math.PI * 2.0D / total);
         double cos = Math.cos(angle);
         double sin = Math.sin(angle);
         double nu = u * cos - v * sin;
@@ -563,67 +499,6 @@ public final class Mirror {
             center = nearest;
         }
         return (int) Math.floor(center);
-    }
-
-    /** Quarter turns and flips around the anchor corner, in the plane of the clicked face. */
-    private static BlockPos around(BlockPos pos, BlockPos anchor, int kind, Direction.Axis axis) {
-        int dx = pos.getX() - anchor.getX();
-        int dy = pos.getY() - anchor.getY();
-        int dz = pos.getZ() - anchor.getZ();
-        int u = planeU(dx, dy, dz, axis);
-        int v = planeV(dx, dy, dz, axis);
-        int nu = u;
-        int nv = v;
-        switch (kind) {
-            case 1 -> nu = -u;
-            case 2 -> nv = -v;
-            case 3 -> {
-                nu = -u;
-                nv = -v;
-            }
-            case 4 -> {
-                int[] spun = spin2(u, v, 1);
-                nu = spun[0];
-                nv = spun[1];
-            }
-            case 5 -> {
-                int[] spun = spin2(u, v, 3);
-                nu = spun[0];
-                nv = spun[1];
-            }
-            case 6 -> {
-                nu = v;
-                nv = u;
-            }
-            default -> {
-                nu = -v;
-                nv = -u;
-            }
-        }
-        return assemble(anchor, axis, nu, nv, planeFixed(dx, dy, dz, axis));
-    }
-
-    private static BlockState styleEight(BlockState state, int kind, Direction.Axis axis) {
-        if (axis == Direction.Axis.Y) {
-            return switch (kind) {
-                case 1 -> state.mirror(net.minecraft.world.level.block.Mirror.FRONT_BACK);
-                case 2 -> state.mirror(net.minecraft.world.level.block.Mirror.LEFT_RIGHT);
-                case 3 -> state.rotate(Rotation.CLOCKWISE_180);
-                case 4 -> state.rotate(Rotation.CLOCKWISE_90);
-                case 5 -> state.rotate(Rotation.COUNTERCLOCKWISE_90);
-                case 6 -> state.rotate(Rotation.CLOCKWISE_90).mirror(net.minecraft.world.level.block.Mirror.FRONT_BACK);
-                default -> state.rotate(Rotation.CLOCKWISE_90).mirror(net.minecraft.world.level.block.Mirror.LEFT_RIGHT);
-            };
-        }
-        return switch (kind) {
-            case 1 -> mirrorPlane(state, axis, true);
-            case 2 -> mirrorPlane(state, axis, false);
-            case 3 -> spinState(state, axis, 2);
-            case 4 -> spinState(state, axis, 1);
-            case 5 -> spinState(state, axis, 3);
-            case 6 -> mirrorPlane(spinState(state, axis, 1), axis, true);
-            default -> mirrorPlane(spinState(state, axis, 1), axis, false);
-        };
     }
 
     /** Clockwise quarters around {@code axis}, matching a top-face circle when the axis is Y. */
@@ -649,12 +524,6 @@ public final class Mirror {
             spun = flipHalves(spun);
         }
         return spun;
-    }
-
-    private static BlockState mirrorPlane(BlockState state, Direction.Axis axis, boolean alongU) {
-        BlockState mapped = mapDirections(state, dir -> alongU ? mirrorU(dir, axis) : mirrorV(dir, axis), null);
-        boolean vertical = alongU ? axis == Direction.Axis.Z : axis == Direction.Axis.X;
-        return vertical ? flipHalves(mapped) : mapped;
     }
 
     /** The two plane axes, then the clicked axis. Clockwise is (u, v) to (-v, u). */
@@ -760,24 +629,6 @@ public final class Mirror {
             case Z -> value == Direction.Axis.Y ? Direction.Axis.X : Direction.Axis.Y;
             default -> value == Direction.Axis.X ? Direction.Axis.Z : Direction.Axis.X;
         };
-    }
-
-    private static Direction mirrorU(Direction dir, Direction.Axis axis) {
-        Direction.Axis flipped = switch (axis) {
-            case X -> Direction.Axis.Z;
-            case Z -> Direction.Axis.Y;
-            default -> Direction.Axis.X;
-        };
-        return dir.getAxis() == flipped ? dir.getOpposite() : dir;
-    }
-
-    private static Direction mirrorV(Direction dir, Direction.Axis axis) {
-        Direction.Axis flipped = switch (axis) {
-            case X -> Direction.Axis.Y;
-            case Z -> Direction.Axis.X;
-            default -> Direction.Axis.Z;
-        };
-        return dir.getAxis() == flipped ? dir.getOpposite() : dir;
     }
 
     private static BlockState mapDirections(BlockState state, java.util.function.UnaryOperator<Direction> dirs, java.util.function.UnaryOperator<Direction.Axis> axes) {

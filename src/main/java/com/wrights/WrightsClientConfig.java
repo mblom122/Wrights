@@ -183,8 +183,8 @@ public final class WrightsClientConfig {
             .comment("When true, mirrored mining removes the blocks and drops nothing.")
             .define("mirrorMineVoid", false);
     public static final ModConfigSpec.IntValue MIRROR_PATTERN = BUILDER
-            .comment("0 is 2 copies, 1 is 4, 2 is 8, 3 is 16.")
-            .defineInRange("mirrorPattern", 0, 0, 3);
+            .comment("How many copies, from 1 to 32, spaced around the anchored face.")
+            .defineInRange("mirrorCopies", 2, 1, 32);
     public static final ModConfigSpec.IntValue MIRROR_AXES = BUILDER
             .comment("0 uses the clicked face and the pattern. Otherwise bit 1 is X, bit 2 is Y, and bit 4 is Z, mirrored through the middle of the anchor block.")
             .defineInRange("mirrorAxes", 0, 0, 7);
@@ -639,10 +639,8 @@ public final class WrightsClientConfig {
         save();
     }
 
-    public static void setMirrorPattern(int pattern) {
-        MIRROR_PATTERN.set(Mirror.clampPattern(pattern));
-        rememberAxes();
-        MIRROR_AXES.set(0);
+    public static void setMirrorPattern(int copies) {
+        MIRROR_PATTERN.set(Mirror.clampCopies(copies));
         save();
     }
 
@@ -692,7 +690,11 @@ public final class WrightsClientConfig {
     }
 
     public static void cycleMirrorPattern() {
-        setMirrorPattern(MIRROR_PATTERN.get() + 1);
+        int next = MIRROR_PATTERN.get() + 1;
+        if (next > 32) {
+            next = 1;
+        }
+        setMirrorPattern(next);
     }
 
     public static void clearMirror() {
