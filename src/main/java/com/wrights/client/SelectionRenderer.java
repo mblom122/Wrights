@@ -92,7 +92,7 @@ public final class SelectionRenderer {
         if ((adjust || !gui) && capture) {
             drawCapture(pose, buffers, camera);
             drawCaptureGhosts(pose, buffers, camera, minecraft);
-        } else if ((!gui || placing) && WrightsClientState.mode == WrightsClientState.Mode.BUILD && !WrightsClientState.bindSupply) {
+        } else if ((!gui || placing) && WrightsClientState.mode == WrightsClientState.Mode.BUILD && !WrightsClientState.bindSupply && !mirrorBlocks()) {
             drawPreview(pose, buffers, camera);
         }
         if ((!gui || placing) && WrightsClientState.mode == WrightsClientState.Mode.BUILD && (WrightsClientState.bindSupply || WrightsClientState.supplyBound)) {
@@ -100,6 +100,10 @@ public final class SelectionRenderer {
         }
         drawMarkedJobs(pose, buffers, camera, minecraft);
         drawMirror(pose, buffers, camera, minecraft);
+    }
+
+    private static boolean mirrorBlocks() {
+        return WrightsClientState.mirrorAim && WrightsClientConfig.mirrorBlocks();
     }
 
     private static void drawMirror(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {

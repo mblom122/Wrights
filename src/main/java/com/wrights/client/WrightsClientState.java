@@ -1339,7 +1339,8 @@ public final class WrightsClientState {
         }
         Minecraft minecraft = Minecraft.getInstance();
         if (mode == Mode.BUILD && follow && minecraft.player != null && ControllerItem.isHeld(minecraft.player)
-                && (minecraft.screen == null || minecraft.screen instanceof PlacementScreen)) {
+                && (minecraft.screen == null || minecraft.screen instanceof PlacementScreen)
+                && !(mirrorAim && WrightsClientConfig.mirrorBlocks())) {
             anchor = lookTarget();
         }
     }
@@ -1752,7 +1753,7 @@ public final class WrightsClientState {
         if (mode == Mode.CAPTURE && hasBox() && !boxDragging) {
             return nudgeSelection(outward);
         }
-        if (mode == Mode.BUILD && !bindSupply && anchor != null && buildId != null) {
+        if (mode == Mode.BUILD && !bindSupply && anchor != null && buildId != null && !(mirrorAim && WrightsClientConfig.mirrorBlocks())) {
             return nudgeAnchored(outward);
         }
         return false;

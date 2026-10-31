@@ -81,7 +81,10 @@ public final class WrightsHud {
         } else if (WrightsClientState.mode == WrightsClientState.Mode.SAVING) {
             line = Component.translatable("hud.wrights.saving", WrightsClientState.name);
         } else if (WrightsClientState.mode == WrightsClientState.Mode.BUILD) {
-            if (WrightsClientState.buildId == null) {
+            if (WrightsClientState.mirrorAim && WrightsClientConfig.mirrorBlocks()) {
+                line = Component.translatable("hud.wrights.tool_mirror");
+                sub = Component.translatable(mirrorFooter(minecraft));
+            } else if (WrightsClientState.buildId == null) {
                 line = Component.translatable("hud.wrights.pick_blueprint");
             } else if (WrightsClientState.bindSupply) {
                 line = Component.translatable("hud.wrights.bind_explain");
