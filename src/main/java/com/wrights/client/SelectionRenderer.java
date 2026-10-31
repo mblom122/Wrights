@@ -184,7 +184,7 @@ public final class SelectionRenderer {
     }
 
     private static void drawMirror(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
-        if (minecraft.level == null || !WrightsConfig.allowMirror()) {
+        if (!WrightsClientState.mirrorAim || minecraft.level == null || !WrightsConfig.allowMirror()) {
             return;
         }
         String here = minecraft.level.dimension().location().toString();
