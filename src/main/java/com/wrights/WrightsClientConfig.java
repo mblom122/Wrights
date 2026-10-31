@@ -51,13 +51,13 @@ public final class WrightsClientConfig {
             .defineInRange("queueEdgeBlue", 151, 0, 255);
     public static final ModConfigSpec.IntValue PLACE_EDGE_RED = BUILDER
             .comment("Outline color of the build you are about to place, red channel.")
-            .defineInRange("placeEdgeRed", 196, 0, 255);
+            .defineInRange("placeEdgeRed", 240, 0, 255);
     public static final ModConfigSpec.IntValue PLACE_EDGE_GREEN = BUILDER
             .comment("Outline color of the build you are about to place, green channel.")
-            .defineInRange("placeEdgeGreen", 122, 0, 255);
+            .defineInRange("placeEdgeGreen", 196, 0, 255);
     public static final ModConfigSpec.IntValue PLACE_EDGE_BLUE = BUILDER
             .comment("Outline color of the build you are about to place, blue channel.")
-            .defineInRange("placeEdgeBlue", 58, 0, 255);
+            .defineInRange("placeEdgeBlue", 32, 0, 255);
     public static final ModConfigSpec.IntValue GHOST_TRANSPARENCY = BUILDER
             .comment("How see-through blueprint blocks are in the world, from 0 to 100 percent. 0 is solid and 100 is invisible.")
             .defineInRange("ghostTransparency", 50, 0, 100);

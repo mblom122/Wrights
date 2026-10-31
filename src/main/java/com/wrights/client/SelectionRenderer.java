@@ -703,7 +703,12 @@ public final class SelectionRenderer {
         float placeBlue = com.wrights.WrightsClientConfig.channel(place, 0);
         drawBox(pose, lines, box, camera, placeRed, placeGreen, placeBlue, pulse);
         AABB marker = new AABB(anchor.getX(), anchor.getY(), anchor.getZ(), anchor.getX() + 1.0D, anchor.getY() + 1.0D, anchor.getZ() + 1.0D);
-        drawBox(pose, lines, marker, camera, placeRed, placeGreen, placeBlue, 1.0F);
+        int anchorColor = WrightsUi.BLUE;
+        drawBox(pose, lines, marker, camera,
+                WrightsClientConfig.channel(anchorColor, 16),
+                WrightsClientConfig.channel(anchorColor, 8),
+                WrightsClientConfig.channel(anchorColor, 0),
+                1.0F);
         buffers.endBatch(RenderType.lines());
     }
 
