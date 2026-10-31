@@ -236,7 +236,9 @@ public final class WrightsClientState {
         }
         paces.keySet().retainAll(seen);
         markedJobs.retainAll(seen);
-        if (activeBuilds.keySet().removeIf(id -> finishedJob(id) && !cellMarksJob(id))) {
+        // A removed job never sends another clear, so drop outlines that no longer have a job.
+        // Finished mirror jobs stay in the list and keep their block marks.
+        if (activeBuilds.keySet().removeIf(id -> !seen.contains(id) || (finishedJob(id) && !cellMarksJob(id)))) {
             rebuildActiveCells();
         }
     }
