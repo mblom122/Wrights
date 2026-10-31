@@ -38,7 +38,7 @@ public class PlacementScreen extends Screen implements JeiPreview {
     private int controlsW;
     private int modelX;
     private int locationY;
-    private int sizeY;
+    private int sizeLeft;
     private EditBox xBox;
     private EditBox yBox;
     private EditBox zBox;
@@ -69,8 +69,8 @@ public class PlacementScreen extends Screen implements JeiPreview {
         int gap = 14;
         int pad = 12;
         int openW = this.font.width(Component.translatable("screen.wrights.open_map")) + 12;
-        // Location + size sit under selection on the left (~120px). Keep the model from eating that room.
-        int leftChrome = 148 + (map ? 18 : 0) + 120;
+        // Location + size sit side by side under selection (~60px). Keep the model from eating that room.
+        int leftChrome = 148 + (map ? 18 : 0) + 60;
         int modelSize = Math.min(140, Math.max(map ? openW : 88, this.height - leftChrome - 36));
         if (pad + modelSize + gap + controlsW + pad > this.width - 8) {
             modelSize = Math.max(map ? openW : 88, this.width - 8 - pad * 2 - gap - controlsW);
@@ -79,7 +79,7 @@ public class PlacementScreen extends Screen implements JeiPreview {
         boolean voiding = WrightsClientConfig.VOID_BLOCKS.get() || WrightsClientConfig.VOID_FLUIDS.get();
         int extraRows = (WrightsClientState.showStoredSettings() ? 1 : 0) + (WrightsClientState.showStoredAll() ? 1 : 0) + (voiding ? 1 : 0);
         int pasteRows = 3 + extraRows;
-        int leftNeed = 28 + modelSize + 16 + 18 + 32 + (map ? 18 : 0) + 52 + 40 + 120 + 8;
+        int leftNeed = 28 + modelSize + 16 + 18 + 32 + (map ? 18 : 0) + 52 + 40 + 60 + 8;
         int rightNeed = 28 + 46 + 36 + 48 + pasteRows * 18 + 14 + 18 + 14 + 18 + 20 + 16 + 18 + 18 + 12;
         panelH = Math.min(this.height - 8, Math.max(leftNeed, rightNeed));
         panelX = JeiPreview.left(this.width, panelW);
@@ -92,28 +92,39 @@ public class PlacementScreen extends Screen implements JeiPreview {
             WrightsClientState.anchor = WrightsClientState.lookTarget();
         }
         locationY = column.belowSelection();
-        sizeY = locationY + 60;
-        int boxW = Math.max(36, modelSize - 52);
-        int plusX = 18 + boxW + 2;
-        xBox = number(modelX + 18, locationY + 12, boxW);
-        yBox = number(modelX + 18, locationY + 28, boxW);
-        zBox = number(modelX + 18, locationY + 44, boxW);
-        sxBox = number(modelX + 18, sizeY + 12, boxW);
-        syBox = number(modelX + 18, sizeY + 28, boxW);
-        szBox = number(modelX + 18, sizeY + 44, boxW);
+        // Two narrow columns (~40% of the old field width) side by side under Selection.
+        int stepW = 16;
+        int axisRoom = 8;
+        int pairGap = 6;
+        int span = modelSize + gap;
+        int boxW = 22;
+        int colW = stepW + 2 + boxW + 2 + stepW + axisRoom;
+        while (boxW > 16 && colW * 2 + pairGap > span) {
+            boxW--;
+            colW = stepW + 2 + boxW + 2 + stepW + axisRoom;
+        }
+        sizeLeft = modelX + colW + pairGap;
+        int locPlus = modelX + stepW + 2 + boxW + 2;
+        int sizePlus = sizeLeft + stepW + 2 + boxW + 2;
+        xBox = number(modelX + stepW + 2, locationY + 12, boxW);
+        yBox = number(modelX + stepW + 2, locationY + 28, boxW);
+        zBox = number(modelX + stepW + 2, locationY + 44, boxW);
+        sxBox = number(sizeLeft + stepW + 2, locationY + 12, boxW);
+        syBox = number(sizeLeft + stepW + 2, locationY + 28, boxW);
+        szBox = number(sizeLeft + stepW + 2, locationY + 44, boxW);
         step(modelX, locationY + 12, "-", () -> move(-1, 0, 0));
-        step(modelX + plusX, locationY + 12, "+", () -> move(1, 0, 0));
+        step(locPlus, locationY + 12, "+", () -> move(1, 0, 0));
         step(modelX, locationY + 28, "-", () -> move(0, -1, 0));
-        step(modelX + plusX, locationY + 28, "+", () -> move(0, 1, 0));
+        step(locPlus, locationY + 28, "+", () -> move(0, 1, 0));
         step(modelX, locationY + 44, "-", () -> move(0, 0, -1));
-        step(modelX + plusX, locationY + 44, "+", () -> move(0, 0, 1));
-        step(modelX, sizeY + 12, "-", () -> resize(0, -1));
-        step(modelX + plusX, sizeY + 12, "+", () -> resize(0, 1));
-        step(modelX, sizeY + 28, "-", () -> resize(1, -1));
-        step(modelX + plusX, sizeY + 28, "+", () -> resize(1, 1));
-        step(modelX, sizeY + 44, "-", () -> resize(2, -1));
-        step(modelX + plusX, sizeY + 44, "+", () -> resize(2, 1));
-        column.shiftPromptTo(sizeY + 60);
+        step(locPlus, locationY + 44, "+", () -> move(0, 0, 1));
+        step(sizeLeft, locationY + 12, "-", () -> resize(0, -1));
+        step(sizePlus, locationY + 12, "+", () -> resize(0, 1));
+        step(sizeLeft, locationY + 28, "-", () -> resize(1, -1));
+        step(sizePlus, locationY + 28, "+", () -> resize(1, 1));
+        step(sizeLeft, locationY + 44, "-", () -> resize(2, -1));
+        step(sizePlus, locationY + 44, "+", () -> resize(2, 1));
+        column.shiftPromptTo(locationY + 60);
         int top = panelY + 28;
         rotateY = top + 46;
         flipY = rotateY + 36;
@@ -171,7 +182,7 @@ public class PlacementScreen extends Screen implements JeiPreview {
         addRenderableWidget(new WrightsButton(controlsX + backX, foot + 18, backW, 18, Component.translatable("screen.wrights.back"), button -> onClose()));
         buildButton = new WrightsButton(controlsX + 12, foot + 40, controlsW - 24, 18, Component.translatable("menu.wrights.build"), button -> send());
         addRenderableWidget(buildButton);
-        int contentBottom = Math.max(sizeY + 60, foot + 60);
+        int contentBottom = Math.max(locationY + 60, foot + 60);
         panelH = Math.min(this.height - 8, Math.max(panelH, contentBottom - panelY + 8));
         refresh();
     }
@@ -252,14 +263,15 @@ public class PlacementScreen extends Screen implements JeiPreview {
         graphics.drawString(this.font, this.font.plainSubstrByWidth(title, panelW - 24), panelX + 14, panelY + 8, WrightsUi.COPPER, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.placement"), controlsX + 12, panelY + 28, WrightsUi.TEXT, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.location"), modelX, locationY, WrightsUi.TEXT, false);
-        graphics.drawString(this.font, Component.translatable("screen.wrights.size_label"), modelX, sizeY, WrightsUi.TEXT, false);
-        int axisX = sxBox.getX() + sxBox.getWidth() + 20;
-        axis(graphics, axisX, locationY + 12, "X");
-        axis(graphics, axisX, locationY + 28, "Y");
-        axis(graphics, axisX, locationY + 44, "Z");
-        axis(graphics, axisX, sizeY + 12, "X");
-        axis(graphics, axisX, sizeY + 28, "Y");
-        axis(graphics, axisX, sizeY + 44, "Z");
+        graphics.drawString(this.font, Component.translatable("screen.wrights.size_label"), sizeLeft, locationY, WrightsUi.TEXT, false);
+        int locAxis = xBox.getX() + xBox.getWidth() + 20;
+        int sizeAxis = sxBox.getX() + sxBox.getWidth() + 20;
+        axis(graphics, locAxis, locationY + 12, "X");
+        axis(graphics, locAxis, locationY + 28, "Y");
+        axis(graphics, locAxis, locationY + 44, "Z");
+        axis(graphics, sizeAxis, locationY + 12, "X");
+        axis(graphics, sizeAxis, locationY + 28, "Y");
+        axis(graphics, sizeAxis, locationY + 44, "Z");
         graphics.drawString(this.font, Component.translatable("screen.wrights.deploy_on_job"), controlsX + 12, deployY - 14, WrightsUi.TEXT, false);
         int supplyLabelY = inventoryButton.getY() - 14;
         graphics.drawString(this.font, Component.translatable("screen.wrights.use_items_from"), controlsX + 12, supplyLabelY, WrightsUi.MUTED, false);
