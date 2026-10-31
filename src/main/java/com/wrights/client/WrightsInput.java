@@ -181,8 +181,12 @@ public final class WrightsInput {
         }
         if (com.wrights.blueprint.BlueprintClientFlags.build && Minecraft.getInstance().screen == null) {
             event.setCanceled(true);
+            event.setCancellationResult(net.minecraft.world.InteractionResult.SUCCESS);
             event.setUseBlock(TriState.FALSE);
             event.setUseItem(TriState.FALSE);
+            if (boundThisClick) {
+                return;
+            }
             useBuildClick(event.getEntity(), event.getPos(), event.getFace(), event.getHitVec());
             return;
         }

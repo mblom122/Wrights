@@ -1,7 +1,9 @@
 package com.wrights.blueprint;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -35,6 +37,12 @@ public final class MirrorLaunch {
     public record Result(int started, boolean nowhere) {
     }
 
+    private record Stamp(long tick, BlockPos pos) {
+    }
+
+    /** One click can reach the server twice, once for each hand. The second place stacks a slab. */
+    private static final Map<UUID, Stamp> LAST_PLACE = new ConcurrentHashMap<>();
+
     private MirrorLaunch() {
     }
 
@@ -67,6 +75,9 @@ public final class MirrorLaunch {
         }
         BlockPos target = planned.getClickedPos();
         if (!payload.replace() && !level.getBlockState(target).isAir()) {
+            return;
+        }
+        if (placedAlready(player, level.getGameTime(), target)) {
             return;
         }
         InteractionResult result = stack.useOn(context);
@@ -149,6 +160,12 @@ public final class MirrorLaunch {
         if (started > 0) {
             Messages.actionBar(player, "message.wrights.mirror_started", started);
         }
+    }
+
+    private static boolean placedAlready(ServerPlayer player, long tick, BlockPos target) {
+        Stamp stamp = new Stamp(tick, target.immutable());
+        Stamp previous = LAST_PLACE.put(player.getUUID(), stamp);
+        return previous != null && previous.tick == tick && previous.pos.equals(target);
     }
 
     private static InteractionHand blockHand(ServerPlayer player) {
