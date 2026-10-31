@@ -69,6 +69,12 @@ public final class BuildJob {
     private boolean voidBlocks;
     private boolean voidFluids;
     private boolean voidNbt;
+    /** Place chests and machines. Off skips those blocks for this build. */
+    private boolean placeNbtBlocks = true;
+    /** Apply saved machine settings. Off leaves a stored block freshly placed. */
+    private boolean placeSettings = true;
+    /** Apply a full NBT copy. Creative only, and only when the blueprint still has one. */
+    private boolean placeAll = true;
     private UUID replaceSchematicId;
     private int clipX = Integer.MAX_VALUE;
     private int clipY = Integer.MAX_VALUE;
@@ -441,11 +447,30 @@ public final class BuildJob {
         return voidNbt;
     }
 
+    public boolean placeNbtBlocks() {
+        return placeNbtBlocks;
+    }
+
+    public boolean placeSettings() {
+        return placeSettings;
+    }
+
+    public boolean placeAll() {
+        return placeAll;
+    }
+
     public void setPasteOptions(boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt) {
+        setPasteOptions(placeFluids, voidBlocks, voidFluids, voidNbt, true, true, true);
+    }
+
+    public void setPasteOptions(boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean placeNbt, boolean placeSettings, boolean placeAll) {
         this.placeFluids = placeFluids;
         this.voidBlocks = voidBlocks;
         this.voidFluids = voidFluids;
         this.voidNbt = voidNbt;
+        this.placeNbtBlocks = placeNbt;
+        this.placeSettings = placeSettings;
+        this.placeAll = placeAll;
     }
 
     public UUID replaceSchematicId() {
@@ -867,6 +892,9 @@ public final class BuildJob {
         tag.putBoolean("voidBlocks", voidBlocks);
         tag.putBoolean("voidFluids", voidFluids);
         tag.putBoolean("voidNbt", voidNbt);
+        tag.putBoolean("placeNbtBlocks", placeNbtBlocks);
+        tag.putBoolean("placeSettings", placeSettings);
+        tag.putBoolean("placeAll", placeAll);
         if (replaceSchematicId != null) {
             tag.putUUID("replace", replaceSchematicId);
         }
@@ -1010,6 +1038,9 @@ public final class BuildJob {
         job.voidBlocks = tag.getBoolean("voidBlocks");
         job.voidFluids = tag.getBoolean("voidFluids");
         job.voidNbt = tag.getBoolean("voidNbt");
+        job.placeNbtBlocks = !tag.contains("placeNbtBlocks") || tag.getBoolean("placeNbtBlocks");
+        job.placeSettings = !tag.contains("placeSettings") || tag.getBoolean("placeSettings");
+        job.placeAll = !tag.contains("placeAll") || tag.getBoolean("placeAll");
         if (tag.hasUUID("replace")) {
             job.replaceSchematicId = tag.getUUID("replace");
         }

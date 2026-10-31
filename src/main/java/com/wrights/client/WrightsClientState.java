@@ -80,6 +80,8 @@ public final class WrightsClientState {
     public static boolean bindFromMenu;
     public static final List<JobNotice> jobNotices = new ArrayList<>();
     public static DockNotice dockNotice;
+    public static boolean storedSettings;
+    public static boolean storedAll;
     public static boolean sampled;
     public static boolean concealed;
     public static boolean follow;
@@ -948,6 +950,7 @@ public final class WrightsClientState {
                     bit.stateId()));
         }
         editGhosts = parsed;
+        boolean switching = editId == null || !payload.id().equals(editId);
         editId = payload.id();
         editName = payload.name();
         editX = Math.max(1, payload.sizeX());
@@ -956,6 +959,13 @@ public final class WrightsClientState {
         editBlocks = payload.blocks();
         previewSampled = payload.sampled();
         previewConcealed = payload.concealed();
+        storedSettings = payload.storedSettings();
+        storedAll = payload.storedAll();
+        if (switching) {
+            WrightsClientConfig.setPlaceNbtBlocks(true);
+            WrightsClientConfig.setPlaceNbtSettings(true);
+            WrightsClientConfig.setPlaceNbtAll(true);
+        }
         editPivotX = clamp(payload.anchorX(), editX);
         editPivotY = clamp(payload.anchorY(), editY);
         editPivotZ = clamp(payload.anchorZ(), editZ);
@@ -1245,8 +1255,51 @@ public final class WrightsClientState {
                 WrightsClientConfig.VOID_NBT.get(),
                 force,
                 WrightsClientConfig.SUPPLY_PLAYER_FIRST.get(),
-                queue));
+                queue,
+                WrightsClientConfig.PLACE_NBT_BLOCKS.get(),
+                placeSettingsChosen(),
+                placeAllChosen()));
         return true;
+    }
+
+    public static boolean showStoredSettings() {
+        return storedSettings || storedAll;
+    }
+
+    public static boolean showStoredAll() {
+        Minecraft minecraft = Minecraft.getInstance();
+        return storedAll && WrightsConfig.copyAll() && minecraft.player != null
+                && minecraft.player.getAbilities().instabuild && !minecraft.player.isSpectator();
+    }
+
+    /** Settings to apply on this build. Off when All is on, since All already includes them. */
+    public static boolean placeSettingsChosen() {
+        return showStoredSettings() && WrightsClientConfig.PLACE_NBT_SETTINGS.get() && !placeAllChosen();
+    }
+
+    public static boolean placeAllChosen() {
+        return showStoredAll() && WrightsClientConfig.PLACE_NBT_ALL.get();
+    }
+
+    /** Keep full NBT on save when the All control is hidden, so a survival save does not strip it. */
+    public static boolean keepStoredAll() {
+        if (!storedAll) {
+            return false;
+        }
+        if (!showStoredAll()) {
+            return true;
+        }
+        return WrightsClientConfig.PLACE_NBT_ALL.get();
+    }
+
+    public static boolean keepStoredSettings() {
+        if (keepStoredAll()) {
+            return false;
+        }
+        if (!showStoredSettings()) {
+            return storedSettings;
+        }
+        return WrightsClientConfig.PLACE_NBT_SETTINGS.get();
     }
 
     public static void stepAnchor() {

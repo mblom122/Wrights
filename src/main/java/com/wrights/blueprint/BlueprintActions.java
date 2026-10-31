@@ -688,6 +688,10 @@ public final class BlueprintActions {
     }
 
     public static void finishEdit(ServerPlayer player, boolean keep) {
+        finishEdit(player, keep, true, true, true, true);
+    }
+
+    public static void finishEdit(ServerPlayer player, boolean keep, boolean placeFluids, boolean placeNbt, boolean placeSettings, boolean placeAll) {
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
         Schematic baseline = session.editBaseline();
         boolean wasDraft = session.editWasDraft();
@@ -705,13 +709,13 @@ public final class BlueprintActions {
                 Messages.actionBar(player, "message.wrights.edit_discarded");
                 return;
             }
-            Schematic saved = draft != null ? draft : baseline;
+            Schematic saved = (draft != null ? draft : baseline).withStored(placeFluids, placeNbt, placeSettings, placeAll).withPaste(placeFluids, baseline.voidBlocks(), baseline.voidFluids(), baseline.voidNbt());
             storeSaved(player, saved);
             session.setDraft(saved);
             session.setDraftDirty(false);
             BlueprintNetwork.syncLibrary(player);
             BlueprintNetwork.preview(player, saved, false, false);
-            if (saved != baseline) {
+            if (!saved.sameBlocks(baseline) || saved.placeFluids() != baseline.placeFluids()) {
                 Messages.actionBar(player, "message.wrights.session_saved", saved.name());
             } else {
                 Messages.actionBar(player, "message.wrights.session_clean");
@@ -721,10 +725,15 @@ public final class BlueprintActions {
         Schematic current = held(player, baseline.id());
         if (keep) {
             if (current != null) {
+                Schematic saved = current.withStored(placeFluids, placeNbt, placeSettings, placeAll).withPaste(placeFluids, current.voidBlocks(), current.voidFluids(), current.voidNbt());
+                if (!saved.sameBlocks(current) || saved.placeFluids() != current.placeFluids()) {
+                    storeSaved(player, saved);
+                    current = saved;
+                }
                 BlueprintNetwork.syncLibrary(player);
                 BlueprintNetwork.preview(player, current, false, false);
             }
-            if (current != null && current != baseline) {
+            if (current != null && !current.sameBlocks(baseline)) {
                 Messages.actionBar(player, "message.wrights.session_saved", current.name());
             } else {
                 Messages.actionBar(player, "message.wrights.session_clean");
@@ -964,7 +973,7 @@ public final class BlueprintActions {
         BlueprintNetwork.materials(player, id, false, Requirements.stocked(player, Requirements.of(schematic, clipX, clipY, clipZ, placeFluids), supplySession.supplyPos(), supplySession.supplyDimension()));
     }
 
-    public static void saveSession(ServerPlayer player, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt) {
+    public static void saveSession(ServerPlayer player, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean placeNbt, boolean placeSettings, boolean placeAll) {
         if (!requireTool(player)) {
             return;
         }
@@ -979,9 +988,9 @@ public final class BlueprintActions {
             Messages.actionBar(player, "message.wrights.blueprint_in_use");
             return;
         }
-        Schematic next = draft.withPaste(placeFluids, voidBlocks, voidFluids, voidNbt);
+        Schematic next = draft.withStored(placeFluids, placeNbt, placeSettings, placeAll).withPaste(placeFluids, voidBlocks, voidFluids, voidNbt);
         Schematic stored = held(player, session.buildId());
-        if (!session.draftDirty() && stored != null && stored.samePaste(next)) {
+        if (!session.draftDirty() && stored != null && stored.sameBlocks(next) && stored.samePaste(next)) {
             Messages.actionBar(player, "message.wrights.session_clean");
             return;
         }
@@ -1051,10 +1060,14 @@ public final class BlueprintActions {
     }
 
     public static void launch(ServerPlayer player, java.util.UUID id, BlockPos anchorPoint, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt) {
-        launch(player, id, anchorPoint, sizeX, sizeY, sizeZ, pivotX, pivotY, pivotZ, drones, placeFluids, voidBlocks, voidFluids, voidNbt, false, true, false);
+        launch(player, id, anchorPoint, sizeX, sizeY, sizeZ, pivotX, pivotY, pivotZ, drones, placeFluids, voidBlocks, voidFluids, voidNbt, false, true, false, true, true, true);
     }
 
     public static void launch(ServerPlayer player, java.util.UUID id, BlockPos anchorPoint, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean force, boolean playerFirst, boolean queue) {
+        launch(player, id, anchorPoint, sizeX, sizeY, sizeZ, pivotX, pivotY, pivotZ, drones, placeFluids, voidBlocks, voidFluids, voidNbt, force, playerFirst, queue, true, true, true);
+    }
+
+    public static void launch(ServerPlayer player, java.util.UUID id, BlockPos anchorPoint, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean force, boolean playerFirst, boolean queue, boolean placeNbt, boolean placeSettings, boolean placeAll) {
         if (!requireTool(player)) {
             return;
         }
@@ -1096,7 +1109,7 @@ public final class BlueprintActions {
             buildSchematicId = snapshot.id();
         }
         boolean deferSupplies = force && queue && !player.getAbilities().instabuild && !player.isSpectator();
-        if (!JobManager.startBlueprintBuild(player, buildSchematicId, origin, sx, sy, sz, drones, placeFluids, voidBlocks, voidFluids, voidNbt, playerFirst, queue, deferSupplies) && snapshot != null) {
+        if (!JobManager.startBlueprintBuild(player, buildSchematicId, origin, sx, sy, sz, drones, placeFluids, voidBlocks, voidFluids, voidNbt, playerFirst, queue, deferSupplies, placeNbt, placeSettings, placeAll) && snapshot != null) {
             library.removeSchematic(snapshot.id());
         }
         BlueprintNetwork.syncLibrary(player);
@@ -1314,7 +1327,9 @@ public final class BlueprintActions {
                 schematic.placeFluids(),
                 schematic.voidBlocks(),
                 schematic.voidFluids(),
-                schematic.voidNbt());
+                schematic.voidNbt(),
+                schematic.hasSettings(),
+                schematic.hasAll());
     }
 
     private static boolean held(ServerPlayer player) {

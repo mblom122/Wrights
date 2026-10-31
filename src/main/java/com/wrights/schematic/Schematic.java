@@ -144,6 +144,57 @@ public final class Schematic {
                 && voidNbt == other.voidNbt;
     }
 
+    public boolean hasSettings() {
+        for (Entry entry : entries) {
+            if (entry.nbt() != null && !entry.nbtFull()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean hasAll() {
+        for (Entry entry : entries) {
+            if (entry.nbtFull()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Drops fluids, stored blocks, settings, or a full copy when that choice is off.
+     * A full copy stays intact. Settings-only keeps machine config and clears a full copy down to that.
+     */
+    public Schematic withStored(boolean fluids, boolean nbtBlocks, boolean settings, boolean all) {
+        java.util.List<Entry> next = new java.util.ArrayList<>(entries.size());
+        for (Entry entry : entries) {
+            boolean fluid = com.wrights.util.BlockFilters.isFluid(entry.state());
+            boolean stored = entry.state().hasBlockEntity();
+            if (fluid && !fluids) {
+                continue;
+            }
+            if (stored && !nbtBlocks) {
+                continue;
+            }
+            net.minecraft.nbt.CompoundTag nbt = entry.nbt();
+            boolean full = entry.nbtFull();
+            if (stored && nbt != null) {
+                if (all && full) {
+                    // Keep the exact copy.
+                } else if (settings) {
+                    nbt = full ? com.wrights.util.BlockEntityNbt.settings(nbt) : nbt;
+                    full = false;
+                } else {
+                    nbt = null;
+                    full = false;
+                }
+            }
+            next.add(new Entry(entry.x(), entry.y(), entry.z(), entry.state(), entry.secondary(), nbt, full && all));
+        }
+        return withEntries(next);
+    }
+
     public Schematic withPaste(boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt) {
         return new Schematic(id, name, sizeX, sizeY, sizeZ, entries, sourceMin, sourceMax, sourceDimension, anchorX, anchorY, anchorZ, ephemeral, placeFluids, voidBlocks, voidFluids, voidNbt);
     }

@@ -205,7 +205,7 @@ public final class LayerColumn {
         add.widget(new WrightsButton(x + half + 4, layersY, half, 16, Component.translatable("screen.wrights.duplicate_layer"), button -> editLayer(BlueprintPayloads.EditLayer.COPY, layer + 1)));
         add.widget(new WrightsButton(x, layersY + 18, half, 16, Component.translatable("screen.wrights.remove_layer"), button -> editLayer(BlueprintPayloads.EditLayer.REMOVE, layer)));
         add.widget(new WrightsButton(x + half + 4, layersY + 18, half, 16, Component.translatable("screen.wrights.add_layer"), button -> showPrompt(false)));
-        promptY = selectionY + 66;
+        promptY = selectionY + 40;
         int boxW = Math.min(42, Math.max(28, size / 3));
         int actionW = Math.max(24, (size - boxW - 8) / 2);
         promptBox = new EditBox(font, x, promptY + 14, boxW, 16, Component.translatable("screen.wrights.layer_at"));
@@ -237,6 +237,11 @@ public final class LayerColumn {
         add.widget(anchorButton);
         add.widget(removeButton);
         add.widget(changeButton);
+    }
+
+    /** Y just under the selection buttons, where location and size sit. */
+    public int belowSelection() {
+        return selectionY + 40;
     }
 
     public void refresh() {
@@ -273,8 +278,14 @@ public final class LayerColumn {
         }
         graphics.drawCenteredString(font, Component.translatable("screen.wrights.layer", LayerAxis.letter(axis), layer + 1, depth()), modelX + modelSize / 2, layerY - 12, WrightsUi.MUTED);
         graphics.drawString(font, Component.translatable("screen.wrights.selection"), modelX, selectionY - 12, WrightsUi.TEXT, false);
-        graphics.drawString(font, font.plainSubstrByWidth(Component.translatable("screen.wrights.hint_selected").getString(), modelSize), modelX, selectionY + 40, 0xFFF2D48A, false);
-        graphics.drawString(font, font.plainSubstrByWidth(Component.translatable("screen.wrights.hint_anchor").getString(), modelSize), modelX, selectionY + 52, WrightsUi.BLUE, false);
+        String selected = Component.translatable("screen.wrights.hint_selected").getString();
+        String anchor = Component.translatable("screen.wrights.hint_anchor").getString();
+        int legendGap = 12;
+        int legendWidth = font.width(selected) + legendGap + font.width(anchor);
+        int legendX = modelX + Math.max(2, (modelSize - legendWidth) / 2);
+        int legendY = gridY + 3;
+        graphics.drawString(font, selected, legendX, legendY, 0xFFF2D48A, true);
+        graphics.drawString(font, anchor, legendX + font.width(selected) + legendGap, legendY, WrightsUi.BLUE, true);
         graphics.drawString(font, Component.translatable("screen.wrights.layers"), modelX, layersY - 12, WrightsUi.TEXT, false);
         if (promptOpen) {
             graphics.drawString(font, font.plainSubstrByWidth(Component.translatable(movePrompt ? "screen.wrights.move_prompt" : "screen.wrights.add_prompt").getString(), modelSize), modelX, promptY + 2, WrightsUi.MUTED, false);

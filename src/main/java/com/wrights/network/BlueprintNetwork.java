@@ -251,7 +251,7 @@ public final class BlueprintNetwork {
 
     private static void finishEdit(BlueprintPayloads.FinishEdit payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
-        context.enqueueWork(() -> BlueprintActions.finishEdit(player, payload.keep()));
+        context.enqueueWork(() -> BlueprintActions.finishEdit(player, payload.keep(), payload.placeFluids(), payload.placeNbt(), payload.placeSettings(), payload.placeAll()));
     }
 
     private static void build(BlueprintPayloads.BeginBuild payload, IPayloadContext context) {
@@ -278,7 +278,10 @@ public final class BlueprintNetwork {
                 payload.voidNbt(),
                 payload.force(),
                 payload.playerFirst(),
-                payload.queue()));
+                payload.queue(),
+                payload.placeNbt(),
+                payload.placeSettings(),
+                payload.placeAll()));
     }
 
     private static void editCell(BlueprintPayloads.EditCell payload, IPayloadContext context) {
@@ -316,7 +319,7 @@ public final class BlueprintNetwork {
 
     private static void saveSession(BlueprintPayloads.SaveSession payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
-        context.enqueueWork(() -> BlueprintActions.saveSession(player, payload.placeFluids(), payload.voidBlocks(), payload.voidFluids(), payload.voidNbt()));
+        context.enqueueWork(() -> BlueprintActions.saveSession(player, payload.placeFluids(), payload.voidBlocks(), payload.voidFluids(), payload.voidNbt(), payload.placeNbt(), payload.placeSettings(), payload.placeAll()));
     }
 
     private static void control(BlueprintPayloads.JobControl payload, IPayloadContext context) {

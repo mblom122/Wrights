@@ -629,10 +629,14 @@ public final class JobManager {
     }
 
     public static boolean startBlueprintBuild(ServerPlayer player, UUID schematicId, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean supplyPlayerFirst, boolean queue) {
-        return startBlueprintBuild(player, schematicId, origin, sizeX, sizeY, sizeZ, drones, placeFluids, voidBlocks, voidFluids, voidNbt, supplyPlayerFirst, queue, false);
+        return startBlueprintBuild(player, schematicId, origin, sizeX, sizeY, sizeZ, drones, placeFluids, voidBlocks, voidFluids, voidNbt, supplyPlayerFirst, queue, false, true, true, true);
     }
 
     public static boolean startBlueprintBuild(ServerPlayer player, UUID schematicId, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean supplyPlayerFirst, boolean queue, boolean deferSupplies) {
+        return startBlueprintBuild(player, schematicId, origin, sizeX, sizeY, sizeZ, drones, placeFluids, voidBlocks, voidFluids, voidNbt, supplyPlayerFirst, queue, deferSupplies, true, true, true);
+    }
+
+    public static boolean startBlueprintBuild(ServerPlayer player, UUID schematicId, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean supplyPlayerFirst, boolean queue, boolean deferSupplies, boolean placeNbt, boolean placeSettings, boolean placeAll) {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         Schematic schematic = library.schematic(schematicId).orElse(null);
         if (schematic == null || schematic.blockCount() == 0) {
@@ -651,7 +655,7 @@ public final class JobManager {
                 schematic.id(),
                 schematic.blockCount());
         job.setClip(sizeX, sizeY, sizeZ);
-        job.setPasteOptions(placeFluids, voidBlocks, voidFluids, voidNbt);
+        job.setPasteOptions(placeFluids, voidBlocks, voidFluids, voidNbt, placeNbt, placeSettings, placeAll);
         job.setAnchor(origin.offset(schematic.anchorX(), schematic.anchorY(), schematic.anchorZ()));
         com.wrights.blueprint.BlueprintSessions.BlueprintSession session = com.wrights.blueprint.BlueprintSessions.get(player);
         job.setSupply(session.supplyPos(), session.supplyDimension());
@@ -2663,7 +2667,7 @@ public final class JobManager {
         if (!level.isLoaded(pos)) {
             return false;
         }
-        if (!job.placeFluids() && com.wrights.util.BlockFilters.isFluid(entry.state())) {
+        if (skippedContent(job, entry)) {
             return true;
         }
         return level.getBlockState(pos).equals(entry.state());
@@ -3629,10 +3633,10 @@ public final class JobManager {
         Item payment = BlockFilters.payment(state);
         BlockState existing = level.getBlockState(pos);
         if (existing.equals(state)) {
-            applyEntryNbt(level, player, pos, entry);
+            applyEntryNbt(level, player, job, pos, entry);
             return PlaceResult.DONE;
         }
-        if (!job.placeFluids() && BlockFilters.isFluid(state)) {
+        if (skippedContent(job, entry)) {
             job.skippedOne();
             return PlaceResult.DONE;
         }
@@ -3698,7 +3702,7 @@ public final class JobManager {
         if (paid) {
             consumeItem(player, level, job, hand, payment);
         }
-        applyEntryNbt(level, player, pos, entry);
+        applyEntryNbt(level, player, job, pos, entry);
         job.recordPlaced(entry.x(), entry.y(), entry.z(), after, paid);
         if (!quiet) {
             level.gameEvent(player, GameEvent.BLOCK_PLACE, pos);
@@ -3709,11 +3713,19 @@ public final class JobManager {
         return PlaceResult.DONE;
     }
 
+    private static boolean skippedContent(BuildJob job, Schematic.Entry entry) {
+        net.minecraft.world.level.block.state.BlockState state = entry.state();
+        if (!job.placeFluids() && BlockFilters.isFluid(state)) {
+            return true;
+        }
+        return !job.placeNbtBlocks() && state.hasBlockEntity();
+    }
+
     /**
      * A placed machine starts like a hand-placed one. Copied settings are applied on top.
      * A full copy replaces that, and only a creative player may place one.
      */
-    private static void applyEntryNbt(ServerLevel level, ServerPlayer player, BlockPos pos, Schematic.Entry entry) {
+    private static void applyEntryNbt(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos pos, Schematic.Entry entry) {
         BlockEntity be = level.getBlockEntity(pos);
         if (be == null) {
             return;
@@ -3730,9 +3742,9 @@ public final class JobManager {
             return;
         }
         net.minecraft.nbt.CompoundTag data = entry.nbt();
-        boolean full = entry.nbtFull() && WrightsConfig.copyAll() && creative(player);
+        boolean full = job.placeAll() && entry.nbtFull() && WrightsConfig.copyAll() && creative(player);
         if (!full) {
-            if (!WrightsConfig.copySettings() || !WrightsConfig.settingsAllowed(be.getBlockState().getBlock())) {
+            if (!job.placeSettings() || !WrightsConfig.copySettings() || !WrightsConfig.settingsAllowed(be.getBlockState().getBlock())) {
                 return;
             }
             data = com.wrights.util.BlockEntityNbt.settings(data);

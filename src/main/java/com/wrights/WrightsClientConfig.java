@@ -91,6 +91,15 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.BooleanValue PLACE_FLUIDS = BUILDER
             .comment("When true, a build places water and lava saved in the blueprint.")
             .define("placeFluids", true);
+    public static final ModConfigSpec.BooleanValue PLACE_NBT_BLOCKS = BUILDER
+            .comment("When true, a build places chests and machines saved in the blueprint.")
+            .define("placeNbtBlocks", true);
+    public static final ModConfigSpec.BooleanValue PLACE_NBT_SETTINGS = BUILDER
+            .comment("When true, a build applies machine settings saved in the blueprint.")
+            .define("placeNbtSettings", true);
+    public static final ModConfigSpec.BooleanValue PLACE_NBT_ALL = BUILDER
+            .comment("When true, a creative build applies a full NBT copy saved in the blueprint.")
+            .define("placeNbtAll", true);
     public static final ModConfigSpec.BooleanValue VOID_BLOCKS = BUILDER
             .comment("When true, a build removes a block that does not match the blueprint before placing.")
             .define("voidBlocks", false);
@@ -310,6 +319,27 @@ public final class WrightsClientConfig {
 
     public static void setPlaceFluids(boolean enabled) {
         PLACE_FLUIDS.set(enabled);
+        save();
+    }
+
+    public static void setPlaceNbtBlocks(boolean enabled) {
+        PLACE_NBT_BLOCKS.set(enabled);
+        save();
+    }
+
+    public static void setPlaceNbtSettings(boolean enabled) {
+        if (enabled) {
+            PLACE_NBT_ALL.set(false);
+        }
+        PLACE_NBT_SETTINGS.set(enabled);
+        save();
+    }
+
+    public static void setPlaceNbtAll(boolean enabled) {
+        if (enabled) {
+            PLACE_NBT_SETTINGS.set(false);
+        }
+        PLACE_NBT_ALL.set(enabled);
         save();
     }
 

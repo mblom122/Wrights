@@ -434,11 +434,17 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record FinishEdit(boolean keep) implements CustomPacketPayload {
+    public record FinishEdit(boolean keep, boolean placeFluids, boolean placeNbt, boolean placeSettings, boolean placeAll) implements CustomPacketPayload {
         public static final Type<FinishEdit> TYPE = payloadType("finish_edit");
         public static final StreamCodec<RegistryFriendlyByteBuf, FinishEdit> STREAM_CODEC = StreamCodec.of(
-                (buf, value) -> buf.writeBoolean(value.keep),
-                buf -> new FinishEdit(buf.readBoolean()));
+                (buf, value) -> {
+                    buf.writeBoolean(value.keep);
+                    buf.writeBoolean(value.placeFluids);
+                    buf.writeBoolean(value.placeNbt);
+                    buf.writeBoolean(value.placeSettings);
+                    buf.writeBoolean(value.placeAll);
+                },
+                buf -> new FinishEdit(buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean()));
 
         @Override
         public Type<? extends CustomPacketPayload> type() {
@@ -483,7 +489,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record Preview(UUID id, String name, int sizeX, int sizeY, int sizeZ, int blocks, boolean sampled, boolean concealed, List<Bit> bits, int anchorX, int anchorY, int anchorZ, boolean forBuild, boolean openEditor, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt) implements CustomPacketPayload {
+    public record Preview(UUID id, String name, int sizeX, int sizeY, int sizeZ, int blocks, boolean sampled, boolean concealed, List<Bit> bits, int anchorX, int anchorY, int anchorZ, boolean forBuild, boolean openEditor, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean storedSettings, boolean storedAll) implements CustomPacketPayload {
         public static final Type<Preview> TYPE = payloadType("preview");
         public static final StreamCodec<RegistryFriendlyByteBuf, Preview> STREAM_CODEC = StreamCodec.of((buf, value) -> value.write(buf), Preview::read);
 
@@ -505,6 +511,8 @@ public final class BlueprintPayloads {
             buf.writeBoolean(voidBlocks);
             buf.writeBoolean(voidFluids);
             buf.writeBoolean(voidNbt);
+            buf.writeBoolean(storedSettings);
+            buf.writeBoolean(storedAll);
             buf.writeVarInt(bits.size());
             for (Bit bit : bits) {
                 bit.write(buf);
@@ -529,12 +537,14 @@ public final class BlueprintPayloads {
             boolean voidBlocks = buf.readBoolean();
             boolean voidFluids = buf.readBoolean();
             boolean voidNbt = buf.readBoolean();
+            boolean storedSettings = buf.readBoolean();
+            boolean storedAll = buf.readBoolean();
             int count = buf.readVarInt();
             List<Bit> bits = new ArrayList<>(count);
             for (int i = 0; i < count; i++) {
                 bits.add(Bit.read(buf));
             }
-            return new Preview(id, name, sizeX, sizeY, sizeZ, blocks, sampled, concealed, bits, anchorX, anchorY, anchorZ, forBuild, openEditor, placeFluids, voidBlocks, voidFluids, voidNbt);
+            return new Preview(id, name, sizeX, sizeY, sizeZ, blocks, sampled, concealed, bits, anchorX, anchorY, anchorZ, forBuild, openEditor, placeFluids, voidBlocks, voidFluids, voidNbt, storedSettings, storedAll);
         }
 
         @Override
@@ -543,7 +553,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record LaunchBuild(UUID id, BlockPos origin, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean force, boolean playerFirst, boolean queue) implements CustomPacketPayload {
+    public record LaunchBuild(UUID id, BlockPos origin, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean force, boolean playerFirst, boolean queue, boolean placeNbt, boolean placeSettings, boolean placeAll) implements CustomPacketPayload {
         public static final Type<LaunchBuild> TYPE = payloadType("launch_build");
         public static final StreamCodec<RegistryFriendlyByteBuf, LaunchBuild> STREAM_CODEC = StreamCodec.of((buf, value) -> value.write(buf), LaunchBuild::read);
 
@@ -564,10 +574,13 @@ public final class BlueprintPayloads {
             buf.writeBoolean(force);
             buf.writeBoolean(playerFirst);
             buf.writeBoolean(queue);
+            buf.writeBoolean(placeNbt);
+            buf.writeBoolean(placeSettings);
+            buf.writeBoolean(placeAll);
         }
 
         public static LaunchBuild read(RegistryFriendlyByteBuf buf) {
-            return new LaunchBuild(buf.readUUID(), buf.readBlockPos(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean());
+            return new LaunchBuild(buf.readUUID(), buf.readBlockPos(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean());
         }
 
         @Override
@@ -1821,7 +1834,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record SaveSession(boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt) implements CustomPacketPayload {
+    public record SaveSession(boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean placeNbt, boolean placeSettings, boolean placeAll) implements CustomPacketPayload {
         public static final Type<SaveSession> TYPE = payloadType("save_session");
         public static final StreamCodec<RegistryFriendlyByteBuf, SaveSession> STREAM_CODEC = StreamCodec.of(
                 (buf, value) -> {
@@ -1829,8 +1842,11 @@ public final class BlueprintPayloads {
                     buf.writeBoolean(value.voidBlocks);
                     buf.writeBoolean(value.voidFluids);
                     buf.writeBoolean(value.voidNbt);
+                    buf.writeBoolean(value.placeNbt);
+                    buf.writeBoolean(value.placeSettings);
+                    buf.writeBoolean(value.placeAll);
                 },
-                buf -> new SaveSession(buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean()));
+                buf -> new SaveSession(buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean()));
 
         @Override
         public Type<? extends CustomPacketPayload> type() {
