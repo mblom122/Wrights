@@ -41,6 +41,7 @@ public final class WrightsHud {
         Component sub = null;
         Component note = null;
         Component offset = mirrorOffset(minecraft);
+        List<Component> look = List.of();
         Component task = taskLine();
         if (WrightsClientState.bindPort != null) {
             line = Component.translatable("hud.wrights.port_chest");
@@ -100,7 +101,12 @@ public final class WrightsHud {
         } else if (WrightsClientState.mode == WrightsClientState.Mode.MANAGE) {
             line = Component.translatable("hud.wrights.manage_explain");
         } else if (WrightsClientState.mode == WrightsClientState.Mode.INFO) {
-            line = Component.translatable("hud.wrights.info_explain");
+            look = InfoLook.describe(minecraft);
+            if (look.isEmpty()) {
+                line = Component.translatable("hud.wrights.info_explain");
+            } else {
+                offset = null;
+            }
         } else if (WrightsClientState.mode == WrightsClientState.Mode.LINK) {
             line = Component.translatable("hud.wrights.link_explain");
             sub = Component.translatable("hud.wrights.link_targets");
@@ -126,7 +132,13 @@ public final class WrightsHud {
         int taskWidth = minecraft.font.width(task) + 16;
         int detailWidth = 0;
         int detailHeight = 0;
-        if (line != null) {
+        if (!look.isEmpty()) {
+            for (Component row : look) {
+                detailWidth = Math.max(detailWidth, minecraft.font.width(row));
+            }
+            detailWidth += 16;
+            detailHeight = 6 + look.size() * 12;
+        } else if (line != null) {
             detailWidth = minecraft.font.width(line);
             if (sub != null) {
                 detailWidth = Math.max(detailWidth, minecraft.font.width(sub));
@@ -150,10 +162,20 @@ public final class WrightsHud {
         graphics.fill(taskX, stackY, taskX + taskWidth, stackY + 14, 0xC0101822);
         graphics.fill(taskX, stackY, taskX + 2, stackY + 14, WrightsUi.COPPER);
         graphics.drawString(minecraft.font, task, taskX + 8, stackY + 3, WrightsUi.COPPER, false);
-        if (line == null && !showModes(minecraft)) {
+        if (line == null && look.isEmpty() && !showModes(minecraft)) {
             return;
         }
-        if (line != null) {
+        if (!look.isEmpty()) {
+            int top = stackY + 18;
+            int x = center - detailWidth / 2;
+            graphics.fill(x, top, x + detailWidth, top + detailHeight, 0xC0101822);
+            graphics.fill(x, top, x + 2, top + detailHeight, WrightsUi.COPPER);
+            int textY = top + 4;
+            for (int i = 0; i < look.size(); i++) {
+                graphics.drawString(minecraft.font, look.get(i), x + 8, textY, i == 0 ? WrightsUi.TEXT : WrightsUi.MUTED, false);
+                textY += 12;
+            }
+        } else if (line != null) {
             int top = stackY + 18;
             int x = center - detailWidth / 2;
             graphics.fill(x, top, x + detailWidth, top + detailHeight, 0xC0101822);
