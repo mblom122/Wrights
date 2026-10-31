@@ -101,6 +101,8 @@ public final class WrightsClientState {
     public static String digitalDim = "";
     public static List<BlueprintPayloads.DigitalInfoLine> digitalLines = List.of();
     public static long digitalInfoAt;
+    public static List<Component> digitalUseTip = List.of();
+    public static long digitalUseUntil;
     public static BlockPos anchor;
     public static int pivotX;
     public static int pivotY;
@@ -1451,6 +1453,24 @@ public final class WrightsClientState {
         if (minecraft.screen instanceof WrightsMenuScreen menu) {
             menu.refreshDigital();
         }
+    }
+
+    public static void showDigitalUse(List<BlueprintPayloads.DigitalUseLine> lines) {
+        List<Component> tip = new ArrayList<>();
+        if (lines != null) {
+            for (BlueprintPayloads.DigitalUseLine line : lines) {
+                net.minecraft.world.item.Item item = net.minecraft.world.item.Item.byId(line.itemId());
+                Component name = new net.minecraft.world.item.ItemStack(item).getHoverName();
+                if (line.pulled() > 0) {
+                    tip.add(Component.translatable("message.wrights.digital_pulled", line.pulled(), name));
+                }
+                if (line.crafted() > 0) {
+                    tip.add(Component.translatable("message.wrights.digital_crafted", line.crafted(), name));
+                }
+            }
+        }
+        digitalUseTip = tip;
+        digitalUseUntil = tip.isEmpty() ? 0L : System.currentTimeMillis() + 4500L;
     }
 
     public static void applyDigitalInfo(BlueprintPayloads.DigitalInfoSync payload) {

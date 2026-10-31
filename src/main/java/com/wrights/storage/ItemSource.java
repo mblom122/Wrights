@@ -110,40 +110,55 @@ public final class ItemSource {
     }
 
     public static Result take(ServerPlayer player, Item item, int count, boolean allowCraft) {
+        return takeDetailed(player, item, count, allowCraft).result;
+    }
+
+    /** Where a take landed: inventory and chest first, then digital stock, then a craft request. */
+    public record Take(Result result, int fromDigital, int crafted) {
+    }
+
+    public static Take takeDetailed(ServerPlayer player, Item item, int count) {
+        return takeDetailed(player, item, count, true);
+    }
+
+    public static Take takeDetailed(ServerPlayer player, Item item, int count, boolean allowCraft) {
         if (count <= 0) {
-            return Result.OK;
+            return new Take(Result.OK, 0, 0);
         }
         if (player.getAbilities().instabuild) {
             int have = playerCount(player, item);
             if (have > 0) {
                 shrinkPlayer(player, item, Math.min(have, count));
             }
-            return Result.OK;
+            return new Take(Result.OK, 0, 0);
         }
         long have = available(player, item);
         if (have < count) {
+            long missing = count - Math.max(0L, have);
             if (allowCraft && craftable(player, item)) {
                 DigitalLink link = linkOf(player);
                 ServerLevel level = DigitalNetworks.levelOf(player, link.pos());
-                if (level != null && DigitalNetworks.requestCraft(player, level, link, item, count - have)) {
-                    return Result.CRAFTING;
+                if (level != null && DigitalNetworks.requestCraft(player, level, link, item, missing)) {
+                    return new Take(Result.CRAFTING, 0, (int) Math.min(Integer.MAX_VALUE, missing));
                 }
             }
-            return Result.MISSING;
+            return new Take(Result.MISSING, 0, 0);
         }
         int left = count;
         left -= shrinkPlayer(player, item, left);
         if (left > 0) {
             left -= shrinkChest(player, item, left);
         }
+        int fromDigital = 0;
         if (left > 0) {
             DigitalLink link = linkOf(player);
             ServerLevel level = DigitalNetworks.levelOf(player, link == null ? null : link.pos());
             if (level != null) {
-                left -= (int) DigitalNetworks.extract(player, level, link, item, left);
+                fromDigital = (int) Math.min(Integer.MAX_VALUE, DigitalNetworks.extract(player, level, link, item, left));
+                left -= fromDigital;
             }
         }
-        return left <= 0 ? Result.OK : Result.MISSING;
+        return new Take(left <= 0 ? Result.OK : Result.MISSING, fromDigital, 0);
     }
 
     /**

@@ -255,6 +255,7 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         for (Renderable widget : this.renderables) {
             widget.render(graphics, mouseX, mouseY, partialTick);
         }
+        manage.drawDigitalTip(this, graphics, mouseX, mouseY);
     }
 
     @Override

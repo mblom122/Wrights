@@ -55,6 +55,8 @@
   "message.wrights.digital_ae2_slot": "Put the controller in an AE2 wireless access point",
   "message.wrights.digital_offline": "That network is offline",
   "message.wrights.digital_crafting": "Requested craft from digital storage",
+  "message.wrights.digital_pulled": "Pulled %s %s from digital storage",
+  "message.wrights.digital_crafted": "Crafting %s %s from digital storage",
   "message.wrights.bind_aim": "Right-click a chest, barrel, or shulker",
   "message.wrights.paste_missing": "That copy is no longer available",
   "message.wrights.stopped": "Wright stopped",

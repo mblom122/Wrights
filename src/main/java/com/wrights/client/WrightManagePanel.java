@@ -1,12 +1,15 @@
 package com.wrights.client;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.Item;
@@ -270,6 +273,18 @@ final class WrightManagePanel {
         if (dialog != NONE) {
             renderDialog(screen, graphics, swarm, mouseX, mouseY);
         }
+        drawDigitalTip(screen, graphics, mouseX, mouseY);
+    }
+
+    void drawDigitalTip(ManageHost screen, GuiGraphics graphics, int mouseX, int mouseY) {
+        if (WrightsClientState.digitalUseTip.isEmpty() || System.currentTimeMillis() >= WrightsClientState.digitalUseUntil) {
+            return;
+        }
+        List<FormattedCharSequence> lines = new ArrayList<>();
+        for (Component line : WrightsClientState.digitalUseTip) {
+            lines.add(line.getVisualOrderText());
+        }
+        graphics.renderTooltip(screen.font(), lines, mouseX, mouseY);
     }
 
     boolean mouseClicked(ManageHost screen, double mouseX, double mouseY, int button) {

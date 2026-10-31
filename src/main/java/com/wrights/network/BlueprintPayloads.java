@@ -1784,6 +1784,43 @@ public final class BlueprintPayloads {
         }
     }
 
+    public record DigitalUseLine(int itemId, int pulled, int crafted) {
+        public void write(RegistryFriendlyByteBuf buf) {
+            buf.writeVarInt(itemId);
+            buf.writeVarInt(pulled);
+            buf.writeVarInt(crafted);
+        }
+
+        public static DigitalUseLine read(RegistryFriendlyByteBuf buf) {
+            return new DigitalUseLine(buf.readVarInt(), buf.readVarInt(), buf.readVarInt());
+        }
+    }
+
+    public record DigitalUse(java.util.List<DigitalUseLine> lines) implements CustomPacketPayload {
+        public static final Type<DigitalUse> TYPE = payloadType("digital_use");
+        public static final StreamCodec<RegistryFriendlyByteBuf, DigitalUse> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    java.util.List<DigitalUseLine> lines = value.lines == null ? java.util.List.of() : value.lines;
+                    buf.writeVarInt(lines.size());
+                    for (DigitalUseLine line : lines) {
+                        line.write(buf);
+                    }
+                },
+                buf -> {
+                    int count = buf.readVarInt();
+                    java.util.List<DigitalUseLine> lines = new java.util.ArrayList<>(count);
+                    for (int i = 0; i < count; i++) {
+                        lines.add(DigitalUseLine.read(buf));
+                    }
+                    return new DigitalUse(lines);
+                });
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public record SaveSession(boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt) implements CustomPacketPayload {
         public static final Type<SaveSession> TYPE = payloadType("save_session");
         public static final StreamCodec<RegistryFriendlyByteBuf, SaveSession> STREAM_CODEC = StreamCodec.of(

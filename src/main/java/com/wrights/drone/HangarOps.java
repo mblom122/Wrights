@@ -1,7 +1,9 @@
 package com.wrights.drone;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import net.minecraft.network.chat.Component;
@@ -11,10 +13,13 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
+import net.neoforged.neoforge.network.PacketDistributor;
+
 import com.wrights.WrightsConfig;
 import com.wrights.item.ModItems;
 import com.wrights.item.PersonalWrightportItem;
 import com.wrights.item.WrightItem;
+import com.wrights.network.BlueprintPayloads;
 import com.wrights.storage.DigitalNetworks;
 import com.wrights.storage.ItemSource;
 import com.wrights.util.Messages;
@@ -86,14 +91,19 @@ public final class HangarOps {
     }
 
     static Swarm applyBatchOwned(ServerPlayer player, UUID owner, Swarm swarm, int action, int value, int[] units) {
-        return switch (action) {
-            case ADD_COUNT -> insertCount(player, owner, swarm, value);
-            case TO_TIER -> moveMarked(player, swarm, units, WrightTier.clamp(value));
-            case MAX_AFFORD -> raiseMarked(player, swarm, units);
-            case TAKE_MARKED -> takeMarked(player, swarm, units);
-            case DOWN_ONE -> downOne(player, swarm, units);
-            default -> swarm;
-        };
+        beginUseNotes();
+        try {
+            return switch (action) {
+                case ADD_COUNT -> insertCount(player, owner, swarm, value);
+                case TO_TIER -> moveMarked(player, swarm, units, WrightTier.clamp(value));
+                case MAX_AFFORD -> raiseMarked(player, swarm, units);
+                case TAKE_MARKED -> takeMarked(player, swarm, units);
+                case DOWN_ONE -> downOne(player, swarm, units);
+                default -> swarm;
+            };
+        } finally {
+            flushUseNotes(player);
+        }
     }
 
     private static void storePort(ServerPlayer player, int kind, int index, Swarm swarm, Swarm next) {
@@ -140,20 +150,25 @@ public final class HangarOps {
     }
 
     public static Swarm editOwned(ServerPlayer player, UUID owner, Swarm swarm, int action, int index) {
-        return switch (action) {
-            case BUILD -> build(player, owner, swarm);
-            case REMOVE -> swarm.removeUnit(index);
-            case SPEED -> speed(player, swarm, index);
-            case ASSIGN -> swarm.withAssign(index);
-            case UP -> swarm.move(index, -1);
-            case DOWN -> swarm.move(index, 1);
-            case INSERT -> insert(player, owner, swarm, index);
-            case EXTRACT -> extract(player, swarm, index);
-            case UPGRADE -> upgrade(player, swarm, index);
-            case TAKE -> take(player, swarm, index);
-            case DOWNGRADE -> downgrade(player, swarm, index);
-            default -> swarm;
-        };
+        beginUseNotes();
+        try {
+            return switch (action) {
+                case BUILD -> build(player, owner, swarm);
+                case REMOVE -> swarm.removeUnit(index);
+                case SPEED -> speed(player, swarm, index);
+                case ASSIGN -> swarm.withAssign(index);
+                case UP -> swarm.move(index, -1);
+                case DOWN -> swarm.move(index, 1);
+                case INSERT -> insert(player, owner, swarm, index);
+                case EXTRACT -> extract(player, swarm, index);
+                case UPGRADE -> upgrade(player, swarm, index);
+                case TAKE -> take(player, swarm, index);
+                case DOWNGRADE -> downgrade(player, swarm, index);
+                default -> swarm;
+            };
+        } finally {
+            flushUseNotes(player);
+        }
     }
 
     private static int wanted(int mode, int available) {
@@ -189,7 +204,11 @@ public final class HangarOps {
         Pull pulled = pullWrights(player, Math.min(room, count));
         List<Taken> tiers = pulled.tiers();
         if (tiers.isEmpty()) {
-            Messages.actionBar(player, pulled.crafting() ? "message.wrights.digital_crafting" : "message.wrights.need_wright_item");
+            if (pulled.crafting() > 0) {
+                Messages.actionBar(player, "message.wrights.digital_crafted", pulled.crafting(), new ItemStack(ModItems.WRIGHT.get()).getHoverName());
+            } else {
+                Messages.actionBar(player, "message.wrights.need_wright_item");
+            }
             return swarm;
         }
         Swarm next = swarm;
@@ -207,7 +226,7 @@ public final class HangarOps {
     private static Pull pullWrights(ServerPlayer player, int count) {
         List<Taken> tiers = new ArrayList<>();
         if (count <= 0) {
-            return new Pull(tiers, false);
+            return new Pull(tiers, 0);
         }
         Inventory inventory = player.getInventory();
         for (int slot = 0; slot < inventory.getContainerSize() && tiers.size() < count; slot++) {
@@ -243,6 +262,7 @@ public final class HangarOps {
             }
             chest.setChanged();
         }
+        int beforeDigital = tiers.size();
         int need = count - tiers.size();
         if (need > 0) {
             var link = ItemSource.linkOf(player);
@@ -253,16 +273,19 @@ public final class HangarOps {
                 }
             }
         }
+        int fromDigital = tiers.size() - beforeDigital;
+        if (fromDigital > 0) {
+            noteUse(ModItems.WRIGHT.get(), fromDigital, 0);
+        }
         need = count - tiers.size();
-        boolean crafting = false;
-        if (need > 0 && ItemSource.craftable(player, ModItems.WRIGHT.get())) {
-            crafting = orderCraft(player, ModItems.WRIGHT.get(), need);
+        int crafting = 0;
+        if (!player.getAbilities().instabuild && need > 0 && orderCraft(player, ModItems.WRIGHT.get(), need)) {
+            crafting = need;
         }
         if (player.getAbilities().instabuild) {
             while (tiers.size() < count) {
                 tiers.add(new Taken(WrightTier.BASE, ""));
             }
-            crafting = false;
         }
         return new Pull(tiers, crafting);
     }
@@ -270,7 +293,7 @@ public final class HangarOps {
     private record Taken(int tier, String name) {
     }
 
-    private record Pull(List<Taken> tiers, boolean crafting) {
+    private record Pull(List<Taken> tiers, int crafting) {
     }
 
     private static Swarm extract(ServerPlayer player, Swarm swarm, int mode) {
@@ -430,7 +453,7 @@ public final class HangarOps {
             if (best < 0) {
                 break;
             }
-            if (ItemSource.take(player, WrightTier.upgradeItem(bestTier + 1), 1) != ItemSource.Result.OK) {
+            if (takeUpgrade(player, WrightTier.upgradeItem(bestTier + 1), 1).result() != ItemSource.Result.OK) {
                 break;
             }
             refundInstalled(player, bestTier);
@@ -509,7 +532,7 @@ public final class HangarOps {
                 return swarm;
             }
             Item upgrade = WrightTier.upgradeItem(target);
-            if (upgrade != null && ItemSource.take(player, upgrade, 1) != ItemSource.Result.OK) {
+            if (upgrade != null && takeUpgrade(player, upgrade, 1).result() != ItemSource.Result.OK) {
                 return swarm;
             }
             refundInstalled(player, tier);
@@ -576,7 +599,55 @@ public final class HangarOps {
         }
         var link = ItemSource.linkOf(player);
         var level = DigitalNetworks.levelOf(player, link == null ? null : link.pos());
-        return level != null && DigitalNetworks.requestCraft(player, level, link, item, amount);
+        boolean ordered = level != null && DigitalNetworks.requestCraft(player, level, link, item, amount);
+        if (ordered) {
+            noteUse(item, 0, (int) Math.min(Integer.MAX_VALUE, amount));
+        }
+        return ordered;
+    }
+
+    private static final ThreadLocal<Map<Item, int[]>> USE_NOTES = ThreadLocal.withInitial(HashMap::new);
+
+    private static void beginUseNotes() {
+        USE_NOTES.get().clear();
+    }
+
+    private static void noteUse(Item item, int pulled, int crafted) {
+        if (item == null || (pulled <= 0 && crafted <= 0)) {
+            return;
+        }
+        int[] counts = USE_NOTES.get().computeIfAbsent(item, key -> new int[2]);
+        counts[0] += Math.max(0, pulled);
+        counts[1] += Math.max(0, crafted);
+    }
+
+    private static void flushUseNotes(ServerPlayer player) {
+        Map<Item, int[]> notes = USE_NOTES.get();
+        if (notes.isEmpty()) {
+            return;
+        }
+        List<BlueprintPayloads.DigitalUseLine> lines = new ArrayList<>();
+        for (Map.Entry<Item, int[]> entry : notes.entrySet()) {
+            int pulled = entry.getValue()[0];
+            int crafted = entry.getValue()[1];
+            if (pulled > 0 || crafted > 0) {
+                lines.add(new BlueprintPayloads.DigitalUseLine(Item.getId(entry.getKey()), pulled, crafted));
+            }
+        }
+        notes.clear();
+        if (!lines.isEmpty()) {
+            PacketDistributor.sendToPlayer(player, new BlueprintPayloads.DigitalUse(lines));
+        }
+    }
+
+    private static ItemSource.Take takeUpgrade(ServerPlayer player, Item item, int count) {
+        ItemSource.Take taken = ItemSource.takeDetailed(player, item, count);
+        if (taken.result() == ItemSource.Result.OK) {
+            noteUse(item, taken.fromDigital(), 0);
+        } else if (taken.result() == ItemSource.Result.CRAFTING) {
+            noteUse(item, 0, taken.crafted());
+        }
+        return taken;
     }
 
     private static void refundInstalled(ServerPlayer player, int tier) {
@@ -636,12 +707,12 @@ public final class HangarOps {
     }
 
     private static boolean consume(ServerPlayer player, Item item) {
-        ItemSource.Result result = ItemSource.take(player, item, 1);
-        if (result == ItemSource.Result.CRAFTING) {
-            Messages.actionBar(player, "message.wrights.digital_crafting");
+        ItemSource.Take taken = takeUpgrade(player, item, 1);
+        if (taken.result() == ItemSource.Result.CRAFTING) {
+            Messages.actionBar(player, "message.wrights.digital_crafted", Math.max(1, taken.crafted()), new ItemStack(item).getHoverName());
             return false;
         }
-        return result == ItemSource.Result.OK;
+        return taken.result() == ItemSource.Result.OK;
     }
 
     static Swarm rename(ServerPlayer player, Swarm swarm, int index, String name) {
