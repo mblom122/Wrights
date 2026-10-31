@@ -241,7 +241,19 @@ public final class SelectionRenderer {
         float pulse = 0.55F + 0.45F * (float) Math.sin(System.currentTimeMillis() / 220.0D);
         boolean faceMode = (axes & 7) == 0;
         AABB border = new AABB(anchor).inflate(0.02D);
-        java.util.List<AABB> slabs = faceMode ? java.util.List.of(faceSlab(border, face)) : mirrorSlabs(anchor, face, axes);
+        java.util.List<AABB> slabs = new java.util.ArrayList<>();
+        if (faceMode) {
+            slabs.add(faceSlab(border, face));
+            if (pattern == Mirror.PAIR || pattern == Mirror.CROSS) {
+                slabs.add(centerSlab(anchor, face.getAxis()));
+                if (pattern == Mirror.CROSS) {
+                    Direction.Axis second = face.getAxis() == Direction.Axis.X ? Direction.Axis.Z : Direction.Axis.X;
+                    slabs.add(centerSlab(anchor, second));
+                }
+            }
+        } else {
+            slabs.addAll(mirrorSlabs(anchor, face, axes));
+        }
         VertexConsumer fill = buffers.getBuffer(RenderType.debugFilledBox());
         float alpha = faceMode ? 0.19F + (pulse - 0.10F) / 0.90F * 0.46F : 0.18F + 0.10F * pulse;
         for (AABB slab : slabs) {
