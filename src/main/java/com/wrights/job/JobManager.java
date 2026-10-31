@@ -194,9 +194,15 @@ public final class JobManager {
             redo(player, library, job);
             return;
         } else if (action == com.wrights.network.BlueprintPayloads.JobControl.UNDO) {
+            if (WrightsConfig.refuse(player, WrightsConfig.allowUndo())) {
+                return;
+            }
             startUndo(player, library, job, false);
             return;
         } else if (action == com.wrights.network.BlueprintPayloads.JobControl.UNDO_FORCE) {
+            if (WrightsConfig.refuse(player, WrightsConfig.allowUndo())) {
+                return;
+            }
             startUndo(player, library, job, true);
             return;
         } else if (action == com.wrights.network.BlueprintPayloads.JobControl.REMOVE) {

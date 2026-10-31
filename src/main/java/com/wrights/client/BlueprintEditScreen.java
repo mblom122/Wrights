@@ -10,6 +10,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.WrightsClientConfig;
+import com.wrights.WrightsConfig;
 import com.wrights.blueprint.BlueprintTransforms;
 import com.wrights.network.BlueprintPayloads;
 
@@ -119,6 +120,7 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
         if (placeFluidsButton == null) {
             return;
         }
+        placeFluidsButton.setShown(WrightsConfig.allowPlaceFluids());
         placeFluidsButton.setPicked(WrightsClientConfig.PLACE_FLUIDS.get());
         placeNbtButton.setPicked(WrightsClientConfig.PLACE_NBT_BLOCKS.get());
         boolean showSettings = WrightsClientState.showStoredSettings();

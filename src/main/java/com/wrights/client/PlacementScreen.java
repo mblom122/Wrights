@@ -193,6 +193,7 @@ public class PlacementScreen extends Screen implements JeiPreview {
             highlightSupplyButton.visible = bound;
         }
         if (placeFluidsButton != null) {
+            placeFluidsButton.setShown(WrightsConfig.allowPlaceFluids());
             placeFluidsButton.setPicked(WrightsClientConfig.PLACE_FLUIDS.get());
             placeNbtButton.setPicked(WrightsClientConfig.PLACE_NBT_BLOCKS.get());
             boolean showSettings = WrightsClientState.showStoredSettings();
@@ -212,11 +213,13 @@ public class PlacementScreen extends Screen implements JeiPreview {
             }
             voidBlocksButton.setY(y);
             voidFluidsButton.setY(y);
+            voidBlocksButton.setShown(WrightsConfig.allowVoidBlocks());
+            voidFluidsButton.setShown(WrightsConfig.allowVoidFluids());
             voidBlocksButton.setPicked(WrightsClientConfig.VOID_BLOCKS.get());
             voidFluidsButton.setPicked(WrightsClientConfig.VOID_FLUIDS.get());
             boolean voiding = WrightsClientConfig.VOID_BLOCKS.get() || WrightsClientConfig.VOID_FLUIDS.get();
             voidNbtButton.setY(y + 18);
-            voidNbtButton.setShown(voiding);
+            voidNbtButton.setShown(voiding && WrightsConfig.allowVoidNbt());
             voidNbtButton.setPicked(voiding && WrightsClientConfig.VOID_NBT.get());
         }
         if (buildButton != null) {

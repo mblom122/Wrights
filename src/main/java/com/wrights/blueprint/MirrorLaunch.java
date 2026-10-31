@@ -48,7 +48,7 @@ public final class MirrorLaunch {
 
     /** Places the block in the other hand, then asks wrights to build the reflected copies. */
     public static void placeHeld(ServerPlayer player, BlueprintPayloads.MirrorPlace payload) {
-        if (!ControllerItem.isHeld(player) || payload == null) {
+        if (!ControllerItem.isHeld(player) || payload == null || WrightsConfig.refuse(player, WrightsConfig.allowMirrorBlocks())) {
             return;
         }
         InteractionHand hand = blockHand(player);
@@ -74,7 +74,8 @@ public final class MirrorLaunch {
             return;
         }
         BlockPos target = planned.getClickedPos();
-        if (!payload.replace() && !level.getBlockState(target).isAir()) {
+        boolean replace = payload.replace() && WrightsConfig.allowMirrorReplace();
+        if (!replace && !level.getBlockState(target).isAir()) {
             return;
         }
         if (placedAlready(player, level.getGameTime(), target)) {
@@ -131,7 +132,7 @@ public final class MirrorLaunch {
         Schematic.Entry entry = new Schematic.Entry((short) 0, (short) 0, (short) 0, state, BlockFilters.isSecondary(state), nbt, full);
         Schematic source = new Schematic(UUID.randomUUID(), "Mirror", 1, 1, 1, List.of(entry), placed, placed, "", 0, 0, 0, true);
         Direction plane = Direction.from3DDataValue(Mth.clamp(payload.anchorFace(), 0, 5));
-        List<Mirror.Placed> copies = Mirror.place(source, placed, 1, 1, 1, payload.anchor(), plane, payload.pattern(), payload.shapes(), payload.axes());
+        List<Mirror.Placed> copies = Mirror.place(source, placed, 1, 1, 1, payload.anchor(), plane, WrightsConfig.allowedPattern(payload.pattern()), payload.shapes(), WrightsConfig.allowedAxes(payload.axes()));
         if (copies.isEmpty()) {
             Messages.actionBar(player, "message.wrights.mirror_same");
             return;
@@ -145,11 +146,10 @@ public final class MirrorLaunch {
             if (!BoxEdits.inWorld(min) || !BoxEdits.inWorld(far)) {
                 continue;
             }
-            if (!payload.replace() && (!level.isLoaded(min) || !level.getBlockState(min).isAir())) {
+            if (!replace && (!level.isLoaded(min) || !level.getBlockState(min).isAir())) {
                 continue;
             }
             library.putSchematic(schematic);
-            boolean replace = payload.replace();
             boolean ok = JobManager.startBlueprintBuild(player, schematic.id(), min, schematic.sizeX(), schematic.sizeY(), schematic.sizeZ(), 0, false, replace, replace, replace, true, true, false, copyNbt, settings, all);
             if (!ok) {
                 library.removeSchematic(schematic.id());

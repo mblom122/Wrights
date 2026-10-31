@@ -501,7 +501,9 @@ public class BlueprintAdjustScreen extends Screen {
         } else if (WrightsClientState.cornerA != null && WrightsClientState.cornerB != null) {
             graphics.drawCenteredString(this.font, Component.translatable("message.wrights.copy_empty"), modelX + modelW / 2, modelY + modelH / 2, WrightsUi.MUTED);
         }
-        drawToggle(graphics, mouseX, mouseY, fluidX, fluidY, WrightsClientConfig.COPY_FLUIDS.get(), "screen.wrights.copy_fluids", "screen.wrights.copy_fluids_hint", true);
+        if (WrightsConfig.allowCopyFluids()) {
+            drawToggle(graphics, mouseX, mouseY, fluidX, fluidY, WrightsClientConfig.COPY_FLUIDS.get(), "screen.wrights.copy_fluids", "screen.wrights.copy_fluids_hint", true);
+        }
         drawToggle(graphics, mouseX, mouseY, nbtX, nbtY, WrightsClientConfig.COPY_NBT_BLOCKS.get(), "screen.wrights.copy_nbt_blocks", "screen.wrights.copy_nbt_blocks_hint", true);
         boolean settingsOn = WrightsConfig.copySettings();
         String settingsHint = settingsOn
@@ -596,7 +598,7 @@ public class BlueprintAdjustScreen extends Screen {
                 || hitHelp(mouseX, mouseY, allX, allY, "screen.wrights.copy_nbt_all"))) {
             return true;
         }
-        if (button == 0 && hitToggle(mouseX, mouseY, fluidX, fluidY, "screen.wrights.copy_fluids")) {
+        if (WrightsConfig.allowCopyFluids() && button == 0 && hitToggle(mouseX, mouseY, fluidX, fluidY, "screen.wrights.copy_fluids")) {
             if (saving()) {
                 return true;
             }

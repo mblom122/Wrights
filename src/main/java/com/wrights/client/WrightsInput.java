@@ -324,6 +324,10 @@ public final class WrightsInput {
             return;
         }
         if (com.wrights.WrightsClientConfig.mirrorBlocks()) {
+            if (!com.wrights.WrightsConfig.allowMirrorBlocks()) {
+                player.displayClientMessage(Component.translatable("message.wrights.feature_off"), true);
+                return;
+            }
             if (pos == null || face == null) {
                 player.displayClientMessage(Component.translatable("message.wrights.mirror_look"), true);
                 return;

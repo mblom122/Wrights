@@ -162,6 +162,9 @@ public final class BlueprintActions {
     }
 
     public static void requestLibrary(ServerPlayer player, boolean global) {
+        if (global && !WrightsConfig.allowGlobal()) {
+            global = false;
+        }
         BlueprintSessions.get(player).setLibraryGlobal(global);
         if (global) {
             com.wrights.schematic.GlobalBlueprintStore.reload();
@@ -188,13 +191,16 @@ public final class BlueprintActions {
             return;
         }
         if (mode == 1) {
+            if (WrightsConfig.refuse(player, WrightsConfig.allowCapture())) {
+                return;
+            }
             session.startCapture(player.level().dimension(), suggestName(blueprintNames(SchematicLibrary.get(player.getServer()), null)));
             BlueprintNetwork.syncCapture(player);
         }
     }
 
     public static void startCapture(ServerPlayer player) {
-        if (!requireTool(player)) {
+        if (!requireTool(player) || WrightsConfig.refuse(player, WrightsConfig.allowCapture())) {
             return;
         }
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
@@ -356,9 +362,10 @@ public final class BlueprintActions {
     }
 
     public static void confirm(ServerPlayer player, String name, boolean copyFluids, boolean copyNbtBlocks, boolean copyNbtSettings, boolean copyNbtAll, boolean buildAfter, byte[] turns) {
-        if (!requireTool(player)) {
+        if (!requireTool(player) || WrightsConfig.refuse(player, WrightsConfig.allowCapture())) {
             return;
         }
+        copyFluids = copyFluids && WrightsConfig.allowCopyFluids();
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
         if (session.mode() != BlueprintSessions.Mode.CAPTURE) {
             return;
@@ -588,7 +595,7 @@ public final class BlueprintActions {
 
     /** Copy a blueprint from world↔global. The source is removed after a successful copy. */
     public static void moveLibrary(ServerPlayer player, UUID id, boolean toGlobal) {
-        if (id == null) {
+        if (id == null || WrightsConfig.refuse(player, WrightsConfig.allowGlobal())) {
             return;
         }
         if (toGlobal) {
@@ -677,6 +684,9 @@ public final class BlueprintActions {
     }
 
     public static void beginEdit(ServerPlayer player, java.util.UUID id) {
+        if (WrightsConfig.refuse(player, WrightsConfig.allowEdit())) {
+            return;
+        }
         Schematic schematic = editable(player, id, false);
         if (schematic == null) {
             return;
@@ -749,7 +759,7 @@ public final class BlueprintActions {
     }
 
     public static void recapture(ServerPlayer player, java.util.UUID id) {
-        if (!requireTool(player)) {
+        if (!requireTool(player) || WrightsConfig.refuse(player, WrightsConfig.allowEdit())) {
             return;
         }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
@@ -794,6 +804,9 @@ public final class BlueprintActions {
     }
 
     public static void editCell(ServerPlayer player, java.util.UUID id, int x, int y, int z, int stateId, boolean remove) {
+        if (WrightsConfig.refuse(player, WrightsConfig.allowEdit())) {
+            return;
+        }
         Schematic schematic = editable(player, id, true);
         if (schematic == null) {
             return;
@@ -825,6 +838,9 @@ public final class BlueprintActions {
     }
 
     public static void editLayer(ServerPlayer player, java.util.UUID id, int operation, int from, int to, int axis) {
+        if (WrightsConfig.refuse(player, WrightsConfig.allowEdit())) {
+            return;
+        }
         Schematic schematic = editable(player, id, true);
         if (schematic == null) {
             return;
@@ -937,6 +953,9 @@ public final class BlueprintActions {
     }
 
     public static void transform(ServerPlayer player, java.util.UUID id, int operation) {
+        if (WrightsConfig.refuse(player, WrightsConfig.allowEdit())) {
+            return;
+        }
         Schematic schematic = editable(player, id, true);
         if (schematic == null) {
             return;
@@ -977,6 +996,10 @@ public final class BlueprintActions {
         if (!requireTool(player)) {
             return;
         }
+        placeFluids = placeFluids && WrightsConfig.allowPlaceFluids();
+        voidBlocks = voidBlocks && WrightsConfig.allowVoidBlocks();
+        voidFluids = voidFluids && WrightsConfig.allowVoidFluids();
+        voidNbt = voidNbt && WrightsConfig.allowVoidNbt();
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
         Schematic draft = session.draft();
         if (session.mode() != BlueprintSessions.Mode.BUILD || draft == null || session.buildId() == null) {
@@ -1002,7 +1025,7 @@ public final class BlueprintActions {
     }
 
     public static void beginBuild(ServerPlayer player, java.util.UUID id) {
-        if (!requireTool(player)) {
+        if (!requireTool(player) || WrightsConfig.refuse(player, WrightsConfig.allowPlace())) {
             return;
         }
         if (id == null || id.equals(Util.NIL_UUID)) {
@@ -1068,9 +1091,18 @@ public final class BlueprintActions {
     }
 
     public static void launch(ServerPlayer player, java.util.UUID id, BlockPos anchorPoint, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean force, boolean playerFirst, boolean queue, boolean placeNbt, boolean placeSettings, boolean placeAll, boolean mirror, BlockPos mirrorAnchor, int mirrorFace, int mirrorPattern, boolean mirrorShapes, int mirrorAxes) {
-        if (!requireTool(player)) {
+        if (!requireTool(player) || WrightsConfig.refuse(player, WrightsConfig.allowPlace())) {
             return;
         }
+        placeFluids = placeFluids && WrightsConfig.allowPlaceFluids();
+        voidBlocks = voidBlocks && WrightsConfig.allowVoidBlocks();
+        voidFluids = voidFluids && WrightsConfig.allowVoidFluids();
+        voidNbt = voidNbt && WrightsConfig.allowVoidNbt();
+        if (mirror && !WrightsConfig.allowMirrorBlueprints()) {
+            mirror = false;
+        }
+        mirrorPattern = WrightsConfig.allowedPattern(mirrorPattern);
+        mirrorAxes = WrightsConfig.allowedAxes(mirrorAxes);
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
         if (session.mode() != BlueprintSessions.Mode.BUILD || !id.equals(session.buildId())) {
             Messages.actionBar(player, "message.wrights.blueprint_missing");

@@ -25,6 +25,9 @@ public final class DigitalBinder {
         }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
+        if (!clear && WrightsConfig.refuse(player, WrightsConfig.allowLink())) {
+            return;
+        }
         if (clear || pos == null || pos.equals(BlockPos.ZERO)) {
             session.setDigitalLink(DigitalLink.NONE);
             library.setDigital(player.getUUID(), DigitalLink.NONE);

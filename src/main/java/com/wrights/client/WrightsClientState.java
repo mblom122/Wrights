@@ -532,24 +532,28 @@ public final class WrightsClientState {
             return;
         }
         int last = com.wrights.WrightsClientConfig.LAST_MODE.get();
-        if (last == 3) {
+        if (last == 3 && WrightsConfig.allowJobs()) {
             resumeSent = true;
             enterJobs();
             return;
         }
-        if (last == 4) {
+        if (last == 4 && WrightsConfig.allowManage()) {
             resumeSent = true;
             enterManage();
             return;
         }
-        if (last == 5) {
+        if (last == 5 && WrightsConfig.allowInfo()) {
             resumeSent = true;
             enterInfo();
             return;
         }
-        if (last == 6) {
+        if (last == 6 && WrightsConfig.allowLink()) {
             resumeSent = true;
             enterLink();
+            return;
+        }
+        if ((last == 1 && !WrightsConfig.allowCapture()) || (last == 2 && !WrightsConfig.allowPlace())) {
+            resumeSent = true;
             return;
         }
         if (last != 1 && last != 2) {
@@ -663,16 +667,75 @@ public final class WrightsClientState {
         PacketDistributor.sendToServer(new BlueprintPayloads.BeginBuild(send));
     }
 
+    private static int[] mainModes() {
+        int count = 0;
+        if (WrightsConfig.showBuilding()) {
+            count++;
+        }
+        if (WrightsConfig.allowJobs()) {
+            count++;
+        }
+        if (WrightsConfig.allowManage()) {
+            count++;
+        }
+        if (WrightsConfig.allowInfo()) {
+            count++;
+        }
+        if (WrightsConfig.allowLink()) {
+            count++;
+        }
+        int[] modes = new int[Math.max(1, count)];
+        int n = 0;
+        if (WrightsConfig.showBuilding()) {
+            modes[n++] = 0;
+        }
+        if (WrightsConfig.allowJobs()) {
+            modes[n++] = 1;
+        }
+        if (WrightsConfig.allowManage()) {
+            modes[n++] = 2;
+        }
+        if (WrightsConfig.allowInfo()) {
+            modes[n++] = 3;
+        }
+        if (WrightsConfig.allowLink()) {
+            modes[n++] = 4;
+        }
+        if (n == 0) {
+            return new int[0];
+        }
+        if (n == modes.length) {
+            return modes;
+        }
+        int[] trimmed = new int[n];
+        System.arraycopy(modes, 0, trimmed, 0, n);
+        return trimmed;
+    }
+
     public static void cycleMainMode(int delta) {
-        int index = switch (mode) {
+        int[] modes = mainModes();
+        if (modes.length == 0) {
+            return;
+        }
+        int current = switch (mode) {
             case CAPTURE, SAVING, BUILD -> 0;
             case JOBS -> 1;
             case MANAGE -> 2;
             case INFO -> 3;
             case LINK -> 4;
-            default -> delta > 0 ? -1 : 5;
+            default -> -1;
         };
-        int next = Math.floorMod(index + delta, 5);
+        int at = 0;
+        for (int i = 0; i < modes.length; i++) {
+            if (modes[i] == current) {
+                at = i;
+                break;
+            }
+        }
+        if (current < 0) {
+            at = delta > 0 ? -1 : 0;
+        }
+        int next = modes[Math.floorMod(at + delta, modes.length)];
         if (next == 0) {
             enterBuildFromLast();
             bindSupply = false;
@@ -1278,7 +1341,7 @@ public final class WrightsClientState {
         if (minecraft.level == null) {
             return false;
         }
-        return WrightsClientConfig.mirrorArmed(minecraft.level.dimension().location().toString());
+        return WrightsConfig.allowMirrorBlueprints() && WrightsClientConfig.mirrorArmed(minecraft.level.dimension().location().toString());
     }
 
     public static void setMirrorAnchor(BlockPos pos, Direction face) {

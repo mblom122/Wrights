@@ -795,16 +795,16 @@
   "menu.wrights.mirror_blocks_hint": "Right-click places the block in your other hand. Wrights build the reflected copies. Hold the controller in one hand and the block in the other.",
   "menu.wrights.mirror_blueprints": "Blueprints",
   "menu.wrights.mirror_blueprints_hint": "Right-click queues the blueprint you have armed, plus its reflected copies.",
-  "menu.wrights.mirror_pattern": "Pattern",
-  "menu.wrights.mirror_axis": "Axis",
-  "menu.wrights.mirror_axis_anchor": "Anchor",
-  "menu.wrights.mirror_axis_anchor_hint": "The face you shift-right-click sets the axis. The pattern buttons use that face.",
+  "menu.wrights.mirror_pattern": "From the clicked face",
+  "menu.wrights.mirror_axis": "Through the anchor block",
+  "menu.wrights.mirror_axis_anchor": "Face",
+  "menu.wrights.mirror_axis_anchor_hint": "Uses the pattern above and the face you clicked. The copy sits on the other side of that face.",
   "menu.wrights.mirror_axis_x": "X",
-  "menu.wrights.mirror_axis_x_hint": "Mirror across east and west. Turn on more than one axis to mirror on each of them.",
+  "menu.wrights.mirror_axis_x_hint": "Mirrors through the middle of the anchor block, the same distance east and west. This replaces the pattern.",
   "menu.wrights.mirror_axis_y": "Y",
-  "menu.wrights.mirror_axis_y_hint": "Mirror across up and down. Turn on more than one axis to mirror on each of them.",
+  "menu.wrights.mirror_axis_y_hint": "Mirrors through the middle of the anchor block, the same distance up and down. This replaces the pattern.",
   "menu.wrights.mirror_axis_z": "Z",
-  "menu.wrights.mirror_axis_z_hint": "Mirror across north and south. Turn on more than one axis to mirror on each of them.",
+  "menu.wrights.mirror_axis_z_hint": "Mirrors through the middle of the anchor block, the same distance north and south. This replaces the pattern.",
   "menu.wrights.mirror_lead": "Wrights build a reflected copy of each blueprint you place.",
   "menu.wrights.mirror_none": "No anchor yet. Shift-right-click a block face. Shift-right-click the air to clear it.",
   "menu.wrights.mirror_other_world": "The anchor is in another world. Set it again here, or clear it.",
@@ -852,6 +852,7 @@
   "message.wrights.mirror_skip_nbt": "Copy NBT blocks is off, so this block is not mirrored",
   "message.wrights.mirror_started": "Wrights will also build %s mirrored copies",
   "message.wrights.mirror_same": "That mirror lands on the build itself. Click a face beside it.",
-  "message.wrights.mirror_far": "The mirror anchor is too far away"
+  "message.wrights.mirror_far": "The mirror anchor is too far away",
+  "message.wrights.feature_off": "The server has turned that off"
 }
 

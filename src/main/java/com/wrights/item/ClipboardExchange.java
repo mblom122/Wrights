@@ -12,6 +12,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.server.level.ServerPlayer;
 
+import com.wrights.WrightsConfig;
 import com.wrights.network.BlueprintNetwork;
 import com.wrights.network.BlueprintPayloads;
 import com.wrights.schematic.Schematic;
@@ -66,6 +67,9 @@ public final class ClipboardExchange {
     }
 
     public static void importClip(ServerPlayer player, byte[] data, int mode, String name) {
+        if (WrightsConfig.refuse(player, WrightsConfig.allowTransfer())) {
+            return;
+        }
         CompoundTag wrapper = decode(data);
         if (wrapper == null || !wrapper.contains("body")) {
             Messages.actionBar(player, "message.wrights.clipboard_bad");

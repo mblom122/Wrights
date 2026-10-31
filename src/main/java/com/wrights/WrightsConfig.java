@@ -4,8 +4,12 @@ import java.util.List;
 import java.util.Locale;
 
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.Block;
 import net.neoforged.neoforge.common.ModConfigSpec;
+
+import com.wrights.blueprint.Mirror;
+import com.wrights.util.Messages;
 
 public final class WrightsConfig {
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
@@ -117,6 +121,93 @@ public final class WrightsConfig {
                     "mekanism is energy cubes and machines. ae2 is Applied Energistics 2. Add other ids, such as mekanismgenerators, when you want those too.")
             .defineListAllowEmpty("copySettingsMods", List.of("mekanism", "ae2"), () -> "", WrightsConfig::modId);
 
+    static {
+        BUILDER.comment(
+                "Turn features off for a modpack. A parent that is off also turns off its parts.",
+                "The menu hides what is off. The server still refuses the action.")
+                .push("features");
+    }
+
+    public static final ModConfigSpec.BooleanValue ALLOW_BUILDING = BUILDER
+            .comment("Building, including blueprints and mirroring.")
+            .define("building", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_BLUEPRINTS = BUILDER
+            .comment("The blueprint library, capturing, placing, and editing.")
+            .define("blueprints", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_CAPTURE = BUILDER
+            .comment("Copying a box of the world into a new blueprint.")
+            .define("capture", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_PLACE = BUILDER
+            .comment("Sending wrights to build a blueprint.")
+            .define("place", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_EDIT = BUILDER
+            .comment("Changing a saved blueprint, including recapture.")
+            .define("edit", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_UNDO = BUILDER
+            .comment("Taking a finished build back apart and returning the items.")
+            .define("undo", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_GLOBAL = BUILDER
+            .comment("The global library, shared outside this world.")
+            .define("globalLibrary", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_TRANSFER = BUILDER
+            .comment("Importing and exporting blueprints through the clipboard.")
+            .define("transfer", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_COPY_FLUIDS = BUILDER
+            .comment("Saving water and lava into a blueprint.")
+            .define("copyFluids", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_PLACE_FLUIDS = BUILDER
+            .comment("Placing water and lava from a blueprint.")
+            .define("placeFluids", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_VOID_BLOCKS = BUILDER
+            .comment("Removing blocks that do not match the blueprint before placing.")
+            .define("voidBlocks", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_VOID_FLUIDS = BUILDER
+            .comment("Removing water or lava that does not match the blueprint before placing.")
+            .define("voidFluids", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_VOID_NBT = BUILDER
+            .comment("Voiding may also remove chests and other blocks that store contents.")
+            .define("voidNbt", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_MIRROR = BUILDER
+            .comment("Mirroring. Off hides the mirror page and refuses mirrored copies.")
+            .define("mirror", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_MIRROR_BLOCKS = BUILDER
+            .comment("Mirroring the block in the other hand.")
+            .define("mirrorBlocks", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_MIRROR_BLUEPRINTS = BUILDER
+            .comment("Mirroring a queued blueprint.")
+            .define("mirrorBlueprints", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_MIRROR_REPLACE = BUILDER
+            .comment("Mirrored block copies may replace a block that is already there.")
+            .define("mirrorReplace", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_MIRROR_AXES = BUILDER
+            .comment("Choosing X, Y, and Z in the mirror menu. Off keeps the axis from the anchor face.")
+            .define("mirrorAxes", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_PATTERN_4 = BUILDER
+            .comment("The 4 x times mirror pattern.")
+            .define("mirrorPattern4", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_PATTERN_8 = BUILDER
+            .comment("The 8 x times mirror pattern.")
+            .define("mirrorPattern8", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_PATTERN_16 = BUILDER
+            .comment("The 16 x times mirror pattern.")
+            .define("mirrorPattern16", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_JOBS = BUILDER
+            .comment("The jobs page.")
+            .define("jobs", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_MANAGE = BUILDER
+            .comment("The manage page for wrightports.")
+            .define("manage", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_INFO = BUILDER
+            .comment("The info page for supply and stock.")
+            .define("info", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_LINK = BUILDER
+            .comment("Binding a digital storage network.")
+            .define("link", true);
+
+    static {
+        BUILDER.pop();
+    }
+
     static final ModConfigSpec SPEC = BUILDER.build();
 
     private WrightsConfig() {
@@ -177,6 +268,156 @@ public final class WrightsConfig {
 
     public static boolean copySettingsWhitelist() {
         return read(COPY_SETTINGS_WHITELIST, false);
+    }
+
+    public static boolean allowBuilding() {
+        return read(ALLOW_BUILDING, true);
+    }
+
+    public static boolean allowBlueprints() {
+        return allowBuilding() && read(ALLOW_BLUEPRINTS, true);
+    }
+
+    public static boolean allowCapture() {
+        return allowBlueprints() && read(ALLOW_CAPTURE, true);
+    }
+
+    public static boolean allowPlace() {
+        return allowBlueprints() && read(ALLOW_PLACE, true);
+    }
+
+    public static boolean allowEdit() {
+        return allowBlueprints() && read(ALLOW_EDIT, true);
+    }
+
+    public static boolean allowUndo() {
+        return allowBlueprints() && read(ALLOW_UNDO, true);
+    }
+
+    public static boolean allowGlobal() {
+        return allowBlueprints() && read(ALLOW_GLOBAL, true);
+    }
+
+    public static boolean allowTransfer() {
+        return allowBlueprints() && read(ALLOW_TRANSFER, true);
+    }
+
+    public static boolean allowCopyFluids() {
+        return allowBlueprints() && read(ALLOW_COPY_FLUIDS, true);
+    }
+
+    public static boolean allowPlaceFluids() {
+        return allowPlace() && read(ALLOW_PLACE_FLUIDS, true);
+    }
+
+    public static boolean allowVoidBlocks() {
+        return allowPlace() && read(ALLOW_VOID_BLOCKS, true);
+    }
+
+    public static boolean allowVoidFluids() {
+        return allowPlace() && read(ALLOW_VOID_FLUIDS, true);
+    }
+
+    public static boolean allowVoidNbt() {
+        return allowVoidBlocks() && read(ALLOW_VOID_NBT, true);
+    }
+
+    public static boolean allowMirror() {
+        return allowBuilding() && read(ALLOW_MIRROR, true) && (read(ALLOW_MIRROR_BLOCKS, true) || read(ALLOW_MIRROR_BLUEPRINTS, true));
+    }
+
+    public static boolean allowMirrorBlocks() {
+        return allowMirror() && read(ALLOW_MIRROR_BLOCKS, true);
+    }
+
+    public static boolean allowMirrorBlueprints() {
+        return allowMirror() && read(ALLOW_MIRROR_BLUEPRINTS, true);
+    }
+
+    public static boolean allowMirrorReplace() {
+        return allowMirrorBlocks() && read(ALLOW_MIRROR_REPLACE, true);
+    }
+
+    public static boolean allowMirrorAxes() {
+        return allowMirror() && read(ALLOW_MIRROR_AXES, true);
+    }
+
+    public static boolean allowJobs() {
+        return read(ALLOW_JOBS, true);
+    }
+
+    public static boolean allowManage() {
+        return read(ALLOW_MANAGE, true);
+    }
+
+    public static boolean allowInfo() {
+        return read(ALLOW_INFO, true);
+    }
+
+    public static boolean allowLink() {
+        return read(ALLOW_LINK, true);
+    }
+
+    /** Building has a blueprint list or a mirror page to show. */
+    public static boolean showBuilding() {
+        return allowBlueprints() || allowMirror();
+    }
+
+    public static boolean patternOn(int pattern) {
+        return switch (Mirror.clampPattern(pattern)) {
+            case Mirror.CROSS -> read(ALLOW_PATTERN_4, true);
+            case Mirror.EIGHT -> read(ALLOW_PATTERN_8, true);
+            case Mirror.SIXTEEN -> read(ALLOW_PATTERN_16, true);
+            default -> true;
+        };
+    }
+
+    public static int allowedPattern(int pattern) {
+        int id = Mirror.clampPattern(pattern);
+        if (patternOn(id)) {
+            return id;
+        }
+        int[] order = {Mirror.PAIR, Mirror.CROSS, Mirror.EIGHT, Mirror.SIXTEEN};
+        for (int candidate : order) {
+            if (patternOn(candidate)) {
+                return candidate;
+            }
+        }
+        return Mirror.PAIR;
+    }
+
+    public static int[] patternChoices() {
+        int[] all = {Mirror.PAIR, Mirror.CROSS, Mirror.EIGHT, Mirror.SIXTEEN};
+        int count = 0;
+        for (int id : all) {
+            if (patternOn(id)) {
+                count++;
+            }
+        }
+        int[] choices = new int[Math.max(1, count)];
+        int n = 0;
+        for (int id : all) {
+            if (patternOn(id)) {
+                choices[n++] = id;
+            }
+        }
+        if (n == 0) {
+            choices[0] = Mirror.PAIR;
+        }
+        return choices;
+    }
+
+    public static int allowedAxes(int axes) {
+        return allowMirrorAxes() ? (axes & 7) : 0;
+    }
+
+    /** Tells the player and returns true when the feature is off. */
+    public static boolean refuse(ServerPlayer player, boolean allowed) {
+        if (allowed || player == null) {
+            return !allowed;
+        }
+        Messages.actionBar(player, "message.wrights.feature_off");
+        return true;
     }
 
     /** Copy settings may keep this block's data. Copy all does not ask. */
