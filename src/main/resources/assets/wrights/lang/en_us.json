@@ -833,7 +833,7 @@
   "menu.wrights.mirror_on": "Show ghostblocks",
   "menu.wrights.mirror_on_hint": "Wrights build the copies. Off keeps the anchor but skips them.",
   "menu.wrights.mirror_mine": "Mirror mining",
-  "menu.wrights.mirror_mine_hint": "Breaking a block also breaks the mirrored copies. Same block only breaks that block. Any plain block also breaks other blocks that do not store data.",
+  "menu.wrights.mirror_mine_hint": "Breaking a block also breaks the mirrored copies. Drops go into your inventory, or at your feet if it is full. Same block only breaks that block. Any plain block also breaks other blocks that do not store data.",
   "menu.wrights.mirror_mine_same": "Same block",
   "menu.wrights.mirror_mine_any": "Any plain block",
   "menu.wrights.mirror_mine_silk": "Silk touch",

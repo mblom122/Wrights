@@ -1,7 +1,9 @@
 package com.wrights.blueprint;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -13,12 +15,14 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 
@@ -261,11 +265,50 @@ public final class MirrorLaunch {
             }
             BlockState state = level.getBlockState(copy);
             BlockEntity entity = level.getBlockEntity(copy);
+            Set<UUID> already = player.getAbilities().instabuild ? Set.of() : nearbyItems(level, copy);
             if (!player.getAbilities().instabuild) {
                 net.minecraft.world.level.block.Block.dropResources(state, level, copy, entity, player, tool);
             }
             level.destroyBlock(copy, false, player);
+            if (!player.getAbilities().instabuild) {
+                claimDrops(player, level, copy, already);
+            }
         }
+    }
+
+    /** Item entities already sitting on the block, so the new drops can be told apart. */
+    private static Set<UUID> nearbyItems(ServerLevel level, BlockPos pos) {
+        Set<UUID> ids = new HashSet<>();
+        for (ItemEntity entity : level.getEntitiesOfClass(ItemEntity.class, new AABB(pos).inflate(1.0D))) {
+            ids.add(entity.getUUID());
+        }
+        return ids;
+    }
+
+    /** Mirror drops go into the inventory. Whatever does not fit lands at the player. */
+    private static void claimDrops(ServerPlayer player, ServerLevel level, BlockPos pos, Set<UUID> already) {
+        for (ItemEntity entity : level.getEntitiesOfClass(ItemEntity.class, new AABB(pos).inflate(1.0D))) {
+            if (!entity.isAlive() || already.contains(entity.getUUID())) {
+                continue;
+            }
+            ItemStack stack = entity.getItem().copy();
+            entity.discard();
+            giveOrDrop(player, stack);
+        }
+    }
+
+    private static void giveOrDrop(ServerPlayer player, ItemStack stack) {
+        if (stack.isEmpty()) {
+            return;
+        }
+        if (player.getInventory().add(stack) || stack.isEmpty()) {
+            return;
+        }
+        ServerLevel level = player.serverLevel();
+        ItemEntity dropped = new ItemEntity(level, player.getX(), player.getY(), player.getZ(), stack);
+        dropped.setPickUpDelay(0);
+        dropped.setDeltaMovement(0.0D, 0.05D, 0.0D);
+        level.addFreshEntity(dropped);
     }
 
     /** Same block, or any block that does not store data. */
