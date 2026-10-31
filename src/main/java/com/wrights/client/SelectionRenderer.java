@@ -196,19 +196,23 @@ public final class SelectionRenderer {
         int axes = WrightsConfig.allowedAxes(WrightsClientConfig.MIRROR_AXES.get());
         int pattern = WrightsConfig.allowedPattern(WrightsClientConfig.MIRROR_PATTERN.get());
         float pulse = 0.55F + 0.45F * (float) Math.sin(System.currentTimeMillis() / 220.0D);
+        boolean faceMode = (axes & 7) == 0;
+        AABB border = new AABB(anchor).inflate(0.02D);
+        java.util.List<AABB> slabs = faceMode ? java.util.List.of(faceSlab(border, face)) : mirrorSlabs(anchor, face, axes);
         VertexConsumer fill = buffers.getBuffer(RenderType.debugFilledBox());
-        for (AABB slab : mirrorSlabs(anchor, face, axes)) {
+        for (AABB slab : slabs) {
             AABB local = slab.move(-camera.x, -camera.y, -camera.z);
             LevelRenderer.addChainedFilledBoxVertices(pose, fill, local.minX, local.minY, local.minZ, local.maxX, local.maxY, local.maxZ, 0.35F, 0.78F, 0.74F, 0.18F + 0.10F * pulse);
         }
         buffers.endBatch(RenderType.debugFilledBox());
         VertexConsumer lines = buffers.getBuffer(RenderType.lines());
         float lineAlpha = 0.85F + 0.15F * pulse;
-        for (AABB slab : mirrorSlabs(anchor, face, axes)) {
-            drawBox(pose, lines, slab, camera, 0.45F, 0.92F, 0.86F, lineAlpha);
-        }
-        if ((axes & 7) == 0) {
-            drawBox(pose, lines, new AABB(anchor).inflate(0.02D), camera, 0.45F, 0.92F, 0.86F, lineAlpha);
+        if (faceMode) {
+            drawFace(pose, lines, border, face, camera, 0.45F, 0.92F, 0.86F, lineAlpha);
+        } else {
+            for (AABB slab : slabs) {
+                drawBox(pose, lines, slab, camera, 0.45F, 0.92F, 0.86F, lineAlpha);
+            }
         }
         if (WrightsConfig.allowMirrorBlueprints() && !WrightsClientConfig.mirrorBlocks() && WrightsClientConfig.mirrorArmed(here) && WrightsClientState.mode == WrightsClientState.Mode.BUILD && WrightsClientState.anchor != null && WrightsClientState.buildId != null) {
             BlockPos origin = WrightsClientState.anchor.offset(-WrightsClientState.pivotX, -WrightsClientState.pivotY, -WrightsClientState.pivotZ);
@@ -219,14 +223,10 @@ public final class SelectionRenderer {
         buffers.endBatch(RenderType.lines());
     }
 
-    /** Face mode marks the clicked side inside the block. Axis mode draws a plane through the middle. */
+    /** Face mode marks the clicked side. Axis mode draws a plane through the middle. */
     private static java.util.List<AABB> mirrorSlabs(BlockPos anchor, Direction face, int axes) {
         java.util.List<AABB> slabs = new java.util.ArrayList<>();
         int mask = axes & 7;
-        if (mask == 0) {
-            slabs.add(faceSlab(anchor, face));
-            return slabs;
-        }
         if ((mask & Mirror.AXIS_X) != 0) {
             slabs.add(centerSlab(anchor, Direction.Axis.X));
         }
@@ -254,22 +254,50 @@ public final class SelectionRenderer {
         };
     }
 
-    private static AABB faceSlab(BlockPos anchor, Direction face) {
-        double x0 = anchor.getX();
-        double y0 = anchor.getY();
-        double z0 = anchor.getZ();
-        double x1 = x0 + 1.0D;
-        double y1 = y0 + 1.0D;
-        double z1 = z0 + 1.0D;
-        double thin = 0.24D;
+    /** The clicked side. Its outer corners are the border corners, so the fill meets the outline. */
+    private static AABB faceSlab(AABB border, Direction face) {
+        double thin = 0.02D;
         return switch (face) {
-            case EAST -> new AABB(x1 - thin, y0, z0, x1, y1, z1);
-            case WEST -> new AABB(x0, y0, z0, x0 + thin, y1, z1);
-            case UP -> new AABB(x0, y1 - thin, z0, x1, y1, z1);
-            case DOWN -> new AABB(x0, y0, z0, x1, y0 + thin, z1);
-            case SOUTH -> new AABB(x0, y0, z1 - thin, x1, y1, z1);
-            case NORTH -> new AABB(x0, y0, z0, x1, y1, z0 + thin);
+            case EAST -> new AABB(border.maxX - thin, border.minY, border.minZ, border.maxX, border.maxY, border.maxZ);
+            case WEST -> new AABB(border.minX, border.minY, border.minZ, border.minX + thin, border.maxY, border.maxZ);
+            case UP -> new AABB(border.minX, border.maxY - thin, border.minZ, border.maxX, border.maxY, border.maxZ);
+            case DOWN -> new AABB(border.minX, border.minY, border.minZ, border.maxX, border.minY + thin, border.maxZ);
+            case SOUTH -> new AABB(border.minX, border.minY, border.maxZ - thin, border.maxX, border.maxY, border.maxZ);
+            case NORTH -> new AABB(border.minX, border.minY, border.minZ, border.maxX, border.maxY, border.minZ + thin);
         };
+    }
+
+    /** The four edges of one side, taken from that side's corners. */
+    private static void drawFace(PoseStack pose, VertexConsumer lines, AABB border, Direction face, Vec3 camera, float red, float green, float blue, float alpha) {
+        double x0 = border.minX;
+        double y0 = border.minY;
+        double z0 = border.minZ;
+        double x1 = border.maxX;
+        double y1 = border.maxY;
+        double z1 = border.maxZ;
+        switch (face) {
+            case EAST, WEST -> {
+                double x = face == Direction.EAST ? x1 : x0;
+                edge(pose, lines, camera, x, y0, z0, x, y1, z0, red, green, blue, alpha);
+                edge(pose, lines, camera, x, y1, z0, x, y1, z1, red, green, blue, alpha);
+                edge(pose, lines, camera, x, y1, z1, x, y0, z1, red, green, blue, alpha);
+                edge(pose, lines, camera, x, y0, z1, x, y0, z0, red, green, blue, alpha);
+            }
+            case UP, DOWN -> {
+                double y = face == Direction.UP ? y1 : y0;
+                edge(pose, lines, camera, x0, y, z0, x1, y, z0, red, green, blue, alpha);
+                edge(pose, lines, camera, x1, y, z0, x1, y, z1, red, green, blue, alpha);
+                edge(pose, lines, camera, x1, y, z1, x0, y, z1, red, green, blue, alpha);
+                edge(pose, lines, camera, x0, y, z1, x0, y, z0, red, green, blue, alpha);
+            }
+            default -> {
+                double z = face == Direction.SOUTH ? z1 : z0;
+                edge(pose, lines, camera, x0, y0, z, x1, y0, z, red, green, blue, alpha);
+                edge(pose, lines, camera, x1, y0, z, x1, y1, z, red, green, blue, alpha);
+                edge(pose, lines, camera, x1, y1, z, x0, y1, z, red, green, blue, alpha);
+                edge(pose, lines, camera, x0, y1, z, x0, y0, z, red, green, blue, alpha);
+            }
+        }
     }
 
     public static BlockPos supplyTarget(Minecraft minecraft) {
@@ -520,10 +548,11 @@ public final class SelectionRenderer {
         VertexConsumer fill = buffers.getBuffer(RenderType.debugFilledBox());
         if (first != null && second != null) {
             AABB box = selectionBox(first, second);
+            AABB border = box.inflate(0.02D);
             float alpha = com.wrights.WrightsClientConfig.wallAlpha();
             if (alpha > 0.01F) {
                 int rgb = com.wrights.WrightsClientConfig.wallRgb();
-                AABB wall = box.deflate(0.04D).move(-camera.x, -camera.y, -camera.z);
+                AABB wall = border.move(-camera.x, -camera.y, -camera.z);
                 LevelRenderer.addChainedFilledBoxVertices(
                         pose, fill, wall.minX, wall.minY, wall.minZ, wall.maxX, wall.maxY, wall.maxZ,
                         com.wrights.WrightsClientConfig.channel(rgb, 16),
@@ -536,7 +565,7 @@ public final class SelectionRenderer {
             }
             buffers.endBatch(RenderType.debugFilledBox());
             int edge = com.wrights.WrightsClientConfig.edgeRgb();
-            drawBox(pose, buffers.getBuffer(RenderType.lines()), box.inflate(0.02D), camera,
+            drawBox(pose, buffers.getBuffer(RenderType.lines()), border, camera,
                     com.wrights.WrightsClientConfig.channel(edge, 16),
                     com.wrights.WrightsClientConfig.channel(edge, 8),
                     com.wrights.WrightsClientConfig.channel(edge, 0),
