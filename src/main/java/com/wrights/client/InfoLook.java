@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import javax.annotation.Nullable;
+
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
@@ -358,13 +360,42 @@ public final class InfoLook {
             } else {
                 lines.add(Component.translatable("menu.wrights.job_percent", WrightsClientState.percent(job), job.done(), job.total()));
             }
-        } else {
+        } else if (drone.waitReason() != DroneEntity.WAIT_HOME) {
             lines.add(Component.translatable("hud.wrights.info_wright_home").withStyle(ChatFormatting.AQUA));
         }
+        addWrightWork(lines, drone);
         if (!drone.carried().isEmpty()) {
             lines.add(Component.translatable("hud.wrights.info_wright_carry", drone.carried().getHoverName()));
         }
         return lines;
+    }
+
+    /** Current block, next in queue, and why this wright is standing still. */
+    public static void addWrightWork(List<Component> lines, DroneEntity drone) {
+        if (!drone.currentBlock().isEmpty()) {
+            lines.add(Component.translatable("hud.wrights.info_wright_placing", drone.currentBlock().getHoverName()));
+        }
+        if (!drone.nextBlock().isEmpty()) {
+            lines.add(Component.translatable("hud.wrights.info_wright_next", drone.nextBlock().getHoverName()));
+        }
+        Component waiting = waitLine(drone.waitReason());
+        if (waiting != null) {
+            lines.add(waiting.plainCopy().withStyle(ChatFormatting.GOLD));
+        }
+    }
+
+    @Nullable
+    private static Component waitLine(int reason) {
+        return switch (reason) {
+            case DroneEntity.WAIT_FLOOR -> Component.translatable("hud.wrights.info_wright_wait_floor");
+            case DroneEntity.WAIT_ITEMS -> Component.translatable("hud.wrights.info_wright_wait_items");
+            case DroneEntity.WAIT_CHUNK -> Component.translatable("hud.wrights.info_wright_wait_chunk");
+            case DroneEntity.WAIT_IDLE -> Component.translatable("hud.wrights.info_wright_idle");
+            case DroneEntity.WAIT_HOME -> Component.translatable("hud.wrights.info_wright_home");
+            case DroneEntity.WAIT_SHELTER -> Component.translatable("hud.wrights.info_wright_shelter");
+            case DroneEntity.WAIT_PAUSED -> Component.translatable("hud.wrights.info_wright_paused");
+            default -> null;
+        };
     }
 
     private static List<Component> portLines(String dimension, BlockPos pos, WrightportBlockEntity port) {

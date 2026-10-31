@@ -32,6 +32,16 @@ public enum WrightJadeProvider implements IEntityComponentProvider, StreamServer
     public void appendTooltip(ITooltip tooltip, EntityAccessor accessor, IPluginConfig config) {
         if (accessor.getEntity() instanceof DroneEntity drone) {
             tooltip.add(Component.translatable("jade.wrights.tier", Component.translatable(WrightTier.nameKey(drone.tier()))));
+            if (!drone.currentBlock().isEmpty()) {
+                tooltip.add(Component.translatable("hud.wrights.info_wright_placing", drone.currentBlock().getHoverName()));
+            }
+            if (!drone.nextBlock().isEmpty()) {
+                tooltip.add(Component.translatable("hud.wrights.info_wright_next", drone.nextBlock().getHoverName()));
+            }
+            Component waiting = waitLine(drone.waitReason());
+            if (waiting != null) {
+                tooltip.add(waiting);
+            }
         }
         decodeFromData(accessor).ifPresent(status -> {
             tooltip.add(Component.translatable(status.kind().key(), status.name()));
@@ -39,6 +49,19 @@ public enum WrightJadeProvider implements IEntityComponentProvider, StreamServer
             tooltip.add(Component.translatable("hud.wrights.job_detail", status.done(), status.total(), percent, status.skipped()));
             tooltip.add(Component.translatable("jade.wrights.size", status.sizeX(), status.sizeY(), status.sizeZ()));
         });
+    }
+
+    private static Component waitLine(int reason) {
+        return switch (reason) {
+            case DroneEntity.WAIT_FLOOR -> Component.translatable("hud.wrights.info_wright_wait_floor");
+            case DroneEntity.WAIT_ITEMS -> Component.translatable("hud.wrights.info_wright_wait_items");
+            case DroneEntity.WAIT_CHUNK -> Component.translatable("hud.wrights.info_wright_wait_chunk");
+            case DroneEntity.WAIT_IDLE -> Component.translatable("hud.wrights.info_wright_idle");
+            case DroneEntity.WAIT_HOME -> Component.translatable("hud.wrights.info_wright_home");
+            case DroneEntity.WAIT_SHELTER -> Component.translatable("hud.wrights.info_wright_shelter");
+            case DroneEntity.WAIT_PAUSED -> Component.translatable("hud.wrights.info_wright_paused");
+            default -> null;
+        };
     }
 
     @Override

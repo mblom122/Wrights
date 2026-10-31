@@ -31,6 +31,19 @@ public class DroneEntity extends Entity {
     private static final EntityDataAccessor<String> JOB_ID = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Integer> TIER = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<ItemStack> CARRIED = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.ITEM_STACK);
+    private static final EntityDataAccessor<ItemStack> CURRENT_BLOCK = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.ITEM_STACK);
+    private static final EntityDataAccessor<ItemStack> NEXT_BLOCK = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.ITEM_STACK);
+    private static final EntityDataAccessor<Integer> WAIT_REASON = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.INT);
+
+    /** Not waiting — actively flying to or placing the current block. */
+    public static final int WAIT_NONE = 0;
+    public static final int WAIT_FLOOR = 1;
+    public static final int WAIT_ITEMS = 2;
+    public static final int WAIT_CHUNK = 3;
+    public static final int WAIT_IDLE = 4;
+    public static final int WAIT_HOME = 5;
+    public static final int WAIT_SHELTER = 6;
+    public static final int WAIT_PAUSED = 7;
 
     private boolean returning;
     private boolean stranded;
@@ -158,6 +171,7 @@ public class DroneEntity extends Entity {
         this.returnTicks = 0;
         this.ownerId = player.getUUID();
         this.setJobId(null);
+        setWorkStatus(ItemStack.EMPTY, ItemStack.EMPTY, WAIT_HOME);
         setHomePort(port);
         if (!WrightsConfig.flyHome()) {
             int n = Math.max(1, count);
@@ -189,6 +203,9 @@ public class DroneEntity extends Entity {
         builder.define(JOB_ID, "");
         builder.define(TIER, com.wrights.drone.WrightTier.BASE);
         builder.define(CARRIED, ItemStack.EMPTY);
+        builder.define(CURRENT_BLOCK, ItemStack.EMPTY);
+        builder.define(NEXT_BLOCK, ItemStack.EMPTY);
+        builder.define(WAIT_REASON, WAIT_NONE);
     }
 
     /** The drop this wright is bringing home. Empty while it is still on the way out. */
@@ -198,6 +215,30 @@ public class DroneEntity extends Entity {
 
     public void setCarried(ItemStack stack) {
         this.entityData.set(CARRIED, stack == null || stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1));
+    }
+
+    /** Block this wright is placing or waiting on right now. */
+    public ItemStack currentBlock() {
+        return this.entityData.get(CURRENT_BLOCK);
+    }
+
+    /** Next schematic block after the current one in this wright's share. */
+    public ItemStack nextBlock() {
+        return this.entityData.get(NEXT_BLOCK);
+    }
+
+    public int waitReason() {
+        return this.entityData.get(WAIT_REASON);
+    }
+
+    public void setWorkStatus(ItemStack current, ItemStack next, int waitReason) {
+        this.entityData.set(CURRENT_BLOCK, current == null || current.isEmpty() ? ItemStack.EMPTY : current.copyWithCount(1));
+        this.entityData.set(NEXT_BLOCK, next == null || next.isEmpty() ? ItemStack.EMPTY : next.copyWithCount(1));
+        this.entityData.set(WAIT_REASON, waitReason);
+    }
+
+    public void clearWorkStatus() {
+        setWorkStatus(ItemStack.EMPTY, ItemStack.EMPTY, WAIT_NONE);
     }
 
     public int tier() {

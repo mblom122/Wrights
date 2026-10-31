@@ -2596,6 +2596,7 @@ public final class JobManager {
         for (BuildJob.Hand hand : job.hands()) {
             if (hand.sheltering) {
                 working = true;
+                publishHandStatus(level, player, schematic, job, hand, DroneEntity.WAIT_SHELTER);
                 continue;
             }
             hand.waitingOnOthers = false;
@@ -2603,6 +2604,7 @@ public final class JobManager {
             if (index == -2) {
                 scanning = true;
                 recallHand(level, player, hand);
+                publishHandStatus(level, player, schematic, job, hand, DroneEntity.WAIT_NONE);
                 continue;
             }
             if (index == SUPPORT_WAIT) {
@@ -2611,22 +2613,26 @@ public final class JobManager {
                 hand.waitingOnOthers = true;
                 hand.idle = false;
                 recallHand(level, player, hand);
+                publishHandStatus(level, player, schematic, job, hand, DroneEntity.WAIT_FLOOR);
                 continue;
             }
             if (index == NEED_ITEMS) {
                 waiting = true;
                 waitingItems = true;
                 parkForItems(level, player, hand);
+                publishHandStatus(level, player, schematic, job, hand, DroneEntity.WAIT_ITEMS);
                 continue;
             }
             if (index < 0) {
                 hand.awaitingItems = false;
                 hand.idle = true;
+                publishHandStatus(level, player, schematic, job, hand, DroneEntity.WAIT_IDLE);
                 continue;
             }
             hand.awaitingItems = false;
             hand.idle = false;
             working = true;
+            int handStatus = job.paused() ? DroneEntity.WAIT_PAUSED : DroneEntity.WAIT_NONE;
             Schematic.Entry next = schematic.entry(index);
             BlockPos nextPos = job.min().offset(next.x(), next.y(), next.z());
             DroneEntity drone = ensureHand(level, player, job, hand, nextPos);
@@ -2635,12 +2641,14 @@ public final class JobManager {
             }
             if (drone == null) {
                 waitingChunk = true;
+                publishHandStatus(level, player, schematic, job, hand, DroneEntity.WAIT_CHUNK);
                 continue;
             }
             Vec3 hover = Vec3.atCenterOf(nextPos).add(0.0D, 0.85D + (hand.lane % 2) * 0.45D, 0.0D);
             if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
                 drone.moveToward(hover, flyStep(hand.speed, drone.distanceToSqr(hover)));
                 hand.lastPos = drone.blockPosition();
+                publishHandStatus(level, player, schematic, job, hand, handStatus);
                 continue;
             }
             int budget = placeBudget(hand);
@@ -2654,17 +2662,20 @@ public final class JobManager {
                 if (at == SUPPORT_WAIT) {
                     waiting = true;
                     hand.waitingOnOthers = true;
+                    handStatus = DroneEntity.WAIT_FLOOR;
                     recallHand(level, player, hand);
                     break;
                 }
                 if (at == NEED_ITEMS) {
                     waiting = true;
                     waitingItems = true;
+                    handStatus = DroneEntity.WAIT_ITEMS;
                     parkForItems(level, player, hand);
                     break;
                 }
                 if (at < 0) {
                     hand.idle = true;
+                    handStatus = DroneEntity.WAIT_IDLE;
                     break;
                 }
                 Schematic.Entry entry = schematic.entry(at);
@@ -2675,6 +2686,7 @@ public final class JobManager {
                 if (entry.secondary() && supportWaiting(level, job, hand, at, pos, entry)) {
                     waiting = true;
                     hand.waitingOnOthers = true;
+                    handStatus = DroneEntity.WAIT_FLOOR;
                     recallHand(level, player, hand);
                     break;
                 }
@@ -2687,6 +2699,7 @@ public final class JobManager {
                 if (placed == PlaceResult.PAUSE) {
                     job.setWaitKind(BuildJob.WAIT_CHUNK);
                     waitingChunk = true;
+                    publishHandStatus(level, player, schematic, job, hand, DroneEntity.WAIT_CHUNK);
                     library.setDirty();
                     if (job.tickMessage()) {
                         noteChunk(player, library, job);
@@ -2696,12 +2709,14 @@ public final class JobManager {
                 if (placed == PlaceResult.WAIT) {
                     waitingItems = true;
                     waiting = true;
+                    handStatus = DroneEntity.WAIT_ITEMS;
                     recallHand(level, player, hand);
                     break;
                 }
                 noteProgress(schematic, job, hand, entry, at);
                 job.advance();
             }
+            publishHandStatus(level, player, schematic, job, hand, handStatus);
         }
         shareWithIdle(job, schematic);
         releaseIdle(level, player, job, schematic);
@@ -3367,6 +3382,54 @@ public final class JobManager {
             }
         }
         return false;
+    }
+
+    /** Push current / next block and wait reason onto the flying wright for hover tooltips. */
+    private static void publishHandStatus(ServerLevel level, ServerPlayer player, Schematic schematic, BuildJob job, BuildJob.Hand hand, int waitReason) {
+        if (hand.entityId == null || !(level.getEntity(hand.entityId) instanceof DroneEntity drone) || !drone.isAlive()) {
+            return;
+        }
+        int reason = waitReason;
+        if (job.paused() && reason == DroneEntity.WAIT_NONE) {
+            reason = DroneEntity.WAIT_PAUSED;
+        }
+        int[] targets = peekHandTargets(level, schematic, job, hand);
+        ItemStack current = stackFor(schematic, targets[0]);
+        ItemStack next = stackFor(schematic, targets[1]);
+        drone.setWorkStatus(current, next, reason);
+    }
+
+    /**
+     * First open cell this hand owns, then the one after it. Does not move cursors.
+     * Negative indexes mean none.
+     */
+    private static int[] peekHandTargets(ServerLevel level, Schematic schematic, BuildJob job, BuildJob.Hand hand) {
+        int current = -1;
+        int next = -1;
+        for (int i = 0; i < schematic.blockCount(); i++) {
+            Schematic.Entry entry = schematic.entry(i);
+            if (!ownsEntry(job, hand, entry) || job.outsideClip(entry) || satisfied(level, job, entry)) {
+                continue;
+            }
+            Falling hold = falling(level, schematic, job, entry);
+            if (hold == Falling.SKIP) {
+                continue;
+            }
+            if (current < 0) {
+                current = i;
+                continue;
+            }
+            next = i;
+            break;
+        }
+        return new int[] { current, next };
+    }
+
+    private static ItemStack stackFor(Schematic schematic, int index) {
+        if (schematic == null || index < 0 || index >= schematic.blockCount()) {
+            return ItemStack.EMPTY;
+        }
+        return BlockFilters.icon(schematic.entry(index).state());
     }
 
     private static void noteProgress(Schematic schematic, BuildJob job, BuildJob.Hand hand, Schematic.Entry entry, int index) {
