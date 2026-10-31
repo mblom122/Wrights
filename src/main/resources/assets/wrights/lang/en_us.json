@@ -232,6 +232,7 @@
   "menu.wrights.jobs_finished_stopped": "Stopped %s",
   "menu.wrights.jobs_finished_undone": "Undone %s",
   "menu.wrights.drones_pool": "Working %s / %s total",
+  "menu.wrights.wrights_available": "Available wrights %s / %s",
   "menu.wrights.job_drone_count": "Wrights %s",
   "menu.wrights.job_drone_queued": "Wrights %s / %s",
   "menu.wrights.manage_all": "Manage all",

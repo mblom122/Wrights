@@ -1,8 +1,10 @@
 package com.wrights.client;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 import net.minecraft.client.Minecraft;
@@ -24,6 +26,7 @@ import com.wrights.WrightsClientConfig;
 import com.wrights.WrightsConfig;
 import com.wrights.drone.Swarm;
 import com.wrights.drone.WrightportPlaces;
+import com.wrights.item.WrightportBlockItem;
 import com.wrights.item.PersonalWrightportItem;
 import com.wrights.network.BlueprintPayloads;
 
@@ -140,6 +143,7 @@ public class WrightsMenuScreen extends Screen {
     private BlueprintPayloads.PlacedPort placedPick;
     private boolean holding;
     private int holdTicker;
+    private int portStockTick;
     private int jobScroll;
     private UUID leadJob;
     private int historyScroll;
@@ -1351,6 +1355,7 @@ public class WrightsMenuScreen extends Screen {
             infoPage = false;
             setFocused(null);
             refresh();
+            PacketDistributor.sendToServer(new BlueprintPayloads.PlacedPortsAsk());
             return true;
         }
         if (button == 0 && hitTask(mouseX, mouseY, panelY + 98)) {
@@ -1890,7 +1895,7 @@ public class WrightsMenuScreen extends Screen {
         hoveredJob = null;
         prepareJobs();
         int[] pool = dronePool();
-        String drones = this.font.plainSubstrByWidth(Component.translatable("menu.wrights.drones_pool", pool[0], pool[1]).getString(), Math.max(40, jobW - manageAllWidth - 8));
+        String drones = this.font.plainSubstrByWidth(Component.translatable("menu.wrights.wrights_available", pool[0], pool[1]).getString(), Math.max(40, jobW - manageAllWidth - 8));
         graphics.drawString(this.font, drones, jobX, manageAllY + 4, WrightsUi.TEXT, false);
         drawJobButton(graphics, manageAllRight, manageAllY, "menu.wrights.manage_all", mouseX, mouseY, manageAllWidth);
         int rowX = jobX + 4;
@@ -2336,14 +2341,31 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private int[] dronePool() {
-        int total = this.minecraft.player == null ? 0 : com.wrights.drone.WrightHomes.countUnits(this.minecraft.player, id -> true);
-        int working = 0;
-        for (BlueprintPayloads.JobLine job : WrightsClientState.jobs) {
-            if (!job.finished() && !job.saving()) {
-                working += job.crew().size();
+        int owned = 0;
+        if (this.minecraft.player != null) {
+            for (WrightportPlaces.Spot spot : WrightportPlaces.list(this.minecraft.player)) {
+                owned += Swarm.from(WrightportPlaces.stack(this.minecraft.player, spot.kind(), spot.index())).units().size();
+            }
+            var inventory = this.minecraft.player.getInventory();
+            for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
+                var stack = inventory.getItem(slot);
+                if (stack.getItem() instanceof WrightportBlockItem) {
+                    owned += Swarm.from(stack).units().size() * stack.getCount();
+                }
             }
         }
-        return new int[] {working, total};
+        for (BlueprintPayloads.PlacedPort port : WrightsClientState.placedPorts) {
+            if (!port.unowned()) {
+                owned += port.units();
+            }
+        }
+        Set<UUID> busy = new HashSet<>();
+        for (BlueprintPayloads.JobLine job : WrightsClientState.jobs) {
+            if (!job.finished()) {
+                busy.addAll(job.crew());
+            }
+        }
+        return new int[] { Math.max(0, owned - busy.size()), owned };
     }
 
     private boolean hitWide(double mouseX, double mouseY, int right, int y, int width) {
@@ -2395,6 +2417,9 @@ public class WrightsMenuScreen extends Screen {
     @Override
     public void tick() {
         super.tick();
+        if (jobsPage && portStockTick++ % 20 == 0) {
+            PacketDistributor.sendToServer(new BlueprintPayloads.PlacedPortsAsk());
+        }
         if (!managePage) {
             return;
         }
