@@ -856,6 +856,7 @@
   "hud.wrights.mirror_blocks_ready": "Anchor set. Right-click places. Shift-right-click air clears the anchor.",
   "hud.wrights.mirror_blueprint_explain": "Right-click queues the blueprint. Shift-right-click a face sets the anchor.",
   "hud.wrights.mirror_blueprint_ready": "Anchor set. Right-click queues the blueprint. Shift-right-click air clears it.",
+  "hud.wrights.mirror_offset": "From anchor   X %s   Y %s   Z %s",
   "message.wrights.mirror_set": "Mirror anchor set on the %s face",
   "message.wrights.mirror_pattern": "Mirror pattern: %s",
   "message.wrights.mirror_look": "Look at a block face",

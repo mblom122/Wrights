@@ -7,6 +7,8 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 
 import org.lwjgl.glfw.GLFW;
 
@@ -38,6 +40,7 @@ public final class WrightsHud {
         Component line = null;
         Component sub = null;
         Component note = null;
+        Component offset = mirrorOffset(minecraft);
         Component task = taskLine();
         if (WrightsClientState.bindPort != null) {
             line = Component.translatable("hud.wrights.port_chest");
@@ -131,8 +134,12 @@ public final class WrightsHud {
             if (note != null) {
                 detailWidth = Math.max(detailWidth, minecraft.font.width(note));
             }
+            if (offset != null) {
+                detailWidth = Math.max(detailWidth, minecraft.font.width(offset));
+            }
             detailWidth += 16;
-            detailHeight = sub == null ? 18 : note == null ? 30 : 42;
+            int rows = 1 + (sub == null ? 0 : 1) + (note == null ? 0 : 1) + (offset == null ? 0 : 1);
+            detailHeight = 6 + rows * 12;
         }
         int stackWidth = Math.max(taskWidth, detailWidth);
         int stackHeight = 14 + (detailHeight == 0 ? 0 : 4 + detailHeight);
@@ -151,12 +158,19 @@ public final class WrightsHud {
             int x = center - detailWidth / 2;
             graphics.fill(x, top, x + detailWidth, top + detailHeight, 0xC0101822);
             graphics.fill(x, top, x + 2, top + detailHeight, WrightsUi.COPPER);
-            graphics.drawString(minecraft.font, line, x + 8, top + 4, WrightsUi.TEXT, false);
+            int textY = top + 4;
+            graphics.drawString(minecraft.font, line, x + 8, textY, WrightsUi.TEXT, false);
             if (sub != null) {
-                graphics.drawString(minecraft.font, sub, x + 8, top + 16, WrightsUi.MUTED, false);
+                textY += 12;
+                graphics.drawString(minecraft.font, sub, x + 8, textY, WrightsUi.MUTED, false);
             }
             if (note != null) {
-                graphics.drawString(minecraft.font, note, x + 8, top + 28, 0xFFF0C14A, false);
+                textY += 12;
+                graphics.drawString(minecraft.font, note, x + 8, textY, 0xFFF0C14A, false);
+            }
+            if (offset != null) {
+                textY += 12;
+                graphics.drawString(minecraft.font, offset, x + 8, textY, WrightsUi.TEAL, false);
             }
         }
         if (showMainModes(minecraft)) {
@@ -328,6 +342,30 @@ public final class WrightsHud {
         for (int i = 0; i < lines.size(); i++) {
             graphics.drawString(minecraft.font, lines.get(i), x, y + i * 10, color, false);
         }
+    }
+
+    /** Signed distance from the mirror anchor to the block under the crosshair. */
+    private static Component mirrorOffset(Minecraft minecraft) {
+        if (!WrightsClientState.mirrorAim || minecraft.level == null || minecraft.player == null) {
+            return null;
+        }
+        if (!WrightsClientConfig.mirrorPlaced(minecraft.level.dimension().location().toString())) {
+            return null;
+        }
+        if (!(minecraft.hitResult instanceof BlockHitResult hit) || hit.getType() != HitResult.Type.BLOCK) {
+            return null;
+        }
+        BlockPos anchor = WrightsClientConfig.mirrorAnchor();
+        BlockPos at = hit.getBlockPos();
+        return Component.translatable(
+                "hud.wrights.mirror_offset",
+                signed(at.getX() - anchor.getX()),
+                signed(at.getY() - anchor.getY()),
+                signed(at.getZ() - anchor.getZ()));
+    }
+
+    private static String signed(int value) {
+        return value > 0 ? "+" + value : Integer.toString(value);
     }
 
     private static String mirrorFooter(Minecraft minecraft) {
