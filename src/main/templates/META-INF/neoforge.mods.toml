@@ -127,6 +127,14 @@ First tested in an otherwise empty NeoForge 1.21.1 instance.
     ordering="AFTER"
     side="BOTH"
 
+# Framed Blocks is optional. The dev client has it so framed building blocks can be tested.
+[[dependencies.${mod_id}]]
+    modId="framedblocks"
+    type="optional"
+    versionRange="[10.6,)"
+    ordering="AFTER"
+    side="BOTH"
+
 # Refined Storage 2 is optional. Shift-right-click an RS controller with the Wrights controller to bind.
 [[dependencies.${mod_id}]]
     modId="refinedstorage"

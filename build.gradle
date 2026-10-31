@@ -151,12 +151,13 @@ dependencies {
     compileOnly "maven.modrinth:jade:${jade_version}"
     localRuntime "maven.modrinth:jade:${jade_version}"
 
-    // AE2 and Mekanism are in the dev client so interaction can be tested. compileOnly keeps them
-    // out of the published jar. GuideME is required by AE2. Refined Storage stays compile-only.
+    // AE2, Mekanism, and Framed Blocks are in the dev client so interaction can be tested. compileOnly
+    // keeps them out of the published jar. GuideME is required by AE2. Refined Storage stays compile-only.
     compileOnly "maven.modrinth:ae2:${ae2_version}"
     localRuntime "maven.modrinth:ae2:${ae2_version}"
     localRuntime "maven.modrinth:guideme:${guideme_version}"
     localRuntime "maven.modrinth:mekanism:${mekanism_version}"
+    localRuntime "maven.modrinth:framedblocks:${framedblocks_version}"
     compileOnly "maven.modrinth:refined-storage:${rs_version}"
 
     // Example mod dependency using a mod jar from ./libs with a flat dir repository
