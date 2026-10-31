@@ -1,61 +1,45 @@
 # Wrights
 
-A NeoForge mod for Minecraft 1.21.1. The Wright Controller copies a region of blocks, then a small wright pastes that copy where you aim it.
+A NeoForge mod for Minecraft 1.21.1. Wrights copy a build and place it again. Mark a structure, save it as a blueprint, and send a wright to build it from your inventory, a bound chest, or a linked digital network. Mirror can repeat the block in your other hand, or a whole blueprint, around an anchor.
 
-`gradlew runClient` opens the test instance. That client includes Jade, so looking at a wright shows its tier and the build it is working on. Do not add All the Mods until a build has been checked here.
+Curios is required. The personal wrightport uses that slot.
 
-## Run the isolated instance
+## Playing
 
-Requirements: a network connection the first time, so Gradle can download Minecraft, NeoForge, and a Java 21 toolchain.
+Hold the **Wright Controller**. **Ctrl + Shift + scroll** changes mode: Build, Jobs, Manage, Info, and Link. Inside Build, **Shift + scroll** picks the tool. Press **B** to open blueprints, jobs, and wrights.
 
-```
-gradlew runClient
-```
+**New** marks a blueprint. Two corners, a dragged box, or a box you slide into place. Chests and machines can be saved empty, with their settings, or, in Creative, as an exact copy.
 
-Create a new world with cheats enabled. In that world:
+**Build** places a blueprint. A hologram follows where you look. The list shows every block and where it will come from. Survival spends those items. Creative builds for free. A job waits in the queue when no wright is free.
+
+**Mirror** uses an anchor. Shift-right-click a block to set it, and shift-right-click air to clear it. Blocks mode places the block in your other hand. Blueprints mode builds mirrored copies of the blueprint you are placing. A slider makes 1 to 32 copies around the anchored face, or the copy can mirror through the middle of the anchor on X, Y, and Z. Breaking a block can send wrights to mine the copies as one job.
+
+The bulb on the personal wrightport, and the lamps on a placed wrightport, use the same colors. Red means no wrights are stored. Yellow means every stored wright is out on a job. Green means at least one is free.
+
+## Requirements
+
+- Minecraft 1.21.1
+- NeoForge 21.1 or newer
+- Curios API
+- Java 21
+
+Jade, JEI, Applied Energistics 2, Refined Storage, and Mekanism are optional. AE2 links from a wireless access point. Refined Storage links from Link mode.
+
+Server limits live in the world's `serverconfig/wrights-server.toml`.
+
+## License
+
+All Rights Reserved. You can read this source. Republishing the mod or the code needs permission.
+
+## Development
+
+`gradlew runClient` opens the test instance. The first run needs a network connection so Gradle can download Minecraft, NeoForge, and a Java 21 toolchain.
+
+In a new world with cheats:
 
 ```
 /gamemode creative
 /give @s wrights:controller
 ```
 
-The jar for a hand-made empty NeoForge 1.21.1 instance is produced with:
-
-```
-gradlew isolatedPack
-```
-
-It is written to `modpack/mods`. That instance still needs Curios. Install Jade next to the Wrights jar when you want to test the wright tooltip. Leave every other mod out. See `modpack/INSTANCE.txt`.
-
-## Controls
-
-Hold the Wright Controller.
-
-- Use on a block: set corner 1, then corner 2. A gold wireframe shows the selection.
-- Use on air: copy the selection. The original blocks stay. Air, chests, machines, portals, and unbreakable blocks are not stored.
-- Sneak-use on a block face: aim the paste. A blue wireframe shows the destination. Sneak-use that same spot again to launch the wright.
-- Use on air while a paste is aimed: cancel the aim.
-- Sneak-use on air: stop the running job and dismiss the wright.
-
-Press **B** to open the Wrights menu. Blueprints are saved copies the wright can build again.
-
-- New: right-click sets corner 1, sneak-right-click sets corner 2. The gold box can be moved and resized, then saved.
-- Pick a blueprint and press Build. A hologram follows the block you look at. Sneak-right-click to type the position and size, then send the wright.
-
-Survival spends matching blocks from your inventory. Creative places them for free. The paste will not overwrite solid blocks. A door or tall plant costs one item. The wright pauses if you walk away or the chunk is not loaded, and it resumes when you come back.
-
-## Test checklist
-
-- Mods screen lists Wrights, Curios, Jade, and JEI (plus NeoForge and Minecraft).
-- Looking at a wright with Jade shows its tier, the blueprint name, progress, skipped blocks, and the build size.
-- Creative tab "Wrights" contains the controller. The crafting recipe uses copper, redstone, an amethyst shard, and iron.
-- Corner 1, corner 2, and the gold box appear. A third click starts a new corner 1.
-- A selection larger than 32 on a side, or 32768 blocks, is rejected.
-- Use on air copies. The action bar reports how many blocks were stored. A chest's contents are not part of the copy.
-- Sneak-use shows the blue destination box. Sneak-use again on that spot launches one wright. The wright is visible while blocks appear.
-- Creative paste spends nothing. Survival paste spends items and skips blocks you do not have.
-- Solid blocks already in the destination are left in place and counted as skipped.
-- Sneak-use on air stops the wright. Walking away pauses it. Rejoining the world lets it continue.
-- A door in the copy costs one door, not two.
-
-Server limits live in the world's `serverconfig/wrights-server.toml`.
+`gradlew isolatedPack` writes the jar to `modpack/mods`. That instance still needs Curios beside it. Install Jade too when you want the wright tooltip.
