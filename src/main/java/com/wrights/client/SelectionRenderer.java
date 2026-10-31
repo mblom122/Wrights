@@ -208,7 +208,7 @@ public final class SelectionRenderer {
         VertexConsumer lines = buffers.getBuffer(RenderType.lines());
         float lineAlpha = 0.85F + 0.15F * pulse;
         if (faceMode) {
-            drawFace(pose, lines, border, face, camera, 0.45F, 0.92F, 0.86F, lineAlpha);
+            drawBox(pose, lines, border, camera, 0.45F, 0.92F, 0.86F, lineAlpha);
         } else {
             for (AABB slab : slabs) {
                 drawBox(pose, lines, slab, camera, 0.45F, 0.92F, 0.86F, lineAlpha);
@@ -254,9 +254,9 @@ public final class SelectionRenderer {
         };
     }
 
-    /** The clicked side. Its outer corners are the border corners, so the fill meets the outline. */
+    /** The clicked side, as thick as before, with its outer face on the border. */
     private static AABB faceSlab(AABB border, Direction face) {
-        double thin = 0.02D;
+        double thin = 0.24D;
         return switch (face) {
             case EAST -> new AABB(border.maxX - thin, border.minY, border.minZ, border.maxX, border.maxY, border.maxZ);
             case WEST -> new AABB(border.minX, border.minY, border.minZ, border.minX + thin, border.maxY, border.maxZ);
@@ -265,39 +265,6 @@ public final class SelectionRenderer {
             case SOUTH -> new AABB(border.minX, border.minY, border.maxZ - thin, border.maxX, border.maxY, border.maxZ);
             case NORTH -> new AABB(border.minX, border.minY, border.minZ, border.maxX, border.maxY, border.minZ + thin);
         };
-    }
-
-    /** The four edges of one side, taken from that side's corners. */
-    private static void drawFace(PoseStack pose, VertexConsumer lines, AABB border, Direction face, Vec3 camera, float red, float green, float blue, float alpha) {
-        double x0 = border.minX;
-        double y0 = border.minY;
-        double z0 = border.minZ;
-        double x1 = border.maxX;
-        double y1 = border.maxY;
-        double z1 = border.maxZ;
-        switch (face) {
-            case EAST, WEST -> {
-                double x = face == Direction.EAST ? x1 : x0;
-                edge(pose, lines, camera, x, y0, z0, x, y1, z0, red, green, blue, alpha);
-                edge(pose, lines, camera, x, y1, z0, x, y1, z1, red, green, blue, alpha);
-                edge(pose, lines, camera, x, y1, z1, x, y0, z1, red, green, blue, alpha);
-                edge(pose, lines, camera, x, y0, z1, x, y0, z0, red, green, blue, alpha);
-            }
-            case UP, DOWN -> {
-                double y = face == Direction.UP ? y1 : y0;
-                edge(pose, lines, camera, x0, y, z0, x1, y, z0, red, green, blue, alpha);
-                edge(pose, lines, camera, x1, y, z0, x1, y, z1, red, green, blue, alpha);
-                edge(pose, lines, camera, x1, y, z1, x0, y, z1, red, green, blue, alpha);
-                edge(pose, lines, camera, x0, y, z1, x0, y, z0, red, green, blue, alpha);
-            }
-            default -> {
-                double z = face == Direction.SOUTH ? z1 : z0;
-                edge(pose, lines, camera, x0, y0, z, x1, y0, z, red, green, blue, alpha);
-                edge(pose, lines, camera, x1, y0, z, x1, y1, z, red, green, blue, alpha);
-                edge(pose, lines, camera, x1, y1, z, x0, y1, z, red, green, blue, alpha);
-                edge(pose, lines, camera, x0, y1, z, x0, y0, z, red, green, blue, alpha);
-            }
-        }
     }
 
     public static BlockPos supplyTarget(Minecraft minecraft) {
