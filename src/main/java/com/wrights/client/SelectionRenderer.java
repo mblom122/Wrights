@@ -249,41 +249,6 @@ public final class SelectionRenderer {
         };
     }
 
-    /** Face mode draws the clicked side. Axis mode draws a plane through the middle of the anchor block. */
-    private static java.util.List<AABB> mirrorSlabs(BlockPos anchor, Direction face, int axes) {
-        java.util.List<AABB> slabs = new java.util.ArrayList<>();
-        int mask = axes & 7;
-        if (mask == 0) {
-            slabs.add(faceSlab(anchor, face));
-            return slabs;
-        }
-        if ((mask & Mirror.AXIS_X) != 0) {
-            slabs.add(centerSlab(anchor, Direction.Axis.X));
-        }
-        if ((mask & Mirror.AXIS_Y) != 0) {
-            slabs.add(centerSlab(anchor, Direction.Axis.Y));
-        }
-        if ((mask & Mirror.AXIS_Z) != 0) {
-            slabs.add(centerSlab(anchor, Direction.Axis.Z));
-        }
-        return slabs;
-    }
-
-    private static AABB centerSlab(BlockPos anchor, Direction.Axis axis) {
-        double x0 = anchor.getX();
-        double y0 = anchor.getY();
-        double z0 = anchor.getZ();
-        double x1 = x0 + 1.0D;
-        double y1 = y0 + 1.0D;
-        double z1 = z0 + 1.0D;
-        double thin = 0.03D;
-        return switch (axis) {
-            case X -> new AABB(x0 + 0.5D - thin, y0, z0, x0 + 0.5D + thin, y1, z1);
-            case Y -> new AABB(x0, y0 + 0.5D - thin, z0, x1, y0 + 0.5D + thin, z1);
-            case Z -> new AABB(x0, y0, z0 + 0.5D - thin, x1, y1, z0 + 0.5D + thin);
-        };
-    }
-
     private static AABB faceSlab(BlockPos anchor, Direction face) {
         double x0 = anchor.getX();
         double y0 = anchor.getY();
