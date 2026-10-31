@@ -295,11 +295,12 @@ public final class LayerColumn {
         String selected = Component.translatable("screen.wrights.hint_selected").getString();
         String anchor = Component.translatable("screen.wrights.hint_anchor").getString();
         int legendGap = 12;
-        int legendWidth = font.width(selected) + legendGap + font.width(anchor);
-        int legendX = modelX + Math.max(2, (modelSize - legendWidth) / 2);
+        int selectedW = font.width(selected);
+        int legendWidth = selectedW + legendGap + font.width(anchor);
+        int pairX = modelX + Math.max(2, (modelSize - legendWidth) / 2);
         int legendY = gridY + 3;
-        graphics.drawString(font, selected, legendX, legendY, 0xFFF2D48A, true);
-        graphics.drawString(font, anchor, legendX + font.width(selected) + legendGap, legendY, WrightsUi.BLUE, true);
+        graphics.drawString(font, selected, modelX + 2, legendY, 0xFFF2D48A, true);
+        graphics.drawString(font, anchor, pairX + selectedW + legendGap, legendY, WrightsUi.BLUE, true);
         graphics.drawString(font, Component.translatable("screen.wrights.layers"), modelX, layersY - 12, WrightsUi.TEXT, false);
         if (promptOpen) {
             graphics.drawString(font, font.plainSubstrByWidth(Component.translatable(movePrompt ? "screen.wrights.move_prompt" : "screen.wrights.add_prompt").getString(), modelSize), modelX, promptY + 2, WrightsUi.MUTED, false);
