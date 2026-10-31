@@ -29,12 +29,13 @@ public final class Mirror {
     public static final int PAIR = 0;
     public static final int CROSS = 1;
     public static final int EIGHT = 2;
+    public static final int SIXTEEN = 3;
 
     private Mirror() {
     }
 
     public static int clampPattern(int pattern) {
-        if (pattern == CROSS || pattern == EIGHT) {
+        if (pattern == CROSS || pattern == EIGHT || pattern == SIXTEEN) {
             return pattern;
         }
         return PAIR;
@@ -43,6 +44,7 @@ public final class Mirror {
     /** Original build plus the reflected ones. */
     public static int copyCount(int pattern) {
         return switch (clampPattern(pattern)) {
+            case SIXTEEN -> 16;
             case EIGHT -> 8;
             case CROSS -> 4;
             default -> 2;
@@ -216,18 +218,20 @@ public final class Mirror {
 
     private static List<Shot> shots(BlockPos anchor, Direction face, int pattern, boolean shapes) {
         List<Shot> shots = new ArrayList<>();
-        if (clampPattern(pattern) == EIGHT) {
-            for (int step = 1; step <= 7; step++) {
+        int patternId = clampPattern(pattern);
+        if (patternId == EIGHT || patternId == SIXTEEN) {
+            int steps = patternId == SIXTEEN ? 15 : 7;
+            for (int step = 1; step <= steps; step++) {
                 int kind = step;
                 shots.add(new Shot() {
                     @Override
                     public BlockPos move(BlockPos pos) {
-                        return around(pos, anchor, kind);
+                        return moveAround(pos, anchor, kind);
                     }
 
                     @Override
                     public BlockState restyle(BlockState state) {
-                        return shapes ? styleEight(state, kind) : state;
+                        return shapes ? styleAround(state, kind) : state;
                     }
                 });
             }
@@ -286,6 +290,25 @@ public final class Mirror {
             case Y -> new BlockPos(pos.getX(), next, pos.getZ());
             case Z -> new BlockPos(pos.getX(), pos.getY(), next);
         };
+    }
+
+    /** Kinds 1–7 spin around the anchor. Kinds 8–15 are those same copies flipped up. */
+    private static BlockPos moveAround(BlockPos pos, BlockPos anchor, int kind) {
+        if (kind <= 7) {
+            return around(pos, anchor, kind);
+        }
+        int flat = kind - 8;
+        BlockPos turned = flat == 0 ? pos : around(pos, anchor, flat);
+        return turned == null ? null : reflect(turned, anchor, Direction.UP);
+    }
+
+    private static BlockState styleAround(BlockState state, int kind) {
+        if (kind <= 7) {
+            return styleEight(state, kind);
+        }
+        int flat = kind - 8;
+        BlockState turned = flat == 0 ? state : styleEight(state, flat);
+        return flipVertical(turned);
     }
 
     /** Quarter turns and flips around the anchor corner, so every copy stays on the block grid. */

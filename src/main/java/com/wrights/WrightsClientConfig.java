@@ -174,8 +174,8 @@ public final class WrightsClientConfig {
             .comment("When true, a mirrored block copy replaces whatever is already there. When false, that spot is skipped unless it is air.")
             .define("mirrorReplace", false);
     public static final ModConfigSpec.IntValue MIRROR_PATTERN = BUILDER
-            .comment("0 pair, 1 cross, 2 eight.")
-            .defineInRange("mirrorPattern", 0, 0, 2);
+            .comment("0 is 2 copies, 1 is 4, 2 is 8, 3 is 16.")
+            .defineInRange("mirrorPattern", 0, 0, 3);
     public static final ModConfigSpec.IntValue MIRROR_FACE = BUILDER
             .defineInRange("mirrorFace", 0, 0, 5);
     public static final ModConfigSpec.IntValue MIRROR_X = BUILDER

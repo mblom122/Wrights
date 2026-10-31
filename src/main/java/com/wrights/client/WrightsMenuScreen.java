@@ -1527,12 +1527,12 @@ public class WrightsMenuScreen extends Screen {
         drawMirrorStatus(graphics, x, y, w);
         y += 40;
         mirrorHighlightY = y;
-        int gap = 8;
-        int clearW = Math.min(108, Math.max(72, (w - gap) / 2));
-        int highlightW = Math.max(72, w - gap - clearW);
+        int buttonGap = 8;
+        int clearW = Math.min(108, Math.max(72, (w - buttonGap) / 2));
+        int highlightW = Math.max(72, w - buttonGap - clearW);
         mirrorHighlightX = x;
         mirrorHighlightW = highlightW;
-        mirrorClearX = x + highlightW + gap;
+        mirrorClearX = x + highlightW + buttonGap;
         mirrorClearW = clearW;
         String dimension = this.minecraft != null && this.minecraft.level != null ? this.minecraft.level.dimension().location().toString() : "";
         boolean here = WrightsClientConfig.mirrorPlaced(dimension);
