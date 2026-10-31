@@ -86,6 +86,8 @@ public final class WrightsClientState {
     public static boolean concealed;
     public static boolean follow;
     public static boolean bindSupply;
+    /** Build-tool slot that sets the face a mirror is measured from. */
+    public static boolean mirrorAim;
     /** Placed wrightport waiting for a chest click. Null when not binding. */
     public static BlockPos bindPort;
     public static boolean supplyBound;
@@ -1258,8 +1260,27 @@ public final class WrightsClientState {
                 queue,
                 WrightsClientConfig.PLACE_NBT_BLOCKS.get(),
                 placeSettingsChosen(),
-                placeAllChosen()));
+                placeAllChosen(),
+                mirrorSend(),
+                mirrorSend() ? WrightsClientConfig.mirrorAnchor() : BlockPos.ZERO,
+                WrightsClientConfig.MIRROR_FACE.get(),
+                WrightsClientConfig.MIRROR_PATTERN.get(),
+                WrightsClientConfig.MIRROR_SHAPES.get()));
         return true;
+    }
+
+    private static boolean mirrorSend() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level == null) {
+            return false;
+        }
+        return WrightsClientConfig.mirrorArmed(minecraft.level.dimension().location().toString());
+    }
+
+    public static void setMirrorAnchor(BlockPos pos, Direction face) {
+        Minecraft minecraft = Minecraft.getInstance();
+        String dimension = minecraft.level == null ? "" : minecraft.level.dimension().location().toString();
+        WrightsClientConfig.setMirror(pos, face.get3DDataValue(), dimension);
     }
 
     public static boolean showStoredSettings() {
@@ -1387,12 +1408,14 @@ public final class WrightsClientState {
             return;
         }
         int styles = styleSteps();
-        int count = styles + 2;
+        int count = styles + 3;
         int next = Math.floorMod(buildToolSlot() + direction, count);
         if (next < styles) {
             selectNewStyle(styleAt(next));
         } else if (next == styles) {
             selectBuildTool(false);
+        } else if (next == styles + 1) {
+            selectMirrorTool();
         } else {
             selectBuildTool(true);
         }
@@ -1414,7 +1437,7 @@ public final class WrightsClientState {
         return CaptureStyle.MOVE;
     }
 
-    /** New template styles first, then Use template, then Bind inventory. */
+    /** New template styles, then Use template, Mirror, and Bind inventory. */
     private static int buildToolSlot() {
         if (mode == Mode.CAPTURE) {
             int offset = switch (captureStyle) {
@@ -1424,10 +1447,18 @@ public final class WrightsClientState {
             };
             return Math.min(offset, styleSteps() - 1);
         }
-        if (mode == Mode.BUILD && bindSupply) {
+        if (mode == Mode.BUILD && mirrorAim) {
             return styleSteps() + 1;
         }
+        if (mode == Mode.BUILD && bindSupply) {
+            return styleSteps() + 2;
+        }
         return styleSteps();
+    }
+
+    private static void selectMirrorTool() {
+        selectBuildTool(false);
+        mirrorAim = true;
     }
 
     private static void selectBuildTool(boolean bind) {
@@ -1443,12 +1474,14 @@ public final class WrightsClientState {
             enterBuildFromLast();
         }
         bindSupply = bind;
+        mirrorAim = false;
         if (bind) {
             bindFromMenu = false;
         }
     }
 
     private static void selectNewStyle(CaptureStyle style) {
+        mirrorAim = false;
         if (mode == Mode.SAVING) {
             return;
         }

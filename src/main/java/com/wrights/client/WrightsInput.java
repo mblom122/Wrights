@@ -11,6 +11,8 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.network.chat.Component;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
@@ -177,7 +179,7 @@ public final class WrightsInput {
             event.setCanceled(true);
             event.setUseBlock(TriState.FALSE);
             event.setUseItem(TriState.FALSE);
-            useBuildClick(event.getEntity(), event.getPos());
+            useBuildClick(event.getEntity(), event.getPos(), event.getFace());
             return;
         }
         if (WrightsClientState.mode == WrightsClientState.Mode.JOBS && Minecraft.getInstance().screen == null) {
@@ -224,7 +226,7 @@ public final class WrightsInput {
             if (boundThisClick) {
                 return;
             }
-            useBuildClick(event.getEntity(), null);
+            useBuildClick(event.getEntity(), null, null);
             return;
         }
         if (WrightsClientState.mode == WrightsClientState.Mode.JOBS && Minecraft.getInstance().screen == null) {
@@ -262,9 +264,23 @@ public final class WrightsInput {
                 new BlueprintPayloads.LibraryRequest(WrightsClientState.libraryGlobal));
     }
 
-    private static void useBuildClick(net.minecraft.world.entity.player.Player player, BlockPos pos) {
+    private static void useBuildClick(net.minecraft.world.entity.player.Player player, BlockPos pos, Direction face) {
         if (pos != null) {
             boundThisClick = true;
+        }
+        if (WrightsClientState.mirrorAim) {
+            if (player.isShiftKeyDown()) {
+                com.wrights.WrightsClientConfig.cycleMirrorPattern();
+                player.displayClientMessage(Component.translatable("message.wrights.mirror_pattern", Component.translatable(mirrorPatternKey())), true);
+                return;
+            }
+            if (pos != null && face != null) {
+                WrightsClientState.setMirrorAnchor(pos, face);
+                player.displayClientMessage(Component.translatable("message.wrights.mirror_set", Component.translatable("menu.wrights.face." + face.getName())), true);
+            } else {
+                player.displayClientMessage(Component.translatable("message.wrights.mirror_look"), true);
+            }
+            return;
         }
         if (WrightsClientState.buildId == null) {
             Minecraft.getInstance().setScreen(new WrightsMenuScreen());
@@ -296,6 +312,17 @@ public final class WrightsInput {
             return;
         }
         WrightsClientState.tryBuild();
+    }
+
+    private static String mirrorPatternKey() {
+        int pattern = com.wrights.WrightsClientConfig.MIRROR_PATTERN.get();
+        if (pattern == com.wrights.blueprint.Mirror.EIGHT) {
+            return "menu.wrights.mirror_eight";
+        }
+        if (pattern == com.wrights.blueprint.Mirror.CROSS) {
+            return "menu.wrights.mirror_cross";
+        }
+        return "menu.wrights.mirror_pair";
     }
 
     private static void openAimedJob() {

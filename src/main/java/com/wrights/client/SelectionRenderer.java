@@ -2,6 +2,8 @@ package com.wrights.client;
 
 import com.wrights.WrightsMod;
 import com.wrights.WrightsConfig;
+import com.wrights.WrightsClientConfig;
+import com.wrights.blueprint.Mirror;
 import com.wrights.block.WrightportBlockEntity;
 import com.wrights.item.ControllerItem;
 import com.wrights.network.BlueprintPayloads;
@@ -20,6 +22,7 @@ import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
 import net.minecraft.world.Container;
 import net.minecraft.world.level.Level;
@@ -96,6 +99,52 @@ public final class SelectionRenderer {
             drawSupplyMarkers(pose, buffers, camera, minecraft);
         }
         drawMarkedJobs(pose, buffers, camera, minecraft);
+        drawMirror(pose, buffers, camera, minecraft);
+    }
+
+    private static void drawMirror(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
+        if (minecraft.level == null) {
+            return;
+        }
+        String here = minecraft.level.dimension().location().toString();
+        if (!WrightsClientConfig.mirrorPlaced(here)) {
+            return;
+        }
+        BlockPos anchor = WrightsClientConfig.mirrorAnchor();
+        Direction face = Direction.from3DDataValue(WrightsClientConfig.MIRROR_FACE.get());
+        AABB slab = faceSlab(anchor, face);
+        float pulse = 0.55F + 0.45F * (float) Math.sin(System.currentTimeMillis() / 220.0D);
+        VertexConsumer fill = buffers.getBuffer(RenderType.debugFilledBox());
+        AABB local = slab.move(-camera.x, -camera.y, -camera.z);
+        LevelRenderer.addChainedFilledBoxVertices(pose, fill, local.minX, local.minY, local.minZ, local.maxX, local.maxY, local.maxZ, 0.35F, 0.78F, 0.74F, 0.18F + 0.10F * pulse);
+        buffers.endBatch(RenderType.debugFilledBox());
+        VertexConsumer lines = buffers.getBuffer(RenderType.lines());
+        drawBox(pose, lines, slab, camera, 0.45F, 0.92F, 0.86F, 0.85F + 0.15F * pulse);
+        if (WrightsClientConfig.mirrorArmed(here) && WrightsClientState.mode == WrightsClientState.Mode.BUILD && WrightsClientState.anchor != null && WrightsClientState.buildId != null) {
+            BlockPos origin = WrightsClientState.anchor.offset(-WrightsClientState.pivotX, -WrightsClientState.pivotY, -WrightsClientState.pivotZ);
+            for (AABB copy : Mirror.volumes(origin, WrightsClientState.viewX, WrightsClientState.viewY, WrightsClientState.viewZ, anchor, face, WrightsClientConfig.MIRROR_PATTERN.get())) {
+                drawBox(pose, lines, copy, camera, 0.35F, 0.78F, 0.74F, 0.55F);
+            }
+        }
+        buffers.endBatch(RenderType.lines());
+    }
+
+    private static AABB faceSlab(BlockPos anchor, Direction face) {
+        double x0 = anchor.getX();
+        double y0 = anchor.getY();
+        double z0 = anchor.getZ();
+        double x1 = x0 + 1.0D;
+        double y1 = y0 + 1.0D;
+        double z1 = z0 + 1.0D;
+        double thin = 0.06D;
+        return switch (face) {
+            case EAST -> new AABB(x1, y0, z0, x1 + thin, y1, z1);
+            case WEST -> new AABB(x0 - thin, y0, z0, x0, y1, z1);
+            case UP -> new AABB(x0, y1, z0, x1, y1 + thin, z1);
+            case DOWN -> new AABB(x0, y0 - thin, z0, x1, y0, z1);
+            case SOUTH -> new AABB(x0, y0, z1, x1, y1, z1 + thin);
+            case NORTH -> new AABB(x0, y0, z0 - thin, x1, y1, z0);
+        };
     }
 
     public static BlockPos supplyTarget(Minecraft minecraft) {

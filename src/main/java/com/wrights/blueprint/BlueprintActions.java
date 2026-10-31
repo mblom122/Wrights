@@ -1060,14 +1060,14 @@ public final class BlueprintActions {
     }
 
     public static void launch(ServerPlayer player, java.util.UUID id, BlockPos anchorPoint, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt) {
-        launch(player, id, anchorPoint, sizeX, sizeY, sizeZ, pivotX, pivotY, pivotZ, drones, placeFluids, voidBlocks, voidFluids, voidNbt, false, true, false, true, true, true);
+        launch(player, id, anchorPoint, sizeX, sizeY, sizeZ, pivotX, pivotY, pivotZ, drones, placeFluids, voidBlocks, voidFluids, voidNbt, false, true, false);
     }
 
     public static void launch(ServerPlayer player, java.util.UUID id, BlockPos anchorPoint, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean force, boolean playerFirst, boolean queue) {
-        launch(player, id, anchorPoint, sizeX, sizeY, sizeZ, pivotX, pivotY, pivotZ, drones, placeFluids, voidBlocks, voidFluids, voidNbt, force, playerFirst, queue, true, true, true);
+        launch(player, id, anchorPoint, sizeX, sizeY, sizeZ, pivotX, pivotY, pivotZ, drones, placeFluids, voidBlocks, voidFluids, voidNbt, force, playerFirst, queue, true, true, true, false, BlockPos.ZERO, 0, 0, true);
     }
 
-    public static void launch(ServerPlayer player, java.util.UUID id, BlockPos anchorPoint, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean force, boolean playerFirst, boolean queue, boolean placeNbt, boolean placeSettings, boolean placeAll) {
+    public static void launch(ServerPlayer player, java.util.UUID id, BlockPos anchorPoint, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean force, boolean playerFirst, boolean queue, boolean placeNbt, boolean placeSettings, boolean placeAll, boolean mirror, BlockPos mirrorAnchor, int mirrorFace, int mirrorPattern, boolean mirrorShapes) {
         if (!requireTool(player)) {
             return;
         }
@@ -1095,7 +1095,18 @@ public final class BlueprintActions {
             return;
         }
         if (!force && !player.getAbilities().instabuild && !player.isSpectator()) {
-            java.util.List<Requirements.Cost> listed = Requirements.ordered(player, Requirements.of(schematic, sx, sy, sz, placeFluids), session.supplyPos(), session.supplyDimension());
+            java.util.List<Requirements.Cost> costs = Requirements.of(schematic, sx, sy, sz, placeFluids);
+            if (mirror) {
+                int times = Mirror.copyCount(mirrorPattern);
+                if (times > 1) {
+                    java.util.List<Requirements.Cost> scaled = new ArrayList<>(costs.size());
+                    for (Requirements.Cost cost : costs) {
+                        scaled.add(new Requirements.Cost(cost.itemId(), cost.count() * times));
+                    }
+                    costs = scaled;
+                }
+            }
+            java.util.List<Requirements.Cost> listed = Requirements.ordered(player, costs, session.supplyPos(), session.supplyDimension());
             if (Requirements.anyShort(listed)) {
                 BlueprintNetwork.materials(player, id, true, listed);
                 return;
@@ -1109,8 +1120,19 @@ public final class BlueprintActions {
             buildSchematicId = snapshot.id();
         }
         boolean deferSupplies = force && queue && !player.getAbilities().instabuild && !player.isSpectator();
-        if (!JobManager.startBlueprintBuild(player, buildSchematicId, origin, sx, sy, sz, drones, placeFluids, voidBlocks, voidFluids, voidNbt, playerFirst, queue, deferSupplies, placeNbt, placeSettings, placeAll) && snapshot != null) {
+        boolean started = JobManager.startBlueprintBuild(player, buildSchematicId, origin, sx, sy, sz, drones, placeFluids, voidBlocks, voidFluids, voidNbt, playerFirst, queue, deferSupplies, placeNbt, placeSettings, placeAll);
+        if (!started && snapshot != null) {
             library.removeSchematic(snapshot.id());
+        }
+        if (started && mirror && mirrorAnchor != null && player.distanceToSqr(mirrorAnchor.getX() + 0.5D, mirrorAnchor.getY() + 0.5D, mirrorAnchor.getZ() + 0.5D) <= rangeSqr()) {
+            MirrorLaunch.Result mirrored = MirrorLaunch.spawn(player, schematic, origin, sx, sy, sz, drones, placeFluids, voidBlocks, voidFluids, voidNbt, playerFirst, queue, deferSupplies, placeNbt, placeSettings, placeAll, mirrorAnchor, mirrorFace, mirrorPattern, mirrorShapes);
+            if (mirrored.started() > 0) {
+                Messages.actionBar(player, "message.wrights.mirror_started", mirrored.started());
+            } else if (mirrored.nowhere()) {
+                Messages.actionBar(player, "message.wrights.mirror_same");
+            }
+        } else if (started && mirror && mirrorAnchor != null) {
+            Messages.actionBar(player, "message.wrights.mirror_far");
         }
         BlueprintNetwork.syncLibrary(player);
     }

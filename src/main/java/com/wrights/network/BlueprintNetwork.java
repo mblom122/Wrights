@@ -281,7 +281,12 @@ public final class BlueprintNetwork {
                 payload.queue(),
                 payload.placeNbt(),
                 payload.placeSettings(),
-                payload.placeAll()));
+                payload.placeAll(),
+                payload.mirror(),
+                payload.mirrorAnchor(),
+                payload.mirrorFace(),
+                payload.mirrorPattern(),
+                payload.mirrorShapes()));
     }
 
     private static void editCell(BlueprintPayloads.EditCell payload, IPayloadContext context) {

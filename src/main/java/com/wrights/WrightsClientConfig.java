@@ -4,7 +4,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import net.minecraft.core.BlockPos;
 import net.neoforged.neoforge.common.ModConfigSpec;
+
+import com.wrights.blueprint.Mirror;
 
 public final class WrightsClientConfig {
     public static final int[] COLORS = {
@@ -156,6 +159,27 @@ public final class WrightsClientConfig {
             .defineInRange("hudToastX", 900, 0, 1000);
     public static final ModConfigSpec.IntValue HUD_TOAST_Y = BUILDER
             .defineInRange("hudToastY", 80, 0, 1000);
+    public static final ModConfigSpec.BooleanValue MIRROR_ON = BUILDER
+            .comment("When true, a placed blueprint also starts the mirrored copies.")
+            .define("mirrorOn", true);
+    public static final ModConfigSpec.BooleanValue MIRROR_SET = BUILDER
+            .define("mirrorSet", false);
+    public static final ModConfigSpec.BooleanValue MIRROR_SHAPES = BUILDER
+            .comment("When true, stairs, slabs and facing are flipped to match the copy.")
+            .define("mirrorShapes", true);
+    public static final ModConfigSpec.IntValue MIRROR_PATTERN = BUILDER
+            .comment("0 pair, 1 cross, 2 eight.")
+            .defineInRange("mirrorPattern", 0, 0, 2);
+    public static final ModConfigSpec.IntValue MIRROR_FACE = BUILDER
+            .defineInRange("mirrorFace", 0, 0, 5);
+    public static final ModConfigSpec.IntValue MIRROR_X = BUILDER
+            .defineInRange("mirrorX", 0, -30000000, 30000000);
+    public static final ModConfigSpec.IntValue MIRROR_Y = BUILDER
+            .defineInRange("mirrorY", 0, -30000000, 30000000);
+    public static final ModConfigSpec.IntValue MIRROR_Z = BUILDER
+            .defineInRange("mirrorZ", 0, -30000000, 30000000);
+    public static final ModConfigSpec.ConfigValue<String> MIRROR_DIM = BUILDER
+            .define("mirrorDim", "");
 
     static final ModConfigSpec SPEC = BUILDER.build();
 
@@ -508,6 +532,53 @@ public final class WrightsClientConfig {
         LAST_MODE.set(clamp(mode, 0, 6));
         LAST_STYLE.set(clamp(style, 0, 2));
         LAST_BUILD.set(buildId == null ? "" : buildId);
+        save();
+    }
+
+    public static boolean mirrorPlaced(String dimension) {
+        return MIRROR_SET.get() && dimension != null && !dimension.isEmpty() && dimension.equals(MIRROR_DIM.get());
+    }
+
+    public static boolean mirrorArmed(String dimension) {
+        return MIRROR_ON.get() && mirrorPlaced(dimension);
+    }
+
+    public static BlockPos mirrorAnchor() {
+        return new BlockPos(MIRROR_X.get(), MIRROR_Y.get(), MIRROR_Z.get());
+    }
+
+    public static void setMirror(BlockPos pos, int face, String dimension) {
+        MIRROR_SET.set(true);
+        MIRROR_ON.set(true);
+        MIRROR_X.set(pos.getX());
+        MIRROR_Y.set(pos.getY());
+        MIRROR_Z.set(pos.getZ());
+        MIRROR_FACE.set(clamp(face, 0, 5));
+        MIRROR_DIM.set(dimension == null ? "" : dimension);
+        save();
+    }
+
+    public static void setMirrorOn(boolean on) {
+        MIRROR_ON.set(on);
+        save();
+    }
+
+    public static void setMirrorShapes(boolean shapes) {
+        MIRROR_SHAPES.set(shapes);
+        save();
+    }
+
+    public static void setMirrorPattern(int pattern) {
+        MIRROR_PATTERN.set(Mirror.clampPattern(pattern));
+        save();
+    }
+
+    public static void cycleMirrorPattern() {
+        setMirrorPattern(MIRROR_PATTERN.get() + 1);
+    }
+
+    public static void clearMirror() {
+        MIRROR_SET.set(false);
         save();
     }
 
