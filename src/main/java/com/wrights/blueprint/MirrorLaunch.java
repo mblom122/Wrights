@@ -137,8 +137,7 @@ public final class MirrorLaunch {
             Messages.actionBar(player, "message.wrights.mirror_same");
             return;
         }
-        SchematicLibrary library = SchematicLibrary.get(player.getServer());
-        int started = 0;
+        List<Mirror.Placed> ready = new java.util.ArrayList<>();
         for (Mirror.Placed copy : copies) {
             BlockPos min = copy.origin();
             Schematic schematic = copy.schematic();
@@ -149,14 +148,9 @@ public final class MirrorLaunch {
             if (!replace && (!level.isLoaded(min) || !level.getBlockState(min).isAir())) {
                 continue;
             }
-            library.putSchematic(schematic);
-            boolean ok = JobManager.startBlueprintBuild(player, schematic.id(), min, schematic.sizeX(), schematic.sizeY(), schematic.sizeZ(), 0, false, replace, replace, replace, true, true, false, copyNbt, settings, all);
-            if (!ok) {
-                library.removeSchematic(schematic.id());
-                continue;
-            }
-            started++;
+            ready.add(copy);
         }
+        int started = startUnited(player, ready, 0, false, replace, replace, replace, true, true, false, copyNbt, settings, all);
         if (started > 0) {
             Messages.actionBar(player, "message.wrights.mirror_started", started);
         }
@@ -191,8 +185,7 @@ public final class MirrorLaunch {
         if (copies.isEmpty()) {
             return new Result(0, true);
         }
-        SchematicLibrary library = SchematicLibrary.get(player.getServer());
-        int started = 0;
+        List<Mirror.Placed> ready = new java.util.ArrayList<>();
         for (Mirror.Placed placed : copies) {
             BlockPos min = placed.origin();
             Schematic schematic = placed.schematic();
@@ -200,14 +193,39 @@ public final class MirrorLaunch {
             if (!BoxEdits.inWorld(min) || !BoxEdits.inWorld(far)) {
                 continue;
             }
+            ready.add(placed);
+        }
+        int started = startUnited(player, ready, drones, placeFluids, voidBlocks, voidFluids, voidNbt, playerFirst, queue, deferSupplies, placeNbt, placeSettings, placeAll);
+        return new Result(started, false);
+    }
+
+    /** Starts one job that holds every copy. Falls back to a job per copy when they cannot share a schematic. */
+    private static int startUnited(ServerPlayer player, List<Mirror.Placed> copies, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean playerFirst, boolean queue, boolean deferSupplies, boolean placeNbt, boolean placeSettings, boolean placeAll) {
+        if (copies.isEmpty()) {
+            return 0;
+        }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        Mirror.Placed united = Mirror.unite(copies);
+        if (united != null) {
+            Schematic schematic = united.schematic();
             library.putSchematic(schematic);
-            boolean ok = JobManager.startBlueprintBuild(player, schematic.id(), min, schematic.sizeX(), schematic.sizeY(), schematic.sizeZ(), drones, placeFluids, voidBlocks, voidFluids, voidNbt, playerFirst, queue, deferSupplies, placeNbt, placeSettings, placeAll);
+            boolean ok = JobManager.startBlueprintBuild(player, schematic.id(), united.origin(), schematic.sizeX(), schematic.sizeY(), schematic.sizeZ(), drones, placeFluids, voidBlocks, voidFluids, voidNbt, playerFirst, queue, deferSupplies, placeNbt, placeSettings, placeAll);
+            if (ok) {
+                return copies.size();
+            }
+            library.removeSchematic(schematic.id());
+        }
+        int started = 0;
+        for (Mirror.Placed placed : copies) {
+            Schematic schematic = placed.schematic();
+            library.putSchematic(schematic);
+            boolean ok = JobManager.startBlueprintBuild(player, schematic.id(), placed.origin(), schematic.sizeX(), schematic.sizeY(), schematic.sizeZ(), drones, placeFluids, voidBlocks, voidFluids, voidNbt, playerFirst, queue, deferSupplies, placeNbt, placeSettings, placeAll);
             if (!ok) {
                 library.removeSchematic(schematic.id());
                 continue;
             }
             started++;
         }
-        return new Result(started, false);
+        return started;
     }
 }

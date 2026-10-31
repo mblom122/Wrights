@@ -163,6 +163,105 @@ public final class Mirror {
         return placed;
     }
 
+    /** One schematic for every copy, so they share a single job and one undo. */
+    public static Placed unite(List<Placed> copies) {
+        if (copies == null || copies.isEmpty()) {
+            return null;
+        }
+        if (copies.size() == 1) {
+            return copies.get(0);
+        }
+        List<BlockPos> worlds = new ArrayList<>();
+        List<Schematic.Entry> raw = new ArrayList<>();
+        Set<BlockPos> seen = new HashSet<>();
+        for (Placed placed : copies) {
+            if (placed == null || placed.schematic() == null || placed.origin() == null) {
+                continue;
+            }
+            BlockPos origin = placed.origin();
+            for (Schematic.Entry entry : placed.schematic().entries()) {
+                BlockPos world = origin.offset(entry.x(), entry.y(), entry.z());
+                if (!seen.add(world)) {
+                    continue;
+                }
+                worlds.add(world);
+                raw.add(entry);
+            }
+        }
+        if (worlds.isEmpty()) {
+            return null;
+        }
+        int minX = Integer.MAX_VALUE;
+        int minY = Integer.MAX_VALUE;
+        int minZ = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE;
+        int maxY = Integer.MIN_VALUE;
+        int maxZ = Integer.MIN_VALUE;
+        for (BlockPos world : worlds) {
+            minX = Math.min(minX, world.getX());
+            minY = Math.min(minY, world.getY());
+            minZ = Math.min(minZ, world.getZ());
+            maxX = Math.max(maxX, world.getX());
+            maxY = Math.max(maxY, world.getY());
+            maxZ = Math.max(maxZ, world.getZ());
+        }
+        int sizeX = maxX - minX + 1;
+        int sizeY = maxY - minY + 1;
+        int sizeZ = maxZ - minZ + 1;
+        int cap = Math.max(1, WrightsConfig.MAX_AXIS.getAsInt());
+        if (sizeX > cap || sizeY > cap || sizeZ > cap || sizeX > Short.MAX_VALUE || sizeY > Short.MAX_VALUE || sizeZ > Short.MAX_VALUE) {
+            return null;
+        }
+        List<Schematic.Entry> local = new ArrayList<>(raw.size());
+        for (int i = 0; i < raw.size(); i++) {
+            Schematic.Entry entry = raw.get(i);
+            BlockPos world = worlds.get(i);
+            CompoundTag nbt = entry.nbt() == null ? null : entry.nbt().copy();
+            local.add(new Schematic.Entry(
+                    (short) (world.getX() - minX),
+                    (short) (world.getY() - minY),
+                    (short) (world.getZ() - minZ),
+                    entry.state(),
+                    entry.secondary(),
+                    nbt,
+                    entry.nbtFull()));
+        }
+        Schematic first = copies.get(0).schematic();
+        String name = mirrorName(first.name());
+        BlockPos min = new BlockPos(minX, minY, minZ);
+        BlockPos max = new BlockPos(maxX, maxY, maxZ);
+        Schematic schematic = new Schematic(UUID.randomUUID(), name, sizeX, sizeY, sizeZ, local, min, max, "", 0, 0, 0, true)
+                .withPaste(first.placeFluids(), first.voidBlocks(), first.voidFluids(), first.voidNbt());
+        return new Placed(schematic, min);
+    }
+
+    private static String mirrorName(String name) {
+        if (name == null || name.isBlank()) {
+            return "Mirror";
+        }
+        int cut = name.lastIndexOf(" · ");
+        if (cut > 0) {
+            String tail = name.substring(cut + 3);
+            boolean digits = !tail.isEmpty();
+            for (int i = 0; i < tail.length(); i++) {
+                if (!Character.isDigit(tail.charAt(i))) {
+                    digits = false;
+                    break;
+                }
+            }
+            if (digits) {
+                name = name.substring(0, cut);
+            }
+        }
+        if (name.length() > 40) {
+            name = name.substring(0, 40).trim();
+        }
+        if (name.isBlank() || name.equals("Mirror")) {
+            return "Mirror";
+        }
+        return name + " · mirror";
+    }
+
     public static List<AABB> volumes(BlockPos origin, int clipX, int clipY, int clipZ, BlockPos anchor, Direction face, int pattern, int axes) {
         List<AABB> boxes = new ArrayList<>();
         if (origin == null || anchor == null || face == null || clipX < 1 || clipY < 1 || clipZ < 1) {
