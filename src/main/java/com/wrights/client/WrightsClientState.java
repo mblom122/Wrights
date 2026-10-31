@@ -78,6 +78,7 @@ public final class WrightsClientState {
     public static int poolStored = -1;
     public static boolean bindFromMenu;
     public static final List<JobNotice> jobNotices = new ArrayList<>();
+    public static DockNotice dockNotice;
     public static boolean sampled;
     public static boolean concealed;
     public static boolean follow;
@@ -1009,6 +1010,13 @@ public final class WrightsClientState {
         }
     }
 
+    public static void showDockToast(com.wrights.network.BlueprintPayloads.DockToast toast) {
+        if (toast == null || toast.docked() + toast.digital() + toast.dropped() <= 0) {
+            return;
+        }
+        dockNotice = new DockNotice(toast);
+    }
+
     public static void applyDeploy() {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player == null) {
@@ -1220,6 +1228,9 @@ public final class WrightsClientState {
     public static void tickCapture() {
         if (!jobNotices.isEmpty()) {
             jobNotices.removeIf(notice -> --notice.ticks <= 0);
+        }
+        if (dockNotice != null && --dockNotice.ticks <= 0) {
+            dockNotice = null;
         }
         if (pickCooldown > 0) {
             pickCooldown--;
@@ -1900,6 +1911,40 @@ public final class WrightsClientState {
         public JobNotice(String name, int seconds) {
             this.name = name;
             this.seconds = seconds;
+        }
+    }
+
+    /** Wrights that left a missing dock. Replaced while more of them arrive, then it fades. */
+    public static final class DockNotice {
+        public final int docked;
+        public final int dx;
+        public final int dy;
+        public final int dz;
+        public final String port;
+        public final int digital;
+        public final int sx;
+        public final int sy;
+        public final int sz;
+        public final int dropped;
+        public final int gx;
+        public final int gy;
+        public final int gz;
+        public int ticks = 140;
+
+        public DockNotice(com.wrights.network.BlueprintPayloads.DockToast toast) {
+            this.docked = toast.docked();
+            this.dx = toast.dx();
+            this.dy = toast.dy();
+            this.dz = toast.dz();
+            this.port = toast.port() == null ? "" : toast.port();
+            this.digital = toast.digital();
+            this.sx = toast.sx();
+            this.sy = toast.sy();
+            this.sz = toast.sz();
+            this.dropped = toast.dropped();
+            this.gx = toast.gx();
+            this.gy = toast.gy();
+            this.gz = toast.gz();
         }
     }
 }

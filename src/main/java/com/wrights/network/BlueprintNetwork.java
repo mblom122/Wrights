@@ -99,6 +99,7 @@ public final class BlueprintNetwork {
         registrar.playToClient(BlueprintPayloads.DigitalInfoSync.TYPE, BlueprintPayloads.DigitalInfoSync.STREAM_CODEC, BlueprintNetwork::clientDigitalInfo);
         registrar.playToClient(BlueprintPayloads.UndoPrompt.TYPE, BlueprintPayloads.UndoPrompt.STREAM_CODEC, BlueprintNetwork::clientUndoPrompt);
         registrar.playToClient(BlueprintPayloads.JobDone.TYPE, BlueprintPayloads.JobDone.STREAM_CODEC, BlueprintNetwork::clientJobDone);
+        registrar.playToClient(BlueprintPayloads.DockToast.TYPE, BlueprintPayloads.DockToast.STREAM_CODEC, BlueprintNetwork::clientDockToast);
         registrar.playToClient(BlueprintPayloads.BlueprintItemList.TYPE, BlueprintPayloads.BlueprintItemList.STREAM_CODEC, BlueprintNetwork::clientBlueprintItems);
         registrar.playToClient(BlueprintPayloads.FolderItemList.TYPE, BlueprintPayloads.FolderItemList.STREAM_CODEC, BlueprintNetwork::clientFolderItems);
         registrar.playToClient(BlueprintPayloads.ClipboardOffer.TYPE, BlueprintPayloads.ClipboardOffer.STREAM_CODEC, BlueprintNetwork::clientClipboardOffer);
@@ -565,6 +566,26 @@ public final class BlueprintNetwork {
             return;
         }
         context.enqueueWork(() -> com.wrights.client.WrightsClientState.showJobDone(payload.name(), payload.seconds()));
+    }
+
+    private static void clientDockToast(BlueprintPayloads.DockToast payload, IPayloadContext context) {
+        if (FMLEnvironment.dist != Dist.CLIENT) {
+            return;
+        }
+        context.enqueueWork(() -> com.wrights.client.WrightsClientState.showDockToast(payload));
+    }
+
+    public static void dockToast(ServerPlayer player, int docked, BlockPos dock, String port, int digital, BlockPos storage, int dropped, BlockPos ground) {
+        if (player == null) {
+            return;
+        }
+        BlockPos dockAt = dock == null ? BlockPos.ZERO : dock;
+        BlockPos storedAt = storage == null ? BlockPos.ZERO : storage;
+        BlockPos droppedAt = ground == null ? BlockPos.ZERO : ground;
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.DockToast(
+                docked, dockAt.getX(), dockAt.getY(), dockAt.getZ(), port == null ? "" : port,
+                digital, storedAt.getX(), storedAt.getY(), storedAt.getZ(),
+                dropped, droppedAt.getX(), droppedAt.getY(), droppedAt.getZ()));
     }
 
     private static void clientUndoPrompt(BlueprintPayloads.UndoPrompt payload, IPayloadContext context) {

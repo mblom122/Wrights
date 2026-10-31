@@ -145,6 +145,7 @@ public final class DockRecovery {
         } else if (where == Where.DOCK) {
             notice.docked++;
             notice.dockAt = droppedAt;
+            notice.portName = portLabel(level, droppedAt);
         } else {
             notice.dropped++;
             notice.droppedAt = droppedAt;
@@ -163,6 +164,19 @@ public final class DockRecovery {
                     notice.dropped, notice.droppedAt.getX(), notice.droppedAt.getY(), notice.droppedAt.getZ()));
         }
         Messages.actionBar(player, text);
+        com.wrights.network.BlueprintNetwork.dockToast(player, notice.docked, notice.dockAt, notice.portName,
+                notice.digital, notice.digitalAt, notice.dropped, notice.droppedAt);
+    }
+
+    private static String portLabel(ServerLevel level, BlockPos pos) {
+        if (level == null || pos == null || !level.isLoaded(pos)) {
+            return "";
+        }
+        BlockEntity entity = level.getBlockEntity(pos);
+        if (!(entity instanceof WrightportBlockEntity port)) {
+            return "";
+        }
+        return port.label();
     }
 
     private static final class Notice {
@@ -170,6 +184,7 @@ public final class DockRecovery {
         private int digital;
         private int dropped;
         private int docked;
+        private String portName = "";
         private BlockPos digitalAt;
         private BlockPos droppedAt;
         private BlockPos dockAt;

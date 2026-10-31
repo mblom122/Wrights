@@ -363,12 +363,15 @@ public final class WrightsHud {
     }
 
     private static void drawJobNotices(GuiGraphics graphics, Minecraft minecraft) {
-        if (WrightsClientState.jobNotices.isEmpty()) {
+        WrightsClientState.DockNotice dock = WrightsClientState.dockNotice;
+        if (WrightsClientState.jobNotices.isEmpty() && dock == null) {
             return;
         }
         int headerH = 18;
         int bodyH = 28;
         int height = headerH + bodyH;
+        List<Component> dockLines = dockLines(dock);
+        int dockHeight = dockLines.isEmpty() ? 0 : headerH + 8 + dockLines.size() * 11;
         int maxWidth = 0;
         int[] widths = new int[WrightsClientState.jobNotices.size()];
         for (int i = 0; i < WrightsClientState.jobNotices.size(); i++) {
@@ -383,7 +386,18 @@ public final class WrightsHud {
                     Math.max(minecraft.font.width(name), minecraft.font.width(time)) + 18));
             maxWidth = Math.max(maxWidth, widths[i]);
         }
-        int total = WrightsClientState.jobNotices.size() * height + (WrightsClientState.jobNotices.size() - 1) * 4;
+        int dockWidth = 0;
+        if (!dockLines.isEmpty()) {
+            Component header = Component.translatable("hud.wrights.dock_gone");
+            dockWidth = minecraft.font.width(header) + 30;
+            for (Component line : dockLines) {
+                dockWidth = Math.max(dockWidth, minecraft.font.width(line) + 18);
+            }
+            dockWidth = Math.min(240, dockWidth);
+            maxWidth = Math.max(maxWidth, dockWidth);
+        }
+        int cards = WrightsClientState.jobNotices.size() + (dockLines.isEmpty() ? 0 : 1);
+        int total = WrightsClientState.jobNotices.size() * height + dockHeight + Math.max(0, cards - 1) * 4;
         int stackX = HudAnchor.toastX(graphics.guiWidth(), maxWidth);
         int y = HudAnchor.toastY(graphics.guiHeight(), total);
         int spot = HudAnchor.toastSpot();
@@ -397,23 +411,58 @@ public final class WrightsHud {
             int width = widths[i];
             int x = toastX(spot, stackX, maxWidth, width);
             int alpha = notice.ticks > 20 ? 0xE0 : Math.max(0, 0xE0 * notice.ticks / 20);
-            int panel = (alpha << 24) | 0x101822;
-            int toolbar = (alpha << 24) | 0x1C2A36;
-            int copper = (alpha << 24) | (WrightsUi.COPPER & 0xFFFFFF);
-            int edge = (alpha << 24) | 0x31404E;
-            int border = (alpha << 24) | 0x3A4C5C;
-            int text = (alpha << 24) | (WrightsUi.TEXT & 0xFFFFFF);
-            int muted = (alpha << 24) | (WrightsUi.MUTED & 0xFFFFFF);
-            graphics.fill(x, y, x + width, y + height, panel);
-            WrightsUi.border(graphics, x, y, width, height, border);
-            graphics.fill(x + 1, y + 1, x + width - 1, y + headerH, toolbar);
-            graphics.fill(x + 1, y + 1, x + 3, y + headerH, copper);
-            graphics.fill(x + 1, y + headerH - 1, x + width - 1, y + headerH, edge);
-            drawInfoBubble(graphics, x + 8, y + 5, alpha);
-            graphics.drawString(minecraft.font, header, x + 20, y + 5, text, false);
-            graphics.drawString(minecraft.font, minecraft.font.plainSubstrByWidth(name.getString(), width - 16), x + 8, y + headerH + 5, muted, false);
-            graphics.drawString(minecraft.font, minecraft.font.plainSubstrByWidth(time.getString(), width - 16), x + 8, y + headerH + 16, muted, false);
+            paintToast(graphics, minecraft, x, y, width, height, headerH, alpha, header, List.of(name, time));
             y += height + 4;
+        }
+        if (!dockLines.isEmpty()) {
+            int x = toastX(spot, stackX, maxWidth, dockWidth);
+            int alpha = dock.ticks > 20 ? 0xE0 : Math.max(0, 0xE0 * dock.ticks / 20);
+            paintToast(graphics, minecraft, x, y, dockWidth, dockHeight, headerH, alpha,
+                    Component.translatable("hud.wrights.dock_gone"), dockLines);
+        }
+    }
+
+    private static List<Component> dockLines(WrightsClientState.DockNotice dock) {
+        List<Component> lines = new java.util.ArrayList<>();
+        if (dock == null) {
+            return lines;
+        }
+        if (dock.docked > 0) {
+            if (dock.port == null || dock.port.isBlank()) {
+                lines.add(Component.translatable("hud.wrights.dock_toast_port", dock.docked, dock.dx, dock.dy, dock.dz));
+            } else {
+                lines.add(Component.translatable("hud.wrights.dock_toast_port_named", dock.docked,
+                        Component.translatable("block.wrights.wrightport.named", dock.port), dock.dx, dock.dy, dock.dz));
+            }
+        }
+        if (dock.digital > 0) {
+            lines.add(Component.translatable("hud.wrights.dock_toast_digital", dock.digital, dock.sx, dock.sy, dock.sz));
+        }
+        if (dock.dropped > 0) {
+            lines.add(Component.translatable("hud.wrights.dock_toast_ground", dock.dropped, dock.gx, dock.gy, dock.gz));
+        }
+        return lines;
+    }
+
+    private static void paintToast(GuiGraphics graphics, Minecraft minecraft, int x, int y, int width, int height, int headerH, int alpha, Component header, List<Component> lines) {
+        int panel = (alpha << 24) | 0x101822;
+        int toolbar = (alpha << 24) | 0x1C2A36;
+        int copper = (alpha << 24) | (WrightsUi.COPPER & 0xFFFFFF);
+        int edge = (alpha << 24) | 0x31404E;
+        int border = (alpha << 24) | 0x3A4C5C;
+        int text = (alpha << 24) | (WrightsUi.TEXT & 0xFFFFFF);
+        int muted = (alpha << 24) | (WrightsUi.MUTED & 0xFFFFFF);
+        graphics.fill(x, y, x + width, y + height, panel);
+        WrightsUi.border(graphics, x, y, width, height, border);
+        graphics.fill(x + 1, y + 1, x + width - 1, y + headerH, toolbar);
+        graphics.fill(x + 1, y + 1, x + 3, y + headerH, copper);
+        graphics.fill(x + 1, y + headerH - 1, x + width - 1, y + headerH, edge);
+        drawInfoBubble(graphics, x + 8, y + 5, alpha);
+        graphics.drawString(minecraft.font, header, x + 20, y + 5, text, false);
+        int lineY = y + headerH + 5;
+        for (Component line : lines) {
+            graphics.drawString(minecraft.font, minecraft.font.plainSubstrByWidth(line.getString(), width - 16), x + 8, lineY, muted, false);
+            lineY += 11;
         }
     }
 

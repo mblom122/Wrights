@@ -866,6 +866,35 @@ public final class BlueprintPayloads {
         }
     }
 
+    public record DockToast(int docked, int dx, int dy, int dz, String port, int digital, int sx, int sy, int sz, int dropped, int gx, int gy, int gz) implements CustomPacketPayload {
+        public static final Type<DockToast> TYPE = payloadType("dock_toast");
+        public static final StreamCodec<RegistryFriendlyByteBuf, DockToast> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeVarInt(value.docked);
+                    buf.writeVarInt(value.dx);
+                    buf.writeVarInt(value.dy);
+                    buf.writeVarInt(value.dz);
+                    buf.writeUtf(value.port == null ? "" : value.port, 32);
+                    buf.writeVarInt(value.digital);
+                    buf.writeVarInt(value.sx);
+                    buf.writeVarInt(value.sy);
+                    buf.writeVarInt(value.sz);
+                    buf.writeVarInt(value.dropped);
+                    buf.writeVarInt(value.gx);
+                    buf.writeVarInt(value.gy);
+                    buf.writeVarInt(value.gz);
+                },
+                buf -> new DockToast(
+                        buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readUtf(32),
+                        buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(),
+                        buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public record JobDone(String name, int seconds) implements CustomPacketPayload {
         public static final Type<JobDone> TYPE = payloadType("job_done");
         public static final StreamCodec<RegistryFriendlyByteBuf, JobDone> STREAM_CODEC = StreamCodec.of(
