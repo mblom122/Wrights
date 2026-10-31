@@ -12,6 +12,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.LightTexture;
@@ -244,11 +245,6 @@ public final class SelectionRenderer {
         java.util.List<AABB> slabs = new java.util.ArrayList<>();
         if (faceMode) {
             slabs.add(faceSlab(border, face));
-            slabs.add(centerSlab(anchor, face.getAxis()));
-            if (pattern == Mirror.CROSS) {
-                Direction.Axis second = face.getAxis() == Direction.Axis.X ? Direction.Axis.Z : Direction.Axis.X;
-                slabs.add(centerSlab(anchor, second));
-            }
         } else {
             slabs.addAll(mirrorSlabs(anchor, face, axes));
         }
@@ -275,6 +271,28 @@ public final class SelectionRenderer {
             }
         }
         buffers.endBatch(RenderType.lines());
+        if (faceMode) {
+            drawMirrorCount(pose, buffers, camera, minecraft, anchor, face, pattern);
+        }
+    }
+
+    /** The chosen copy count, sitting in the anchored side. */
+    private static void drawMirrorCount(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft, BlockPos anchor, Direction face, int pattern) {
+        String text = Integer.toString(Mirror.copyCount(pattern, 0));
+        Font font = minecraft.font;
+        float width = font.width(text);
+        double out = 0.40D;
+        pose.pushPose();
+        pose.translate(
+                anchor.getX() + 0.5D + face.getStepX() * out - camera.x,
+                anchor.getY() + 0.5D + face.getStepY() * out - camera.y,
+                anchor.getZ() + 0.5D + face.getStepZ() * out - camera.z);
+        pose.mulPose(minecraft.getEntityRenderDispatcher().cameraOrientation());
+        float scale = 0.05F;
+        pose.scale(-scale, -scale, scale);
+        font.drawInBatch(text, -width / 2.0F, -font.lineHeight / 2.0F, WrightsUi.TEAL, false, pose.last().pose(), buffers, Font.DisplayMode.SEE_THROUGH, 0, LightTexture.FULL_BRIGHT);
+        pose.popPose();
+        buffers.endBatch();
     }
 
     /** Face mode marks the clicked side. Axis mode draws a plane through the middle. */
