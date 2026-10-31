@@ -1,7 +1,7 @@
 {
   "size": 1,
   "order": 80,
-  "icon": "curios:slot/empty_curio_slot",
+  "icon": "wrights:slot/wrightport",
   "add_cosmetic": false,
   "validators": ["wrights:wrightport"]
 }
