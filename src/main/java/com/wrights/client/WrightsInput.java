@@ -386,7 +386,7 @@ public final class WrightsInput {
         if (player.isShiftKeyDown()) {
             if (pos != null && face != null) {
                 WrightsClientState.setMirrorAnchor(pos, face);
-                player.displayClientMessage(Component.translatable("message.wrights.mirror_set", Component.translatable("menu.wrights.face." + face.getName())), true);
+                player.displayClientMessage(Component.translatable("message.wrights.mirror_set", Component.translatable(mirrorAxisKey(face.getAxis()))), true);
             } else {
                 com.wrights.WrightsClientConfig.clearMirror();
                 player.displayClientMessage(Component.translatable("message.wrights.mirror_cleared"), true);
@@ -491,5 +491,13 @@ public final class WrightsInput {
             WrightsClientState.cycleBuildTool(event.getScrollDeltaY() > 0.0D ? -1 : 1);
             event.setCanceled(true);
         }
+    }
+
+    private static String mirrorAxisKey(Direction.Axis axis) {
+        return switch (axis) {
+            case X -> "menu.wrights.mirror_axis_x";
+            case Y -> "menu.wrights.mirror_axis_y";
+            case Z -> "menu.wrights.mirror_axis_z";
+        };
     }
 }

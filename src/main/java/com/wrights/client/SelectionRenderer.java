@@ -244,7 +244,7 @@ public final class SelectionRenderer {
         AABB border = new AABB(anchor).inflate(0.02D);
         java.util.List<AABB> slabs = new java.util.ArrayList<>();
         if (faceMode) {
-            slabs.add(faceSlab(border, face));
+            slabs.add(axisBeam(border, face.getAxis()));
         } else {
             slabs.addAll(mirrorSlabs(anchor, face, axes));
         }
@@ -259,6 +259,9 @@ public final class SelectionRenderer {
         float lineAlpha = 0.85F + 0.15F * pulse;
         if (faceMode) {
             drawBox(pose, lines, border, camera, 0.45F, 0.92F, 0.86F, lineAlpha);
+            if (!slabs.isEmpty()) {
+                drawBox(pose, lines, slabs.get(0), camera, 0.45F, 0.92F, 0.86F, lineAlpha);
+            }
         } else {
             for (AABB slab : slabs) {
                 drawBox(pose, lines, slab, camera, 0.45F, 0.92F, 0.86F, lineAlpha);
@@ -276,17 +279,18 @@ public final class SelectionRenderer {
         }
     }
 
-    /** The chosen copy count, sitting in the anchored side. */
+    /** The chosen copy count, sitting past the positive end of the anchor axis. */
     private static void drawMirrorCount(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft, BlockPos anchor, Direction face, int pattern) {
         String text = Integer.toString(Mirror.copyCount(pattern, 0));
         Font font = minecraft.font;
         float width = font.width(text);
+        Direction end = Direction.get(Direction.AxisDirection.POSITIVE, face.getAxis());
         double out = 0.40D;
         pose.pushPose();
         pose.translate(
-                anchor.getX() + 0.5D + face.getStepX() * out - camera.x,
-                anchor.getY() + 0.5D + face.getStepY() * out - camera.y,
-                anchor.getZ() + 0.5D + face.getStepZ() * out - camera.z);
+                anchor.getX() + 0.5D + end.getStepX() * out - camera.x,
+                anchor.getY() + 0.5D + end.getStepY() * out - camera.y,
+                anchor.getZ() + 0.5D + end.getStepZ() * out - camera.z);
         pose.mulPose(minecraft.getEntityRenderDispatcher().cameraOrientation());
         float scale = 0.05F;
         pose.scale(-scale, -scale, scale);
@@ -326,16 +330,16 @@ public final class SelectionRenderer {
         };
     }
 
-    /** The clicked side, as thick as before, with its outer face on the border. */
-    private static AABB faceSlab(AABB border, Direction face) {
-        double thin = 0.24D;
-        return switch (face) {
-            case EAST -> new AABB(border.maxX - thin, border.minY, border.minZ, border.maxX, border.maxY, border.maxZ);
-            case WEST -> new AABB(border.minX, border.minY, border.minZ, border.minX + thin, border.maxY, border.maxZ);
-            case UP -> new AABB(border.minX, border.maxY - thin, border.minZ, border.maxX, border.maxY, border.maxZ);
-            case DOWN -> new AABB(border.minX, border.minY, border.minZ, border.maxX, border.minY + thin, border.maxZ);
-            case SOUTH -> new AABB(border.minX, border.minY, border.maxZ - thin, border.maxX, border.maxY, border.maxZ);
-            case NORTH -> new AABB(border.minX, border.minY, border.minZ, border.maxX, border.maxY, border.minZ + thin);
+    /** A beam through the middle of the anchor, from one face to the opposite face on this axis. */
+    private static AABB axisBeam(AABB border, Direction.Axis axis) {
+        double cx = (border.minX + border.maxX) * 0.5D;
+        double cy = (border.minY + border.maxY) * 0.5D;
+        double cz = (border.minZ + border.maxZ) * 0.5D;
+        double radius = 0.12D;
+        return switch (axis) {
+            case X -> new AABB(border.minX, cy - radius, cz - radius, border.maxX, cy + radius, cz + radius);
+            case Y -> new AABB(cx - radius, border.minY, cz - radius, cx + radius, border.maxY, cz + radius);
+            case Z -> new AABB(cx - radius, cy - radius, border.minZ, cx + radius, cy + radius, border.maxZ);
         };
     }
 

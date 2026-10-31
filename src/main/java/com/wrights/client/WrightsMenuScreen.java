@@ -1769,6 +1769,14 @@ public class WrightsMenuScreen extends Screen {
         mirrorClearY = y;
     }
 
+    private static String mirrorAxisKey(Direction.Axis axis) {
+        return switch (axis) {
+            case X -> "menu.wrights.mirror_axis_x";
+            case Y -> "menu.wrights.mirror_axis_y";
+            case Z -> "menu.wrights.mirror_axis_z";
+        };
+    }
+
     private int drawMirrorStatus(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int w) {
         String dimension = this.minecraft != null && this.minecraft.level != null ? this.minecraft.level.dimension().location().toString() : "";
         boolean placed = WrightsClientConfig.mirrorPlaced(dimension);
@@ -1782,20 +1790,19 @@ public class WrightsMenuScreen extends Screen {
             drawWrapped(graphics, Component.translatable("menu.wrights.mirror_other_world"), x + 10, y + 6, w - 16, WrightsUi.TEXT);
         } else {
             net.minecraft.core.BlockPos anchor = WrightsClientConfig.mirrorAnchor();
-            int face = WrightsClientConfig.MIRROR_FACE.get();
-            Direction shown = Direction.from3DDataValue(face);
-            graphics.drawString(this.font, Component.translatable("menu.wrights.mirror_anchor", anchor.getX(), anchor.getY(), anchor.getZ(), Component.translatable("menu.wrights.face." + shown.getName())), x + 10, y + 6, WrightsUi.TEXT, false);
+            Direction.Axis axis = Direction.from3DDataValue(WrightsClientConfig.MIRROR_FACE.get()).getAxis();
+            graphics.drawString(this.font, Component.translatable("menu.wrights.mirror_anchor", anchor.getX(), anchor.getY(), anchor.getZ(), Component.translatable(mirrorAxisKey(axis))), x + 10, y + 6, WrightsUi.TEXT, false);
             int copies = com.wrights.blueprint.Mirror.copyCount(WrightsClientConfig.MIRROR_PATTERN.get(), WrightsClientConfig.MIRROR_AXES.get());
             graphics.drawString(this.font, Component.translatable(armed ? "menu.wrights.mirror_copies" : "menu.wrights.mirror_paused", copies), x + 10, y + 18, armed ? WrightsUi.TEAL : WrightsUi.MUTED, false);
             mirrorFaceY = y + 30;
             int pad = 8;
             int gap = 4;
-            int buttonW = (w - pad * 2 - gap * 5) / 6;
-            for (int i = 0; i < 6; i++) {
+            int buttonW = (w - pad * 2 - gap * 2) / 3;
+            Direction.Axis[] axes = {Direction.Axis.X, Direction.Axis.Y, Direction.Axis.Z};
+            for (int i = 0; i < axes.length; i++) {
                 int bx = x + pad + i * (buttonW + gap);
-                int bw = i == 5 ? x + w - pad - bx : buttonW;
-                Direction side = Direction.from3DDataValue(i);
-                drawChoice(graphics, mouseX, mouseY, bx, mirrorFaceY, bw, 16, face == i, "menu.wrights.face." + side.getName());
+                int bw = i == axes.length - 1 ? x + w - pad - bx : buttonW;
+                drawChoice(graphics, mouseX, mouseY, bx, mirrorFaceY, bw, 16, axis == axes[i], mirrorAxisKey(axes[i]));
             }
         }
         return height;
@@ -1972,12 +1979,13 @@ public class WrightsMenuScreen extends Screen {
         if (mirrorFaceY >= 0 && mouseY >= mirrorFaceY && mouseY < mirrorFaceY + 16) {
             int pad = 8;
             int faceGap = 4;
-            int buttonW = (mirrorBodyW - pad * 2 - faceGap * 5) / 6;
-            for (int i = 0; i < 6; i++) {
+            int buttonW = (mirrorBodyW - pad * 2 - faceGap * 2) / 3;
+            Direction.Axis[] axes = {Direction.Axis.X, Direction.Axis.Y, Direction.Axis.Z};
+            for (int i = 0; i < axes.length; i++) {
                 int bx = x + pad + i * (buttonW + faceGap);
-                int bw = i == 5 ? x + mirrorBodyW - pad - bx : buttonW;
+                int bw = i == axes.length - 1 ? x + mirrorBodyW - pad - bx : buttonW;
                 if (mouseX >= bx && mouseX < bx + bw) {
-                    WrightsClientConfig.setMirrorFace(i);
+                    WrightsClientConfig.setMirrorFace(Direction.get(Direction.AxisDirection.POSITIVE, axes[i]).get3DDataValue());
                     return true;
                 }
             }
