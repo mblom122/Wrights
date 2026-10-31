@@ -1312,7 +1312,25 @@ public final class JobManager {
     }
 
     private static boolean nearSite(ServerPlayer player, BuildJob job) {
-        return WrightHomes.playerCovers(player, job.dimension(), job.min());
+        BlockPos[] box = jobBox(job);
+        return WrightHomes.playerCovers(player, job.dimension(), box[0], box[1]);
+    }
+
+    /** The build's block box, stretched to include the anchor the player aims at. */
+    private static BlockPos[] jobBox(BuildJob job) {
+        BlockPos min = job.min();
+        BlockPos far = min.offset(Math.max(0, job.boxSizeX() - 1), Math.max(0, job.boxSizeY() - 1), Math.max(0, job.boxSizeZ() - 1));
+        BlockPos anchor = job.anchor();
+        return new BlockPos[] {
+                new BlockPos(
+                        Math.min(min.getX(), Math.min(far.getX(), anchor.getX())),
+                        Math.min(min.getY(), Math.min(far.getY(), anchor.getY())),
+                        Math.min(min.getZ(), Math.min(far.getZ(), anchor.getZ()))),
+                new BlockPos(
+                        Math.max(min.getX(), Math.max(far.getX(), anchor.getX())),
+                        Math.max(min.getY(), Math.max(far.getY(), anchor.getY())),
+                        Math.max(min.getZ(), Math.max(far.getZ(), anchor.getZ())))
+        };
     }
 
     /** Block crews keep working from the wrightport. Personal crews wait on the player. */
@@ -1329,7 +1347,8 @@ public final class JobManager {
                     continue;
                 }
                 block = true;
-                if (!WrightHomes.portCovers(job.dimension(), hand.homePort, job.dimension(), job.min())) {
+                BlockPos[] box = jobBox(job);
+                if (!WrightHomes.portCoversArea(job.dimension(), hand.homePort, job.dimension(), box[0], box[1])) {
                     blockOk = false;
                     badPort = hand.homePort;
                 }
@@ -1702,12 +1721,13 @@ public final class JobManager {
         return false;
     }
 
-    /** A worn port counts while you are in range. A block port counts while its area covers the build. */
+    /** A personal port counts while you are near the build. A block port counts while its area meets the build. */
     private static boolean coversJob(ServerPlayer player, BuildJob job, BlockPos home) {
+        BlockPos[] box = jobBox(job);
         if (home == null) {
-            return WrightHomes.playerCovers(player, job.dimension(), job.min());
+            return WrightHomes.playerCovers(player, job.dimension(), box[0], box[1]);
         }
-        return WrightHomes.portCovers(job.dimension(), home, job.dimension(), job.min());
+        return WrightHomes.portCoversArea(job.dimension(), home, job.dimension(), box[0], box[1]);
     }
 
     /**
@@ -1781,7 +1801,9 @@ public final class JobManager {
             return List.of();
         }
         boolean playerFirst = com.wrights.blueprint.BlueprintSessions.get(player).portPlayerFirst();
-        return WrightHomes.freeFor(player, level, job.min(), playerFirst, id -> !claimedByOther(library, player.getUUID(), job.id(), id), limit);
+        BlockPos[] box = jobBox(job);
+        boolean near = WrightHomes.playerCovers(player, job.dimension(), box[0], box[1]);
+        return WrightHomes.freeFor(player, level, box[0], box[1], near, playerFirst, id -> !claimedByOther(library, player.getUUID(), job.id(), id), limit);
     }
 
     private static List<UUID> pickResume(ServerPlayer player, SchematicLibrary library, BuildJob job, int wanted) {
@@ -1798,7 +1820,9 @@ public final class JobManager {
         List<WrightHomes.FreeWright> personal = new ArrayList<>();
         List<WrightHomes.FreeWright> blocks = new ArrayList<>();
         if (level != null) {
-            for (WrightHomes.FreeWright free : WrightHomes.freeFor(player, level, job.min(), true, id -> !claimedByOther(library, player.getUUID(), job.id(), id), Integer.MAX_VALUE)) {
+            BlockPos[] box = jobBox(job);
+            boolean near = WrightHomes.playerCovers(player, job.dimension(), box[0], box[1]);
+            for (WrightHomes.FreeWright free : WrightHomes.freeFor(player, level, box[0], box[1], near, true, id -> !claimedByOther(library, player.getUUID(), job.id(), id), Integer.MAX_VALUE)) {
                 if (free.personal()) {
                     personal.add(free);
                 } else {
@@ -1861,11 +1885,12 @@ public final class JobManager {
                 break;
             }
         }
-        boolean playerNear = WrightHomes.playerCovers(player, job.dimension(), job.min());
+        BlockPos[] box = jobBox(job);
+        boolean playerNear = WrightHomes.playerCovers(player, job.dimension(), box[0], box[1]);
         int ports = level == null ? 0 : WrightHomes.coveringPortCount(level, job.min(), player.getUUID());
         if (fromBlock && origin != null && level != null && !level.isLoaded(origin)) {
             Messages.actionBar(player, "message.wrights.paused_chunk");
-        } else if (fromBlock && origin != null && !WrightHomes.portCovers(job.dimension(), origin, job.dimension(), job.min()) && !playerNear) {
+        } else if (fromBlock && origin != null && !WrightHomes.portCoversArea(job.dimension(), origin, job.dimension(), box[0], box[1]) && !playerNear) {
             tellPortAt(player, level, origin, "message.wrights.resume_port_far", "message.wrights.resume_port_far_named");
         } else if (!fromBlock && !playerNear && ports == 0) {
             Messages.actionBar(player, "message.wrights.resume_player_far");
@@ -2163,9 +2188,11 @@ public final class JobManager {
     private static CrewGap crewGap(ServerPlayer player, BuildJob job) {
         ServerLevel level = player.getServer().getLevel(job.dimension());
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
-        WrightHomes.Reach reach = WrightHomes.reach(player, level, job.min(), id -> !claimedByOther(library, player.getUUID(), job.id(), id));
-        int owned = (reach.playerNear() ? reach.personal() : 0) + reach.portWrights();
-        int free = (reach.playerNear() ? reach.personalFree() : 0) + reach.portFree();
+        BlockPos[] box = jobBox(job);
+        boolean near = WrightHomes.playerCovers(player, job.dimension(), box[0], box[1]);
+        WrightHomes.Reach reach = WrightHomes.reach(player, level, box[0], box[1], near, id -> !claimedByOther(library, player.getUUID(), job.id(), id));
+        int owned = (near ? reach.personal() : 0) + reach.portWrights();
+        int free = (near ? reach.personalFree() : 0) + reach.portFree();
         if (owned > 0 && free == 0) {
             return CrewGap.NONE_AVAILABLE;
         }

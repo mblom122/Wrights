@@ -27,7 +27,7 @@
   "message.wrights.armed": "Paste aimed. Sneak-use that spot again to launch",
   "message.wrights.aim_cancelled": "Aim cancelled",
   "message.wrights.launched": "Wright launched",
-  "message.wrights.queued": "Queued for %s wrights. They join from a port in range.",
+  "message.wrights.queued": "Queued for %s wrights. They join from you or a wrightport in range.",
   "message.wrights.queue_ready": "Queued build has its %s wrights",
   "message.wrights.build_overlap": "A wright is already building there",
   "message.wrights.stopped_all": "Stopped the wrights",

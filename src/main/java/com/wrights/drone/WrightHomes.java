@@ -70,6 +70,20 @@ public final class WrightHomes {
         return player != null && ownedBy(port, player.getUUID());
     }
 
+    private static int chunkStart(BlockPos min, BlockPos max, boolean x) {
+        BlockPos high = max == null ? min : max;
+        int first = SectionPos.blockToSectionCoord(x ? min.getX() : min.getZ());
+        int second = SectionPos.blockToSectionCoord(x ? high.getX() : high.getZ());
+        return Math.min(first, second) - PORT_CHUNKS;
+    }
+
+    private static int chunkEnd(BlockPos min, BlockPos max, boolean x) {
+        BlockPos high = max == null ? min : max;
+        int first = SectionPos.blockToSectionCoord(x ? min.getX() : min.getZ());
+        int second = SectionPos.blockToSectionCoord(x ? high.getX() : high.getZ());
+        return Math.max(first, second) + PORT_CHUNKS;
+    }
+
     private static boolean ownedBy(WrightportBlockEntity port, UUID owner) {
         return owner != null && owner.equals(port.owner());
     }
@@ -78,11 +92,26 @@ public final class WrightHomes {
     public static final int PORT_CHUNKS = 3;
 
     public static boolean playerCovers(ServerPlayer player, ResourceKey<Level> dimension, BlockPos site) {
-        if (player == null || site == null || dimension == null || !player.level().dimension().equals(dimension)) {
+        return playerCovers(player, dimension, site, site);
+    }
+
+    /** True when the player is within range of the closest point on the build, not only one corner. */
+    public static boolean playerCovers(ServerPlayer player, ResourceKey<Level> dimension, BlockPos min, BlockPos max) {
+        if (player == null || min == null || dimension == null || !player.level().dimension().equals(dimension)) {
             return false;
         }
+        BlockPos high = max == null ? min : max;
+        double x0 = Math.min(min.getX(), high.getX());
+        double y0 = Math.min(min.getY(), high.getY());
+        double z0 = Math.min(min.getZ(), high.getZ());
+        double x1 = Math.max(min.getX(), high.getX()) + 1.0D;
+        double y1 = Math.max(min.getY(), high.getY()) + 1.0D;
+        double z1 = Math.max(min.getZ(), high.getZ()) + 1.0D;
+        double x = Math.max(x0, Math.min(player.getX(), x1));
+        double y = Math.max(y0, Math.min(player.getY() + 0.5D, y1));
+        double z = Math.max(z0, Math.min(player.getZ(), z1));
         double range = WrightsConfig.MAX_RANGE.getAsInt();
-        return player.distanceToSqr(Vec3.atCenterOf(site)) <= range * range;
+        return player.distanceToSqr(x, y, z) <= range * range;
     }
 
     /** A placed port covers a build when that build sits in its 7 by 7 chunk square. */
@@ -95,6 +124,23 @@ public final class WrightHomes {
         return dx <= PORT_CHUNKS && dz <= PORT_CHUNKS;
     }
 
+    /** A placed port covers a build when its chunk square meets any part of that build. */
+    public static boolean portCoversArea(ResourceKey<Level> portDimension, BlockPos port, ResourceKey<Level> jobDimension, BlockPos min, BlockPos max) {
+        if (port == null || min == null || portDimension == null || !portDimension.equals(jobDimension)) {
+            return false;
+        }
+        BlockPos high = max == null ? min : max;
+        int portX = SectionPos.blockToSectionCoord(port.getX());
+        int portZ = SectionPos.blockToSectionCoord(port.getZ());
+        int minX = SectionPos.blockToSectionCoord(Math.min(min.getX(), high.getX()));
+        int maxX = SectionPos.blockToSectionCoord(Math.max(min.getX(), high.getX()));
+        int minZ = SectionPos.blockToSectionCoord(Math.min(min.getZ(), high.getZ()));
+        int maxZ = SectionPos.blockToSectionCoord(Math.max(min.getZ(), high.getZ()));
+        int dx = portX < minX ? minX - portX : portX > maxX ? portX - maxX : 0;
+        int dz = portZ < minZ ? minZ - portZ : portZ > maxZ ? portZ - maxZ : 0;
+        return dx <= PORT_CHUNKS && dz <= PORT_CHUNKS;
+    }
+
     /**
      * What can reach a build. Personal wrights only count as reachable while the player is near the site.
      * A placed port counts while its 7 by 7 chunk square contains the site.
@@ -103,7 +149,12 @@ public final class WrightHomes {
     }
 
     public static Reach reach(ServerPlayer player, ServerLevel level, BlockPos site, Predicate<UUID> free) {
-        boolean near = playerCovers(player, level == null ? null : level.dimension(), site);
+        return reach(player, level, site, site, playerCovers(player, level == null ? null : level.dimension(), site), free);
+    }
+
+    public static Reach reach(ServerPlayer player, ServerLevel level, BlockPos min, BlockPos max, boolean playerNear, Predicate<UUID> free) {
+        boolean near = playerNear;
+        BlockPos site = min;
         int personal = 0;
         int personalFree = 0;
         if (player != null) {
@@ -118,10 +169,12 @@ public final class WrightHomes {
         int portWrights = 0;
         int portFree = 0;
         if (level != null && site != null) {
-            int centerX = SectionPos.blockToSectionCoord(site.getX());
-            int centerZ = SectionPos.blockToSectionCoord(site.getZ());
-            for (int chunkX = centerX - PORT_CHUNKS; chunkX <= centerX + PORT_CHUNKS; chunkX++) {
-                for (int chunkZ = centerZ - PORT_CHUNKS; chunkZ <= centerZ + PORT_CHUNKS; chunkZ++) {
+            int fromX = chunkStart(min, max, true);
+            int toX = chunkEnd(min, max, true);
+            int fromZ = chunkStart(min, max, false);
+            int toZ = chunkEnd(min, max, false);
+            for (int chunkX = fromX; chunkX <= toX; chunkX++) {
+                for (int chunkZ = fromZ; chunkZ <= toZ; chunkZ++) {
                     if (!level.hasChunk(chunkX, chunkZ)) {
                         continue;
                     }
@@ -129,7 +182,7 @@ public final class WrightHomes {
                         if (!(entity instanceof WrightportBlockEntity port) || !ownedBy(port, player)) {
                             continue;
                         }
-                        if (!portCovers(level.dimension(), entity.getBlockPos(), level.dimension(), site)) {
+                        if (!portCoversArea(level.dimension(), entity.getBlockPos(), level.dimension(), min, max)) {
                             continue;
                         }
                         ports++;
@@ -276,12 +329,18 @@ public final class WrightHomes {
      * Block ones count while their port's 7 by 7 chunk square contains the site.
      */
     public static List<FreeWright> freeFor(ServerPlayer player, ServerLevel level, BlockPos site, boolean playerFirst, Predicate<UUID> free, int limit) {
+        boolean near = player != null && level != null && playerCovers(player, level.dimension(), site);
+        return freeFor(player, level, site, site, near, playerFirst, free, limit);
+    }
+
+    public static List<FreeWright> freeFor(ServerPlayer player, ServerLevel level, BlockPos min, BlockPos max, boolean playerNear, boolean playerFirst, Predicate<UUID> free, int limit) {
         List<FreeWright> personal = new ArrayList<>();
         List<FreeWright> blocks = new ArrayList<>();
+        BlockPos site = min;
         if (limit <= 0 || player == null || level == null || site == null) {
             return personal;
         }
-        if (playerCovers(player, level.dimension(), site)) {
+        if (playerNear) {
             for (Swarm.Unit unit : Wrightports.swarm(player).units()) {
                 if (!free.test(unit.id()) || ManageLock.blocks(player, unit.id())) {
                     continue;
@@ -289,10 +348,13 @@ public final class WrightHomes {
                 personal.add(new FreeWright(unit, null));
             }
         }
-        int centerX = SectionPos.blockToSectionCoord(site.getX());
-        int centerZ = SectionPos.blockToSectionCoord(site.getZ());
-        for (int chunkX = centerX - PORT_CHUNKS; chunkX <= centerX + PORT_CHUNKS; chunkX++) {
-            for (int chunkZ = centerZ - PORT_CHUNKS; chunkZ <= centerZ + PORT_CHUNKS; chunkZ++) {
+        BlockPos high = max == null ? site : max;
+        int fromX = chunkStart(site, high, true);
+        int toX = chunkEnd(site, high, true);
+        int fromZ = chunkStart(site, high, false);
+        int toZ = chunkEnd(site, high, false);
+        for (int chunkX = fromX; chunkX <= toX; chunkX++) {
+            for (int chunkZ = fromZ; chunkZ <= toZ; chunkZ++) {
                 if (!level.hasChunk(chunkX, chunkZ)) {
                     continue;
                 }
@@ -301,7 +363,7 @@ public final class WrightHomes {
                         continue;
                     }
                     BlockPos home = entity.getBlockPos();
-                    if (!portCovers(level.dimension(), home, level.dimension(), site)) {
+                    if (!portCoversArea(level.dimension(), home, level.dimension(), site, high)) {
                         continue;
                     }
                     for (Swarm.Unit unit : port.swarm().units()) {
