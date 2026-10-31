@@ -1790,6 +1790,9 @@ public final class JobManager {
     }
 
     private static boolean claimedByOther(ServerPlayer player, SchematicLibrary library, UUID jobId, UUID unitId) {
+        if (isReturning(unitId)) {
+            return true;
+        }
         for (BuildJob other : library.jobsFor(player.getUUID())) {
             if ((jobId != null && other.id().equals(jobId)) || !usesDrones(other) || other.awaitingDrones()) {
                 continue;
@@ -4043,6 +4046,7 @@ public final class JobManager {
             Entity existing = level.getEntity(job.droneId());
             if (existing instanceof DroneEntity drone && drone.isAlive()) {
                 paint(drone, job);
+                bindUnit(job, drone, 0);
                 return drone;
             }
             BlockPos last = job.lastDronePos();
@@ -4054,10 +4058,15 @@ public final class JobManager {
         for (DroneEntity drone : level.getEntitiesOfClass(DroneEntity.class, search, entity -> entity.jobId().filter(job.id()::equals).isPresent() && entity.isAlive())) {
             job.setDroneId(drone.getUUID());
             paint(drone, job);
+            bindUnit(job, drone, 0);
             return drone;
+        }
+        if (stillFlyingHome(job, 0)) {
+            return null;
         }
         DroneEntity drone = new DroneEntity(ModEntities.DRONE.get(), level);
         drone.setJobId(job.id());
+        bindUnit(job, drone, 0);
         Vec3 site = Vec3.atCenterOf(workPos).add(0.0D, 1.15D, 0.0D);
         BlockPos home = job.hands().isEmpty() ? null : job.hands().get(0).homePort;
         depart(drone, player, site, 0, 1, home);
@@ -4066,6 +4075,17 @@ public final class JobManager {
         level.addFreshEntity(drone);
         paint(drone, job);
         return drone;
+    }
+
+    private static void bindUnit(BuildJob job, DroneEntity drone, int handIndex) {
+        if (handIndex >= 0 && handIndex < job.crewUnits().size()) {
+            drone.assignUnit(job.crewUnits().get(handIndex));
+        }
+    }
+
+    /** The flyer for this wright is still on its way back, so another one must not launch. */
+    private static boolean stillFlyingHome(BuildJob job, int handIndex) {
+        return handIndex >= 0 && handIndex < job.crewUnits().size() && isReturning(job.crewUnits().get(handIndex));
     }
 
     private static void paint(DroneEntity drone, BuildJob job) {
@@ -4078,6 +4098,7 @@ public final class JobManager {
             Entity existing = level.getEntity(hand.entityId);
             if (existing instanceof DroneEntity drone && drone.isAlive()) {
                 carryStrand(job, hand, drone);
+                bindUnit(job, drone, job.hands().indexOf(hand));
                 return drone;
             }
             BlockPos last = hand.lastPos;
@@ -4094,10 +4115,15 @@ public final class JobManager {
             hand.entityId = drone.getUUID();
             hand.lastPos = drone.blockPosition();
             carryStrand(job, hand, drone);
+            bindUnit(job, drone, job.hands().indexOf(hand));
             return drone;
+        }
+        if (stillFlyingHome(job, job.hands().indexOf(hand))) {
+            return null;
         }
         DroneEntity drone = new DroneEntity(ModEntities.DRONE.get(), level);
         drone.setJobId(job.id());
+        bindUnit(job, drone, job.hands().indexOf(hand));
         Vec3 site = Vec3.atCenterOf(workPos).add(0.0D, 1.15D, 0.0D);
         depart(drone, player, site, hand.lane, hand.lanes, hand.homePort);
         hand.entityId = drone.getUUID();
@@ -4646,6 +4672,25 @@ public final class JobManager {
             }
             return false;
         }
+    }
+
+    /** Wrights still flying home. A queued job must not launch a second flyer for the same one. */
+    private static final Set<UUID> RETURNING = new HashSet<>();
+
+    public static void holdReturn(UUID unitId) {
+        if (unitId != null) {
+            RETURNING.add(unitId);
+        }
+    }
+
+    public static void releaseReturn(UUID unitId) {
+        if (unitId != null) {
+            RETURNING.remove(unitId);
+        }
+    }
+
+    private static boolean isReturning(UUID unitId) {
+        return unitId != null && RETURNING.contains(unitId);
     }
 
     private static void sendHome(MinecraftServer server, ServerPlayer player, BuildJob job) {

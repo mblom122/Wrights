@@ -83,6 +83,18 @@ public class DroneEntity extends Entity {
         this.stranded = false;
     }
 
+    /** The port wright this flyer stands for. Set while it is out, so a return cannot be double-booked. */
+    public void assignUnit(@Nullable UUID unit) {
+        if (unit != null) {
+            this.unitId = unit;
+        }
+    }
+
+    @Nullable
+    public UUID unitId() {
+        return this.unitId;
+    }
+
     /** Saves a wright whose dock is already gone, when it will not get to fly home. */
     public void recoverIfStranded() {
         if (!this.stranded || !(this.level() instanceof ServerLevel server)) {
@@ -157,6 +169,17 @@ public class DroneEntity extends Entity {
         }
         Vec3 dock = port != null ? WrightHomes.hatch(port) : WrightHomes.behindPlayer(player);
         this.returnLimit = returnBudget(dock);
+        if (this.unitId != null && !this.level().isClientSide) {
+            com.wrights.job.JobManager.holdReturn(this.unitId);
+        }
+    }
+
+    @Override
+    public void remove(RemovalReason reason) {
+        if (reason.shouldDestroy() && this.unitId != null && this.level() instanceof ServerLevel) {
+            com.wrights.job.JobManager.releaseReturn(this.unitId);
+        }
+        super.remove(reason);
     }
 
     @Override
@@ -236,6 +259,9 @@ public class DroneEntity extends Entity {
             return;
         }
         if (this.returning) {
+            if (this.unitId != null) {
+                com.wrights.job.JobManager.holdReturn(this.unitId);
+            }
             ServerPlayer player = this.ownerId == null ? null : serverLevel.getServer().getPlayerList().getPlayer(this.ownerId);
             boolean loadedHome = homePort != null && serverLevel.isLoaded(homePort);
             if (!this.stranded && (player == null || player.level() != this.level())) {
@@ -313,6 +339,9 @@ public class DroneEntity extends Entity {
         this.stranded = tag.getBoolean("Stranded");
         if (tag.hasUUID("UnitId")) {
             this.unitId = tag.getUUID("UnitId");
+        }
+        if (this.returning && this.unitId != null && this.level() instanceof ServerLevel) {
+            com.wrights.job.JobManager.holdReturn(this.unitId);
         }
         this.unitName = tag.getString("UnitName");
     }
