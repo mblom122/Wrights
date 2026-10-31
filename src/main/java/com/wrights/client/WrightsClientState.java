@@ -98,6 +98,9 @@ public final class WrightsClientState {
     public static BlockPos portGlowAnchor;
     public static boolean portGlowLine;
     public static long portGlowUntil;
+    public static String mirrorGlowDim = "";
+    public static BlockPos mirrorGlowPos;
+    public static long mirrorGlowUntil;
     public static int digitalKind;
     public static boolean digitalOnline;
     public static boolean digitalBound;
@@ -1517,6 +1520,17 @@ public final class WrightsClientState {
 
     public static boolean portGlowing() {
         return portGlowPos != null && System.currentTimeMillis() < portGlowUntil;
+    }
+
+    /** Marks the mirror anchor for five seconds, with a line back to the player. */
+    public static void glowMirrorAnchor(String dimension, BlockPos pos) {
+        mirrorGlowDim = dimension == null ? "" : dimension;
+        mirrorGlowPos = pos == null ? null : pos.immutable();
+        mirrorGlowUntil = System.currentTimeMillis() + 5000L;
+    }
+
+    public static boolean mirrorGlowing() {
+        return mirrorGlowPos != null && System.currentTimeMillis() < mirrorGlowUntil;
     }
 
     public static void applySupply(BlueprintPayloads.SupplySync payload) {

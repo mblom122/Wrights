@@ -1456,6 +1456,11 @@ public class WrightsMenuScreen extends Screen {
     private int mirrorShapesY;
     private int mirrorReplaceY = -1;
     private int mirrorOnY;
+    private int mirrorHighlightX;
+    private int mirrorHighlightY = -1;
+    private int mirrorHighlightW;
+    private int mirrorClearX;
+    private int mirrorClearW;
     private int mirrorClearY;
     private int mirrorBodyX;
     private int mirrorBodyW;
@@ -1481,12 +1486,17 @@ public class WrightsMenuScreen extends Screen {
         y += 36;
         graphics.drawString(this.font, Component.translatable("menu.wrights.mirror_pattern"), x, y, WrightsUi.MUTED, false);
         y += 12;
-        int cardW = Math.max(40, (w - gap * 2) / 3);
+        int cardW = Math.max(36, (w - gap * 3) / 4);
         mirrorCardY = y;
         mirrorCardW = cardW;
-        drawChoice(graphics, mouseX, mouseY, x, y, cardW, 36, WrightsClientConfig.MIRROR_PATTERN.get() == com.wrights.blueprint.Mirror.PAIR, "menu.wrights.mirror_pair", "menu.wrights.mirror_pair_hint");
-        drawChoice(graphics, mouseX, mouseY, x + cardW + gap, y, cardW, 36, WrightsClientConfig.MIRROR_PATTERN.get() == com.wrights.blueprint.Mirror.CROSS, "menu.wrights.mirror_cross", "menu.wrights.mirror_cross_hint");
-        drawChoice(graphics, mouseX, mouseY, x + (cardW + gap) * 2, y, cardW, 36, WrightsClientConfig.MIRROR_PATTERN.get() == com.wrights.blueprint.Mirror.EIGHT, "menu.wrights.mirror_eight", "menu.wrights.mirror_eight_hint");
+        int pattern = WrightsClientConfig.MIRROR_PATTERN.get();
+        String[] patternNames = {"menu.wrights.mirror_pair", "menu.wrights.mirror_cross", "menu.wrights.mirror_eight", "menu.wrights.mirror_sixteen"};
+        String[] patternHints = {"menu.wrights.mirror_pair_hint", "menu.wrights.mirror_cross_hint", "menu.wrights.mirror_eight_hint", "menu.wrights.mirror_sixteen_hint"};
+        for (int i = 0; i < patternNames.length; i++) {
+            int cardX = x + (cardW + gap) * i;
+            int width = i == patternNames.length - 1 ? x + w - cardX : cardW;
+            drawChoice(graphics, mouseX, mouseY, cardX, y, width, 36, pattern == i, patternNames[i], patternHints[i]);
+        }
         y += 44;
         mirrorNbtY = y;
         drawMirrorToggle(graphics, mouseX, mouseY, x, y, WrightsClientConfig.COPY_NBT_BLOCKS.get(), "screen.wrights.copy_nbt_blocks", "screen.wrights.copy_nbt_blocks_hint", true);
@@ -1516,13 +1526,28 @@ public class WrightsMenuScreen extends Screen {
         y += 22;
         drawMirrorStatus(graphics, x, y, w);
         y += 40;
-        mirrorClearY = y;
+        mirrorHighlightY = y;
+        int gap = 8;
+        int clearW = Math.min(108, Math.max(72, (w - gap) / 2));
+        int highlightW = Math.max(72, w - gap - clearW);
+        mirrorHighlightX = x;
+        mirrorHighlightW = highlightW;
+        mirrorClearX = x + highlightW + gap;
+        mirrorClearW = clearW;
+        String dimension = this.minecraft != null && this.minecraft.level != null ? this.minecraft.level.dimension().location().toString() : "";
+        boolean here = WrightsClientConfig.mirrorPlaced(dimension);
+        boolean highlightHover = here && mouseX >= x && mouseX < x + highlightW && mouseY >= y && mouseY < y + 18 && !overMirrorHelp(mouseX, mouseY);
+        graphics.fill(x, y, x + highlightW, y + 18, here ? (highlightHover ? 0xFF245850 : 0xFF1A3A38) : 0xFF1C2A37);
+        String highlight = this.font.plainSubstrByWidth(Component.translatable("menu.wrights.mirror_highlight").getString(), Math.max(8, highlightW - 28));
+        graphics.drawString(this.font, highlight, x + 8, y + 5, here ? WrightsUi.TEAL : WrightsUi.MUTED, false);
+        drawHelpBox(graphics, mouseX, mouseY, x + highlightW - 16, y + 3, "menu.wrights.mirror_highlight_hint");
         boolean clearOn = WrightsClientConfig.MIRROR_SET.get();
-        boolean clearHover = clearOn && mouseX >= x && mouseX < x + 108 && mouseY >= y && mouseY < y + 18 && !overMirrorHelp(mouseX, mouseY);
-        graphics.fill(x, y, x + 108, y + 18, clearOn ? (clearHover ? 0xFF5A3030 : 0xFF3A2428) : 0xFF1C2A37);
-        String clear = this.font.plainSubstrByWidth(Component.translatable("menu.wrights.mirror_clear").getString(), 80);
-        graphics.drawString(this.font, clear, x + 8, y + 5, clearOn ? WrightsUi.RED : WrightsUi.MUTED, false);
-        drawHelpBox(graphics, mouseX, mouseY, x + 112, y + 3, "menu.wrights.mirror_clear_hint");
+        boolean clearHover = clearOn && mouseX >= mirrorClearX && mouseX < mirrorClearX + clearW && mouseY >= y && mouseY < y + 18 && !overMirrorHelp(mouseX, mouseY);
+        graphics.fill(mirrorClearX, y, mirrorClearX + clearW, y + 18, clearOn ? (clearHover ? 0xFF5A3030 : 0xFF3A2428) : 0xFF1C2A37);
+        String clear = this.font.plainSubstrByWidth(Component.translatable("menu.wrights.mirror_clear").getString(), Math.max(8, clearW - 28));
+        graphics.drawString(this.font, clear, mirrorClearX + 8, y + 5, clearOn ? WrightsUi.RED : WrightsUi.MUTED, false);
+        drawHelpBox(graphics, mouseX, mouseY, mirrorClearX + clearW - 16, y + 3, "menu.wrights.mirror_clear_hint");
+        mirrorClearY = y;
     }
 
     private void drawMirrorStatus(GuiGraphics graphics, int x, int y, int w) {
@@ -1627,7 +1652,9 @@ public class WrightsMenuScreen extends Screen {
         }
         if (mouseY >= mirrorCardY && mouseY < mirrorCardY + 36) {
             int index = (int) ((mouseX - x) / (mirrorCardW + gap));
-            if (index >= 0 && index < 3 && mouseX < x + (mirrorCardW + gap) * index + mirrorCardW) {
+            int cardX = x + (mirrorCardW + gap) * index;
+            int cardWidth = index == 3 ? x + mirrorBodyW - cardX : mirrorCardW;
+            if (index >= 0 && index < 4 && mouseX >= cardX && mouseX < cardX + cardWidth) {
                 WrightsClientConfig.setMirrorPattern(index);
                 return true;
             }
@@ -1660,7 +1687,17 @@ public class WrightsMenuScreen extends Screen {
             WrightsClientConfig.setMirrorOn(!WrightsClientConfig.MIRROR_ON.get());
             return true;
         }
-        if (WrightsClientConfig.MIRROR_SET.get() && mouseX >= x && mouseX < x + 108 && mouseY >= mirrorClearY && mouseY < mirrorClearY + 18) {
+        if (mirrorHighlightY >= 0 && mouseX >= mirrorHighlightX && mouseX < mirrorHighlightX + mirrorHighlightW && mouseY >= mirrorHighlightY && mouseY < mirrorHighlightY + 18) {
+            String dimension = this.minecraft != null && this.minecraft.level != null ? this.minecraft.level.dimension().location().toString() : "";
+            if (WrightsClientConfig.mirrorPlaced(dimension)) {
+                WrightsClientState.glowMirrorAnchor(dimension, WrightsClientConfig.mirrorAnchor());
+                if (this.minecraft != null) {
+                    this.minecraft.setScreen(null);
+                }
+            }
+            return true;
+        }
+        if (WrightsClientConfig.MIRROR_SET.get() && mouseX >= mirrorClearX && mouseX < mirrorClearX + mirrorClearW && mouseY >= mirrorClearY && mouseY < mirrorClearY + 18) {
             WrightsClientConfig.clearMirror();
             return true;
         }

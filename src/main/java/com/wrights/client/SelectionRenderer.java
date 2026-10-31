@@ -83,6 +83,7 @@ public final class SelectionRenderer {
         drawPortBounds(pose, buffers, camera, minecraft);
         drawPortGlow(pose, buffers, camera, minecraft);
         drawMarkedPorts(pose, buffers, camera, minecraft);
+        drawMirrorAnchorGlow(pose, buffers, camera, minecraft);
         boolean placing = minecraft.screen instanceof PlacementScreen;
         boolean adjust = minecraft.screen instanceof BlueprintAdjustScreen;
         boolean gui = minecraft.screen != null;
@@ -380,9 +381,7 @@ public final class SelectionRenderer {
         drawBox(pose, lines, box, camera, 1.0F, 0.78F, 0.2F, alpha);
         drawBox(pose, lines, box.inflate(0.06D), camera, 1.0F, 0.92F, 0.45F, alpha * 0.7F);
         if (WrightsClientState.portGlowLine && WrightsClientState.portGlowAnchor != null) {
-            Vec3 from = Vec3.atCenterOf(WrightsClientState.portGlowAnchor).add(0.0D, 0.55D, 0.0D);
-            Vec3 to = Vec3.atCenterOf(WrightsClientState.portGlowPos).add(0.0D, 0.65D, 0.0D);
-            drawLine(pose, lines, camera, from, to, 1.0F, 0.78F, 0.2F, alpha);
+            drawGuide(pose, lines, camera, new AABB(WrightsClientState.portGlowAnchor), new AABB(WrightsClientState.portGlowPos), 1.0F, 0.78F, 0.2F, alpha);
         }
         buffers.endBatch(RenderType.lines());
     }
@@ -395,7 +394,7 @@ public final class SelectionRenderer {
         float pulse = 0.65F + 0.35F * (float) Math.sin(System.currentTimeMillis() / 180.0D);
         VertexConsumer lines = buffers.getBuffer(RenderType.lines());
         boolean any = false;
-        Vec3 eye = minecraft.player.getEyePosition();
+        AABB body = minecraft.player.getBoundingBox();
         for (BlueprintPayloads.PlacedPort port : WrightsClientState.placedPorts) {
             if (!here.equals(port.dimension()) || !WrightsClientState.portMarked(port.dimension(), port.pos())) {
                 continue;
@@ -404,7 +403,7 @@ public final class SelectionRenderer {
             AABB block = new AABB(port.pos()).inflate(0.12D);
             drawBox(pose, lines, block, camera, 0.55F, 1.0F, 0.62F, 1.0F);
             drawBox(pose, lines, block.inflate(0.08D), camera, 0.85F, 1.0F, 0.55F, pulse);
-            drawLine(pose, lines, camera, eye, Vec3.atCenterOf(port.pos()), 0.45F, 1.0F, 0.55F, pulse);
+            drawGuide(pose, lines, camera, body, new AABB(port.pos()), 0.45F, 1.0F, 0.55F, pulse);
             any = true;
         }
         if (any) {
@@ -759,6 +758,58 @@ public final class SelectionRenderer {
         } else {
             drawLine(pose, lines, camera, new Vec3(hx, hy, hz), new Vec3(x2, y2, z2), red, green, blue, alpha);
         }
+    }
+
+    private static void drawMirrorAnchorGlow(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
+        if (!WrightsClientState.mirrorGlowing() || minecraft.level == null || minecraft.player == null) {
+            return;
+        }
+        if (!minecraft.level.dimension().location().toString().equals(WrightsClientState.mirrorGlowDim)) {
+            return;
+        }
+        boolean on = (System.currentTimeMillis() / 180L) % 2L == 0L;
+        BlockPos pos = WrightsClientState.mirrorGlowPos;
+        AABB box = new AABB(pos).inflate(0.08D);
+        VertexConsumer fill = buffers.getBuffer(RenderType.debugFilledBox());
+        AABB local = box.move(-camera.x, -camera.y, -camera.z);
+        LevelRenderer.addChainedFilledBoxVertices(
+                pose, fill, local.minX, local.minY, local.minZ, local.maxX, local.maxY, local.maxZ,
+                0.37F, 0.82F, 0.77F, on ? 0.28F : 0.05F);
+        buffers.endBatch(RenderType.debugFilledBox());
+        VertexConsumer lines = buffers.getBuffer(RenderType.lines());
+        float alpha = on ? 1.0F : 0.18F;
+        drawBox(pose, lines, box, camera, 0.45F, 0.92F, 0.86F, alpha);
+        drawBox(pose, lines, box.inflate(0.06D), camera, 0.70F, 1.0F, 0.94F, alpha * 0.7F);
+        drawGuide(pose, lines, camera, minecraft.player.getBoundingBox(), new AABB(pos), 0.45F, 0.92F, 0.86F, 1.0F);
+        buffers.endBatch(RenderType.lines());
+    }
+
+    /** A solid guide from the face it leaves to the face it arrives on. */
+    private static void drawGuide(PoseStack pose, VertexConsumer lines, Vec3 camera, AABB fromBox, AABB toBox, float red, float green, float blue, float alpha) {
+        Vec3 fromCenter = fromBox.getCenter();
+        Vec3 toCenter = toBox.getCenter();
+        drawLine(pose, lines, camera, faceCenter(fromBox, toCenter), faceCenter(toBox, fromCenter), red, green, blue, alpha);
+    }
+
+    /** Center of the side the line crosses on its way toward the other point. */
+    private static Vec3 faceCenter(AABB box, Vec3 toward) {
+        Vec3 center = box.getCenter();
+        double dx = toward.x - center.x;
+        double dy = toward.y - center.y;
+        double dz = toward.z - center.z;
+        double ax = Math.abs(dx);
+        double ay = Math.abs(dy);
+        double az = Math.abs(dz);
+        double tx = ax < 1.0E-6D ? Double.POSITIVE_INFINITY : (box.maxX - box.minX) * 0.5D / ax;
+        double ty = ay < 1.0E-6D ? Double.POSITIVE_INFINITY : (box.maxY - box.minY) * 0.5D / ay;
+        double tz = az < 1.0E-6D ? Double.POSITIVE_INFINITY : (box.maxZ - box.minZ) * 0.5D / az;
+        if (tx <= ty && tx <= tz) {
+            return new Vec3(dx >= 0.0D ? box.maxX : box.minX, center.y, center.z);
+        }
+        if (ty <= tz) {
+            return new Vec3(center.x, dy >= 0.0D ? box.maxY : box.minY, center.z);
+        }
+        return new Vec3(center.x, center.y, dz >= 0.0D ? box.maxZ : box.minZ);
     }
 
     private static void drawLine(PoseStack pose, VertexConsumer lines, Vec3 camera, Vec3 from, Vec3 to, float red, float green, float blue, float alpha) {
