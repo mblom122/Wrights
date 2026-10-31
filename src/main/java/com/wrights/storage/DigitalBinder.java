@@ -41,7 +41,11 @@ public final class DigitalBinder {
             return;
         }
         DigitalLink.Kind kind = DigitalNetworks.bindKindAt(level, pos);
-        if (kind == DigitalLink.Kind.NONE) {
+        if (kind == DigitalLink.Kind.AE2) {
+            Messages.actionBar(player, "message.wrights.digital_ae2_slot");
+            return;
+        }
+        if (kind != DigitalLink.Kind.RS) {
             Messages.actionBar(player, "message.wrights.digital_not_target");
             return;
         }
@@ -53,9 +57,7 @@ public final class DigitalBinder {
         session.setDigitalLink(link);
         library.setDigital(player.getUUID(), link);
         BlueprintNetwork.syncDigital(player);
-        Messages.actionBar(player, kind == DigitalLink.Kind.AE2
-                ? "message.wrights.digital_bound_ae2"
-                : "message.wrights.digital_bound_rs");
+        Messages.actionBar(player, "message.wrights.digital_bound_rs");
     }
 
     /**

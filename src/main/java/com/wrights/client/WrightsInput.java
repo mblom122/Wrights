@@ -154,13 +154,15 @@ public final class WrightsInput {
             event.setUseBlock(TriState.FALSE);
             event.setUseItem(TriState.FALSE);
             boundThisClick = true;
-            if (com.wrights.storage.DigitalNetworks.bindKindAt(event.getLevel(), event.getPos())
-                    != com.wrights.storage.DigitalLink.Kind.NONE) {
+            com.wrights.storage.DigitalLink.Kind kind = com.wrights.storage.DigitalNetworks.bindKindAt(event.getLevel(), event.getPos());
+            if (kind == com.wrights.storage.DigitalLink.Kind.RS) {
                 net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                         new BlueprintPayloads.BindDigital(event.getPos(), false));
             } else {
-                event.getEntity().displayClientMessage(
-                        net.minecraft.network.chat.Component.translatable("message.wrights.digital_not_target"), true);
+                String key = kind == com.wrights.storage.DigitalLink.Kind.AE2
+                        ? "message.wrights.digital_ae2_slot"
+                        : "message.wrights.digital_not_target";
+                event.getEntity().displayClientMessage(net.minecraft.network.chat.Component.translatable(key), true);
             }
             return;
         }
