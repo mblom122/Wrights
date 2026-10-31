@@ -10,7 +10,6 @@ import com.wrights.WrightsClientConfig;
 /** Drag the hint and the toast, or snap the selected one to a side. */
 public class HudPlaceScreen extends Screen {
     private static final int HINT_H = 36;
-    private static final int TOAST_H = 46;
 
     private boolean hints = true;
     private int dragging;
@@ -71,7 +70,7 @@ public class HudPlaceScreen extends Screen {
         int sx = hints ? hintX : toastX;
         int sy = hints ? hintY : toastY;
         int sw = hints ? hintW : toastW;
-        int sh = hints ? HINT_H : TOAST_H;
+        int sh = hints ? HINT_H : WrightsHud.sampleToastHeight();
         WrightsUi.border(graphics, sx - 2, sy - 2, sw + 4, sh + 4, WrightsUi.COPPER);
         for (Renderable renderable : this.renderables) {
             renderable.render(graphics, mouseX, mouseY, partialTick);
@@ -86,7 +85,7 @@ public class HudPlaceScreen extends Screen {
         hintX = HudAnchor.hintX(this.width, hintW);
         hintY = HudAnchor.hintY(this.height, HINT_H);
         toastX = HudAnchor.toastX(this.width, toastW);
-        toastY = HudAnchor.toastY(this.height, TOAST_H);
+        toastY = HudAnchor.toastY(this.height, WrightsHud.sampleToastHeight());
     }
 
     @Override
@@ -105,7 +104,7 @@ public class HudPlaceScreen extends Screen {
             grabY = (int) mouseY - hintY;
             return true;
         }
-        if (inside(mouseX, mouseY, toastX, toastY, toastW, TOAST_H)) {
+        if (inside(mouseX, mouseY, toastX, toastY, toastW, WrightsHud.sampleToastHeight())) {
             hints = false;
             dragging = 2;
             grabX = (int) mouseX - toastX;
@@ -120,7 +119,7 @@ public class HudPlaceScreen extends Screen {
         if (button == 0 && dragging != 0) {
             boolean hint = dragging == 1;
             int boxW = hint ? hintW : toastW;
-            int boxH = hint ? HINT_H : TOAST_H;
+            int boxH = hint ? HINT_H : WrightsHud.sampleToastHeight();
             int left = (int) mouseX - grabX;
             int top = (int) mouseY - grabY;
             WrightsClientConfig.setHudCustom(hint, HudAnchor.fraction(left + boxW / 2, this.width), HudAnchor.fraction(top + boxH / 2, this.height));

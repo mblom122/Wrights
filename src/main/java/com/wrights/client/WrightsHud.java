@@ -440,22 +440,23 @@ public final class WrightsHud {
             return;
         }
         int headerH = 18;
-        int bodyH = 28;
-        int height = headerH + bodyH;
         List<Component> dockLines = dockLines(dock);
         int dockHeight = dockLines.isEmpty() ? 0 : headerH + 8 + dockLines.size() * 11;
         int maxWidth = 0;
         int[] widths = new int[WrightsClientState.jobNotices.size()];
+        int[] heights = new int[WrightsClientState.jobNotices.size()];
         for (int i = 0; i < WrightsClientState.jobNotices.size(); i++) {
             WrightsClientState.JobNotice notice = WrightsClientState.jobNotices.get(i);
             Component header = Component.translatable("hud.wrights.job_finished");
-            Component name = Component.literal(notice.name);
-            Component time = notice.seconds < 1
-                    ? Component.translatable("hud.wrights.job_time_under")
-                    : Component.translatable("hud.wrights.job_time", duration(notice.seconds));
-            widths[i] = Math.min(240, Math.max(
-                    minecraft.font.width(header) + 30,
-                    Math.max(minecraft.font.width(name), minecraft.font.width(time)) + 18));
+            Component time = noticeTime(notice);
+            int width = minecraft.font.width(header) + 30;
+            width = Math.max(width, minecraft.font.width(notice.name) + 18);
+            if (hasDetail(notice)) {
+                width = Math.max(width, minecraft.font.width(notice.detail) + 18);
+            }
+            width = Math.max(width, minecraft.font.width(time) + 18);
+            widths[i] = Math.min(280, width);
+            heights[i] = noticeHeight(notice);
             maxWidth = Math.max(maxWidth, widths[i]);
         }
         int dockWidth = 0;
@@ -469,22 +470,29 @@ public final class WrightsHud {
             maxWidth = Math.max(maxWidth, dockWidth);
         }
         int cards = WrightsClientState.jobNotices.size() + (dockLines.isEmpty() ? 0 : 1);
-        int total = WrightsClientState.jobNotices.size() * height + dockHeight + Math.max(0, cards - 1) * 4;
+        int total = dockHeight;
+        for (int height : heights) {
+            total += height;
+        }
+        total += Math.max(0, cards - 1) * 4;
         int stackX = HudAnchor.toastX(graphics.guiWidth(), maxWidth);
         int y = HudAnchor.toastY(graphics.guiHeight(), total);
         int spot = HudAnchor.toastSpot();
         for (int i = 0; i < WrightsClientState.jobNotices.size(); i++) {
             WrightsClientState.JobNotice notice = WrightsClientState.jobNotices.get(i);
             Component header = Component.translatable("hud.wrights.job_finished");
-            Component name = Component.literal(notice.name);
-            Component time = notice.seconds < 1
-                    ? Component.translatable("hud.wrights.job_time_under")
-                    : Component.translatable("hud.wrights.job_time", duration(notice.seconds));
+            Component time = noticeTime(notice);
+            List<Component> lines = new java.util.ArrayList<>();
+            lines.add(notice.name);
+            if (hasDetail(notice)) {
+                lines.add(notice.detail);
+            }
+            lines.add(time);
             int width = widths[i];
             int x = toastX(spot, stackX, maxWidth, width);
             int alpha = notice.ticks > 20 ? 0xE0 : Math.max(0, 0xE0 * notice.ticks / 20);
-            paintToast(graphics, minecraft, x, y, width, height, headerH, alpha, header, List.of(name, time));
-            y += height + 4;
+            paintToast(graphics, minecraft, x, y, width, heights[i], headerH, alpha, header, lines);
+            y += heights[i] + 4;
         }
         if (!dockLines.isEmpty()) {
             int x = toastX(spot, stackX, maxWidth, dockWidth);
@@ -566,22 +574,46 @@ public final class WrightsHud {
 
     static void drawSampleToast(GuiGraphics graphics, Minecraft minecraft, int x, int y, int width) {
         Component header = Component.translatable("hud.wrights.job_finished");
-        Component name = Component.translatable("hud.wrights.sample_toast");
+        Component name = Component.translatable("hud.wrights.tool_mirror").append(" - ").append(Component.translatable("hud.wrights.task_mine"));
+        Component detail = Component.translatable("hud.wrights.done_mined", 4, 0);
         Component time = Component.translatable("hud.wrights.job_time", "12s");
-        graphics.fill(x, y, x + width, y + 46, 0xE0101822);
-        WrightsUi.border(graphics, x, y, width, 46, 0xFF3A4C5C);
+        int height = sampleToastHeight();
+        graphics.fill(x, y, x + width, y + height, 0xE0101822);
+        WrightsUi.border(graphics, x, y, width, height, 0xFF3A4C5C);
         graphics.fill(x + 1, y + 1, x + width - 1, y + 18, 0xE01C2A36);
         graphics.fill(x + 1, y + 1, x + 3, y + 18, WrightsUi.COPPER);
         graphics.drawString(minecraft.font, header, x + 8, y + 5, WrightsUi.TEXT, false);
         graphics.drawString(minecraft.font, name, x + 8, y + 23, WrightsUi.MUTED, false);
-        graphics.drawString(minecraft.font, time, x + 8, y + 34, WrightsUi.MUTED, false);
+        graphics.drawString(minecraft.font, detail, x + 8, y + 34, WrightsUi.MUTED, false);
+        graphics.drawString(minecraft.font, time, x + 8, y + 45, WrightsUi.MUTED, false);
+    }
+
+    static int sampleToastHeight() {
+        return 18 + 5 + 11 * 3 + 4;
     }
 
     static int sampleToastWidth(Minecraft minecraft) {
-        return Math.min(240, Math.max(
+        Component name = Component.translatable("hud.wrights.tool_mirror").append(" - ").append(Component.translatable("hud.wrights.task_mine"));
+        Component detail = Component.translatable("hud.wrights.done_mined", 4, 0);
+        return Math.min(280, Math.max(
                 minecraft.font.width(Component.translatable("hud.wrights.job_finished")) + 30,
-                Math.max(minecraft.font.width(Component.translatable("hud.wrights.sample_toast")),
-                        minecraft.font.width(Component.translatable("hud.wrights.job_time", "12s"))) + 18));
+                Math.max(minecraft.font.width(name), Math.max(minecraft.font.width(detail),
+                        minecraft.font.width(Component.translatable("hud.wrights.job_time", "12s")))) + 18));
+    }
+
+    private static boolean hasDetail(WrightsClientState.JobNotice notice) {
+        return notice.detail != null && !notice.detail.getString().isEmpty();
+    }
+
+    private static int noticeHeight(WrightsClientState.JobNotice notice) {
+        int lines = hasDetail(notice) ? 3 : 2;
+        return 18 + 5 + lines * 11 + 4;
+    }
+
+    private static Component noticeTime(WrightsClientState.JobNotice notice) {
+        return notice.seconds < 1
+                ? Component.translatable("hud.wrights.job_time_under")
+                : Component.translatable("hud.wrights.job_time", duration(notice.seconds));
     }
 
     private static void drawInfoBubble(GuiGraphics graphics, int x, int y, int alpha) {

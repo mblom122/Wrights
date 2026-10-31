@@ -13,7 +13,10 @@ import java.util.function.Predicate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.GlobalPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -25,6 +28,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.FallingBlock;
@@ -961,9 +965,9 @@ public final class JobManager {
         }
         if (job.resultSchematicId() == null) {
             if (job.skippedSpecial() > 0) {
-                Messages.actionBar(player, "message.wrights.copy_empty_skipped", job.skippedSpecial());
+                announce(player, library, job, "hud.wrights.task_save", Component.translatable("message.wrights.copy_empty_skipped", job.skippedSpecial()));
             } else {
-                Messages.actionBar(player, "message.wrights.copy_empty");
+                announce(player, library, job, "hud.wrights.task_save", Component.translatable("message.wrights.copy_empty"));
             }
             library.removeJob(job);
             if (job.blueprintName() != null) {
@@ -975,13 +979,13 @@ public final class JobManager {
             Schematic saved = library.schematic(job.resultSchematicId()).orElse(null);
             library.removeJob(job);
             if (saved == null) {
-                Messages.actionBar(player, "message.wrights.copy_empty");
+                announce(player, library, job, "hud.wrights.task_save", Component.translatable("message.wrights.copy_empty"));
                 BlueprintActions.finishSave(player, null, false);
             } else if (job.skippedSpecial() > 0) {
-                Messages.actionBar(player, "message.wrights.copy_done_skipped", saved.blockCount(), BoxEdits.volume(saved.sizeX(), saved.sizeY(), saved.sizeZ()), job.skippedSpecial());
+                announce(player, library, job, "hud.wrights.task_save", Component.translatable("hud.wrights.done_saved_skipped", saved.blockCount(), BoxEdits.volume(saved.sizeX(), saved.sizeY(), saved.sizeZ()), job.skippedSpecial()));
                 BlueprintActions.finishSave(player, saved.id(), true);
             } else {
-                Messages.actionBar(player, "message.wrights.blueprint_saved", saved.name(), BoxEdits.volume(saved.sizeX(), saved.sizeY(), saved.sizeZ()), saved.blockCount());
+                announce(player, library, job, "hud.wrights.task_save", Component.translatable("hud.wrights.done_saved", saved.blockCount(), BoxEdits.volume(saved.sizeX(), saved.sizeY(), saved.sizeZ())));
                 BlueprintActions.finishSave(player, saved.id(), true);
             }
             return;
@@ -1006,9 +1010,9 @@ public final class JobManager {
         }
         ControllerData.write(stack, data.withSchematic(schematic.id(), schematic.sizeX(), schematic.sizeY(), schematic.sizeZ(), schematic.blockCount()));
         if (job.skippedSpecial() > 0) {
-            Messages.actionBar(player, "message.wrights.copy_done_skipped", schematic.blockCount(), BoxEdits.volume(schematic.sizeX(), schematic.sizeY(), schematic.sizeZ()), job.skippedSpecial());
+            announce(player, library, job, "hud.wrights.task_save", Component.translatable("hud.wrights.done_saved_skipped", schematic.blockCount(), BoxEdits.volume(schematic.sizeX(), schematic.sizeY(), schematic.sizeZ()), job.skippedSpecial()));
         } else {
-            Messages.actionBar(player, "message.wrights.copy_done", schematic.blockCount(), BoxEdits.volume(schematic.sizeX(), schematic.sizeY(), schematic.sizeZ()));
+            announce(player, library, job, "hud.wrights.task_save", Component.translatable("hud.wrights.done_saved", schematic.blockCount(), BoxEdits.volume(schematic.sizeX(), schematic.sizeY(), schematic.sizeZ())));
         }
         library.removeJob(job);
     }
@@ -1395,22 +1399,10 @@ public final class JobManager {
         archive(library, job, false);
         BlueprintNetwork.clearJobHologram(player, job.id());
         BlueprintNetwork.syncJobs(player);
-        if (removed <= 0) {
-            Messages.actionBar(player, "message.wrights.undo_none");
-        } else {
-            Messages.actionBar(player, "message.wrights.undo_done", removed, returned);
-        }
-    }
-
-    private static String finishedName(SchematicLibrary library, BuildJob job) {
-        String name = job.blueprintName();
-        if (name == null || name.isBlank()) {
-            name = "Build";
-            if (job.schematicId() != null) {
-                name = library.schematic(job.schematicId()).map(Schematic::name).orElse(name);
-            }
-        }
-        return name;
+        Component detail = removed <= 0
+                ? Component.translatable("message.wrights.undo_none")
+                : Component.translatable("hud.wrights.done_undo", removed, returned);
+        announce(player, library, job, "hud.wrights.task_undo", detail);
     }
 
     private static void finishPaste(MinecraftServer server, SchematicLibrary library, ServerPlayer player, BuildJob job) {
@@ -1418,17 +1410,18 @@ public final class JobManager {
         int placed = job.placed();
         int skipped = job.skipped();
         archive(library, job, false);
+        Component detail;
         if (job.mining()) {
             BlueprintNetwork.clearJobHologram(player, job.id());
-            BlueprintNetwork.jobDone(player, finishedName(library, job), job.elapsedSeconds());
             BlueprintNetwork.syncJobs(player);
             if (placed == 0 && skipped > 0) {
-                Messages.actionBar(player, "message.wrights.all_skipped");
+                detail = Component.translatable("hud.wrights.done_mined", placed, skipped);
             } else if (placed == 0) {
-                Messages.actionBar(player, "message.wrights.mine_none");
+                detail = Component.translatable("message.wrights.mine_none");
             } else {
-                Messages.actionBar(player, "message.wrights.mine_done", placed, skipped);
+                detail = Component.translatable("hud.wrights.done_mined", placed, skipped);
             }
+            announce(player, library, job, null, detail);
             return;
         }
         library.schematic(job.schematicId())
@@ -1436,15 +1429,137 @@ public final class JobManager {
                 .ifPresentOrElse(
                         schematic -> com.wrights.network.BlueprintNetwork.showJobHologram(player, job, schematic),
                         () -> com.wrights.network.BlueprintNetwork.clearJobHologram(player, job.id()));
-        com.wrights.network.BlueprintNetwork.jobDone(player, finishedName(library, job), job.elapsedSeconds());
         com.wrights.network.BlueprintNetwork.syncJobs(player);
         if (placed == 0 && skipped > 0) {
-            Messages.actionBar(player, "message.wrights.all_skipped");
+            detail = Component.translatable("message.wrights.all_skipped");
         } else if (placed == 0) {
-            Messages.actionBar(player, "message.wrights.already_built");
+            detail = Component.translatable("message.wrights.already_built");
         } else {
-            Messages.actionBar(player, "message.wrights.paste_done", placed, skipped);
+            detail = Component.translatable("hud.wrights.done_placed", placed, skipped);
         }
+        announce(player, library, job, null, detail);
+    }
+
+    /** Mode, the sub-modes that were on, and the task. The detail says what the job actually did. */
+    private static void announce(ServerPlayer player, SchematicLibrary library, BuildJob job, String taskKey, Component detail) {
+        if (player == null || job == null) {
+            return;
+        }
+        Component title = jobTitle(player.getServer(), library, job, taskKey);
+        Component line = detail == null ? Component.empty() : detail;
+        if (line.getString().isEmpty()) {
+            Messages.actionBar(player, title);
+        } else {
+            Messages.actionBar(player, title.copy().append(Component.literal(". ")).append(line));
+        }
+        BlueprintNetwork.jobDone(player, title, line, job.elapsedSeconds());
+    }
+
+    private static Component jobTitle(MinecraftServer server, SchematicLibrary library, BuildJob job, String taskKey) {
+        Schematic schematic = job.schematicId() == null || library == null ? null : library.schematic(job.schematicId()).orElse(null);
+        boolean mirror = job.mining() || (schematic != null && schematic.ephemeral() && com.wrights.blueprint.Mirror.marksBlocks(schematic.name()));
+        String mode = mirror ? "hud.wrights.tool_mirror" : (job.kind() == BuildJob.Kind.COPY ? "hud.wrights.tool_new" : "hud.wrights.tool_build");
+        String subject = subjectName(job, schematic);
+        boolean blockPlace = mirror && subject.isEmpty() && !job.mining();
+        String task = taskKey;
+        if (task == null) {
+            if (job.mining()) {
+                task = "hud.wrights.task_mine";
+            } else if (job.kind() == BuildJob.Kind.COPY) {
+                task = "hud.wrights.task_save";
+            } else if (blockPlace) {
+                task = "hud.wrights.task_place";
+            } else {
+                task = "hud.wrights.task_build";
+            }
+        }
+        MutableComponent title = Component.translatable(mode).append(" - ").append(Component.translatable(task));
+        if (job.mining()) {
+            if (job.mineAny()) {
+                title.append(" - ").append(Component.translatable("menu.wrights.mirror_mine_any"));
+            }
+            if (job.mineVoid()) {
+                title.append(" - ").append(Component.translatable("menu.wrights.mirror_mine_void"));
+            }
+            if (silkTouch(server, job.mineTool())) {
+                title.append(" - ").append(Component.translatable("menu.wrights.mirror_mine_silk"));
+            }
+        } else if (job.kind() == BuildJob.Kind.COPY) {
+            if (job.copyFluids()) {
+                title.append(" - ").append(Component.translatable("screen.wrights.copy_fluids"));
+            }
+            if (job.copyNbtAll()) {
+                title.append(" - ").append(Component.translatable("screen.wrights.copy_nbt_all"));
+            } else if (job.copyNbtSettings()) {
+                title.append(" - ").append(Component.translatable("screen.wrights.copy_nbt_settings"));
+            } else if (job.copyNbtBlocks()) {
+                title.append(" - ").append(Component.translatable("screen.wrights.copy_nbt_blocks"));
+            }
+        } else if (blockPlace) {
+            if (job.voidBlocks()) {
+                title.append(" - ").append(Component.translatable("menu.wrights.mirror_replace"));
+            }
+        } else if (!"hud.wrights.task_undo".equals(task) || job.voidBlocks() || job.voidFluids() || job.voidNbt()) {
+            if (job.voidBlocks()) {
+                title.append(" - ").append(Component.translatable("screen.wrights.void_blocks"));
+            }
+            if (job.voidFluids()) {
+                title.append(" - ").append(Component.translatable("screen.wrights.void_fluids"));
+            }
+            if (job.voidNbt()) {
+                title.append(" - ").append(Component.translatable("screen.wrights.void_nbt"));
+            }
+        }
+        if (!subject.isEmpty()) {
+            title.append(" - ").append(Component.literal(subject));
+        }
+        return title;
+    }
+
+    private static String subjectName(BuildJob job, Schematic schematic) {
+        String name = job.blueprintName();
+        if (name != null && (name.equals("Mirror - Mine") || name.equals("Build") || name.equals("Saving") || name.equals("Blueprint"))) {
+            name = null;
+        }
+        if ((name == null || name.isBlank()) && schematic != null) {
+            name = schematic.name();
+        }
+        if (name == null || name.isBlank()) {
+            return "";
+        }
+        name = stripMirrorSuffix(name);
+        if (name.equals("Mirror")) {
+            return "";
+        }
+        return name;
+    }
+
+    private static String stripMirrorSuffix(String name) {
+        if (name.endsWith(" · mirror")) {
+            return name.substring(0, name.length() - " · mirror".length()).trim();
+        }
+        int cut = name.lastIndexOf(" · ");
+        if (cut <= 0) {
+            return name;
+        }
+        String tail = name.substring(cut + 3);
+        if (tail.isEmpty()) {
+            return name;
+        }
+        for (int i = 0; i < tail.length(); i++) {
+            if (!Character.isDigit(tail.charAt(i))) {
+                return name;
+            }
+        }
+        return name.substring(0, cut).trim();
+    }
+
+    private static boolean silkTouch(MinecraftServer server, ItemStack tool) {
+        if (server == null || tool == null || tool.isEmpty()) {
+            return false;
+        }
+        var silk = server.registryAccess().lookupOrThrow(Registries.ENCHANTMENT).get(Enchantments.SILK_TOUCH);
+        return silk.isPresent() && tool.getEnchantments().getLevel(silk.get()) > 0;
     }
 
     private static void noteChunk(ServerPlayer player, SchematicLibrary library, BuildJob job) {

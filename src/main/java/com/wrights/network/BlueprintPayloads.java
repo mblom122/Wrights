@@ -6,6 +6,8 @@ import java.util.UUID;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type;
@@ -936,14 +938,18 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record JobDone(String name, int seconds) implements CustomPacketPayload {
+    public record JobDone(Component name, Component detail, int seconds) implements CustomPacketPayload {
         public static final Type<JobDone> TYPE = payloadType("job_done");
         public static final StreamCodec<RegistryFriendlyByteBuf, JobDone> STREAM_CODEC = StreamCodec.of(
                 (buf, value) -> {
-                    buf.writeUtf(value.name, 48);
+                    buf.writeJsonWithCodec(ComponentSerialization.CODEC, value.name);
+                    buf.writeJsonWithCodec(ComponentSerialization.CODEC, value.detail == null ? Component.empty() : value.detail);
                     buf.writeVarInt(value.seconds);
                 },
-                buf -> new JobDone(buf.readUtf(48), buf.readVarInt()));
+                buf -> new JobDone(
+                        buf.readJsonWithCodec(ComponentSerialization.CODEC),
+                        buf.readJsonWithCodec(ComponentSerialization.CODEC),
+                        buf.readVarInt()));
 
         @Override
         public Type<? extends CustomPacketPayload> type() {

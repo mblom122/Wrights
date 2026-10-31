@@ -1143,9 +1143,10 @@ public final class WrightsClientState {
         return inside > 0 ? inside : blockCount;
     }
 
-    public static void showJobDone(String name, int seconds) {
-        String title = name == null || name.isBlank() ? "Build" : name;
-        jobNotices.add(new JobNotice(title, Math.max(0, seconds)));
+    public static void showJobDone(net.minecraft.network.chat.Component name, net.minecraft.network.chat.Component detail, int seconds) {
+        net.minecraft.network.chat.Component title = name == null ? net.minecraft.network.chat.Component.translatable("hud.wrights.tool_build") : name;
+        net.minecraft.network.chat.Component line = detail == null ? net.minecraft.network.chat.Component.empty() : detail;
+        jobNotices.add(new JobNotice(title, line, Math.max(0, seconds)));
         while (jobNotices.size() > 3) {
             jobNotices.remove(0);
         }
@@ -2206,12 +2207,14 @@ public final class WrightsClientState {
     }
 
     public static final class JobNotice {
-        public final String name;
+        public final net.minecraft.network.chat.Component name;
+        public final net.minecraft.network.chat.Component detail;
         public final int seconds;
         public int ticks = 100;
 
-        public JobNotice(String name, int seconds) {
+        public JobNotice(net.minecraft.network.chat.Component name, net.minecraft.network.chat.Component detail, int seconds) {
             this.name = name;
+            this.detail = detail;
             this.seconds = seconds;
         }
     }
