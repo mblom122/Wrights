@@ -244,6 +244,20 @@ public final class LayerColumn {
         return selectionY + 40;
     }
 
+    /** Move the layer prompt under a block that was added below the selection. */
+    public void shiftPromptTo(int y) {
+        promptY = y;
+        if (promptBox != null) {
+            promptBox.setY(y + 14);
+        }
+        if (promptOk != null) {
+            promptOk.setY(y + 14);
+        }
+        if (promptCancel != null) {
+            promptCancel.setY(y + 14);
+        }
+    }
+
     public void refresh() {
         int limit = Math.max(0, depth() - 1);
         if (awaitTaller && layer > limit) {
