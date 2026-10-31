@@ -297,6 +297,35 @@ def make_wrightport_item() -> None:
     save(img, "item/wrightport.png")
 
 
+def make_wrightport_slot() -> None:
+    """Curios empty-slot icon: the personal wrightport's outline, in the same gray as other slots."""
+    src = new()
+    fill(src, 3, 2, 13, 14, STEEL)
+    fill(src, 2, 5, 4, 7, STEEL)
+    fill(src, 12, 5, 14, 7, STEEL)
+    fill(src, 2, 10, 4, 12, STEEL)
+    fill(src, 12, 10, 14, 12, STEEL)
+    img = new()
+    gray = (85, 85, 85, 255)
+    for y in range(16):
+        for x in range(16):
+            if src.getpixel((x, y))[3] == 0:
+                continue
+            edge = False
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nx, ny = x + dx, y + dy
+                if nx < 0 or ny < 0 or nx >= 16 or ny >= 16 or src.getpixel((nx, ny))[3] == 0:
+                    edge = True
+                    break
+            if edge:
+                px(img, x, y, gray)
+    for y in range(5, 10):
+        for x in range(6, 10):
+            if x in (6, 9) or y in (5, 9):
+                px(img, x, y, gray)
+    save(img, "slot/wrightport.png")
+
+
 def make_personal_wrightport() -> None:
     img = new()
     # wearable module
@@ -503,6 +532,7 @@ def main() -> None:
     make_folder(True)
     make_wrightport_item()
     make_personal_wrightport()
+    make_wrightport_slot()
     make_drone()
     print("done")
 
