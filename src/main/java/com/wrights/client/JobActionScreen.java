@@ -50,7 +50,7 @@ public class JobActionScreen extends Screen {
 
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.fill(0, 0, this.width, this.height, 0xC0060C14);
+        WrightsUi.scrim(graphics, this.width, this.height);
         WrightsUi.panel(graphics, panelX, panelY, 240, 188);
     }
 
@@ -62,16 +62,17 @@ public class JobActionScreen extends Screen {
             return;
         }
         String name = this.font.plainSubstrByWidth(job.name(), 208);
-        graphics.drawString(this.font, name, panelX + 16, panelY + 12, WrightsUi.COPPER, false);
+        graphics.drawString(this.font, name, panelX + 16, panelY + 10, WrightsUi.COPPER, false);
         boolean stalled = !job.paused() && job.waitKind() == com.wrights.job.BuildJob.WAIT_ITEMS;
         String status = job.undoing()
                 ? "menu.wrights.undoing"
                 : job.paused() ? "menu.wrights.paused" : stalled ? "menu.wrights.stalled" : "menu.wrights.running";
-        int statusColor = job.paused() ? WrightsUi.GOLD : stalled ? WrightsUi.TEAL : WrightsUi.TEXT;
-        graphics.drawString(this.font, Component.translatable(status), panelX + 16, panelY + 28, statusColor, false);
+        int statusColor = job.paused() ? WrightsUi.GOLD : stalled ? WrightsUi.TEAL : WrightsUi.COPPER;
+        WrightsUi.status(graphics, panelX + 16, panelY + 24, 208, 48, statusColor);
+        graphics.drawString(this.font, Component.translatable(status), panelX + 26, panelY + 30, statusColor, false);
         int percent = job.finished() ? 100 : WrightsClientState.percent(job);
-        graphics.drawString(this.font, Component.translatable("menu.wrights.job_percent", percent, job.done(), job.total()), panelX + 16, panelY + 44, WrightsUi.MUTED, false);
-        graphics.drawString(this.font, Component.translatable("menu.wrights.job_drone_count", job.crew().size()), panelX + 16, panelY + 60, WrightsUi.TEXT, false);
+        graphics.drawString(this.font, Component.translatable("menu.wrights.job_percent", percent, job.done(), job.total()), panelX + 26, panelY + 42, WrightsUi.MUTED, false);
+        graphics.drawString(this.font, Component.translatable("menu.wrights.job_drone_count", job.crew().size()), panelX + 26, panelY + 54, WrightsUi.TEXT, false);
     }
 
     @Override

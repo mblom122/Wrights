@@ -47,22 +47,26 @@ public class UndoConfirmScreen extends Screen {
 
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.fill(0, 0, this.width, this.height, 0xC0060C14);
+        WrightsUi.scrim(graphics, this.width, this.height);
         WrightsUi.panel(graphics, panelX, panelY, 280, 132);
     }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
-        graphics.drawString(this.font, this.title, panelX + 16, panelY + 12, WrightsUi.COPPER, false);
+        graphics.drawString(this.font, this.title, panelX + 16, panelY + 10, WrightsUi.COPPER, false);
         String key = drop == BlueprintPayloads.UndoPrompt.AT_CHEST
                 ? "screen.wrights.undo_chest"
                 : drop == BlueprintPayloads.UndoPrompt.CHEST_GONE
                         ? "screen.wrights.undo_missing"
                         : "screen.wrights.undo_inventory";
-        int y = panelY + 32;
-        for (var line : this.font.split(Component.translatable(key, extra), 248)) {
-            graphics.drawString(this.font, line, panelX + 16, y, WrightsUi.TEXT, false);
+        WrightsUi.status(graphics, panelX + 16, panelY + 26, 248, 62, WrightsUi.GOLD);
+        int y = panelY + 34;
+        for (var line : this.font.split(Component.translatable(key, extra), 228)) {
+            if (y > panelY + 76) {
+                break;
+            }
+            graphics.drawString(this.font, line, panelX + 26, y, WrightsUi.TEXT, false);
             y += 10;
         }
     }

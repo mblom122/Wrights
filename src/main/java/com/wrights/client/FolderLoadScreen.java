@@ -196,7 +196,7 @@ public class FolderLoadScreen extends Screen {
 
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.fill(0, 0, this.width, this.height, 0xC0060C14);
+        WrightsUi.scrim(graphics, this.width, this.height);
         WrightsUi.panel(graphics, panelX, panelY, panelW, panelH);
         WrightsUi.inset(graphics, listX - 2, listY - 2, listW + 4, listH + 4);
         WrightsUi.inset(graphics, detailX - 2, listY - 2, detailW + 4, listH + 4);
@@ -234,7 +234,8 @@ public class FolderLoadScreen extends Screen {
                     boolean on = view.line.slot() == selectedSlot;
                     boolean hover = mouseX >= listX && mouseX < listX + listW && mouseY >= y && mouseY < y + height;
                     if (on || hover) {
-                        graphics.fill(listX + 2, y, listX + listW - 2, y + height - 1, on ? 0xFF24384A : 0xFF1C2A36);
+                        graphics.fill(listX + 2, y, listX + listW - 2, y + height - 1, on ? WrightsUi.CARD_ON : WrightsUi.CARD_HOVER);
+                        graphics.fill(listX + 2, y, listX + 4, y + height - 1, on ? WrightsUi.TEAL : WrightsUi.COPPER);
                     }
                     int color = view.line.kind() == BlueprintSlips.EXACT ? WrightsUi.MUTED : WrightsUi.TEXT;
                     graphics.drawString(this.font, this.font.plainSubstrByWidth(view.line.name(), listW - 70), listX + 6, y + 3, color, false);

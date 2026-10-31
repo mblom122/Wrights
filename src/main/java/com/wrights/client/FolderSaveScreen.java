@@ -107,7 +107,7 @@ public class FolderSaveScreen extends Screen {
 
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.fill(0, 0, this.width, this.height, 0xC0060C14);
+        WrightsUi.scrim(graphics, this.width, this.height);
         WrightsUi.panel(graphics, panelX, panelY, panelW, panelH);
         WrightsUi.inset(graphics, listX - 2, listY - 2, listW + 4, listH + 4);
     }
@@ -132,7 +132,8 @@ public class FolderSaveScreen extends Screen {
             if (y + ROW >= listY && y <= listY + listH) {
                 boolean hover = mouseX >= listX && mouseX < listX + listW && mouseY >= y && mouseY < y + ROW && mouseY >= listY && mouseY < listY + listH;
                 if (hover) {
-                    graphics.fill(listX + 2, y, listX + listW - 2, y + ROW - 1, 0xFF1C2A36);
+                    graphics.fill(listX + 2, y, listX + listW - 2, y + ROW - 1, WrightsUi.CARD_HOVER);
+                    graphics.fill(listX + 2, y, listX + 4, y + ROW - 1, WrightsUi.COPPER);
                 }
                 graphics.drawString(this.font, this.font.plainSubstrByWidth(folder.name(), listW - 16), listX + 6, y + 2, WrightsUi.TEXT, false);
                 graphics.drawString(this.font, Component.translatable("screen.wrights.folder_row", nested(folder.id()), blueprints(folder.id())), listX + 6, y + 12, WrightsUi.MUTED, false);

@@ -102,7 +102,7 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
 
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.fill(0, 0, this.width, this.height, 0xC0060C14);
+        WrightsUi.scrim(graphics, this.width, this.height);
         WrightsUi.panel(graphics, panelX, panelY, panelW, panelH);
     }
 

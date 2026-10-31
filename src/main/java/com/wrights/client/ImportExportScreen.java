@@ -177,7 +177,7 @@ public class ImportExportScreen extends Screen {
 
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.fill(0, 0, this.width, this.height, 0xC0060C14);
+        WrightsUi.scrim(graphics, this.width, this.height);
         WrightsUi.panel(graphics, panelX, panelY, panelW, panelH);
         WrightsUi.inset(graphics, leftX - 4, bodyY - 16, columnW + 8, panelH - 78);
         WrightsUi.inset(graphics, rightX - 4, bodyY - 16, columnW + 8, panelH - 78);

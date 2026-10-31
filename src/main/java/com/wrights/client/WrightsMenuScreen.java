@@ -635,7 +635,7 @@ public class WrightsMenuScreen extends Screen {
 
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.fill(0, 0, this.width, this.height, 0xC0060C14);
+        WrightsUi.scrim(graphics, this.width, this.height);
         WrightsUi.panel(graphics, panelX, panelY, panelW, panelH);
         if (mirrorPage && !options && !jobsPage && !infoPage && !managePage) {
             int x = listX - 2;
@@ -757,11 +757,7 @@ public class WrightsMenuScreen extends Screen {
 
     private void drawTask(GuiGraphics graphics, Component label, boolean active, boolean soon, int y) {
         int x = panelX + 14;
-        int color = active ? 0xFF24384A : 0xFF18222C;
-        graphics.fill(x, y, x + 100, y + 22, color);
-        if (active) {
-            graphics.fill(x, y, x + 2, y + 22, WrightsUi.COPPER);
-        }
+        WrightsUi.rail(graphics, x, y, 100, 22, active, WrightsUi.COPPER);
         graphics.drawString(this.font, label, x + 8, y + 7, active ? WrightsUi.TEXT : WrightsUi.MUTED, false);
         if (soon) {
             graphics.drawString(this.font, Component.translatable("menu.wrights.soon"), x + 68, y + 7, 0xFF667480, false);
@@ -1236,8 +1232,7 @@ public class WrightsMenuScreen extends Screen {
         graphics.drawString(this.font, Component.translatable("menu.wrights.corner_markers"), x, markerY + 3, WrightsUi.MUTED, false);
         boolean marks = WrightsClientConfig.CORNER_MARKERS.get();
         Component state = Component.translatable(marks ? "menu.wrights.on" : "menu.wrights.off");
-        graphics.fill(markerX, markerY, markerX + markerW, markerY + 16, marks ? 0xFF24384A : 0xFF18222C);
-        WrightsUi.border(graphics, markerX, markerY, markerW, 16, marks ? WrightsUi.COPPER : 0xFF3D4E5E);
+        WrightsUi.choice(graphics, markerX, markerY, markerW, 16, marks, false);
         graphics.drawCenteredString(this.font, state, markerX + markerW / 2, markerY + 4, WrightsUi.TEXT);
         drawOptionSection(graphics, x, buildHeadY, "menu.wrights.section_building", lineEnd);
         boolean paceChoice = creativeVisit();
@@ -1245,50 +1240,46 @@ public class WrightsMenuScreen extends Screen {
         Component speedLabel = Component.translatable("menu.wrights.build_speed");
         graphics.drawString(this.font, speedLabel, x, instantY + 3, paceChoice ? WrightsUi.MUTED : 0xFF667480, false);
         Component pace = Component.translatable(instant ? "menu.wrights.instant" : "menu.wrights.drone_pace");
-        int fill = paceChoice ? (instant ? 0xFF24384A : 0xFF18222C) : 0xFF141C24;
-        int edge = paceChoice ? (instant ? WrightsUi.COPPER : 0xFF3D4E5E) : 0xFF3A4652;
         int text = paceChoice ? WrightsUi.TEXT : 0xFF667480;
-        graphics.fill(instantX, instantY, instantX + instantW, instantY + 16, fill);
-        WrightsUi.border(graphics, instantX, instantY, instantW, 16, edge);
+        if (paceChoice) {
+            WrightsUi.choice(graphics, instantX, instantY, instantW, 16, instant, false);
+        } else {
+            graphics.fill(instantX, instantY, instantX + instantW, instantY + 16, 0xFF141C24);
+            graphics.fill(instantX, instantY, instantX + instantW, instantY + 2, 0xFF2A3440);
+        }
         graphics.drawCenteredString(this.font, pace, instantX + instantW / 2, instantY + 4, text);
         drawOptionHelp(graphics, mouseX, mouseY, x, instantY + 3, speedLabel, instantX, instantX + instantW, Component.translatable(paceChoice ? "menu.wrights.build_speed_hint" : "menu.wrights.build_speed_locked"));
         Component droneLabel = Component.translatable("menu.wrights.drone_deploy");
         graphics.drawString(this.font, droneLabel, x, droneY + 3, WrightsUi.MUTED, false);
-        graphics.fill(droneMinusX, droneY, droneMinusX + 16, droneY + 16, 0xFF18222C);
-        WrightsUi.border(graphics, droneMinusX, droneY, 16, 16, 0xFF3D4E5E);
+        WrightsUi.choice(graphics, droneMinusX, droneY, 16, 16, false, false);
         graphics.drawCenteredString(this.font, "-", droneMinusX + 8, droneY + 4, WrightsUi.TEXT);
         String count = Integer.toString(WrightsClientConfig.droneCount());
         graphics.drawCenteredString(this.font, count, droneMinusX + 26, droneY + 4, WrightsUi.TEXT);
-        graphics.fill(dronePlusX, droneY, dronePlusX + 16, droneY + 16, 0xFF18222C);
-        WrightsUi.border(graphics, dronePlusX, droneY, 16, 16, 0xFF3D4E5E);
+        WrightsUi.choice(graphics, dronePlusX, droneY, 16, 16, false, false);
         graphics.drawCenteredString(this.font, "+", dronePlusX + 8, droneY + 4, WrightsUi.TEXT);
         boolean atMax = WrightsClientConfig.droneCount() >= WrightsConfig.maxWrightsPerJob();
-        graphics.fill(droneX, droneY, droneX + droneW, droneY + 16, atMax ? 0xFF24384A : 0xFF18222C);
-        WrightsUi.border(graphics, droneX, droneY, droneW, 16, atMax ? WrightsUi.COPPER : 0xFF3D4E5E);
+        WrightsUi.choice(graphics, droneX, droneY, droneW, 16, atMax, false);
         graphics.drawCenteredString(this.font, Component.translatable("menu.wrights.drone_max", WrightsConfig.maxWrightsPerJob()), droneX + droneW / 2, droneY + 4, WrightsUi.TEXT);
         drawOptionHelp(graphics, mouseX, mouseY, x, droneY + 3, droneLabel, droneMinusX, droneX + droneW, Component.translatable("menu.wrights.drone_fixed_hint"));
         boolean queueJobs = WrightsClientConfig.QUEUE_JOBS.get();
         Component queueLabel = Component.translatable("menu.wrights.queue_jobs");
         graphics.drawString(this.font, queueLabel, x, queueY + 3, WrightsUi.MUTED, false);
         Component queueState = Component.translatable(queueJobs ? "menu.wrights.on" : "menu.wrights.off");
-        graphics.fill(queueX, queueY, queueX + queueW, queueY + 16, queueJobs ? 0xFF24384A : 0xFF18222C);
-        WrightsUi.border(graphics, queueX, queueY, queueW, 16, queueJobs ? WrightsUi.COPPER : 0xFF3D4E5E);
+        WrightsUi.choice(graphics, queueX, queueY, queueW, 16, queueJobs, false);
         graphics.drawCenteredString(this.font, queueState, queueX + queueW / 2, queueY + 4, WrightsUi.TEXT);
         drawOptionHelp(graphics, mouseX, mouseY, x, queueY + 3, queueLabel, queueX, queueX + queueW, Component.translatable("menu.wrights.queue_jobs_hint"));
         boolean youFirst = WrightsClientConfig.PORT_PLAYER_FIRST.get();
         Component portLabel = Component.translatable("menu.wrights.port_order");
         graphics.drawString(this.font, portLabel, x, portOrderY + 3, WrightsUi.MUTED, false);
         Component portOrder = Component.translatable(youFirst ? "menu.wrights.port_player_first" : "menu.wrights.port_block_first");
-        graphics.fill(portOrderX, portOrderY, portOrderX + portOrderW, portOrderY + 16, youFirst ? 0xFF24384A : 0xFF18222C);
-        WrightsUi.border(graphics, portOrderX, portOrderY, portOrderW, 16, youFirst ? WrightsUi.COPPER : 0xFF3D4E5E);
+        WrightsUi.choice(graphics, portOrderX, portOrderY, portOrderW, 16, youFirst, false);
         graphics.drawCenteredString(this.font, portOrder, portOrderX + portOrderW / 2, portOrderY + 4, WrightsUi.TEXT);
         drawOptionHelp(graphics, mouseX, mouseY, x, portOrderY + 3, portLabel, portOrderX, portOrderX + portOrderW, Component.translatable(youFirst ? "menu.wrights.port_order_player_hint" : "menu.wrights.port_order_block_hint"));
         boolean openMenu = WrightsClientConfig.BUILD_MENU.get();
         Component menuLabel = Component.translatable("menu.wrights.open_build_menu");
         graphics.drawString(this.font, menuLabel, x, buildMenuY + 3, WrightsUi.MUTED, false);
         Component menuState = Component.translatable(openMenu ? "menu.wrights.on" : "menu.wrights.off");
-        graphics.fill(buildMenuX, buildMenuY, buildMenuX + buildMenuW, buildMenuY + 16, openMenu ? 0xFF24384A : 0xFF18222C);
-        WrightsUi.border(graphics, buildMenuX, buildMenuY, buildMenuW, 16, openMenu ? WrightsUi.COPPER : 0xFF3D4E5E);
+        WrightsUi.choice(graphics, buildMenuX, buildMenuY, buildMenuW, 16, openMenu, false);
         graphics.drawCenteredString(this.font, menuState, buildMenuX + buildMenuW / 2, buildMenuY + 4, WrightsUi.TEXT);
         drawOptionHelp(graphics, mouseX, mouseY, x, buildMenuY + 3, menuLabel, buildMenuX, buildMenuX + buildMenuW, Component.translatable("menu.wrights.open_build_menu_hint"));
         Component placeLabel = Component.translatable("menu.wrights.place_offset");
@@ -1302,13 +1293,11 @@ public class WrightsMenuScreen extends Screen {
         Component supplyLabel = Component.translatable("menu.wrights.supply_order");
         graphics.drawString(this.font, supplyLabel, x, supplyOrderY + 3, WrightsUi.MUTED, false);
         Component order = Component.translatable(playerFirst ? "menu.wrights.supply_player_first" : "menu.wrights.supply_chest_first");
-        graphics.fill(supplyOrderX, supplyOrderY, supplyOrderX + supplyOrderW, supplyOrderY + 16, playerFirst ? 0xFF24384A : 0xFF18222C);
-        WrightsUi.border(graphics, supplyOrderX, supplyOrderY, supplyOrderW, 16, playerFirst ? WrightsUi.COPPER : 0xFF3D4E5E);
+        WrightsUi.choice(graphics, supplyOrderX, supplyOrderY, supplyOrderW, 16, playerFirst, false);
         graphics.drawCenteredString(this.font, order, supplyOrderX + supplyOrderW / 2, supplyOrderY + 4, WrightsUi.TEXT);
         drawOptionHelp(graphics, mouseX, mouseY, x, supplyOrderY + 3, supplyLabel, supplyOrderX, supplyOrderX + supplyOrderW, Component.translatable(playerFirst ? "menu.wrights.supply_order_player_hint" : "menu.wrights.supply_order_chest_hint"));
         drawOptionSection(graphics, x, messageHeadY, "menu.wrights.section_messages", lineEnd);
-        graphics.fill(hudPlaceX, hudPlaceY, hudPlaceX + hudPlaceW, hudPlaceY + 16, 0xFF24384A);
-        WrightsUi.border(graphics, hudPlaceX, hudPlaceY, hudPlaceW, 16, WrightsUi.COPPER);
+        WrightsUi.choice(graphics, hudPlaceX, hudPlaceY, hudPlaceW, 16, true, false);
         graphics.drawCenteredString(this.font, Component.translatable("menu.wrights.hud_place"), hudPlaceX + hudPlaceW / 2, hudPlaceY + 4, WrightsUi.TEXT);
         drawOptionHelp(graphics, mouseX, mouseY, hudPlaceX + hudPlaceW + 2, hudPlaceY + 4, Component.empty(), 0, 0, Component.translatable("menu.wrights.hud_place_hint"));
         graphics.disableScissor();
@@ -1373,21 +1362,19 @@ public class WrightsMenuScreen extends Screen {
             int sx = x + i * 16;
             graphics.fill(sx, y, sx + 12, y + 12, 0xFF000000 | color);
             if (color == selected) {
-                WrightsUi.border(graphics, sx - 1, y - 1, 14, 14, 0xFFFFFFFF);
+                WrightsUi.border(graphics, sx - 1, y - 1, 14, 14, WrightsUi.TEXT);
             }
         }
     }
 
     private void drawSlider(GuiGraphics graphics, int labelX, int y, int x, int width, int along, int span, Component label) {
         graphics.drawString(this.font, label, labelX, y, WrightsUi.MUTED, false);
-        int trackY = y + 2;
-        graphics.fill(x - 1, trackY - 1, x + width + 1, trackY + 9, 0xFF8EA0B0);
-        graphics.fill(x, trackY, x + width, trackY + 8, 0xFF101820);
+        int trackY = y + 4;
+        graphics.fill(x, trackY, x + width, trackY + 4, 0xFF101820);
         int filled = (int) Math.round(width * (along / (double) Math.max(1, span)));
-        graphics.fill(x, trackY, x + Math.max(0, Math.min(width, filled)), trackY + 8, 0xFFC47A3A);
-        int knob = x + (int) ((width - 8) * (along / (double) Math.max(1, span)));
-        graphics.fill(knob, trackY - 2, knob + 8, trackY + 10, 0xFFF2D48A);
-        WrightsUi.border(graphics, knob, trackY - 2, 8, 12, 0xFFFFFFFF);
+        graphics.fill(x, trackY, x + Math.max(0, Math.min(width, filled)), trackY + 4, WrightsUi.COPPER);
+        int knob = x + (int) ((width - 6) * (along / (double) Math.max(1, span)));
+        graphics.fill(knob, trackY - 3, knob + 6, trackY + 7, WrightsUi.TEXT);
     }
 
     private void placeField(EditBox box, int x, int y) {
@@ -1449,8 +1436,7 @@ public class WrightsMenuScreen extends Screen {
 
     private void drawSubTask(GuiGraphics graphics, Component label, boolean active, int y) {
         int x = panelX + 30;
-        graphics.fill(x, y, x + 84, y + 18, active ? 0xFF24384A : 0xFF141C24);
-        graphics.fill(x, y, x + 2, y + 18, active ? WrightsUi.TEAL : WrightsUi.COPPER_DIM);
+        WrightsUi.rail(graphics, x, y, 84, 18, active, WrightsUi.TEAL);
         String text = this.font.plainSubstrByWidth(label.getString(), 74);
         graphics.drawString(this.font, text, x + 8, y + 5, active ? WrightsUi.TEXT : WrightsUi.MUTED, false);
     }
@@ -1534,8 +1520,7 @@ public class WrightsMenuScreen extends Screen {
         String dimension = this.minecraft != null && this.minecraft.level != null ? this.minecraft.level.dimension().location().toString() : "";
         boolean placed = WrightsClientConfig.mirrorPlaced(dimension);
         boolean armed = WrightsClientConfig.mirrorArmed(dimension);
-        graphics.fill(x, y, x + w, y + 34, 0xFF101820);
-        graphics.fill(x, y, x + 2, y + 34, placed ? WrightsUi.TEAL : WrightsUi.COPPER_DIM);
+        WrightsUi.status(graphics, x, y, w, 34, placed ? WrightsUi.TEAL : WrightsUi.COPPER_DIM);
         if (!WrightsClientConfig.MIRROR_SET.get()) {
             drawWrapped(graphics, Component.translatable("menu.wrights.mirror_none"), x + 10, y + 6, w - 16, WrightsUi.TEXT);
         } else if (!placed) {
@@ -1551,8 +1536,7 @@ public class WrightsMenuScreen extends Screen {
 
     private void drawChoice(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int w, int h, boolean on, String title, String hint) {
         boolean hover = mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h && !overMirrorHelp(mouseX, mouseY);
-        graphics.fill(x, y, x + w, y + h, on ? 0xFF24384A : (hover ? 0xFF223445 : 0xFF1C2A37));
-        graphics.fill(x, y, x + w, y + 2, on ? WrightsUi.TEAL : WrightsUi.COPPER_DIM);
+        WrightsUi.choice(graphics, x, y, w, h, on, hover);
         String label = this.font.plainSubstrByWidth(Component.translatable(title).getString(), Math.max(8, w - 22));
         graphics.drawString(this.font, label, x + 6, y + (h - 8) / 2, on ? WrightsUi.TEXT : WrightsUi.MUTED, false);
         drawHelpBox(graphics, mouseX, mouseY, x + w - 16, y + (h - 12) / 2, hint);
@@ -1684,10 +1668,7 @@ public class WrightsMenuScreen extends Screen {
     private void drawScopeChip(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int w, boolean global, String key) {
         boolean on = WrightsClientState.libraryGlobal == global;
         boolean hover = mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + 14;
-        graphics.fill(x, y, x + w, y + 14, on ? 0xFF24384A : (hover ? 0xFF223445 : 0xFF1C2A37));
-        if (on) {
-            graphics.fill(x, y, x + w, y + 2, WrightsUi.COPPER);
-        }
+        WrightsUi.choice(graphics, x, y, w, 14, on, hover);
         String label = this.font.plainSubstrByWidth(Component.translatable(key).getString(), w - 4);
         graphics.drawString(this.font, label, x + (w - this.font.width(label)) / 2, y + 3, on ? WrightsUi.TEXT : WrightsUi.MUTED, false);
     }
@@ -1701,10 +1682,7 @@ public class WrightsMenuScreen extends Screen {
             int tabW = i == keys.length - 1 ? listX + listW - x : width;
             boolean on = savedTab == i;
             boolean hover = mouseX >= x && mouseX < x + tabW && mouseY >= tabY && mouseY < tabY + 14;
-            graphics.fill(x, tabY, x + tabW - 1, tabY + 13, on ? 0xFF24384A : (hover ? 0xFF223445 : 0xFF1C2A37));
-            if (on) {
-                graphics.fill(x, tabY, x + tabW - 1, tabY + 2, WrightsUi.COPPER);
-            }
+            WrightsUi.choice(graphics, x, tabY, tabW - 1, 14, on, hover);
             String label = this.font.plainSubstrByWidth(Component.translatable(keys[i]).getString(), tabW - 4);
             graphics.drawString(this.font, label, x + (tabW - this.font.width(label)) / 2, tabY + 3, on ? WrightsUi.TEXT : WrightsUi.MUTED, false);
         }
@@ -2656,7 +2634,10 @@ public class WrightsMenuScreen extends Screen {
         int rowH = jobStride - 4;
         boolean hover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + rowH;
         hoveredJob = hover ? job : hoveredJob;
-        graphics.fill(x, y, x + width, y + rowH, hover ? 0xFF24303C : 0xFF18222C);
+        graphics.fill(x, y, x + width, y + rowH, hover ? WrightsUi.CARD_HOVER : WrightsUi.SHADE);
+        if (hover) {
+            graphics.fill(x, y, x + 2, y + rowH, jobColor(job));
+        }
         String name = this.font.plainSubstrByWidth(job.name(), Math.max(40, width / 2));
         graphics.drawString(this.font, name, x + 6, y + 4, WrightsUi.TEXT, false);
         Component statusText = jobStatusText(job);
@@ -2968,9 +2949,9 @@ public class WrightsMenuScreen extends Screen {
     private int drawJobButton(GuiGraphics graphics, int right, int y, String key, int mouseX, int mouseY, int width, int border) {
         int left = right - width;
         boolean hover = mouseX >= left && mouseX < right && mouseY >= y && mouseY < y + 16;
-        graphics.fill(left, y, right, y + 16, hover ? 0xFF3A5164 : 0xFF24384A);
+        WrightsUi.choice(graphics, left, y, width, 16, false, hover);
         if (border != 0) {
-            WrightsUi.border(graphics, left, y, width, 16, border);
+            graphics.fill(left, y, right, y + 2, border);
         }
         Component label = Component.translatable(key);
         String text = this.font.plainSubstrByWidth(label.getString(), width - 4);
@@ -4237,11 +4218,7 @@ public class WrightsMenuScreen extends Screen {
     private void drawManageTab(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int w, int index) {
         boolean on = manageTab == index;
         boolean hover = mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + 16;
-        graphics.fill(x, y, x + w, y + 16, on ? 0xFF24384A : (hover ? 0xFF223445 : 0xFF1C2A37));
-        if (on) {
-            graphics.fill(x, y, x + w, y + 2, WrightsUi.COPPER);
-        }
-        WrightsUi.border(graphics, x, y, w, 16, on || hover ? WrightsUi.COPPER : 0xFF3D4E5E);
+        WrightsUi.choice(graphics, x, y, w, 16, on, hover);
         String label = this.font.plainSubstrByWidth(Component.translatable(manageTabKey(index)).getString(), w - 8);
         graphics.drawString(this.font, label, x + (w - this.font.width(label)) / 2, y + 4, on ? WrightsUi.TEXT : WrightsUi.MUTED, false);
     }
@@ -4358,8 +4335,7 @@ public class WrightsMenuScreen extends Screen {
         int w = portBarW();
         boolean open = portListOpen;
         boolean hover = spots.size() > 1 && mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + 16;
-        graphics.fill(x, y, x + w, y + 16, open || hover ? 0xFF2C3E52 : 0xFF1A2633);
-        WrightsUi.border(graphics, x, y, w, 16, open || hover ? WrightsUi.COPPER : 0xFF3D4E5E);
+        WrightsUi.choice(graphics, x, y, w, 16, open, hover);
         String text = this.font.plainSubstrByWidth(portLabel(spots, spot).getString(), Math.max(0, w - (spots.size() > 1 ? 18 : 8)));
         graphics.drawString(this.font, text, x + 6, y + 4, WrightsUi.TEXT, false);
         if (spots.size() > 1) {
