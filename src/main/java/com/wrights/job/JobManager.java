@@ -1139,9 +1139,7 @@ public final class JobManager {
                 continue;
             }
             if (falling(level, schematic, job, entry) == Falling.SKIP) {
-                if (job.retire(index)) {
-                    job.skippedOne();
-                }
+                giveUpCell(job, entry, index);
                 markSolo(job, index);
                 continue;
             }
@@ -2869,6 +2867,10 @@ public final class JobManager {
         if (skippedContent(job, entry)) {
             return true;
         }
+        // Already placed or skipped once. Do not retry if the block later pops (cactus) or is broken.
+        if (job.isSettled(entry.x(), entry.y(), entry.z())) {
+            return true;
+        }
         return level.getBlockState(pos).equals(entry.state());
     }
 
@@ -2891,9 +2893,7 @@ public final class JobManager {
             if (!satisfied(level, job, entry)) {
                 Falling hold = falling(level, schematic, job, entry);
                 if (hold == Falling.SKIP) {
-                    if (job.retire(index)) {
-                        job.skippedOne();
-                    }
+                    giveUpCell(job, entry, index);
                     noteProgress(schematic, job, hand, entry, index);
                     budget[0]--;
                     continue;
@@ -3027,9 +3027,7 @@ public final class JobManager {
                 continue;
             }
             if (hold == Falling.SKIP) {
-                if (job.retire(i)) {
-                    job.skippedOne();
-                }
+                giveUpCell(job, entry, i);
                 continue;
             }
             if (entry.secondary() && secondaryWaiting(level, job, entry)) {
@@ -3128,6 +3126,9 @@ public final class JobManager {
         if (!seen.add(BlockPos.asLong(entry.x(), entry.y(), entry.z()))) {
             return Falling.SKIP;
         }
+        if (BlockFilters.isCactus(entry.state())) {
+            return cactusAt(level, schematic, job, entry, seen);
+        }
         BlockPos pos = job.min().offset(entry.x(), entry.y(), entry.z());
         BlockPos below = pos.below();
         if (level.isOutsideBuildHeight(pos) || !level.isLoaded(pos) || !level.isLoaded(below)) {
@@ -3140,6 +3141,59 @@ public final class JobManager {
         if (support >= 0 && floorComing(level, schematic, job, support, seen)) {
             return Falling.WAIT;
         }
+        return Falling.SKIP;
+    }
+
+    /**
+     * A cactus tower is only valid when sand sits under its lowest cactus. That sand may be inside
+     * the blueprint, or — when the cactus is on the bottom layer — already in the world under the paste.
+     */
+    private static Falling cactusAt(ServerLevel level, Schematic schematic, BuildJob job, Schematic.Entry entry, Set<Long> seen) {
+        BlockPos pos = job.min().offset(entry.x(), entry.y(), entry.z());
+        if (level.isOutsideBuildHeight(pos) || !level.isLoaded(pos)) {
+            return Falling.WAIT;
+        }
+        int baseY = entry.y();
+        while (baseY > 0) {
+            int underCactus = schematic.indexAt(entry.x(), baseY - 1, entry.z());
+            if (underCactus < 0 || !BlockFilters.isCactus(schematic.entry(underCactus).state())) {
+                break;
+            }
+            baseY--;
+        }
+        BlockPos soilPos = job.min().offset(entry.x(), baseY, entry.z()).below();
+        if (level.isOutsideBuildHeight(soilPos) || !level.isLoaded(soilPos)) {
+            return Falling.WAIT;
+        }
+        int soilIndex = schematic.indexAt(entry.x(), baseY - 1, entry.z());
+        BlockState soilNow = level.getBlockState(soilPos);
+        if (BlockFilters.cactusSoil(soilNow)) {
+            if (entry.state().canSurvive(level, pos)) {
+                return Falling.READY;
+            }
+            // Upper cactus waiting on a lower cactus in this column.
+            if (entry.y() > baseY) {
+                int lower = schematic.indexAt(entry.x(), entry.y() - 1, entry.z());
+                if (lower >= 0 && floorComing(level, schematic, job, lower, seen)) {
+                    return Falling.WAIT;
+                }
+            }
+            // Neighbors (or a missing mid-tower piece that will never land) make this illegal.
+            return Falling.SKIP;
+        }
+        if (soilIndex >= 0) {
+            Schematic.Entry soil = schematic.entry(soilIndex);
+            if (BlockFilters.cactusSoil(soil.state())) {
+                if (floorComing(level, schematic, job, soilIndex, seen)) {
+                    return Falling.WAIT;
+                }
+                // Sand in the pattern will not be placed (void off over stone, etc.).
+                return Falling.SKIP;
+            }
+            // Pattern puts a non-sand block under the tower — cactus can never live there.
+            return Falling.SKIP;
+        }
+        // Lowest cactus is on the bottom of the blueprint: world under the paste must already be sand.
         return Falling.SKIP;
     }
 
@@ -3202,7 +3256,14 @@ public final class JobManager {
 
     private static boolean floorComing(ServerLevel level, Schematic schematic, BuildJob job, int support, Set<Long> seen) {
         Schematic.Entry floor = schematic.entry(support);
+        if (job.isSettled(floor.x(), floor.y(), floor.z())) {
+            return false;
+        }
         if (!stillQueued(job, floor.x(), floor.y(), floor.z(), support)) {
+            return false;
+        }
+        // Occupied without void, or otherwise never placeable — do not wait forever for it.
+        if (!canEventuallyPlace(level, job, floor)) {
             return false;
         }
         if (BlockFilters.falls(floor.state())) {
@@ -3210,6 +3271,31 @@ public final class JobManager {
         }
         if (BlockFilters.needsGround(floor.state())) {
             return groundAt(level, schematic, job, floor, seen) != Falling.SKIP;
+        }
+        return true;
+    }
+
+    /** False when this cell will be skipped (solid in the way, kept machine, clipped content). */
+    private static boolean canEventuallyPlace(ServerLevel level, BuildJob job, Schematic.Entry entry) {
+        if (job.outsideClip(entry) || skippedContent(job, entry)) {
+            return false;
+        }
+        BlockPos pos = job.min().offset(entry.x(), entry.y(), entry.z());
+        if (level.isOutsideBuildHeight(pos)) {
+            return false;
+        }
+        if (!level.isLoaded(pos)) {
+            return true;
+        }
+        BlockState existing = level.getBlockState(pos);
+        if (existing.equals(entry.state())) {
+            return false;
+        }
+        if (keptStored(job, existing, entry.state())) {
+            return false;
+        }
+        if (!shouldVoid(job, existing, entry.state()) && !existing.isAir() && !existing.canBeReplaced()) {
+            return false;
         }
         return true;
     }
@@ -3865,19 +3951,16 @@ public final class JobManager {
 
     private static PlaceResult placeOne(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos pos, Schematic.Entry entry, boolean quiet, BuildJob.Hand hand) {
         if (level.isOutsideBuildHeight(pos)) {
-            job.skippedOne();
-            return PlaceResult.DONE;
+            return skipCell(player, job, entry);
         }
         if (!level.isLoaded(pos)) {
             if (WrightsConfig.REQUIRE_CHUNKS_LOADED.getAsBoolean()) {
                 return PlaceResult.PAUSE;
             }
-            job.skippedOne();
-            return PlaceResult.DONE;
+            return skipCell(player, job, entry);
         }
         if (!canBuild(player, level, pos)) {
-            job.skippedOne();
-            return PlaceResult.DONE;
+            return skipCell(player, job, entry);
         }
         BlockState state = entry.state();
         Item payment = BlockFilters.payment(state);
@@ -3888,21 +3971,18 @@ public final class JobManager {
             return PlaceResult.DONE;
         }
         if (skippedContent(job, entry)) {
-            job.skippedOne();
-            return PlaceResult.DONE;
+            return skipCell(player, job, entry);
         }
         if (keptStored(job, existing, state)) {
-            job.skippedOne();
-            return PlaceResult.DONE;
+            return skipCell(player, job, entry);
         }
         boolean clearFirst = shouldVoid(job, existing, state);
         if (clearFirst && existing.getDestroySpeed(level, pos) < 0.0F) {
-            job.skippedOne();
-            return PlaceResult.DONE;
+            return skipCell(player, job, entry);
         }
+        // Void off: leave the world block alone and never revisit this schematic cell.
         if (!clearFirst && !existing.isAir() && !existing.canBeReplaced()) {
-            job.skippedOne();
-            return PlaceResult.DONE;
+            return skipCell(player, job, entry);
         }
         if (entry.secondary()) {
             BlockState below = level.getBlockState(pos.below());
@@ -3910,12 +3990,11 @@ public final class JobManager {
                 if (below.isAir() || below.canBeReplaced()) {
                     return PlaceResult.WAIT;
                 }
-                job.skippedOne();
-                return PlaceResult.DONE;
+                return skipCell(player, job, entry);
             }
-        } else if (BlockFilters.needsGround(state) && level.isLoaded(pos.below()) && !state.canSurvive(level, pos)) {
-            job.skippedOne();
-            return PlaceResult.DONE;
+        } else if (level.isLoaded(pos.below()) && !state.canSurvive(level, pos)) {
+            // Wrong floor, or cactus against a neighbor — do not place (and do not retry forever).
+            return skipCell(player, job, entry);
         } else if (!freePlace(player) && payment != null) {
             if (!hasItem(player, level, job, hand, payment)) {
                 return PlaceResult.WAIT;
@@ -3939,15 +4018,13 @@ public final class JobManager {
             if (!after.equals(existing)) {
                 level.setBlock(pos, existing, Block.UPDATE_ALL);
             }
-            job.skippedOne();
-            return PlaceResult.DONE;
+            return skipCell(player, job, entry);
         }
         BlockEvent.EntityPlaceEvent event = new BlockEvent.EntityPlaceEvent(snapshot, existing, player);
         NeoForge.EVENT_BUS.post(event);
         if (event.isCanceled()) {
             level.setBlock(pos, existing, Block.UPDATE_ALL);
-            job.skippedOne();
-            return PlaceResult.DONE;
+            return skipCell(player, job, entry);
         }
         boolean paid = !entry.secondary() && !freePlace(player) && payment != null;
         if (paid) {
@@ -3963,6 +4040,21 @@ public final class JobManager {
         }
         job.placedOne();
         return PlaceResult.DONE;
+    }
+
+    /** Count a skip once and mark the cell settled so wrap-back does not retry it. */
+    private static PlaceResult skipCell(ServerPlayer player, BuildJob job, Schematic.Entry entry) {
+        job.skippedOne();
+        clearPlacedGhost(player, job, entry);
+        return PlaceResult.DONE;
+    }
+
+    /** Falling/ground gave up: count once, settle the cell, never ask for it again. */
+    private static void giveUpCell(BuildJob job, Schematic.Entry entry, int index) {
+        if (job.retire(index)) {
+            job.skippedOne();
+        }
+        job.settleGhost(entry.x(), entry.y(), entry.z());
     }
 
     /** The cell is filled, so the preview ghost for it is finished. */

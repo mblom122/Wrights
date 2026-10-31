@@ -732,6 +732,23 @@ public final class BuildJob {
         settledGhosts.add(BlockPos.asLong(Short.toUnsignedInt(x), Short.toUnsignedInt(y), Short.toUnsignedInt(z)));
     }
 
+    /**
+     * True once this cell was placed or skipped. Later world changes (a cactus popping off, a player
+     * breaking the block) must not make the job try that schematic cell again.
+     */
+    public boolean isSettled(short x, short y, short z) {
+        long key = BlockPos.asLong(Short.toUnsignedInt(x), Short.toUnsignedInt(y), Short.toUnsignedInt(z));
+        if (settledGhosts.contains(key)) {
+            return true;
+        }
+        for (Refund refund : refunds) {
+            if (refund.x() == x && refund.y() == y && refund.z() == z) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void collectSettledGhosts(Set<Long> into) {
         into.addAll(settledGhosts);
         for (Refund refund : refunds) {

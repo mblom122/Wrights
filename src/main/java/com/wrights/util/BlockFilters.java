@@ -5,6 +5,7 @@ import java.util.Map;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -12,6 +13,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.BushBlock;
+import net.minecraft.world.level.block.CactusBlock;
 import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.FallingBlock;
 import net.minecraft.world.level.block.DoublePlantBlock;
@@ -19,6 +21,7 @@ import net.minecraft.world.level.block.EndGatewayBlock;
 import net.minecraft.world.level.block.EndPortalBlock;
 import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.NetherPortalBlock;
+import net.minecraft.world.level.block.SugarCaneBlock;
 import net.minecraft.world.level.block.piston.MovingPistonBlock;
 import net.minecraft.world.level.block.piston.PistonHeadBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -187,9 +190,24 @@ public final class BlockFilters {
         return state.getBlock() instanceof FallingBlock;
     }
 
-    /** Grass, flowers, crops, and the other plants that break unless a block is under them. */
+    /**
+     * Plants that break unless the block under them (and sometimes beside them) is right.
+     * Cactus and sugar cane are not {@link BushBlock}s, but they pop the same way.
+     */
     public static boolean needsGround(BlockState state) {
-        return state.getBlock() instanceof BushBlock;
+        Block block = state.getBlock();
+        return block instanceof BushBlock
+                || block instanceof CactusBlock
+                || block instanceof SugarCaneBlock;
+    }
+
+    public static boolean isCactus(BlockState state) {
+        return state.getBlock() instanceof CactusBlock;
+    }
+
+    /** Sand / red sand — what a cactus tower must sit on. */
+    public static boolean cactusSoil(BlockState state) {
+        return state != null && state.is(BlockTags.SAND);
     }
 
     public static boolean isSecondary(BlockState state) {
