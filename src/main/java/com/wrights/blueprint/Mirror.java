@@ -377,18 +377,19 @@ public final class Mirror {
             return shots;
         }
         int patternId = clampPattern(pattern);
+        Direction.Axis axis = face.getAxis();
         if (patternId == SIXTEEN) {
             for (int step = 1; step <= 15; step++) {
                 int turn = step;
                 shots.add(new Shot() {
                     @Override
                     public BlockPos move(BlockPos pos) {
-                        return circle(pos, anchor, turn);
+                        return circle(pos, anchor, turn, axis);
                     }
 
                     @Override
                     public BlockState restyle(BlockState state) {
-                        return shapes ? state.rotate(circleRotation(turn)) : state;
+                        return shapes ? spinState(state, axis, Math.round(turn / 4.0F)) : state;
                     }
                 });
             }
@@ -400,12 +401,12 @@ public final class Mirror {
                 shots.add(new Shot() {
                     @Override
                     public BlockPos move(BlockPos pos) {
-                        return around(pos, anchor, kind);
+                        return around(pos, anchor, kind, axis);
                     }
 
                     @Override
                     public BlockState restyle(BlockState state) {
-                        return shapes ? styleEight(state, kind) : state;
+                        return shapes ? styleEight(state, kind, axis) : state;
                     }
                 });
             }
@@ -527,54 +528,30 @@ public final class Mirror {
         return reflectCenter(pos, anchor, face.getAxis());
     }
 
-    /** Steps of 22.5 degrees around the middle of the anchor block. Quarter turns stay on the grid. */
-    private static BlockPos circle(BlockPos pos, BlockPos anchor, int step) {
+    /** Steps of 22.5 degrees around the middle, in the plane of the clicked face. Quarter turns stay on the grid. */
+    private static BlockPos circle(BlockPos pos, BlockPos anchor, int step, Direction.Axis axis) {
         int turn = Math.floorMod(step, 16);
+        int dx = pos.getX() - anchor.getX();
+        int dy = pos.getY() - anchor.getY();
+        int dz = pos.getZ() - anchor.getZ();
+        int u = planeU(dx, dy, dz, axis);
+        int v = planeV(dx, dy, dz, axis);
+        int fixed = planeFixed(dx, dy, dz, axis);
         if (turn % 4 == 0) {
-            return turnQuarter(pos, anchor, turn / 4);
+            int[] spun = spin2(u, v, turn / 4);
+            return assemble(anchor, axis, spun[0], spun[1], fixed);
         }
         double angle = turn * (Math.PI / 8.0D);
         double cos = Math.cos(angle);
         double sin = Math.sin(angle);
-        double dx = pos.getX() - anchor.getX();
-        double dz = pos.getZ() - anchor.getZ();
-        double nx = dx * cos - dz * sin;
-        double nz = dx * sin + dz * cos;
-        Integer x = blockOfCenter(anchor.getX() + 0.5D + nx);
-        Integer z = blockOfCenter(anchor.getZ() + 0.5D + nz);
-        if (x == null || z == null) {
+        double nu = u * cos - v * sin;
+        double nv = u * sin + v * cos;
+        Integer bu = blockOfCenter(anchorPart(anchor, axis, true) + 0.5D + nu);
+        Integer bv = blockOfCenter(anchorPart(anchor, axis, false) + 0.5D + nv);
+        if (bu == null || bv == null) {
             return null;
         }
-        return new BlockPos(x, pos.getY(), z);
-    }
-
-    private static BlockPos turnQuarter(BlockPos pos, BlockPos anchor, int quarter) {
-        int dx = pos.getX() - anchor.getX();
-        int dz = pos.getZ() - anchor.getZ();
-        int nx = dx;
-        int nz = dz;
-        switch (Math.floorMod(quarter, 4)) {
-            case 1 -> {
-                nx = -dz;
-                nz = dx;
-            }
-            case 2 -> {
-                nx = -dx;
-                nz = -dz;
-            }
-            case 3 -> {
-                nx = dz;
-                nz = -dx;
-            }
-            default -> {
-            }
-        }
-        long x = anchor.getX() + (long) nx;
-        long z = anchor.getZ() + (long) nz;
-        if (x > Integer.MAX_VALUE || x < Integer.MIN_VALUE || z > Integer.MAX_VALUE || z < Integer.MIN_VALUE) {
-            return null;
-        }
-        return new BlockPos((int) x, pos.getY(), (int) z);
+        return assemble(anchor, axis, bu - anchorPart(anchor, axis, true), bv - anchorPart(anchor, axis, false), fixed);
     }
 
     private static Integer blockOfCenter(double center) {
@@ -588,72 +565,245 @@ public final class Mirror {
         return (int) Math.floor(center);
     }
 
-    private static Rotation circleRotation(int step) {
-        int quarter = Math.floorMod(Math.round(step / 4.0F), 4);
-        return switch (quarter) {
-            case 1 -> Rotation.CLOCKWISE_90;
-            case 2 -> Rotation.CLOCKWISE_180;
-            case 3 -> Rotation.COUNTERCLOCKWISE_90;
-            default -> Rotation.NONE;
+    /** Quarter turns and flips around the anchor corner, in the plane of the clicked face. */
+    private static BlockPos around(BlockPos pos, BlockPos anchor, int kind, Direction.Axis axis) {
+        int dx = pos.getX() - anchor.getX();
+        int dy = pos.getY() - anchor.getY();
+        int dz = pos.getZ() - anchor.getZ();
+        int u = planeU(dx, dy, dz, axis);
+        int v = planeV(dx, dy, dz, axis);
+        int nu = u;
+        int nv = v;
+        switch (kind) {
+            case 1 -> nu = -u;
+            case 2 -> nv = -v;
+            case 3 -> {
+                nu = -u;
+                nv = -v;
+            }
+            case 4 -> {
+                int[] spun = spin2(u, v, 1);
+                nu = spun[0];
+                nv = spun[1];
+            }
+            case 5 -> {
+                int[] spun = spin2(u, v, 3);
+                nu = spun[0];
+                nv = spun[1];
+            }
+            case 6 -> {
+                nu = v;
+                nv = u;
+            }
+            default -> {
+                nu = -v;
+                nv = -u;
+            }
+        }
+        return assemble(anchor, axis, nu, nv, planeFixed(dx, dy, dz, axis));
+    }
+
+    private static BlockState styleEight(BlockState state, int kind, Direction.Axis axis) {
+        if (axis == Direction.Axis.Y) {
+            return switch (kind) {
+                case 1 -> state.mirror(net.minecraft.world.level.block.Mirror.FRONT_BACK);
+                case 2 -> state.mirror(net.minecraft.world.level.block.Mirror.LEFT_RIGHT);
+                case 3 -> state.rotate(Rotation.CLOCKWISE_180);
+                case 4 -> state.rotate(Rotation.CLOCKWISE_90);
+                case 5 -> state.rotate(Rotation.COUNTERCLOCKWISE_90);
+                case 6 -> state.rotate(Rotation.CLOCKWISE_90).mirror(net.minecraft.world.level.block.Mirror.FRONT_BACK);
+                default -> state.rotate(Rotation.CLOCKWISE_90).mirror(net.minecraft.world.level.block.Mirror.LEFT_RIGHT);
+            };
+        }
+        return switch (kind) {
+            case 1 -> mirrorPlane(state, axis, true);
+            case 2 -> mirrorPlane(state, axis, false);
+            case 3 -> spinState(state, axis, 2);
+            case 4 -> spinState(state, axis, 1);
+            case 5 -> spinState(state, axis, 3);
+            case 6 -> mirrorPlane(spinState(state, axis, 1), axis, true);
+            default -> mirrorPlane(spinState(state, axis, 1), axis, false);
         };
     }
 
-    /** Quarter turns and flips around the anchor corner, so every copy stays on the block grid. */
-    private static BlockPos around(BlockPos pos, BlockPos anchor, int kind) {
-        int ox = pos.getX() - anchor.getX();
-        int oy = pos.getY() - anchor.getY();
-        int oz = pos.getZ() - anchor.getZ();
-        int nx = ox;
-        int nz = oz;
-        switch (kind) {
-            case 1 -> {
-                nx = -ox;
-                nz = oz;
+    /** Clockwise quarters around {@code axis}, matching a top-face circle when the axis is Y. */
+    private static BlockState spinState(BlockState state, Direction.Axis axis, int quarters) {
+        int turn = Math.floorMod(quarters, 4);
+        if (turn == 0) {
+            return state;
+        }
+        if (axis == Direction.Axis.Y) {
+            Rotation rotation = switch (turn) {
+                case 1 -> Rotation.CLOCKWISE_90;
+                case 2 -> Rotation.CLOCKWISE_180;
+                case 3 -> Rotation.COUNTERCLOCKWISE_90;
+                default -> Rotation.NONE;
+            };
+            return state.rotate(rotation);
+        }
+        BlockState spun = state;
+        for (int i = 0; i < turn; i++) {
+            spun = mapDirections(spun, dir -> turnDir(dir, axis), value -> turnAxis(value, axis));
+        }
+        if (turn == 2) {
+            spun = flipHalves(spun);
+        }
+        return spun;
+    }
+
+    private static BlockState mirrorPlane(BlockState state, Direction.Axis axis, boolean alongU) {
+        BlockState mapped = mapDirections(state, dir -> alongU ? mirrorU(dir, axis) : mirrorV(dir, axis), null);
+        boolean vertical = alongU ? axis == Direction.Axis.Z : axis == Direction.Axis.X;
+        return vertical ? flipHalves(mapped) : mapped;
+    }
+
+    /** The two plane axes, then the clicked axis. Clockwise is (u, v) to (-v, u). */
+    private static int planeU(int dx, int dy, int dz, Direction.Axis axis) {
+        return switch (axis) {
+            case X -> dz;
+            case Z -> dy;
+            default -> dx;
+        };
+    }
+
+    private static int planeV(int dx, int dy, int dz, Direction.Axis axis) {
+        return switch (axis) {
+            case X -> dy;
+            case Z -> dx;
+            default -> dz;
+        };
+    }
+
+    private static int planeFixed(int dx, int dy, int dz, Direction.Axis axis) {
+        return switch (axis) {
+            case X -> dx;
+            case Z -> dz;
+            default -> dy;
+        };
+    }
+
+    private static int anchorPart(BlockPos anchor, Direction.Axis axis, boolean u) {
+        int dx = anchor.getX();
+        int dy = anchor.getY();
+        int dz = anchor.getZ();
+        return u ? planeU(dx, dy, dz, axis) : planeV(dx, dy, dz, axis);
+    }
+
+    private static int[] spin2(int u, int v, int quarter) {
+        return switch (Math.floorMod(quarter, 4)) {
+            case 1 -> new int[] {-v, u};
+            case 2 -> new int[] {-u, -v};
+            case 3 -> new int[] {v, -u};
+            default -> new int[] {u, v};
+        };
+    }
+
+    private static BlockPos assemble(BlockPos anchor, Direction.Axis axis, int u, int v, int fixed) {
+        long x;
+        long y;
+        long z;
+        switch (axis) {
+            case X -> {
+                x = anchor.getX() + (long) fixed;
+                y = anchor.getY() + (long) v;
+                z = anchor.getZ() + (long) u;
             }
-            case 2 -> {
-                nx = ox;
-                nz = -oz;
-            }
-            case 3 -> {
-                nx = -ox;
-                nz = -oz;
-            }
-            case 4 -> {
-                nx = -oz;
-                nz = ox;
-            }
-            case 5 -> {
-                nx = oz;
-                nz = -ox;
-            }
-            case 6 -> {
-                nx = oz;
-                nz = ox;
+            case Z -> {
+                x = anchor.getX() + (long) v;
+                y = anchor.getY() + (long) u;
+                z = anchor.getZ() + (long) fixed;
             }
             default -> {
-                nx = -oz;
-                nz = -ox;
+                x = anchor.getX() + (long) u;
+                y = anchor.getY() + (long) fixed;
+                z = anchor.getZ() + (long) v;
             }
         }
-        long x = anchor.getX() + (long) nx;
-        long y = anchor.getY() + (long) oy;
-        long z = anchor.getZ() + (long) nz;
         if (x > Integer.MAX_VALUE || x < Integer.MIN_VALUE || y > Integer.MAX_VALUE || y < Integer.MIN_VALUE || z > Integer.MAX_VALUE || z < Integer.MIN_VALUE) {
             return null;
         }
         return new BlockPos((int) x, (int) y, (int) z);
     }
 
-    private static BlockState styleEight(BlockState state, int kind) {
-        return switch (kind) {
-            case 1 -> state.mirror(net.minecraft.world.level.block.Mirror.FRONT_BACK);
-            case 2 -> state.mirror(net.minecraft.world.level.block.Mirror.LEFT_RIGHT);
-            case 3 -> state.rotate(Rotation.CLOCKWISE_180);
-            case 4 -> state.rotate(Rotation.CLOCKWISE_90);
-            case 5 -> state.rotate(Rotation.COUNTERCLOCKWISE_90);
-            case 6 -> state.rotate(Rotation.CLOCKWISE_90).mirror(net.minecraft.world.level.block.Mirror.FRONT_BACK);
-            default -> state.rotate(Rotation.CLOCKWISE_90).mirror(net.minecraft.world.level.block.Mirror.LEFT_RIGHT);
+    private static Direction turnDir(Direction dir, Direction.Axis axis) {
+        return switch (axis) {
+            case X -> switch (dir) {
+                case UP -> Direction.NORTH;
+                case NORTH -> Direction.DOWN;
+                case DOWN -> Direction.SOUTH;
+                case SOUTH -> Direction.UP;
+                default -> dir;
+            };
+            case Z -> switch (dir) {
+                case UP -> Direction.EAST;
+                case EAST -> Direction.DOWN;
+                case DOWN -> Direction.WEST;
+                case WEST -> Direction.UP;
+                default -> dir;
+            };
+            default -> switch (dir) {
+                case NORTH -> Direction.EAST;
+                case EAST -> Direction.SOUTH;
+                case SOUTH -> Direction.WEST;
+                case WEST -> Direction.NORTH;
+                default -> dir;
+            };
         };
+    }
+
+    private static Direction.Axis turnAxis(Direction.Axis value, Direction.Axis around) {
+        if (value == around) {
+            return value;
+        }
+        return switch (around) {
+            case X -> value == Direction.Axis.Y ? Direction.Axis.Z : Direction.Axis.Y;
+            case Z -> value == Direction.Axis.Y ? Direction.Axis.X : Direction.Axis.Y;
+            default -> value == Direction.Axis.X ? Direction.Axis.Z : Direction.Axis.X;
+        };
+    }
+
+    private static Direction mirrorU(Direction dir, Direction.Axis axis) {
+        Direction.Axis flipped = switch (axis) {
+            case X -> Direction.Axis.Z;
+            case Z -> Direction.Axis.Y;
+            default -> Direction.Axis.X;
+        };
+        return dir.getAxis() == flipped ? dir.getOpposite() : dir;
+    }
+
+    private static Direction mirrorV(Direction dir, Direction.Axis axis) {
+        Direction.Axis flipped = switch (axis) {
+            case X -> Direction.Axis.Y;
+            case Z -> Direction.Axis.X;
+            default -> Direction.Axis.Z;
+        };
+        return dir.getAxis() == flipped ? dir.getOpposite() : dir;
+    }
+
+    private static BlockState mapDirections(BlockState state, java.util.function.UnaryOperator<Direction> dirs, java.util.function.UnaryOperator<Direction.Axis> axes) {
+        BlockState next = state;
+        for (Property<?> property : state.getProperties()) {
+            next = mapOne(state, next, property, dirs, axes);
+        }
+        return next;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T extends Comparable<T>> BlockState mapOne(BlockState source, BlockState next, Property<T> property, java.util.function.UnaryOperator<Direction> dirs, java.util.function.UnaryOperator<Direction.Axis> axes) {
+        if (property.getValueClass() == Direction.class) {
+            Property<Direction> facing = (Property<Direction>) property;
+            Direction turned = dirs.apply(source.getValue(facing));
+            if (facing.getPossibleValues().contains(turned)) {
+                return next.setValue(facing, turned);
+            }
+        } else if (axes != null && property.getValueClass() == Direction.Axis.class) {
+            Property<Direction.Axis> axisProp = (Property<Direction.Axis>) property;
+            Direction.Axis turned = axes.apply(source.getValue(axisProp));
+            if (axisProp.getPossibleValues().contains(turned)) {
+                return next.setValue(axisProp, turned);
+            }
+        }
+        return next;
     }
 
     private static BlockState flipAxis(BlockState state, Direction.Axis axis) {
@@ -663,7 +813,7 @@ public final class Mirror {
         return state.mirror(axis == Direction.Axis.X ? net.minecraft.world.level.block.Mirror.FRONT_BACK : net.minecraft.world.level.block.Mirror.LEFT_RIGHT);
     }
 
-    private static BlockState flipVertical(BlockState state) {
+    private static BlockState flipHalves(BlockState state) {
         if (state.hasProperty(BlockStateProperties.SLAB_TYPE)) {
             SlabType type = state.getValue(BlockStateProperties.SLAB_TYPE);
             if (type == SlabType.TOP) {
@@ -680,6 +830,11 @@ public final class Mirror {
             DoubleBlockHalf half = state.getValue(BlockStateProperties.DOUBLE_BLOCK_HALF);
             state = state.setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, half == DoubleBlockHalf.UPPER ? DoubleBlockHalf.LOWER : DoubleBlockHalf.UPPER);
         }
+        return state;
+    }
+
+    private static BlockState flipVertical(BlockState state) {
+        state = flipHalves(state);
         for (Property<?> property : state.getProperties()) {
             state = flipUpDown(state, property);
         }

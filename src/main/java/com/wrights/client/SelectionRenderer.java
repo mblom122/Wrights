@@ -244,12 +244,10 @@ public final class SelectionRenderer {
         java.util.List<AABB> slabs = new java.util.ArrayList<>();
         if (faceMode) {
             slabs.add(faceSlab(border, face));
-            if (pattern == Mirror.PAIR || pattern == Mirror.CROSS) {
-                slabs.add(centerSlab(anchor, face.getAxis()));
-                if (pattern == Mirror.CROSS) {
-                    Direction.Axis second = face.getAxis() == Direction.Axis.X ? Direction.Axis.Z : Direction.Axis.X;
-                    slabs.add(centerSlab(anchor, second));
-                }
+            slabs.add(centerSlab(anchor, face.getAxis()));
+            if (pattern == Mirror.CROSS) {
+                Direction.Axis second = face.getAxis() == Direction.Axis.X ? Direction.Axis.Z : Direction.Axis.X;
+                slabs.add(centerSlab(anchor, second));
             }
         } else {
             slabs.addAll(mirrorSlabs(anchor, face, axes));
