@@ -25,6 +25,10 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
 import net.minecraft.world.Container;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.ChestBlock;
@@ -94,6 +98,8 @@ public final class SelectionRenderer {
             drawCaptureGhosts(pose, buffers, camera, minecraft);
         } else if ((!gui || placing) && WrightsClientState.mode == WrightsClientState.Mode.BUILD && !WrightsClientState.bindSupply && !mirrorBlocks()) {
             drawPreview(pose, buffers, camera);
+        } else if ((!gui || placing) && mirrorBlocks()) {
+            drawMirrorBlockGhosts(pose, buffers, camera, minecraft);
         }
         if ((!gui || placing) && WrightsClientState.mode == WrightsClientState.Mode.BUILD && (WrightsClientState.bindSupply || WrightsClientState.supplyBound)) {
             drawSupplyMarkers(pose, buffers, camera, minecraft);
@@ -104,6 +110,68 @@ public final class SelectionRenderer {
 
     private static boolean mirrorBlocks() {
         return WrightsClientState.mirrorAim && WrightsClientConfig.mirrorBlocks();
+    }
+
+    private static void drawMirrorBlockGhosts(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
+        if (minecraft.player == null || minecraft.level == null || !(minecraft.hitResult instanceof BlockHitResult hit) || hit.getType() != HitResult.Type.BLOCK) {
+            return;
+        }
+        InteractionHand hand = mirrorBlockHand(minecraft.player);
+        if (hand == null || !(minecraft.player.getItemInHand(hand).getItem() instanceof BlockItem blockItem)) {
+            return;
+        }
+        BlockPlaceContext place = new BlockPlaceContext(new UseOnContext(minecraft.player, hand, hit));
+        if (!place.canPlace()) {
+            return;
+        }
+        BlockState state = blockItem.getBlock().getStateForPlacement(place);
+        if (state == null) {
+            state = blockItem.getBlock().defaultBlockState();
+        }
+        if (!ghostVisible(state)) {
+            return;
+        }
+        BlockPos at = place.getClickedPos();
+        double dx = at.getX() + 0.5D - camera.x;
+        double dy = at.getY() + 0.5D - camera.y;
+        double dz = at.getZ() + 0.5D - camera.z;
+        if (dx * dx + dy * dy + dz * dz > rangeSqr()) {
+            return;
+        }
+        BlockRenderDispatcher renderer = minecraft.getBlockRenderer();
+        drawGhost(pose, buffers, renderer, camera, at.getX(), at.getY(), at.getZ(), state);
+        String here = minecraft.level.dimension().location().toString();
+        if (WrightsClientConfig.mirrorArmed(here)) {
+            BlockPos anchor = WrightsClientConfig.mirrorAnchor();
+            Direction face = Direction.from3DDataValue(WrightsClientConfig.MIRROR_FACE.get());
+            int pattern = WrightsClientConfig.MIRROR_PATTERN.get();
+            boolean shapes = WrightsClientConfig.MIRROR_SHAPES.get();
+            for (BlockPos copy : Mirror.copiesOf(at, anchor, face, pattern)) {
+                double cx = copy.getX() + 0.5D - camera.x;
+                double cy = copy.getY() + 0.5D - camera.y;
+                double cz = copy.getZ() + 0.5D - camera.z;
+                if (cx * cx + cy * cy + cz * cz > rangeSqr()) {
+                    continue;
+                }
+                BlockState styled = Mirror.restyle(state, at, copy, anchor, face, pattern, shapes);
+                if (ghostVisible(styled)) {
+                    drawGhost(pose, buffers, renderer, camera, copy.getX(), copy.getY(), copy.getZ(), styled);
+                }
+            }
+        }
+        buffers.endBatch();
+    }
+
+    private static InteractionHand mirrorBlockHand(LocalPlayer player) {
+        boolean mainTool = player.getMainHandItem().getItem() instanceof ControllerItem;
+        boolean offTool = player.getOffhandItem().getItem() instanceof ControllerItem;
+        if (mainTool && player.getOffhandItem().getItem() instanceof BlockItem) {
+            return InteractionHand.OFF_HAND;
+        }
+        if (offTool && player.getMainHandItem().getItem() instanceof BlockItem) {
+            return InteractionHand.MAIN_HAND;
+        }
+        return null;
     }
 
     private static void drawMirror(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {

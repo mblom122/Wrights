@@ -174,6 +174,36 @@ public final class Mirror {
         return boxes;
     }
 
+    /** Reflected copies of one block. The original position is left out. */
+    public static List<BlockPos> copiesOf(BlockPos pos, BlockPos anchor, Direction face, int pattern) {
+        List<BlockPos> copies = new ArrayList<>();
+        if (pos == null || anchor == null || face == null) {
+            return copies;
+        }
+        Set<BlockPos> seen = new HashSet<>();
+        seen.add(pos);
+        for (Shot shot : shots(anchor, face, pattern, false)) {
+            BlockPos moved = shot.move(pos);
+            if (moved != null && seen.add(moved)) {
+                copies.add(moved);
+            }
+        }
+        return copies;
+    }
+
+    public static BlockState restyle(BlockState state, BlockPos from, BlockPos to, BlockPos anchor, Direction face, int pattern, boolean shapes) {
+        if (state == null || from == null || to == null || !shapes) {
+            return state;
+        }
+        for (Shot shot : shots(anchor, face, pattern, true)) {
+            BlockPos moved = shot.move(from);
+            if (to.equals(moved)) {
+                return shot.restyle(state);
+            }
+        }
+        return state;
+    }
+
     private static boolean inside(Schematic.Entry entry, int clipX, int clipY, int clipZ) {
         return entry.x() >= 0 && entry.y() >= 0 && entry.z() >= 0 && entry.x() < clipX && entry.y() < clipY && entry.z() < clipZ;
     }
