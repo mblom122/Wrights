@@ -100,12 +100,13 @@ public final class Mirror {
         for (Shot shot : shots(anchor, face, pattern, shapes, axes)) {
             List<BlockPos> worlds = new ArrayList<>();
             List<Schematic.Entry> raw = new ArrayList<>();
+            Set<BlockPos> local = new HashSet<>();
             for (Schematic.Entry entry : source.entries()) {
                 if (!inside(entry, clipX, clipY, clipZ)) {
                     continue;
                 }
                 BlockPos moved = shot.move(origin.offset(entry.x(), entry.y(), entry.z()));
-                if (moved == null || taken.contains(moved)) {
+                if (moved == null || taken.contains(moved) || !local.add(moved)) {
                     continue;
                 }
                 worlds.add(moved);
@@ -376,19 +377,35 @@ public final class Mirror {
             return shots;
         }
         int patternId = clampPattern(pattern);
-        if (patternId == EIGHT || patternId == SIXTEEN) {
-            int steps = patternId == SIXTEEN ? 15 : 7;
-            for (int step = 1; step <= steps; step++) {
-                int kind = step;
+        if (patternId == SIXTEEN) {
+            for (int step = 1; step <= 15; step++) {
+                int turn = step;
                 shots.add(new Shot() {
                     @Override
                     public BlockPos move(BlockPos pos) {
-                        return moveAround(pos, anchor, kind);
+                        return circle(pos, anchor, turn);
                     }
 
                     @Override
                     public BlockState restyle(BlockState state) {
-                        return shapes ? styleAround(state, kind) : state;
+                        return shapes ? state.rotate(circleRotation(turn)) : state;
+                    }
+                });
+            }
+            return shots;
+        }
+        if (patternId == EIGHT) {
+            for (int step = 1; step <= 7; step++) {
+                int kind = step;
+                shots.add(new Shot() {
+                    @Override
+                    public BlockPos move(BlockPos pos) {
+                        return around(pos, anchor, kind);
+                    }
+
+                    @Override
+                    public BlockState restyle(BlockState state) {
+                        return shapes ? styleEight(state, kind) : state;
                     }
                 });
             }
@@ -523,23 +540,75 @@ public final class Mirror {
         };
     }
 
-    /** Kinds 1–7 spin around the anchor. Kinds 8–15 are those same copies flipped up. */
-    private static BlockPos moveAround(BlockPos pos, BlockPos anchor, int kind) {
-        if (kind <= 7) {
-            return around(pos, anchor, kind);
+    /** Steps of 22.5 degrees around the middle of the anchor block. Quarter turns stay on the grid. */
+    private static BlockPos circle(BlockPos pos, BlockPos anchor, int step) {
+        int turn = Math.floorMod(step, 16);
+        if (turn % 4 == 0) {
+            return turnQuarter(pos, anchor, turn / 4);
         }
-        int flat = kind - 8;
-        BlockPos turned = flat == 0 ? pos : around(pos, anchor, flat);
-        return turned == null ? null : reflect(turned, anchor, Direction.UP);
+        double angle = turn * (Math.PI / 8.0D);
+        double cos = Math.cos(angle);
+        double sin = Math.sin(angle);
+        double dx = pos.getX() - anchor.getX();
+        double dz = pos.getZ() - anchor.getZ();
+        double nx = dx * cos - dz * sin;
+        double nz = dx * sin + dz * cos;
+        Integer x = blockOfCenter(anchor.getX() + 0.5D + nx);
+        Integer z = blockOfCenter(anchor.getZ() + 0.5D + nz);
+        if (x == null || z == null) {
+            return null;
+        }
+        return new BlockPos(x, pos.getY(), z);
     }
 
-    private static BlockState styleAround(BlockState state, int kind) {
-        if (kind <= 7) {
-            return styleEight(state, kind);
+    private static BlockPos turnQuarter(BlockPos pos, BlockPos anchor, int quarter) {
+        int dx = pos.getX() - anchor.getX();
+        int dz = pos.getZ() - anchor.getZ();
+        int nx = dx;
+        int nz = dz;
+        switch (Math.floorMod(quarter, 4)) {
+            case 1 -> {
+                nx = -dz;
+                nz = dx;
+            }
+            case 2 -> {
+                nx = -dx;
+                nz = -dz;
+            }
+            case 3 -> {
+                nx = dz;
+                nz = -dx;
+            }
+            default -> {
+            }
         }
-        int flat = kind - 8;
-        BlockState turned = flat == 0 ? state : styleEight(state, flat);
-        return flipVertical(turned);
+        long x = anchor.getX() + (long) nx;
+        long z = anchor.getZ() + (long) nz;
+        if (x > Integer.MAX_VALUE || x < Integer.MIN_VALUE || z > Integer.MAX_VALUE || z < Integer.MIN_VALUE) {
+            return null;
+        }
+        return new BlockPos((int) x, pos.getY(), (int) z);
+    }
+
+    private static Integer blockOfCenter(double center) {
+        if (center >= Integer.MAX_VALUE || center < Integer.MIN_VALUE) {
+            return null;
+        }
+        double nearest = Math.rint(center);
+        if (Math.abs(center - nearest) < 1.0e-4D) {
+            center = nearest;
+        }
+        return (int) Math.floor(center);
+    }
+
+    private static Rotation circleRotation(int step) {
+        int quarter = Math.floorMod(Math.round(step / 4.0F), 4);
+        return switch (quarter) {
+            case 1 -> Rotation.CLOCKWISE_90;
+            case 2 -> Rotation.CLOCKWISE_180;
+            case 3 -> Rotation.COUNTERCLOCKWISE_90;
+            default -> Rotation.NONE;
+        };
     }
 
     /** Quarter turns and flips around the anchor corner, so every copy stays on the block grid. */
