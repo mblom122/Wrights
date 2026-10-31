@@ -2,18 +2,22 @@
   "type": "minecraft:crafting_shaped",
   "category": "equipment",
   "pattern": [
-    " N ",
-    "RGR"
+    "GMG",
+    "RPR",
+    "GGG"
   ],
   "key": {
-    "N": {
+    "G": {
+      "item": "minecraft:glass_pane"
+    },
+    "M": {
       "item": "minecraft:netherite_ingot"
     },
     "R": {
       "item": "minecraft:redstone"
     },
-    "G": {
-      "item": "minecraft:gold_ingot"
+    "P": {
+      "item": "wrights:wright_upgrade_diamond"
     }
   },
   "result": {

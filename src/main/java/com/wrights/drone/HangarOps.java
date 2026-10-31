@@ -337,7 +337,7 @@ public final class HangarOps {
             if (tier == target) {
                 continue;
             }
-            if (target > tier && !canAfford(player, tier, target)) {
+            if (target > tier + 1 || (target > tier && !canAfford(player, tier, target))) {
                 stuck++;
                 continue;
             }
@@ -365,6 +365,10 @@ public final class HangarOps {
         target = WrightTier.clamp(target);
         if (tier == target) {
             Messages.actionBar(player, "message.wrights.tier_same", Component.translatable(WrightTier.nameKey(target)));
+            return swarm;
+        }
+        if (target > tier + 1) {
+            Messages.actionBar(player, "message.wrights.upgrade_need", Component.translatable(WrightTier.nameKey(tier + 1)));
             return swarm;
         }
         if (target > tier && !canAfford(player, tier, target)) {
@@ -414,6 +418,7 @@ public final class HangarOps {
             if (ItemSource.take(player, WrightTier.upgradeItem(bestTier + 1), 1) != ItemSource.Result.OK) {
                 break;
             }
+            refundInstalled(player, bestTier);
             next = next.withSpeed(picked[best], bestTier + 1);
             raised[best] = true;
         }
@@ -471,12 +476,14 @@ public final class HangarOps {
 
     private static Swarm applyTier(ServerPlayer player, Swarm swarm, int index, int tier, int target) {
         if (target > tier) {
-            for (int step = tier + 1; step <= target; step++) {
-                Item upgrade = WrightTier.upgradeItem(step);
-                if (upgrade != null && ItemSource.take(player, upgrade, 1) != ItemSource.Result.OK) {
-                    return swarm;
-                }
+            if (target != tier + 1) {
+                return swarm;
             }
+            Item upgrade = WrightTier.upgradeItem(target);
+            if (upgrade != null && ItemSource.take(player, upgrade, 1) != ItemSource.Result.OK) {
+                return swarm;
+            }
+            refundInstalled(player, tier);
         } else {
             for (int step = tier; step > target; step--) {
                 Item upgrade = WrightTier.upgradeItem(step);
@@ -534,8 +541,37 @@ public final class HangarOps {
         return picked;
     }
 
+    private static void refundInstalled(ServerPlayer player, int tier) {
+        Item previous = WrightTier.upgradeItem(tier);
+        if (previous != null) {
+            giveStack(player, new ItemStack(previous));
+        }
+    }
+
     private static void giveStack(ServerPlayer player, ItemStack stack) {
+        if (stack.isEmpty()) {
+            return;
+        }
         player.getInventory().add(stack);
+        if (stack.isEmpty()) {
+            return;
+        }
+        ItemStack carried = player.containerMenu.getCarried();
+        if (carried.isEmpty()) {
+            player.containerMenu.setCarried(stack);
+            player.containerMenu.broadcastChanges();
+            return;
+        }
+        if (ItemStack.isSameItemSameComponents(carried, stack)) {
+            int room = carried.getMaxStackSize() - carried.getCount();
+            if (room > 0) {
+                int move = Math.min(room, stack.getCount());
+                carried.grow(move);
+                stack.shrink(move);
+                player.containerMenu.setCarried(carried);
+                player.containerMenu.broadcastChanges();
+            }
+        }
         if (!stack.isEmpty()) {
             player.drop(stack, false);
         }
@@ -556,6 +592,7 @@ public final class HangarOps {
             Messages.actionBar(player, "message.wrights.upgrade_need", Component.translatable(WrightTier.nameKey(nextTier)));
             return swarm;
         }
+        refundInstalled(player, tier);
         Messages.actionBar(player, "message.wrights.upgrade_done", Component.translatable(WrightTier.nameKey(nextTier)));
         return swarm.withSpeed(index, nextTier);
     }

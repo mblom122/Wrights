@@ -715,7 +715,7 @@
   "screen.wrights.manage_cancel": "Cancel",
   "screen.wrights.manage_marked_title": "Marked wrights",
   "screen.wrights.manage_marked_count": "%s marked",
-  "screen.wrights.manage_marked_hint": "Pick a tier to move every marked wright there. A lower tier hands the upgrades back.",
+  "screen.wrights.manage_marked_hint": "Each wright only steps up one tier. The upgrade it was wearing comes back. A lower tier hands every step back.",
   "screen.wrights.manage_max": "As high as we can afford",
   "screen.wrights.manage_down_one": "Down one step",
   "message.wrights.tier_set": "Wright is now %s",

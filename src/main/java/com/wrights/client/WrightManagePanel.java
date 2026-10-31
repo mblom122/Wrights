@@ -333,7 +333,7 @@ final class WrightManagePanel {
                 }
                 if (local >= y + 64 && local < y + 78) {
                     int picked = tierAt(mouseX);
-                    if (picked >= WrightTier.BASE && picked != tier && (picked < tier || canAfford(screen, tier, picked))) {
+                    if (picked >= WrightTier.BASE && picked != tier && (picked < tier || (picked == tier + 1 && canAfford(screen, tier, picked)))) {
                         screen.batch(HangarOps.TO_TIER, picked, new int[] { i });
                     }
                     return true;
@@ -516,7 +516,7 @@ final class WrightManagePanel {
             int chipX = x + (tier - WrightTier.BASE) * (chip + gap);
             boolean enabled = current < WrightTier.BASE || tier != current;
             if (current >= WrightTier.BASE && tier > current) {
-                enabled = canAfford(screen, current, tier);
+                enabled = tier == current + 1 && canAfford(screen, current, tier);
             }
             drawMini(graphics, screen, chipX, y, chip, Component.translatable(WrightTier.nameKey(tier)), enabled || tier == current, tier == current, mouseX, mouseY);
         }
