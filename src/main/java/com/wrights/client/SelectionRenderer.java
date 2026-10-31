@@ -51,6 +51,10 @@ public final class SelectionRenderer {
     }
     private static int[] order = new int[0];
     private static double[] distanceSq = new double[0];
+    /** Look direction for this frame, so box edges can stop just in front of the camera. */
+    private static Vec3 viewLook = new Vec3(0.0D, 0.0D, 1.0D);
+    /** Keep line vertices this far in front of the camera. A vertex behind it makes the whole edge vanish. */
+    private static final double EDGE_NEAR = 0.08D;
 
     private SelectionRenderer() {
     }
@@ -67,6 +71,7 @@ public final class SelectionRenderer {
         }
         PoseStack pose = event.getPoseStack();
         Vec3 camera = event.getCamera().getPosition();
+        viewLook = Vec3.directionFromRotation(event.getCamera().getXRot(), event.getCamera().getYRot());
         MultiBufferSource.BufferSource buffers = minecraft.renderBuffers().bufferSource();
         drawPortBounds(pose, buffers, camera, minecraft);
         drawPortGlow(pose, buffers, camera, minecraft);
@@ -568,7 +573,58 @@ public final class SelectionRenderer {
     }
 
     private static void drawBox(PoseStack pose, VertexConsumer lines, AABB box, Vec3 camera, float red, float green, float blue, float alpha) {
-        LevelRenderer.renderLineBox(pose, lines, box.move(-camera.x, -camera.y, -camera.z), red, green, blue, alpha);
+        double x0 = box.minX;
+        double y0 = box.minY;
+        double z0 = box.minZ;
+        double x1 = box.maxX;
+        double y1 = box.maxY;
+        double z1 = box.maxZ;
+        edge(pose, lines, camera, x0, y0, z0, x1, y0, z0, red, green, blue, alpha);
+        edge(pose, lines, camera, x1, y0, z0, x1, y0, z1, red, green, blue, alpha);
+        edge(pose, lines, camera, x1, y0, z1, x0, y0, z1, red, green, blue, alpha);
+        edge(pose, lines, camera, x0, y0, z1, x0, y0, z0, red, green, blue, alpha);
+        edge(pose, lines, camera, x0, y1, z0, x1, y1, z0, red, green, blue, alpha);
+        edge(pose, lines, camera, x1, y1, z0, x1, y1, z1, red, green, blue, alpha);
+        edge(pose, lines, camera, x1, y1, z1, x0, y1, z1, red, green, blue, alpha);
+        edge(pose, lines, camera, x0, y1, z1, x0, y1, z0, red, green, blue, alpha);
+        edge(pose, lines, camera, x0, y0, z0, x0, y1, z0, red, green, blue, alpha);
+        edge(pose, lines, camera, x1, y0, z0, x1, y1, z0, red, green, blue, alpha);
+        edge(pose, lines, camera, x1, y0, z1, x1, y1, z1, red, green, blue, alpha);
+        edge(pose, lines, camera, x0, y0, z1, x0, y1, z1, red, green, blue, alpha);
+    }
+
+    /** Draws one box edge, cutting it off just in front of the camera so standing close does not hide it. */
+    private static void edge(PoseStack pose, VertexConsumer lines, Vec3 camera, double x1, double y1, double z1, double x2, double y2, double z2, float red, float green, float blue, float alpha) {
+        double ax = x1 - camera.x;
+        double ay = y1 - camera.y;
+        double az = z1 - camera.z;
+        double bx = x2 - camera.x;
+        double by = y2 - camera.y;
+        double bz = z2 - camera.z;
+        double da = ax * viewLook.x + ay * viewLook.y + az * viewLook.z;
+        double db = bx * viewLook.x + by * viewLook.y + bz * viewLook.z;
+        boolean inA = da >= EDGE_NEAR;
+        boolean inB = db >= EDGE_NEAR;
+        if (!inA && !inB) {
+            return;
+        }
+        if (inA && inB) {
+            drawLine(pose, lines, camera, new Vec3(x1, y1, z1), new Vec3(x2, y2, z2), red, green, blue, alpha);
+            return;
+        }
+        double span = db - da;
+        if (Math.abs(span) < 1.0E-6D) {
+            return;
+        }
+        double t = Mth.clamp((EDGE_NEAR - da) / span, 0.0D, 1.0D);
+        double hx = x1 + (x2 - x1) * t;
+        double hy = y1 + (y2 - y1) * t;
+        double hz = z1 + (z2 - z1) * t;
+        if (inA) {
+            drawLine(pose, lines, camera, new Vec3(x1, y1, z1), new Vec3(hx, hy, hz), red, green, blue, alpha);
+        } else {
+            drawLine(pose, lines, camera, new Vec3(hx, hy, hz), new Vec3(x2, y2, z2), red, green, blue, alpha);
+        }
     }
 
     private static void drawLine(PoseStack pose, VertexConsumer lines, Vec3 camera, Vec3 from, Vec3 to, float red, float green, float blue, float alpha) {
