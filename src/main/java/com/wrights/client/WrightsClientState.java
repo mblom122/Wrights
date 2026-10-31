@@ -1540,6 +1540,186 @@ public final class WrightsClientState {
         moveOriginB = null;
     }
 
+    /** Ctrl-scroll grows or shrinks the boundary face under the crosshair. */
+    public static boolean nudgeBoundary(double scrollY) {
+        if (scrollY == 0.0D) {
+            return false;
+        }
+        int outward = scrollY > 0.0D ? 1 : -1;
+        if (mode == Mode.CAPTURE && hasBox() && !boxDragging) {
+            return nudgeSelection(outward);
+        }
+        if (mode == Mode.BUILD && !bindSupply && anchor != null && buildId != null) {
+            return nudgeAnchored(outward);
+        }
+        return false;
+    }
+
+    private static boolean nudgeSelection(int outward) {
+        AABB box = selection(cornerA, cornerB);
+        Direction face = lookedFace(box);
+        if (face == null) {
+            return false;
+        }
+        BlockPos low = BoxEdits.min(cornerA, cornerB);
+        BlockPos high = BoxEdits.max(cornerA, cornerB);
+        int[] min = {low.getX(), low.getY(), low.getZ()};
+        int[] max = {high.getX(), high.getY(), high.getZ()};
+        int axis = face.getAxis().ordinal();
+        if (face.getAxisDirection() == Direction.AxisDirection.POSITIVE) {
+            max[axis] += outward;
+        } else {
+            min[axis] -= outward;
+        }
+        if (min[axis] > max[axis]) {
+            return true;
+        }
+        BlockPos nextMin = new BlockPos(min[0], min[1], min[2]);
+        BlockPos nextMax = new BlockPos(max[0], max[1], max[2]);
+        if (!boxAllowed(nextMin, nextMax)) {
+            return true;
+        }
+        int dMinX = nextMin.getX() - low.getX();
+        int dMinY = nextMin.getY() - low.getY();
+        int dMinZ = nextMin.getZ() - low.getZ();
+        int dMaxX = nextMax.getX() - high.getX();
+        int dMaxY = nextMax.getY() - high.getY();
+        int dMaxZ = nextMax.getZ() - high.getZ();
+        cornerA = nextMin;
+        cornerB = nextMax;
+        if (moveGrabbed) {
+            BlockPos aim = aimFree(WrightsConfig.MAX_RANGE.getAsInt());
+            moveOffX = aim.getX() - nextMin.getX();
+            moveOffY = aim.getY() - nextMin.getY();
+            moveOffZ = aim.getZ() - nextMin.getZ();
+            moveSizeX = nextMax.getX() - nextMin.getX() + 1;
+            moveSizeY = nextMax.getY() - nextMin.getY() + 1;
+            moveSizeZ = nextMax.getZ() - nextMin.getZ() + 1;
+            if (moveOriginA != null && moveOriginB != null) {
+                BlockPos originMin = BoxEdits.min(moveOriginA, moveOriginB);
+                BlockPos originMax = BoxEdits.max(moveOriginA, moveOriginB);
+                moveOriginA = originMin.offset(dMinX, dMinY, dMinZ);
+                moveOriginB = originMax.offset(dMaxX, dMaxY, dMaxZ);
+            }
+        }
+        sendUpdate();
+        return true;
+    }
+
+    private static boolean nudgeAnchored(int outward) {
+        int minX = anchor.getX() - pivotX;
+        int minY = anchor.getY() - pivotY;
+        int minZ = anchor.getZ() - pivotZ;
+        int[] min = {minX, minY, minZ};
+        int[] size = {Math.max(1, viewX), Math.max(1, viewY), Math.max(1, viewZ)};
+        AABB box = new AABB(minX, minY, minZ, minX + size[0], minY + size[1], minZ + size[2]);
+        Direction face = lookedFace(box);
+        if (face == null) {
+            return false;
+        }
+        int axis = face.getAxis().ordinal();
+        int next = size[axis] + outward;
+        if (next < 1 || next > WrightsConfig.MAX_AXIS.getAsInt()) {
+            return true;
+        }
+        if (face.getAxisDirection() == Direction.AxisDirection.NEGATIVE) {
+            min[axis] -= outward;
+        }
+        BlockPos nextMin = new BlockPos(min[0], min[1], min[2]);
+        BlockPos nextMax = nextMin.offset(
+                (axis == 0 ? next : size[0]) - 1,
+                (axis == 1 ? next : size[1]) - 1,
+                (axis == 2 ? next : size[2]) - 1);
+        if (!BoxEdits.inWorld(nextMin) || !BoxEdits.inWorld(nextMax) || !insideBuildHeight(nextMin, nextMax)) {
+            return true;
+        }
+        size[axis] = next;
+        viewX = size[0];
+        viewY = size[1];
+        viewZ = size[2];
+        follow = false;
+        anchor = new BlockPos(nextMin.getX() + pivotX, nextMin.getY() + pivotY, nextMin.getZ() + pivotZ);
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.screen instanceof PlacementScreen placement) {
+            placement.refresh();
+        }
+        return true;
+    }
+
+    private static boolean boxAllowed(BlockPos min, BlockPos max) {
+        if (!BoxEdits.inWorld(min) || !BoxEdits.inWorld(max) || !BoxEdits.fits(min, max)) {
+            return false;
+        }
+        return insideBuildHeight(min, max);
+    }
+
+    private static boolean insideBuildHeight(BlockPos min, BlockPos max) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level == null) {
+            return true;
+        }
+        int floor = minecraft.level.getMinBuildHeight();
+        int ceil = minecraft.level.getMaxBuildHeight() - 1;
+        int lowY = Math.min(min.getY(), max.getY());
+        int highY = Math.max(min.getY(), max.getY());
+        return lowY >= floor && highY <= ceil;
+    }
+
+    private static Direction lookedFace(AABB box) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null) {
+            return null;
+        }
+        Vec3 eye = minecraft.player.getEyePosition(1.0F);
+        Vec3 look = minecraft.player.getViewVector(1.0F);
+        double range = WrightsConfig.MAX_RANGE.getAsInt();
+        double best = range;
+        double bestAlign = 0.0D;
+        Direction face = null;
+        double slack = 0.08D;
+        for (Direction direction : Direction.values()) {
+            double plane = switch (direction) {
+                case WEST -> box.minX;
+                case EAST -> box.maxX;
+                case DOWN -> box.minY;
+                case UP -> box.maxY;
+                case NORTH -> box.minZ;
+                case SOUTH -> box.maxZ;
+            };
+            double component = switch (direction.getAxis()) {
+                case X -> look.x;
+                case Y -> look.y;
+                case Z -> look.z;
+            };
+            if (Math.abs(component) < 1.0E-6D) {
+                continue;
+            }
+            double origin = switch (direction.getAxis()) {
+                case X -> eye.x;
+                case Y -> eye.y;
+                case Z -> eye.z;
+            };
+            double distance = (plane - origin) / component;
+            if (distance < 0.0D || distance > best + 1.0E-4D) {
+                continue;
+            }
+            Vec3 hit = eye.add(look.scale(distance));
+            if (hit.x < box.minX - slack || hit.x > box.maxX + slack
+                    || hit.y < box.minY - slack || hit.y > box.maxY + slack
+                    || hit.z < box.minZ - slack || hit.z > box.maxZ + slack) {
+                continue;
+            }
+            double align = Math.abs(component);
+            if (face != null && distance > best - 1.0E-4D && align <= bestAlign) {
+                continue;
+            }
+            best = distance;
+            bestAlign = align;
+            face = direction;
+        }
+        return face;
+    }
+
     private static AABB selection(BlockPos first, BlockPos second) {
         return new AABB(
                 Math.min(first.getX(), second.getX()),

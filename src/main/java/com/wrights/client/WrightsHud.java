@@ -44,15 +44,22 @@ public final class WrightsHud {
             if (move && WrightsClientState.moveGrabbed && WrightsClientState.hasBox()) {
                 line = volumeLine();
                 sub = Component.translatable("hud.wrights.move_sub");
+                note = Component.translatable("hud.wrights.resize_side");
             } else if (move) {
                 line = Component.translatable(WrightsClientState.hasBox() ? "hud.wrights.move_aim" : "hud.wrights.mode_move_need");
                 sub = Component.translatable("hud.wrights.mode_how");
+                if (WrightsClientState.hasBox()) {
+                    note = Component.translatable("hud.wrights.resize_side");
+                }
             } else if (box && WrightsClientState.boxDragging && WrightsClientState.hasBox()) {
                 line = volumeLine();
                 sub = Component.translatable("hud.wrights.box_sub");
             } else if (box && WrightsClientState.cornerA != null) {
-                line = Component.translatable("hud.wrights.box_idle");
+                line = Component.translatable(WrightsClientState.hasBox() ? "hud.wrights.resize_ready" : "hud.wrights.box_idle");
                 sub = Component.translatable("hud.wrights.mode_how");
+                if (WrightsClientState.hasBox()) {
+                    note = Component.translatable("hud.wrights.resize_side");
+                }
             } else if (WrightsClientState.cornerA == null) {
                 line = Component.translatable("hud.wrights.capture");
                 sub = Component.translatable("hud.wrights.mode_how");
@@ -62,6 +69,7 @@ public final class WrightsHud {
             } else {
                 line = volumeLine();
                 sub = Component.translatable("hud.wrights.mode_how");
+                note = Component.translatable("hud.wrights.resize_side");
             }
         } else if (WrightsClientState.mode == WrightsClientState.Mode.SAVING) {
             line = Component.translatable("hud.wrights.saving", WrightsClientState.name);
@@ -74,6 +82,7 @@ public final class WrightsHud {
             } else {
                 line = Component.translatable("hud.wrights.build", WrightsClientState.buildName);
                 sub = Component.translatable(WrightsClientState.supplyBound ? "hud.wrights.build_chest" : "hud.wrights.build_inventory");
+                note = Component.translatable("hud.wrights.resize_side");
             }
         } else if (WrightsClientState.mode == WrightsClientState.Mode.MANAGE) {
             line = Component.translatable("hud.wrights.manage_explain");

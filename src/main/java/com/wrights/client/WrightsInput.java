@@ -286,6 +286,12 @@ public final class WrightsInput {
             event.setCanceled(true);
             return;
         }
+        if (control) {
+            if (WrightsClientState.nudgeBoundary(event.getScrollDeltaY())) {
+                event.setCanceled(true);
+            }
+            return;
+        }
         if (!shift) {
             return;
         }

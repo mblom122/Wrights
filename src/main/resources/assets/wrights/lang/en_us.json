@@ -485,6 +485,8 @@
   "hud.wrights.move_aim": "Look at the box, then right-click",
   "hud.wrights.move_sub": "Right-click to place it",
   "hud.wrights.mode_how": "Hold Shift and scroll",
+  "hud.wrights.resize_ready": "Look at a side of the box",
+  "hud.wrights.resize_side": "Ctrl and scroll to resize that side",
   "hud.wrights.mode_now": "Changed to %s",
   "hud.wrights.mode_selected": "Selected",
   "hud.wrights.saving": "Saving %s",
