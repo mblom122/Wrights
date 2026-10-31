@@ -204,7 +204,7 @@ public final class LayerColumn {
         add.widget(new WrightsButton(x, layersY, half, 16, Component.translatable("screen.wrights.move_layer"), button -> showPrompt(true)));
         add.widget(new WrightsButton(x + half + 4, layersY, half, 16, Component.translatable("screen.wrights.duplicate_layer"), button -> editLayer(BlueprintPayloads.EditLayer.COPY, layer + 1)));
         add.widget(new WrightsButton(x, layersY + 18, half, 16, Component.translatable("screen.wrights.remove_layer"), button -> editLayer(BlueprintPayloads.EditLayer.REMOVE, layer)));
-        add.widget(new WrightsButton(x + half + 4, layersY + 18, half, 16, Component.translatable("screen.wrights.add_layer"), button -> showPrompt(false)));
+        add.widget(new WrightsButton(x + half + 4, layersY + 18, half, 16, Component.translatable("screen.wrights.add_layer"), button -> editLayer(BlueprintPayloads.EditLayer.INSERT, layer + 1)));
         promptY = selectionY + 40;
         int boxW = Math.min(42, Math.max(28, size / 3));
         int actionW = Math.max(24, (size - boxW - 8) / 2);

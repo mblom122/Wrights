@@ -69,8 +69,8 @@ public class PlacementScreen extends Screen implements JeiPreview {
         int gap = 14;
         int pad = 12;
         int openW = this.font.width(Component.translatable("screen.wrights.open_map")) + 12;
-        // Location + size sit side by side under selection (~60px). Keep the model from eating that room.
-        int leftChrome = 148 + (map ? 18 : 0) + 60;
+        // Location + size sit side by side under selection, with room for the move prompt (~94px).
+        int leftChrome = 148 + (map ? 18 : 0) + 94;
         int modelSize = Math.min(140, Math.max(map ? openW : 88, this.height - leftChrome - 36));
         if (pad + modelSize + gap + controlsW + pad > this.width - 8) {
             modelSize = Math.max(map ? openW : 88, this.width - 8 - pad * 2 - gap - controlsW);
@@ -79,7 +79,7 @@ public class PlacementScreen extends Screen implements JeiPreview {
         boolean voiding = WrightsClientConfig.VOID_BLOCKS.get() || WrightsClientConfig.VOID_FLUIDS.get();
         int extraRows = (WrightsClientState.showStoredSettings() ? 1 : 0) + (WrightsClientState.showStoredAll() ? 1 : 0) + (voiding ? 1 : 0);
         int pasteRows = 3 + extraRows;
-        int leftNeed = 28 + modelSize + 16 + 18 + 32 + (map ? 18 : 0) + 52 + 40 + 60 + 8;
+        int leftNeed = 28 + modelSize + 16 + 18 + 32 + (map ? 18 : 0) + 52 + 40 + 94 + 8;
         int rightNeed = 28 + 46 + 36 + 48 + pasteRows * 18 + 14 + 18 + 14 + 18 + 20 + 16 + 18 + 18 + 12;
         panelH = Math.min(this.height - 8, Math.max(leftNeed, rightNeed));
         panelX = JeiPreview.left(this.width, panelW);
@@ -91,7 +91,9 @@ public class PlacementScreen extends Screen implements JeiPreview {
         if (WrightsClientState.anchor == null) {
             WrightsClientState.anchor = WrightsClientState.lookTarget();
         }
-        locationY = column.belowSelection();
+        // Leave a strip under Selection for the Move-layer prompt, then Location / Size.
+        column.shiftPromptTo(column.belowSelection());
+        locationY = column.belowSelection() + 34;
         // Two narrow columns (~40% of the old field width) side by side under Selection.
         int stepW = 16;
         int axisRoom = 8;
@@ -124,7 +126,6 @@ public class PlacementScreen extends Screen implements JeiPreview {
         step(sizePlus, locationY + 28, "+", () -> resize(1, 1));
         step(sizeLeft, locationY + 44, "-", () -> resize(2, -1));
         step(sizePlus, locationY + 44, "+", () -> resize(2, 1));
-        column.shiftPromptTo(locationY + 60);
         int top = panelY + 28;
         rotateY = top + 46;
         flipY = rotateY + 36;
