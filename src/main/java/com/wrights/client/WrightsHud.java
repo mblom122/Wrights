@@ -85,7 +85,7 @@ public final class WrightsHud {
         } else if (WrightsClientState.mode == WrightsClientState.Mode.SAVING) {
             line = Component.translatable("hud.wrights.saving", WrightsClientState.name);
         } else if (WrightsClientState.mode == WrightsClientState.Mode.BUILD) {
-            if (WrightsClientState.mirrorAim && WrightsClientConfig.mirrorBlocks()) {
+            if (WrightsClientState.mirrorToolActive() && WrightsClientConfig.mirrorBlocks()) {
                 line = Component.translatable("hud.wrights.tool_mirror");
                 sub = Component.translatable(mirrorFooter(minecraft));
             } else if (WrightsClientState.buildId == null) {
@@ -368,7 +368,7 @@ public final class WrightsHud {
 
     /** Signed distance from the mirror anchor to the block under the crosshair. */
     private static Component mirrorOffset(Minecraft minecraft) {
-        if (!WrightsClientState.mirrorAim || minecraft.level == null || minecraft.player == null) {
+        if (!WrightsClientState.mirrorToolActive() || minecraft.level == null || minecraft.player == null) {
             return null;
         }
         if (!WrightsClientConfig.mirrorPlaced(minecraft.level.dimension().location().toString())) {

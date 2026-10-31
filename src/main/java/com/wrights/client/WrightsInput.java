@@ -172,7 +172,7 @@ public final class WrightsInput {
     }
 
     private static boolean mirrorMineReady(Minecraft minecraft) {
-        if (!WrightsClientState.mirrorAim || !com.wrights.WrightsClientConfig.mirrorBlocks() || !com.wrights.WrightsClientConfig.mirrorMine()) {
+        if (!WrightsClientState.mirrorToolActive() || !com.wrights.WrightsClientConfig.mirrorBlocks() || !com.wrights.WrightsClientConfig.mirrorMine()) {
             return false;
         }
         if (!com.wrights.WrightsConfig.allowMirrorMine() || !com.wrights.item.ControllerItem.isHeld(minecraft.player)) {
@@ -346,7 +346,7 @@ public final class WrightsInput {
         if (pos != null) {
             boundThisClick = true;
         }
-        if (WrightsClientState.mirrorAim) {
+        if (WrightsClientState.mirrorToolActive()) {
             useMirrorClick(player, pos, face, hit);
             return;
         }

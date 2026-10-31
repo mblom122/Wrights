@@ -116,7 +116,7 @@ public final class SelectionRenderer {
     }
 
     private static boolean mirrorBlocks() {
-        return WrightsClientState.mirrorAim && WrightsClientConfig.mirrorBlocks();
+        return WrightsClientState.mirrorToolActive() && WrightsClientConfig.mirrorBlocks();
     }
 
     private static void drawMirrorBlockGhosts(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
@@ -269,7 +269,7 @@ public final class SelectionRenderer {
     }
 
     private static void drawMirror(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
-        if (!WrightsClientState.mirrorAim || minecraft.level == null || !WrightsConfig.allowMirror()) {
+        if (!WrightsClientState.mirrorToolActive() || minecraft.level == null || !WrightsConfig.allowMirror()) {
             return;
         }
         String here = minecraft.level.dimension().location().toString();

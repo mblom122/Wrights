@@ -88,6 +88,11 @@ public final class WrightsClientState {
     public static boolean bindSupply;
     /** Build-tool slot that sets the face a mirror is measured from. */
     public static boolean mirrorAim;
+
+    /** True only while the mirror build-tool is the active tool in Build mode. */
+    public static boolean mirrorToolActive() {
+        return mode == Mode.BUILD && mirrorAim;
+    }
     /** Placed wrightport waiting for a chest click. Null when not binding. */
     public static BlockPos bindPort;
     public static boolean supplyBound;
@@ -1519,7 +1524,7 @@ public final class WrightsClientState {
         Minecraft minecraft = Minecraft.getInstance();
         if (mode == Mode.BUILD && follow && minecraft.player != null && ControllerItem.isHeld(minecraft.player)
                 && (minecraft.screen == null || minecraft.screen instanceof PlacementScreen)
-                && !(mirrorAim && WrightsClientConfig.mirrorBlocks())) {
+                && !(mirrorToolActive() && WrightsClientConfig.mirrorBlocks())) {
             anchor = lookTarget();
         }
     }
@@ -1948,7 +1953,7 @@ public final class WrightsClientState {
         if (mode == Mode.CAPTURE && hasBox() && !boxDragging) {
             return nudgeSelection(outward);
         }
-        if (mode == Mode.BUILD && !bindSupply && anchor != null && buildId != null && !(mirrorAim && WrightsClientConfig.mirrorBlocks())) {
+        if (mode == Mode.BUILD && !bindSupply && anchor != null && buildId != null && !(mirrorToolActive() && WrightsClientConfig.mirrorBlocks())) {
             return nudgeAnchored(outward);
         }
         return false;
