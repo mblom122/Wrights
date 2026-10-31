@@ -42,7 +42,7 @@ public class WrightsMod {
         modBus.addListener(WrightsMod::commonSetup);
         container.registerConfig(ModConfig.Type.SERVER, WrightsConfig.SPEC);
         container.registerConfig(ModConfig.Type.CLIENT, WrightsClientConfig.SPEC);
-        LOGGER.info("Wrights loaded for an isolated NeoForge 1.21.1 test");
+        LOGGER.info("Wrights 0.1.4 loaded for an isolated NeoForge 1.21.1 test");
     }
 
     private static void commonSetup(FMLCommonSetupEvent event) {
