@@ -12,6 +12,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -32,15 +33,20 @@ import appeng.api.networking.crafting.CraftingSubmitErrorCode;
 import appeng.api.networking.crafting.ICraftingCPU;
 import appeng.api.networking.crafting.ICraftingPlan;
 import appeng.api.networking.crafting.ICraftingService;
+import appeng.api.networking.crafting.ICraftingSimulationRequester;
 import appeng.api.networking.crafting.ICraftingSubmitResult;
+import appeng.api.networking.crafting.UnsuitableCpus;
+import appeng.api.networking.security.IActionHost;
 import appeng.api.networking.security.IActionSource;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
+import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
 import appeng.api.storage.MEStorage;
 
 import net.neoforged.neoforge.network.PacketDistributor;
 
+import com.wrights.WrightsMod;
 import com.wrights.drone.WrightTier;
 import com.wrights.network.BlueprintPayloads;
 import com.wrights.item.ModItems;
@@ -181,12 +187,17 @@ public final class Ae2DigitalAccess implements DigitalAccess {
         if ((accepted != null && now < accepted) || PENDING.containsKey(craftKey)) {
             return true;
         }
-        // A player source reads getAvailableStacks(), which is empty while a terminal is
-        // already listing the network. The cache is the stock the terminal is showing.
+        // Patterns are only visited when the request names a machine on the network.
+        // A player source has no machine, so the plan used to ignore the pattern provider.
+        // An empty source reads the stored stock instead of the listing the terminal is already walking.
+        IGridNode node = actionNode(level, pos);
+        if (node == null) {
+            return false;
+        }
         IActionSource src = IActionSource.ofPlayer(player);
         Future<ICraftingPlan> future = grid.getCraftingService().beginCraftingCalculation(
                 level,
-                IActionSource::empty,
+                new NetworkRequester(node),
                 key,
                 amount,
                 CalculationStrategy.CRAFT_LESS);
@@ -216,8 +227,10 @@ public final class Ae2DigitalAccess implements DigitalAccess {
             try {
                 finish(server, craft);
             } catch (RuntimeException ex) {
+                WrightsMod.LOGGER.warn("AE2 craft request failed", ex);
                 ServerPlayer player = server.getPlayerList().getPlayer(craft.key.player);
-                tell(server, player, craft, "message.wrights.digital_craft_failed");
+                tell(server, player, craft, Component.translatable(
+                        "message.wrights.digital_craft_failed_reason", Component.literal(shortReason(ex))));
             }
         }
     }
@@ -235,14 +248,17 @@ public final class Ae2DigitalAccess implements DigitalAccess {
             if (ex instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
-            tell(server, player, craft, "message.wrights.digital_craft_failed");
+            WrightsMod.LOGGER.warn("AE2 craft plan failed", ex);
+            Throwable cause = ex.getCause() == null ? ex : ex.getCause();
+            tell(server, player, craft, Component.translatable(
+                    "message.wrights.digital_craft_failed_reason", Component.literal(shortReason(cause))));
             return;
         }
         if (player == null) {
             return;
         }
         if (plan == null) {
-            tell(server, player, craft, "message.wrights.digital_craft_failed");
+            tell(server, player, craft, Component.translatable("message.wrights.digital_craft_incomplete", new ItemStack(craft.key.item).getHoverName()));
             return;
         }
         ServerLevel level = server.getLevel(craft.key.pos.dimension());
@@ -251,12 +267,12 @@ public final class Ae2DigitalAccess implements DigitalAccess {
             tell(server, player, craft, "message.wrights.digital_offline");
             return;
         }
-        // A plan with no CPU is marked "simulated" and lists ingredients it did not reserve.
-        // Those lines are not proof the network is empty, so check the stored stock directly.
+        // A simulated plan is AE2 giving up. It is not proof the drives are empty.
         boolean shortStock = ingredientShort(grid, plan, craft.key.item);
         boolean noCpu = !cpuFree(grid.getCraftingService(), plan);
+        ICraftingSubmitResult result = null;
         if (!plan.simulation()) {
-            ICraftingSubmitResult result = grid.getCraftingService().submitJob(plan, null, null, false, craft.source);
+            result = grid.getCraftingService().submitJob(plan, null, null, false, craft.source);
             if (result.successful()) {
                 ACCEPTED_UNTIL.put(craft.key, server.getTickCount() + 40L);
                 return;
@@ -270,21 +286,136 @@ public final class Ae2DigitalAccess implements DigitalAccess {
                 noCpu = true;
             } else if (code == CraftingSubmitErrorCode.MISSING_INGREDIENT) {
                 shortStock = true;
-            } else if (code != CraftingSubmitErrorCode.INCOMPLETE_PLAN) {
-                tell(server, player, craft, "message.wrights.digital_craft_failed");
-                return;
             }
         }
-        ItemStack stack = new ItemStack(craft.key.item);
-        if (shortStock && noCpu) {
-            tell(server, player, craft, "message.wrights.digital_craft_blocked", stack.getHoverName());
-        } else if (shortStock) {
-            tell(server, player, craft, "message.wrights.digital_craft_materials", stack.getHoverName());
-        } else if (noCpu || grid.getCraftingService().getCpus().isEmpty()) {
-            tell(server, player, craft, "message.wrights.digital_craft_cpu", stack.getHoverName());
-        } else {
-            tell(server, player, craft, "message.wrights.digital_craft_failed");
+        Component name = new ItemStack(craft.key.item).getHoverName();
+        Component reason = reason(plan, result, shortStock, noCpu || grid.getCraftingService().getCpus().isEmpty(), craft.key.item, name);
+        WrightsMod.LOGGER.info(
+                "AE2 craft of {} did not start (simulation={}, bytes={}, missing=[{}], error={}, detail={})",
+                BuiltInRegistries.ITEM.getKey(craft.key.item),
+                plan.simulation(),
+                plan.bytes(),
+                missingIds(plan),
+                result == null || result.errorCode() == null ? "-" : result.errorCode(),
+                result == null || result.errorDetail() == null ? "-" : result.errorDetail());
+        tell(server, player, craft, reason);
+    }
+
+    /** A sentence the player can read, naming the thing AE2 actually refused. */
+    private static Component reason(ICraftingPlan plan, ICraftingSubmitResult result, boolean shortStock, boolean noCpu, Item requested, Component name) {
+        if (plan.simulation() && onlyOutput(plan.missingItems(), requested)) {
+            return Component.translatable("message.wrights.digital_craft_no_pattern", name);
         }
+        if (shortStock && noCpu) {
+            return Component.translatable("message.wrights.digital_craft_blocked", name);
+        }
+        if (shortStock) {
+            Component list = missingDetail(plan, result);
+            if (list == null) {
+                return Component.translatable("message.wrights.digital_craft_materials", name);
+            }
+            return Component.translatable("message.wrights.digital_craft_materials_list", name, list);
+        }
+        if (noCpu) {
+            if (result != null && result.errorDetail() instanceof UnsuitableCpus cpus) {
+                return Component.translatable("message.wrights.digital_craft_cpu_why", name, Component.translatable(
+                        "message.wrights.digital_craft_cpu_bits", cpus.offline(), cpus.busy(), cpus.tooSmall(), cpus.excluded()));
+            }
+            if (result != null && result.errorCode() == CraftingSubmitErrorCode.CPU_TOO_SMALL) {
+                return Component.translatable("message.wrights.digital_craft_cpu_small", name, plan.bytes());
+            }
+            if (result != null && result.errorCode() == CraftingSubmitErrorCode.CPU_OFFLINE) {
+                return Component.translatable("message.wrights.digital_craft_cpu_offline");
+            }
+            if (result != null && result.errorCode() == CraftingSubmitErrorCode.CPU_BUSY) {
+                return Component.translatable("message.wrights.digital_craft_cpu_busy");
+            }
+            return Component.translatable("message.wrights.digital_craft_cpu", name);
+        }
+        Component list = missingDetail(plan, result);
+        if (list != null) {
+            return Component.translatable("message.wrights.digital_craft_failed_reason", list);
+        }
+        if (result != null && result.errorCode() != null) {
+            return Component.translatable("message.wrights.digital_craft_failed_reason", Component.literal(result.errorCode().name()));
+        }
+        return Component.translatable("message.wrights.digital_craft_incomplete", name);
+    }
+
+    private static Component missingDetail(ICraftingPlan plan, ICraftingSubmitResult result) {
+        if (result != null && result.errorDetail() instanceof GenericStack missing && missing.what() != null) {
+            return missing.what().getDisplayName().copy().append(" x" + missing.amount());
+        }
+        return missingList(plan);
+    }
+
+    private static Component missingList(ICraftingPlan plan) {
+        KeyCounter missing = plan.missingItems();
+        if (missing == null || missing.isEmpty()) {
+            return null;
+        }
+        Component text = Component.empty();
+        int shown = 0;
+        for (var entry : missing) {
+            long need = entry.getLongValue();
+            if (need <= 0L) {
+                continue;
+            }
+            if (shown == 4) {
+                text = text.copy().append(", ...");
+                break;
+            }
+            if (shown > 0) {
+                text = text.copy().append(", ");
+            }
+            text = text.copy().append(entry.getKey().getDisplayName()).append(" x" + need);
+            shown++;
+        }
+        return shown == 0 ? null : text;
+    }
+
+    /** True when the only thing AE2 could not get is the item we asked it to craft. */
+    private static boolean onlyOutput(KeyCounter missing, Item requested) {
+        if (missing == null || missing.isEmpty()) {
+            return false;
+        }
+        boolean saw = false;
+        for (var entry : missing) {
+            if (entry.getLongValue() <= 0L) {
+                continue;
+            }
+            saw = true;
+            if (!(entry.getKey() instanceof AEItemKey itemKey) || itemKey.getItem() != requested) {
+                return false;
+            }
+        }
+        return saw;
+    }
+
+    private static String missingIds(ICraftingPlan plan) {
+        KeyCounter missing = plan.missingItems();
+        if (missing == null || missing.isEmpty()) {
+            return "";
+        }
+        StringBuilder text = new StringBuilder();
+        for (var entry : missing) {
+            if (entry.getLongValue() <= 0L) {
+                continue;
+            }
+            if (!text.isEmpty()) {
+                text.append(", ");
+            }
+            text.append(entry.getKey().getId()).append(" x").append(entry.getLongValue());
+        }
+        return text.toString();
+    }
+
+    private static String shortReason(Throwable ex) {
+        String why = ex.getMessage();
+        if (why == null || why.isBlank()) {
+            why = ex.getClass().getSimpleName();
+        }
+        return why.length() > 90 ? why.substring(0, 90) : why;
     }
 
     /** True when a non-output ingredient in the plan is actually absent from network storage. */
@@ -326,10 +457,14 @@ public final class Ae2DigitalAccess implements DigitalAccess {
     }
 
     private static void tell(MinecraftServer server, ServerPlayer player, PendingCraft craft, String key, Object... args) {
+        tell(server, player, craft, Component.translatable(key, args));
+    }
+
+    private static void tell(MinecraftServer server, ServerPlayer player, PendingCraft craft, Component text) {
         QUIET_UNTIL.put(craft.key, server.getTickCount() + (long) QUIET_TICKS);
-        if (player != null) {
+        if (player != null && text != null) {
             PacketDistributor.sendToPlayer(player, new BlueprintPayloads.DigitalUse(List.of()));
-            DigitalNetworks.explainCraftFailure(player, key, args);
+            DigitalNetworks.explainCraftFailure(player, text);
         }
     }
 
@@ -394,6 +529,12 @@ public final class Ae2DigitalAccess implements DigitalAccess {
     }
 
     private static IGrid grid(ServerLevel level, GlobalPos pos) {
+        IGridNode node = actionNode(level, pos);
+        return node == null ? null : node.getGrid();
+    }
+
+    /** The linked controller or access point. AE2 will not read patterns without this node. */
+    private static IGridNode actionNode(ServerLevel level, GlobalPos pos) {
         if (pos == null) {
             return null;
         }
@@ -405,14 +546,17 @@ public final class Ae2DigitalAccess implements DigitalAccess {
         if (be == null) {
             return null;
         }
-        if (be instanceof IWirelessAccessPoint wap) {
-            return wap.getGrid();
+        if (be instanceof IActionHost host) {
+            IGridNode node = host.getActionableNode();
+            if (node != null && node.getGrid() != null) {
+                return node;
+            }
         }
         if (be instanceof IInWorldGridNodeHost host) {
             for (Direction direction : Direction.values()) {
                 IGridNode node = host.getGridNode(direction);
                 if (node != null && node.getGrid() != null) {
-                    return node.getGrid();
+                    return node;
                 }
             }
         }
@@ -423,5 +567,21 @@ public final class Ae2DigitalAccess implements DigitalAccess {
     }
 
     private record PendingCraft(CraftKey key, Future<ICraftingPlan> future, IActionSource source) {
+    }
+
+    /**
+     * Names the linked machine so pattern providers are visited, and carries no player so the
+     * stock snapshot is the stored cache rather than a listing another screen is already walking.
+     */
+    private record NetworkRequester(IGridNode node) implements ICraftingSimulationRequester {
+        @Override
+        public IActionSource getActionSource() {
+            return IActionSource.empty();
+        }
+
+        @Override
+        public IGridNode getGridNode() {
+            return node;
+        }
     }
 }

@@ -5,6 +5,7 @@ import java.util.List;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -139,9 +140,13 @@ public final class DigitalNetworks {
 
     /** Action-bar a craft failure and remember it so a generic "you need the item" line does not replace it. */
     public static void explainCraftFailure(ServerPlayer player, String key, Object... args) {
+        explainCraftFailure(player, Component.translatable(key, args));
+    }
+
+    public static void explainCraftFailure(ServerPlayer player, Component text) {
         CRAFT_FAILURE.set(true);
-        if (player != null) {
-            Messages.actionBar(player, key, args);
+        if (player != null && text != null) {
+            Messages.actionBar(player, text);
         }
     }
 
