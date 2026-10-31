@@ -558,7 +558,7 @@ final class WrightManagePanel {
         panelY = Math.max(8, (screen.screenHeight() - panelH) / 2);
     }
 
-    boolean keyPressed(ManageHost screen, int keyCode) {
+    boolean keyPressed(ManageHost screen, int keyCode, int scanCode, int modifiers) {
         if (nameBox == null || !nameBox.isFocused()) {
             return false;
         }
@@ -574,7 +574,8 @@ final class WrightManagePanel {
             screen.focus(null);
             return true;
         }
-        return false;
+        nameBox.keyPressed(keyCode, scanCode, modifiers);
+        return true;
     }
 
     private void placeNameBox(ManageHost screen, Swarm swarm, int index, int y, int listTop, int listBottom) {

@@ -1621,7 +1621,19 @@ public class WrightsMenuScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (managePage && manage.keyPressed(manageHost, keyCode)) {
+        if (managePage && manage.keyPressed(manageHost, keyCode, scanCode, modifiers)) {
+            return true;
+        }
+        if (portRename != null && portRename.isFocused()) {
+            if (keyCode == 257 || keyCode == 335) {
+                finishPortRename(true);
+                return true;
+            }
+            if (keyCode == 256) {
+                finishPortRename(false);
+                return true;
+            }
+            portRename.keyPressed(keyCode, scanCode, modifiers);
             return true;
         }
         if (managePage && keyCode == 256) {
@@ -1642,10 +1654,6 @@ public class WrightsMenuScreen extends Screen {
             if (sortButton != null) {
                 sortButton.setPicked(false);
             }
-            return true;
-        }
-        if (portRename != null && portRename.visible && portRename.isFocused() && (keyCode == 257 || keyCode == 335)) {
-            finishPortRename(true);
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);

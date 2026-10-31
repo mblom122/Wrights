@@ -279,19 +279,28 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (manage.keyPressed(this, keyCode)) {
+        if (manage.keyPressed(this, keyCode, scanCode, modifiers)) {
             return true;
         }
-        if (nameBox != null && nameBox.isFocused() && (keyCode == 257 || keyCode == 335)) {
-            commitName();
-            setFocused(null);
-            nameBox.setFocused(false);
+        if (nameBox != null && nameBox.isFocused()) {
+            if (keyCode == 257 || keyCode == 335) {
+                commitName();
+                setFocused(null);
+                nameBox.setFocused(false);
+                return true;
+            }
+            if (keyCode == 256) {
+                nameBox.setValue(sentName);
+                nameBox.setFocused(false);
+                setFocused(null);
+                return true;
+            }
+            // Letters arrive in charTyped. Swallow the key so E does not close this screen.
+            nameBox.keyPressed(keyCode, scanCode, modifiers);
             return true;
         }
-        if (keyCode == 256 && nameBox != null && nameBox.isFocused()) {
-            nameBox.setValue(sentName);
-            nameBox.setFocused(false);
-            setFocused(null);
+        if (getFocused() instanceof EditBox box && box.isFocused()) {
+            box.keyPressed(keyCode, scanCode, modifiers);
             return true;
         }
         if (keyCode == 256 && manage.closeTop()) {
