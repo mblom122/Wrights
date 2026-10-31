@@ -42,7 +42,8 @@ public final class WrightsClientState {
         BUILD,
         JOBS,
         MANAGE,
-        INFO
+        INFO,
+        LINK
     }
 
     public static Mode mode = Mode.NONE;
@@ -444,6 +445,7 @@ public final class WrightsClientState {
             case JOBS -> 3;
             case MANAGE -> 4;
             case INFO -> 5;
+            case LINK -> 6;
             default -> 0;
         };
         if (modeId == 0) {
@@ -536,6 +538,11 @@ public final class WrightsClientState {
             enterInfo();
             return;
         }
+        if (last == 6) {
+            resumeSent = true;
+            enterLink();
+            return;
+        }
         if (last != 1 && last != 2) {
             return;
         }
@@ -600,6 +607,13 @@ public final class WrightsClientState {
         updateFlags();
     }
 
+    public static void enterLink() {
+        leaveCapture();
+        mode = Mode.LINK;
+        bindSupply = false;
+        updateFlags();
+    }
+
     /** True once New has been left for Build, so coming back starts a blank capture. */
     private static boolean captureDirty;
     /** Server generation at the moment New was cleared. Older syncs must not restore that box. */
@@ -646,9 +660,10 @@ public final class WrightsClientState {
             case JOBS -> 1;
             case MANAGE -> 2;
             case INFO -> 3;
-            default -> delta > 0 ? -1 : 4;
+            case LINK -> 4;
+            default -> delta > 0 ? -1 : 5;
         };
-        int next = Math.floorMod(index + delta, 4);
+        int next = Math.floorMod(index + delta, 5);
         if (next == 0) {
             enterBuildFromLast();
             bindSupply = false;
@@ -656,8 +671,10 @@ public final class WrightsClientState {
             enterJobs();
         } else if (next == 2) {
             enterManage();
-        } else {
+        } else if (next == 3) {
             enterInfo();
+        } else {
+            enterLink();
         }
         mainPicker = true;
         styleHudTicks = STYLE_HUD_TICKS;

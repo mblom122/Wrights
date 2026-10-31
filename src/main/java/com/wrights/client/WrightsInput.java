@@ -149,15 +149,19 @@ public final class WrightsInput {
         if (!com.wrights.item.ControllerItem.isHeld(event.getEntity())) {
             return;
         }
-        if (event.getEntity().isShiftKeyDown()
-                && com.wrights.storage.DigitalNetworks.bindKindAt(event.getLevel(), event.getPos())
-                        != com.wrights.storage.DigitalLink.Kind.NONE) {
+        if (WrightsClientState.mode == WrightsClientState.Mode.LINK && Minecraft.getInstance().screen == null) {
             event.setCanceled(true);
             event.setUseBlock(TriState.FALSE);
             event.setUseItem(TriState.FALSE);
             boundThisClick = true;
-            net.neoforged.neoforge.network.PacketDistributor.sendToServer(
-                    new BlueprintPayloads.BindDigital(event.getPos(), false));
+            if (com.wrights.storage.DigitalNetworks.bindKindAt(event.getLevel(), event.getPos())
+                    != com.wrights.storage.DigitalLink.Kind.NONE) {
+                net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                        new BlueprintPayloads.BindDigital(event.getPos(), false));
+            } else {
+                event.getEntity().displayClientMessage(
+                        net.minecraft.network.chat.Component.translatable("message.wrights.digital_not_target"), true);
+            }
             return;
         }
         if (com.wrights.blueprint.BlueprintClientFlags.capture) {
@@ -232,13 +236,22 @@ public final class WrightsInput {
         }
         if (menuMode() && Minecraft.getInstance().screen == null) {
             event.setCanceled(true);
+            if (boundThisClick) {
+                return;
+            }
+            if (WrightsClientState.mode == WrightsClientState.Mode.LINK
+                    && Minecraft.getInstance().hitResult instanceof net.minecraft.world.phys.BlockHitResult hit
+                    && hit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK) {
+                return;
+            }
             openToolMenu();
         }
     }
 
     private static boolean menuMode() {
         return WrightsClientState.mode == WrightsClientState.Mode.MANAGE
-                || WrightsClientState.mode == WrightsClientState.Mode.INFO;
+                || WrightsClientState.mode == WrightsClientState.Mode.INFO
+                || WrightsClientState.mode == WrightsClientState.Mode.LINK;
     }
 
     private static void openToolMenu() {

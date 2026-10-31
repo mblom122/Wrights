@@ -94,6 +94,9 @@ public final class WrightsHud {
             line = Component.translatable("hud.wrights.manage_explain");
         } else if (WrightsClientState.mode == WrightsClientState.Mode.INFO) {
             line = Component.translatable("hud.wrights.info_explain");
+        } else if (WrightsClientState.mode == WrightsClientState.Mode.LINK) {
+            line = Component.translatable("hud.wrights.link_explain");
+            sub = Component.translatable("hud.wrights.link_targets");
         } else if (WrightsClientState.mode == WrightsClientState.Mode.JOBS) {
             com.wrights.network.BlueprintPayloads.JobLine aimed = WrightsClientState.jobAimed();
             if (aimed == null) {
@@ -175,6 +178,9 @@ public final class WrightsHud {
         if (WrightsClientState.mode == WrightsClientState.Mode.INFO) {
             return Component.translatable("hud.wrights.task_info");
         }
+        if (WrightsClientState.mode == WrightsClientState.Mode.LINK) {
+            return Component.translatable("hud.wrights.task_link");
+        }
         if (WrightsClientState.mode == WrightsClientState.Mode.SAVING) {
             return Component.translatable("hud.wrights.task_saving");
         }
@@ -195,6 +201,7 @@ public final class WrightsHud {
         Component jobs = Component.translatable("hud.wrights.main_jobs");
         Component manage = Component.translatable("hud.wrights.main_manage");
         Component info = Component.translatable("hud.wrights.main_info");
+        Component link = Component.translatable("hud.wrights.main_link");
         Component selected = Component.translatable("hud.wrights.mode_selected");
         int width = 188;
         width = Math.max(width, minecraft.font.width(title) + 28);
@@ -202,10 +209,11 @@ public final class WrightsHud {
         width = Math.max(width, minecraft.font.width(jobs) + minecraft.font.width(selected) + 36);
         width = Math.max(width, minecraft.font.width(manage) + minecraft.font.width(selected) + 36);
         width = Math.max(width, minecraft.font.width(info) + minecraft.font.width(selected) + 36);
+        width = Math.max(width, minecraft.font.width(link) + minecraft.font.width(selected) + 36);
         int row = 18;
         int textWidth = width - 24;
         int footer = footerHeight(minecraft, how, textWidth);
-        int height = 28 + row * 4 + footer;
+        int height = 28 + row * 5 + footer;
         int x = (graphics.guiWidth() - width) / 2;
         int y = graphics.guiHeight() / 2 + 8;
         WrightsUi.panel(graphics, x, y, width, height);
@@ -217,6 +225,7 @@ public final class WrightsHud {
         drawMainRow(graphics, minecraft, x, y + 24 + row, width, WrightsClientState.mode == WrightsClientState.Mode.JOBS, jobs, selected);
         drawMainRow(graphics, minecraft, x, y + 24 + row * 2, width, WrightsClientState.mode == WrightsClientState.Mode.MANAGE, manage, selected);
         drawMainRow(graphics, minecraft, x, y + 24 + row * 3, width, WrightsClientState.mode == WrightsClientState.Mode.INFO, info, selected);
+        drawMainRow(graphics, minecraft, x, y + 24 + row * 4, width, WrightsClientState.mode == WrightsClientState.Mode.LINK, link, selected);
         drawFooter(graphics, minecraft, how, x + 12, y + height - footer + 4, textWidth, WrightsUi.MUTED);
     }
 

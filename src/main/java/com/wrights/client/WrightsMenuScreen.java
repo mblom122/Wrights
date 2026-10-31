@@ -261,7 +261,8 @@ public class WrightsMenuScreen extends Screen {
             jobsPage = false;
             options = false;
             infoPage = false;
-        } else if (WrightsClientState.mode == WrightsClientState.Mode.INFO) {
+        } else if (WrightsClientState.mode == WrightsClientState.Mode.INFO
+                || WrightsClientState.mode == WrightsClientState.Mode.LINK) {
             infoPage = true;
             managePage = false;
             jobsPage = false;
