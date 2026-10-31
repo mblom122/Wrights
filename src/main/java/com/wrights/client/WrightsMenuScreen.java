@@ -1582,12 +1582,19 @@ public class WrightsMenuScreen extends Screen {
     private int[] mirrorPatternIds = {0, 1, 2, 3};
     private int mirrorAxisY;
     private int mirrorAxisW;
+    private int mirrorNbtX;
     private int mirrorNbtY;
+    private int mirrorSettingsX;
     private int mirrorSettingsY;
+    private int mirrorAllX;
     private int mirrorAllY;
+    private int mirrorShapesX;
     private int mirrorShapesY;
+    private int mirrorReplaceX;
     private int mirrorReplaceY = -1;
+    private int mirrorOnX;
     private int mirrorOnY;
+    private int mirrorToggleW;
     private int mirrorMineY = -1;
     private int mirrorMineModeY = -1;
     private int mirrorMineVoidY = -1;
@@ -1677,38 +1684,48 @@ public class WrightsMenuScreen extends Screen {
             }
             y += 44;
         }
+        int col = (w - gap) / 2;
+        int right = x + col + gap;
+        mirrorToggleW = col;
+        mirrorNbtX = x;
         mirrorNbtY = y;
-        drawMirrorToggle(graphics, mouseX, mouseY, x, y, WrightsClientConfig.COPY_NBT_BLOCKS.get(), "screen.wrights.copy_nbt_blocks", "screen.wrights.copy_nbt_blocks_hint", true);
-        y += 16;
+        drawMirrorToggle(graphics, mouseX, mouseY, x, y, WrightsClientConfig.COPY_NBT_BLOCKS.get(), "screen.wrights.copy_nbt_blocks", "screen.wrights.copy_nbt_blocks_hint", true, col);
+        mirrorSettingsX = right;
         mirrorSettingsY = y;
         boolean settingsOn = WrightsConfig.copySettings();
         String settingsHint = settingsOn
                 ? (WrightsConfig.copySettingsWhitelist() ? "screen.wrights.copy_nbt_settings_whitelist_hint" : "screen.wrights.copy_nbt_settings_hint")
                 : "screen.wrights.copy_off_hint";
-        drawMirrorToggle(graphics, mouseX, mouseY, x, y, mirrorSettingsChosen(), "screen.wrights.copy_nbt_settings", settingsHint, WrightsClientConfig.COPY_NBT_BLOCKS.get() && settingsOn);
+        drawMirrorToggle(graphics, mouseX, mouseY, right, y, mirrorSettingsChosen(), "screen.wrights.copy_nbt_settings", settingsHint, WrightsClientConfig.COPY_NBT_BLOCKS.get() && settingsOn, col);
         y += 16;
+        mirrorAllX = x;
         mirrorAllY = y;
         String allHint = WrightsConfig.copyAll() ? "screen.wrights.copy_nbt_all_hint" : "screen.wrights.copy_off_hint";
-        drawMirrorToggle(graphics, mouseX, mouseY, x, y, mirrorAllChosen(), "screen.wrights.copy_nbt_all", allHint, WrightsClientConfig.COPY_NBT_BLOCKS.get() && mirrorAllUsable());
-        y += 16;
+        drawMirrorToggle(graphics, mouseX, mouseY, x, y, mirrorAllChosen(), "screen.wrights.copy_nbt_all", allHint, WrightsClientConfig.COPY_NBT_BLOCKS.get() && mirrorAllUsable(), col);
+        mirrorShapesX = right;
         mirrorShapesY = y;
-        drawMirrorToggle(graphics, mouseX, mouseY, x, y, WrightsClientConfig.MIRROR_SHAPES.get(), "menu.wrights.mirror_shapes", "menu.wrights.mirror_shapes_hint", true);
+        drawMirrorToggle(graphics, mouseX, mouseY, right, y, WrightsClientConfig.MIRROR_SHAPES.get(), "menu.wrights.mirror_shapes", "menu.wrights.mirror_shapes_hint", true, col);
         y += 16;
         mirrorReplaceY = -1;
-        if (WrightsClientConfig.mirrorBlocks() && WrightsConfig.allowMirrorReplace()) {
-            mirrorReplaceY = y;
-            drawMirrorToggle(graphics, mouseX, mouseY, x, y, WrightsClientConfig.mirrorReplace(), "menu.wrights.mirror_replace", "menu.wrights.mirror_replace_hint", true);
-            y += 16;
-        }
+        boolean replaceOn = WrightsClientConfig.mirrorBlocks() && WrightsConfig.allowMirrorReplace();
         mirrorOnY = y;
-        drawMirrorToggle(graphics, mouseX, mouseY, x, y, WrightsClientConfig.MIRROR_ON.get(), "menu.wrights.mirror_on", "menu.wrights.mirror_on_hint", true);
+        if (replaceOn) {
+            mirrorReplaceX = x;
+            mirrorReplaceY = y;
+            drawMirrorToggle(graphics, mouseX, mouseY, x, y, WrightsClientConfig.mirrorReplace(), "menu.wrights.mirror_replace", "menu.wrights.mirror_replace_hint", true, col);
+            mirrorOnX = right;
+            drawMirrorToggle(graphics, mouseX, mouseY, right, y, WrightsClientConfig.MIRROR_ON.get(), "menu.wrights.mirror_on", "menu.wrights.mirror_on_hint", true, col);
+        } else {
+            mirrorOnX = x;
+            drawMirrorToggle(graphics, mouseX, mouseY, x, y, WrightsClientConfig.MIRROR_ON.get(), "menu.wrights.mirror_on", "menu.wrights.mirror_on_hint", true, col);
+        }
         y += 16;
         mirrorMineY = -1;
         mirrorMineModeY = -1;
         mirrorMineVoidY = -1;
         if (WrightsClientConfig.mirrorBlocks() && WrightsConfig.allowMirrorMine()) {
             mirrorMineY = y;
-            drawMirrorToggle(graphics, mouseX, mouseY, x, y, WrightsClientConfig.mirrorMine(), "menu.wrights.mirror_mine", "menu.wrights.mirror_mine_hint", true);
+            drawMirrorToggle(graphics, mouseX, mouseY, x, y, WrightsClientConfig.mirrorMine(), "menu.wrights.mirror_mine", "menu.wrights.mirror_mine_hint", true, w);
             y += 16;
             if (WrightsClientConfig.mirrorMine()) {
                 mirrorMineModeY = y;
@@ -1719,7 +1736,7 @@ public class WrightsMenuScreen extends Screen {
                 y += 28;
                 if (WrightsConfig.allowVoidBlocks()) {
                     mirrorMineVoidY = y;
-                    drawMirrorToggle(graphics, mouseX, mouseY, x + 16, y, WrightsClientConfig.mirrorMineVoid(), "menu.wrights.mirror_mine_void", "menu.wrights.mirror_mine_void_hint", true);
+                    drawMirrorToggle(graphics, mouseX, mouseY, x + 16, y, WrightsClientConfig.mirrorMineVoid(), "menu.wrights.mirror_mine_void", "menu.wrights.mirror_mine_void_hint", true, w - 16);
                     y += 16;
                 }
             }
@@ -1782,7 +1799,7 @@ public class WrightsMenuScreen extends Screen {
         graphics.drawString(this.font, label, x + 6, y + (h - 8) / 2, on ? WrightsUi.TEXT : WrightsUi.MUTED, false);
     }
 
-    private void drawMirrorToggle(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, boolean on, String label, String hint, boolean enabled) {
+    private void drawMirrorToggle(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, boolean on, String label, String hint, boolean enabled, int columnW) {
         int box = enabled ? 0xFF18222C : 0xFF12171C;
         int border = !enabled ? 0xFF2A343C : on ? WrightsUi.COPPER : 0xFF3D4E5E;
         graphics.fill(x, y, x + 12, y + 12, box);
@@ -1790,7 +1807,8 @@ public class WrightsMenuScreen extends Screen {
         if (on && enabled) {
             graphics.fill(x + 3, y + 3, x + 9, y + 9, WrightsUi.COPPER);
         }
-        Component title = Component.translatable(label);
+        int textW = Math.max(8, columnW - 16 - 4 - 12);
+        String title = this.font.plainSubstrByWidth(Component.translatable(label).getString(), textW);
         graphics.drawString(this.font, title, x + 16, y + 2, enabled ? WrightsUi.TEXT : WrightsUi.MUTED, false);
         drawHelpBox(graphics, mouseX, mouseY, x + 16 + this.font.width(title) + 4, y, hint);
     }
@@ -1887,31 +1905,31 @@ public class WrightsMenuScreen extends Screen {
                 return true;
             }
         }
-        if (hitMirrorToggle(mouseX, mouseY, x, mirrorNbtY, "screen.wrights.copy_nbt_blocks")) {
+        if (hitMirrorCell(mouseX, mouseY, mirrorNbtX, mirrorNbtY)) {
             WrightsClientConfig.setCopyNbtBlocks(!WrightsClientConfig.COPY_NBT_BLOCKS.get());
             return true;
         }
-        if (hitMirrorToggle(mouseX, mouseY, x, mirrorSettingsY, "screen.wrights.copy_nbt_settings")) {
+        if (hitMirrorCell(mouseX, mouseY, mirrorSettingsX, mirrorSettingsY)) {
             if (WrightsClientConfig.COPY_NBT_BLOCKS.get() && WrightsConfig.copySettings()) {
                 WrightsClientConfig.setCopyNbtSettings(!WrightsClientConfig.COPY_NBT_SETTINGS.get());
             }
             return true;
         }
-        if (hitMirrorToggle(mouseX, mouseY, x, mirrorAllY, "screen.wrights.copy_nbt_all")) {
+        if (hitMirrorCell(mouseX, mouseY, mirrorAllX, mirrorAllY)) {
             if (WrightsClientConfig.COPY_NBT_BLOCKS.get() && mirrorAllUsable()) {
                 WrightsClientConfig.setCopyNbtAll(!WrightsClientConfig.COPY_NBT_ALL.get());
             }
             return true;
         }
-        if (hitMirrorToggle(mouseX, mouseY, x, mirrorShapesY, "menu.wrights.mirror_shapes")) {
+        if (hitMirrorCell(mouseX, mouseY, mirrorShapesX, mirrorShapesY)) {
             WrightsClientConfig.setMirrorShapes(!WrightsClientConfig.MIRROR_SHAPES.get());
             return true;
         }
-        if (mirrorReplaceY >= 0 && hitMirrorToggle(mouseX, mouseY, x, mirrorReplaceY, "menu.wrights.mirror_replace")) {
+        if (mirrorReplaceY >= 0 && hitMirrorCell(mouseX, mouseY, mirrorReplaceX, mirrorReplaceY)) {
             WrightsClientConfig.setMirrorReplace(!WrightsClientConfig.mirrorReplace());
             return true;
         }
-        if (hitMirrorToggle(mouseX, mouseY, x, mirrorOnY, "menu.wrights.mirror_on")) {
+        if (hitMirrorCell(mouseX, mouseY, mirrorOnX, mirrorOnY)) {
             WrightsClientConfig.setMirrorOn(!WrightsClientConfig.MIRROR_ON.get());
             return true;
         }
@@ -1951,6 +1969,10 @@ public class WrightsMenuScreen extends Screen {
             return true;
         }
         return false;
+    }
+
+    private boolean hitMirrorCell(double mouseX, double mouseY, int x, int y) {
+        return y >= 0 && mouseX >= x && mouseX < x + mirrorToggleW && mouseY >= y && mouseY < y + 12;
     }
 
     private boolean hitMirrorToggle(double mouseX, double mouseY, int x, int y, String label) {
