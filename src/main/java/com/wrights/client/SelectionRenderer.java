@@ -422,29 +422,27 @@ public final class SelectionRenderer {
         buffers.endBatch(RenderType.lines());
 
         if (pin != null) {
-            int span = Math.max(1, Math.max(max.getX() - min.getX(), Math.max(max.getY() - min.getY(), max.getZ() - min.getZ())) + 1);
-            drawAnchorMarker(pose, buffers, camera, pin, span);
+            drawAnchorMarker(pose, buffers, camera, pin);
         }
     }
 
     /**
      * Shared blue cross + cube used for shape pins, build anchors, and mirror anchors.
      * Drawn through blocks so the point stays readable. Yellow = selection border; blue = anchor.
+     * Size is fixed to one cell — it must not grow when Ctrl+scroll turns a shape and the AABB span changes.
      */
     private static void drawAnchorMarker(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, BlockPos block) {
-        drawAnchorMarker(pose, buffers, camera, block, 10.0D);
+        drawAnchorMarker(pose, buffers, camera, block, 0.0D);
     }
 
-    private static void drawAnchorMarker(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, BlockPos block, double span) {
+    private static void drawAnchorMarker(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, BlockPos block, double ignoredSpan) {
         if (block == null) {
             return;
         }
         double cx = block.getX() + 0.5D;
         double cy = block.getY() + 0.5D;
         double cz = block.getZ() + 0.5D;
-        // Cube always outlines one cell (slightly outside the faces). Arms may grow with span
-        // so a pin stays visible on large shapes without bloating the wire box.
-        double arm = Math.max(0.85D, Math.min(2.5D, span * 0.08D));
+        double arm = 0.85D;
         double marker = 0.55D;
         float ar = WrightsUi.anchorR();
         float ag = WrightsUi.anchorG();
