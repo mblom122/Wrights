@@ -472,35 +472,60 @@ final class ShapeMenuPanel {
         y += 12;
         int gap = 4;
         int cols = 3;
-        int rows = 3;
         int rowH = 26;
+        int labelH = 12;
+        int sectionGap = 6;
         int previewGap = 8;
-        // Kind buttons take a bit more than half; keep the preview inside the panel edge.
         int previewW = Math.max(40, (width - previewGap) * 2 / 5);
         int gridW = Math.max(72, width - previewGap - previewW);
         previewW = Math.max(40, width - previewGap - gridW);
         int cardW = Math.max(36, (gridW - gap * (cols - 1)) / cols);
-        int kind = WrightsClientConfig.SHAPE_KIND.get();
-        Shapes.Kind[] all = Shapes.Kind.values();
-        rows = Math.max(1, (all.length + cols - 1) / cols);
-        for (int i = 0; i < all.length; i++) {
+        java.util.List<Shapes.Kind> flat = new java.util.ArrayList<>();
+        java.util.List<Shapes.Kind> volume = new java.util.ArrayList<>();
+        for (Shapes.Kind entry : Shapes.Kind.values()) {
+            if (entry.volume()) {
+                volume.add(entry);
+            } else {
+                flat.add(entry);
+            }
+        }
+        int flatRows = Math.max(1, (flat.size() + cols - 1) / cols);
+        int volumeRows = Math.max(1, (volume.size() + cols - 1) / cols);
+        int gridH = labelH + flatRows * rowH + sectionGap + labelH + volumeRows * rowH;
+        int previewX = x + gridW + previewGap;
+        previewW = Math.min(previewW, Math.max(0, x + width - previewX));
+        int cursor = y;
+        graphics.drawString(font, Component.translatable("menu.wrights.shape_kind_2d"), x, cursor, WrightsUi.MUTED, false);
+        cursor += labelH;
+        cursor = drawKindGrid(graphics, mouseX, mouseY, x, cursor, gridW, cardW, gap, cols, rowH, flat);
+        cursor += sectionGap;
+        graphics.drawString(font, Component.translatable("menu.wrights.shape_kind_3d"), x, cursor, WrightsUi.MUTED, false);
+        cursor += labelH;
+        drawKindGrid(graphics, mouseX, mouseY, x, cursor, gridW, cardW, gap, cols, rowH, volume);
+        drawShapePreview(graphics, previewX, y, previewW, gridH);
+        return y + gridH;
+    }
+
+    private int drawKindGrid(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int gridW, int cardW, int gap, int cols, int rowH, java.util.List<Shapes.Kind> kinds) {
+        int selected = WrightsClientConfig.SHAPE_KIND.get();
+        for (int i = 0; i < kinds.size(); i++) {
+            Shapes.Kind entry = kinds.get(i);
             int col = i % cols;
             int row = i / cols;
             int cx = x + col * (cardW + gap);
             int cy = y + row * rowH;
             int cw = col == cols - 1 ? x + gridW - cx : cardW;
-            boolean on = kind == i;
+            boolean on = selected == entry.ordinal();
             boolean hover = mouseX >= cx && mouseX < cx + cw && mouseY >= cy && mouseY < cy + 22;
             WrightsUi.choice(graphics, cx, cy, cw, 22, on, hover);
-            String label = font.plainSubstrByWidth(Component.translatable("menu.wrights.shape_kind_" + all[i].name().toLowerCase()).getString(), Math.max(8, cw - 10));
+            String label = font.plainSubstrByWidth(
+                    Component.translatable("menu.wrights.shape_kind_" + entry.name().toLowerCase()).getString(),
+                    Math.max(8, cw - 10));
             graphics.drawString(font, label, cx + 5, cy + 7, on ? WrightsUi.TEXT : WrightsUi.MUTED, false);
-            hits.add(new Hit(cx, cy, cw, 22, "kind", i));
+            hits.add(new Hit(cx, cy, cw, 22, "kind", entry.ordinal()));
         }
-        int gridH = rows * rowH;
-        int previewX = x + gridW + previewGap;
-        previewW = Math.min(previewW, Math.max(0, x + width - previewX));
-        drawShapePreview(graphics, previewX, y, previewW, gridH);
-        return y + gridH;
+        int rows = Math.max(1, (kinds.size() + cols - 1) / cols);
+        return y + rows * rowH;
     }
 
     private void drawShapePreview(GuiGraphics graphics, int x, int y, int width, int height) {
