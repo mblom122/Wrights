@@ -902,7 +902,7 @@
   "menu.wrights.shape_size": "Size",
   "menu.wrights.shape_size_hint": "Radius or half-width of the shape, in blocks from the center.",
   "menu.wrights.shape_height": "Height",
-  "menu.wrights.shape_height_hint": "How tall cylinders and pyramids grow upward from the center.",
+  "menu.wrights.shape_height_hint": "How tall cylinders and pyramids grow upward from the base.",
   "menu.wrights.shape_ring_height_hint": "Tube height of the donut. 1 stays a flat ring; higher rounds into a torus.",
   "menu.wrights.shape_thickness": "Thickness",
   "menu.wrights.shape_thickness_hint": "How wide the ring or donut tube is in the ring plane.",

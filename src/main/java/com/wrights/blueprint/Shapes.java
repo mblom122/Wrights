@@ -14,24 +14,31 @@ import com.wrights.WrightsConfig;
  */
 public final class Shapes {
     public enum Kind {
-        CIRCLE(false),
-        RING(false),
-        SQUARE(false),
-        LINE(false),
-        SPHERE(true),
-        CUBE(true),
-        CYLINDER(true),
-        DOME(true),
-        PYRAMID(true);
+        CIRCLE(false, false),
+        RING(false, true),
+        SQUARE(false, false),
+        LINE(false, false),
+        SPHERE(true, false),
+        CUBE(true, false),
+        CYLINDER(true, true),
+        DOME(true, false),
+        PYRAMID(true, true);
 
         private final boolean volume;
+        private final boolean usesHeight;
 
-        Kind(boolean volume) {
+        Kind(boolean volume, boolean usesHeight) {
             this.volume = volume;
+            this.usesHeight = usesHeight;
         }
 
         public boolean volume() {
             return volume;
+        }
+
+        /** True when the Height slider changes this shape (cylinder, pyramid, ring/torus). */
+        public boolean usesHeight() {
+            return usesHeight;
         }
 
         public static Kind byId(int id) {

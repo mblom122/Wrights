@@ -101,15 +101,11 @@ final class ShapeMenuPanel {
             drawSlider(graphics, x, y, sizeW, thickness - 1, Math.max(1, thicknessMax - 1));
             graphics.drawString(font, Integer.toString(thickness), x + sizeW + 8, y, WrightsUi.TEXT, false);
             y += 18;
-            drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_height", "menu.wrights.shape_ring_height_hint");
-            y += 12;
-            heightY = y;
-            int height = WrightsClientConfig.SHAPE_HEIGHT.get();
-            drawSlider(graphics, x, y, sizeW, height - 1, Math.max(1, max - 1));
-            graphics.drawString(font, Integer.toString(height), x + sizeW + 8, y, WrightsUi.TEXT, false);
-            y += 18;
-        } else if (volume) {
-            drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_height", "menu.wrights.shape_height_hint");
+        }
+        if (kind.usesHeight()) {
+            drawSection(graphics, mouseX, mouseY, x, y,
+                    "menu.wrights.shape_height",
+                    ring ? "menu.wrights.shape_ring_height_hint" : "menu.wrights.shape_height_hint");
             y += 12;
             heightY = y;
             int height = WrightsClientConfig.SHAPE_HEIGHT.get();
