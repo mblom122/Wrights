@@ -505,14 +505,16 @@ final class ShapeMenuPanel {
             case "mat_weight_up" -> {
                 List<ShapeMaterials.Entry> entries = WrightsClientConfig.shapeMaterials();
                 if (value >= 0 && value < entries.size()) {
-                    WrightsClientConfig.shapeMaterialWeight(value, entries.get(value).weight() + 1);
+                    int step = WrightsUi.nudgeStep();
+                    WrightsClientConfig.shapeMaterialWeight(value, entries.get(value).weight() + step);
                 }
                 yield true;
             }
             case "mat_weight_down" -> {
                 List<ShapeMaterials.Entry> entries = WrightsClientConfig.shapeMaterials();
                 if (value >= 0 && value < entries.size()) {
-                    WrightsClientConfig.shapeMaterialWeight(value, entries.get(value).weight() - 1);
+                    int step = WrightsUi.nudgeStep();
+                    WrightsClientConfig.shapeMaterialWeight(value, entries.get(value).weight() - step);
                 }
                 yield true;
             }
@@ -531,11 +533,13 @@ final class ShapeMenuPanel {
                 yield true;
             }
             case "batch_up" -> {
-                WrightsClientConfig.setShapeOrderBatch(WrightsClientConfig.SHAPE_ORDER_BATCH.get() + 1);
+                int step = WrightsUi.nudgeStep();
+                WrightsClientConfig.setShapeOrderBatch(WrightsClientConfig.SHAPE_ORDER_BATCH.get() + step);
                 yield true;
             }
             case "batch_down" -> {
-                WrightsClientConfig.setShapeOrderBatch(WrightsClientConfig.SHAPE_ORDER_BATCH.get() - 1);
+                int step = WrightsUi.nudgeStep();
+                WrightsClientConfig.setShapeOrderBatch(WrightsClientConfig.SHAPE_ORDER_BATCH.get() - step);
                 yield true;
             }
             default -> false;

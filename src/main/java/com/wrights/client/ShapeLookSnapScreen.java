@@ -174,28 +174,8 @@ public class ShapeLookSnapScreen extends Screen {
         if (pos == null) {
             return;
         }
-        int step = nudgeStep();
+        int step = WrightsUi.nudgeStep();
         apply(pos.offset(dx * step, dy * step, dz * step));
-    }
-
-    /** Plain 1, Ctrl 5, Shift 10, Ctrl+Shift 50, Alt 100. */
-    private static int nudgeStep() {
-        boolean control = hasControlDown();
-        boolean shift = hasShiftDown();
-        boolean alt = hasAltDown();
-        if (control && shift) {
-            return 50;
-        }
-        if (alt) {
-            return 100;
-        }
-        if (control) {
-            return 5;
-        }
-        if (shift) {
-            return 10;
-        }
-        return 1;
     }
 
     private void apply(BlockPos pos) {

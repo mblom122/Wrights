@@ -29,6 +29,29 @@ public final class WrightsUi {
     private WrightsUi() {
     }
 
+    /**
+     * +/- nudge size used across Wrights menus: plain 1, Ctrl 5, Shift 10,
+     * Ctrl+Shift 50, Alt 100.
+     */
+    public static int nudgeStep() {
+        boolean control = net.minecraft.client.gui.screens.Screen.hasControlDown();
+        boolean shift = net.minecraft.client.gui.screens.Screen.hasShiftDown();
+        boolean alt = net.minecraft.client.gui.screens.Screen.hasAltDown();
+        if (control && shift) {
+            return 50;
+        }
+        if (alt) {
+            return 100;
+        }
+        if (control) {
+            return 5;
+        }
+        if (shift) {
+            return 10;
+        }
+        return 1;
+    }
+
     /** Block / item counts with thousand separators (locale-aware). */
     public static String count(long value) {
         return NumberFormat.getIntegerInstance().format(value);
