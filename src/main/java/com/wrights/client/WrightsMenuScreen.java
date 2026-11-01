@@ -2953,7 +2953,8 @@ public class WrightsMenuScreen extends Screen {
 
     private static final int JOB_HEADER = 20;
     private static final int JOB_GROUP_MIN = 46;
-    private static final int JOB_BODY = 48;
+    /** Name, Preview/size/blocks, source, anchor, and progress. */
+    private static final int JOB_BODY = 78;
     private static final int JOB_CREW = 18;
     private static final int JOB_BUTTON = 18;
     private static final int ACT_MANAGE = -1;
@@ -3293,13 +3294,16 @@ public class WrightsMenuScreen extends Screen {
         graphics.drawString(this.font, name, x + 6, y + 4, WrightsUi.TEXT, false);
         Component statusText = jobStatusText(job);
         graphics.drawString(this.font, statusText, x + width - 8 - this.font.width(statusText), y + 4, jobColor(job), false);
+        graphics.drawString(this.font, Component.translatable("menu.wrights.job_preview"), x + 6, y + 15, WrightsUi.COPPER, false);
+        graphics.drawString(this.font, Component.translatable("menu.wrights.size", job.sizeX(), job.sizeY(), job.sizeZ()), x + 6, y + 25, WrightsUi.BLUE, false);
+        graphics.drawString(this.font, Component.translatable("menu.wrights.job_preview_blocks", job.total()), x + 6, y + 35, WrightsUi.MUTED, false);
         Component source = jobSource(job);
         if (!source.getString().isEmpty()) {
-            graphics.drawString(this.font, this.font.plainSubstrByWidth(source.getString(), Math.max(40, width - 12)), x + 6, y + 15, WrightsUi.MUTED, false);
+            graphics.drawString(this.font, this.font.plainSubstrByWidth(source.getString(), Math.max(40, width - 12)), x + 6, y + 46, WrightsUi.MUTED, false);
         }
         BlockPos anchor = job.anchor();
-        graphics.drawString(this.font, Component.translatable("menu.wrights.job_anchor", anchor.getX(), anchor.getY(), anchor.getZ()), x + 6, y + 26, WrightsUi.MUTED, false);
-        drawProgress(graphics, x + 6, y + 37, Math.max(40, width - 12), job);
+        graphics.drawString(this.font, Component.translatable("menu.wrights.job_anchor", anchor.getX(), anchor.getY(), anchor.getZ()), x + 6, y + 57, WrightsUi.MUTED, false);
+        drawProgress(graphics, x + 6, y + 68, Math.max(40, width - 12), job);
         if (!job.finished() && !job.saving()) {
             graphics.drawString(this.font, crewCountText(job), x + 6, y + JOB_BODY + 4, WrightsUi.MUTED, false);
         }

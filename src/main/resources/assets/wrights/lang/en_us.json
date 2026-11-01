@@ -293,6 +293,8 @@
   "menu.wrights.jobs_working_empty": "No jobs running",
   "menu.wrights.jobs_finished_empty": "No finished jobs",
   "menu.wrights.job_progress": "%s / %s  ·  skipped %s",
+  "menu.wrights.job_preview": "Preview",
+  "menu.wrights.job_preview_blocks": "%s blocks",
   "menu.wrights.job_anchor": "Anchor %s, %s, %s",
   "menu.wrights.job_percent": "%s%%  ·  %s / %s",
   "menu.wrights.job_skipped": "skipped %s (%s%%)",
