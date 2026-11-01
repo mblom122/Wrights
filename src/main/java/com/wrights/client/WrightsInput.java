@@ -230,6 +230,13 @@ public final class WrightsInput {
         if (!com.wrights.item.ControllerItem.isHeld(event.getEntity())) {
             return;
         }
+        if (Minecraft.getInstance().screen == null && undoChord(event.getEntity())) {
+            event.setCanceled(true);
+            event.setUseBlock(TriState.FALSE);
+            event.setUseItem(TriState.FALSE);
+            undoLastJob(event.getEntity());
+            return;
+        }
         if (WrightsClientState.mode == WrightsClientState.Mode.LINK && Minecraft.getInstance().screen == null) {
             event.setCanceled(true);
             event.setUseBlock(TriState.FALSE);
@@ -294,6 +301,11 @@ public final class WrightsInput {
             return;
         }
         if (!com.wrights.item.ControllerItem.isHeld(event.getEntity())) {
+            return;
+        }
+        if (Minecraft.getInstance().screen == null && undoChord(event.getEntity())) {
+            event.setCanceled(true);
+            undoLastJob(event.getEntity());
             return;
         }
         if (com.wrights.blueprint.BlueprintClientFlags.capture) {
@@ -464,6 +476,27 @@ public final class WrightsInput {
         if (job != null) {
             Minecraft.getInstance().setScreen(new JobActionScreen(job.id()));
         }
+    }
+
+    private static boolean undoChord(net.minecraft.world.entity.player.Player player) {
+        if (!player.isShiftKeyDown()) {
+            return false;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        return InputConstants.isKeyDown(minecraft.getWindow().getWindow(), GLFW.GLFW_KEY_LEFT_CONTROL)
+                || InputConstants.isKeyDown(minecraft.getWindow().getWindow(), GLFW.GLFW_KEY_RIGHT_CONTROL);
+    }
+
+    /** Most recent finished paste that can still be undone (job list is newest-finished first). */
+    private static void undoLastJob(net.minecraft.world.entity.player.Player player) {
+        for (BlueprintPayloads.JobLine job : WrightsClientState.jobs) {
+            if (job.canUndo() && !job.undoing() && !job.undone()) {
+                net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                        new BlueprintPayloads.JobControl(job.id(), BlueprintPayloads.JobControl.UNDO));
+                return;
+            }
+        }
+        player.displayClientMessage(Component.translatable("message.wrights.no_undo_job"), true);
     }
 
     @SubscribeEvent

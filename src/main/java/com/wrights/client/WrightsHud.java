@@ -303,6 +303,7 @@ public final class WrightsHud {
     private static void drawMainModes(GuiGraphics graphics, Minecraft minecraft) {
         Component title = Component.translatable("hud.wrights.main_modes");
         Component how = Component.translatable("hud.wrights.main_how");
+        Component undo = Component.translatable("hud.wrights.main_undo");
         Component build = Component.translatable("hud.wrights.main_build");
         Component jobs = Component.translatable("hud.wrights.main_jobs");
         Component manage = Component.translatable("hud.wrights.main_manage");
@@ -318,7 +319,9 @@ public final class WrightsHud {
         width = Math.max(width, minecraft.font.width(link) + minecraft.font.width(selected) + 36);
         int row = 18;
         int textWidth = width - 24;
-        int footer = footerHeight(minecraft, how, textWidth);
+        int howHeight = footerHeight(minecraft, how, textWidth);
+        int undoHeight = footerHeight(minecraft, undo, textWidth);
+        int footer = howHeight + undoHeight;
         int height = 28 + row * 5 + footer;
         int x = (graphics.guiWidth() - width) / 2;
         int y = graphics.guiHeight() / 2 + 8;
@@ -332,7 +335,9 @@ public final class WrightsHud {
         drawMainRow(graphics, minecraft, x, y + 24 + row * 2, width, WrightsClientState.mode == WrightsClientState.Mode.MANAGE, manage, selected);
         drawMainRow(graphics, minecraft, x, y + 24 + row * 3, width, WrightsClientState.mode == WrightsClientState.Mode.INFO, info, selected);
         drawMainRow(graphics, minecraft, x, y + 24 + row * 4, width, WrightsClientState.mode == WrightsClientState.Mode.LINK, link, selected);
-        drawFooter(graphics, minecraft, how, x + 12, y + height - footer + 4, textWidth, WrightsUi.MUTED);
+        int footY = y + height - footer + 4;
+        drawFooter(graphics, minecraft, how, x + 12, footY, textWidth, WrightsUi.MUTED);
+        drawFooter(graphics, minecraft, undo, x + 12, footY + howHeight - 4, textWidth, 0xFFF0C14A);
     }
 
     private static void drawMainRow(GuiGraphics graphics, Minecraft minecraft, int x, int y, int width, boolean on, Component label, Component selected) {

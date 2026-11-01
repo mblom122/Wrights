@@ -589,6 +589,8 @@
   "hud.wrights.link_explain": "Right-click an RS Controller to link it.",
   "hud.wrights.link_targets": "AE2: put the controller in a wireless access point.",
   "hud.wrights.main_how": "Ctrl, Shift, and scroll to change mode.",
+  "hud.wrights.main_undo": "Right-click — undo the last finished build.",
+  "message.wrights.no_undo_job": "No finished build left to undo",
   "hud.wrights.tool_build": "Use template",
   "hud.wrights.tool_new": "New template",
   "hud.wrights.tool_bind": "Bind inventory",
