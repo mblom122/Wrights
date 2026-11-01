@@ -1244,9 +1244,18 @@ public final class JobManager {
                 anchorX,
                 anchorY,
                 anchorZ);
+        // Bake creation choices into the blueprint so the next place starts from them,
+        // not from whatever the player last toggled in the UI.
+        boolean placeFluids = job.copyFluids();
+        boolean voidBlocks = false;
+        boolean voidFluids = false;
+        boolean voidNbt = false;
         if (previous != null) {
-            schematic = schematic.withPaste(previous.placeFluids(), previous.voidBlocks(), previous.voidFluids(), previous.voidNbt());
+            voidBlocks = previous.voidBlocks();
+            voidFluids = previous.voidFluids();
+            voidNbt = previous.voidNbt();
         }
+        schematic = schematic.withPaste(placeFluids, voidBlocks, voidFluids, voidNbt);
         schematic = applyCopyTurns(schematic, job.copyTurns());
         library.putSchematic(schematic);
         job.setResultSchematicId(schematic.id());

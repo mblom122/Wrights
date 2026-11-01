@@ -438,6 +438,7 @@ public class BlueprintAdjustScreen extends Screen {
             return;
         }
         if (savedKey != null && savedKey.equals(fingerprint()) && WrightsClientState.editingId != null) {
+            WrightsClientState.markRestorePlacement();
             PacketDistributor.sendToServer(new BlueprintPayloads.BeginBuild(WrightsClientState.editingId));
             return;
         }

@@ -63,6 +63,8 @@ public final class WrightsClientState {
     public static boolean libraryGlobal;
     public static UUID selected;
     public static UUID buildId;
+    /** Next build preview should reload this blueprint's saved paste / NBT place toggles. */
+    private static boolean restorePlacementPending;
     public static String buildName = "";
     public static int fullX = 1;
     public static int fullY = 1;
@@ -1089,6 +1091,7 @@ public final class WrightsClientState {
         // A chosen blueprint is placed from Use template. Bind inventory is a separate tool.
         bindSupply = false;
         bindFromMenu = false;
+        restorePlacementPending = true;
         updateFlags();
     }
 
@@ -1238,11 +1241,6 @@ public final class WrightsClientState {
         previewConcealed = payload.concealed();
         storedSettings = payload.storedSettings();
         storedAll = payload.storedAll();
-        if (switching) {
-            WrightsClientConfig.setPlaceNbtBlocks(true);
-            WrightsClientConfig.setPlaceNbtSettings(true);
-            WrightsClientConfig.setPlaceNbtAll(true);
-        }
         editPivotX = clamp(payload.anchorX(), editX);
         editPivotY = clamp(payload.anchorY(), editY);
         editPivotZ = clamp(payload.anchorZ(), editZ);
@@ -1277,13 +1275,17 @@ public final class WrightsClientState {
                 follow = true;
                 anchor = lookTarget();
                 deployChosen = false;
-                WrightsClientConfig.setPlaceFluids(payload.placeFluids());
-                WrightsClientConfig.setVoidBlocks(payload.voidBlocks());
-                WrightsClientConfig.setVoidFluids(payload.voidFluids());
-                WrightsClientConfig.setVoidNbt(payload.voidNbt());
+            }
+            // Restore saved paste options when starting/reselecting a blueprint, not on mid-place mesh refreshes.
+            if (restorePlacementPending || !same || !wasBuild) {
+                applySavedPlacementOptions(payload);
+                restorePlacementPending = false;
             }
             cornerA = null;
             cornerB = null;
+        } else if (switching || payload.openEditor()) {
+            applySavedPlacementOptions(payload);
+            restorePlacementPending = false;
         }
         updateFlags();
         if (payload.openEditor()) {
@@ -1302,6 +1304,30 @@ public final class WrightsClientState {
         if (minecraft.screen instanceof PlacementScreen placement) {
             placement.refresh();
         }
+    }
+
+    /**
+     * Load place/void/NBT toggles from the blueprint payload. Session-only changes stay until the next
+     * start; they are not written back to the blueprint unless the player saves it.
+     */
+    private static void applySavedPlacementOptions(BlueprintPayloads.Preview payload) {
+        WrightsClientConfig.setPlaceFluids(payload.placeFluids());
+        WrightsClientConfig.setVoidBlocks(payload.voidBlocks());
+        WrightsClientConfig.setVoidFluids(payload.voidFluids());
+        WrightsClientConfig.setVoidNbt(payload.voidNbt());
+        WrightsClientConfig.setPlaceNbtBlocks(true);
+        // placeAll and placeSettings clear each other — prefer a full copy when the blueprint has one.
+        if (payload.storedAll()) {
+            WrightsClientConfig.setPlaceNbtAll(true);
+        } else {
+            WrightsClientConfig.setPlaceNbtAll(false);
+            WrightsClientConfig.setPlaceNbtSettings(payload.storedSettings());
+        }
+    }
+
+    /** Call before BeginBuild so a reselected blueprint restores its saved options. */
+    public static void markRestorePlacement() {
+        restorePlacementPending = true;
     }
 
     public static int placeableBlocks() {
