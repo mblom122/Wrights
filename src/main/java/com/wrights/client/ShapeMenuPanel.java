@@ -154,27 +154,38 @@ final class ShapeMenuPanel {
             drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_HEIGHT.get(), SLIDER_HEIGHT);
             y += 18;
         }
-        // Axis = height direction; Rotation = world yaw around the pin (also Ctrl+scroll).
+        // Shape keeps Axis/Rotation. Exchange skips that whole Orientation block.
+        if (!exchangeMode) {
+            y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
+                    "menu.wrights.shape_section_orientation", "menu.wrights.shape_section_orientation_hint", false);
+            drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_axis", "menu.wrights.shape_axis_hint");
+            y += 12;
+            y = drawTriple(graphics, mouseX, mouseY, x, y, leftW,
+                    WrightsClientConfig.SHAPE_PLANE.get(),
+                    "menu.wrights.shape_axis_y",
+                    "menu.wrights.shape_axis_z",
+                    "menu.wrights.shape_axis_x",
+                    "plane");
+            y += 4;
+            drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_rotation", "menu.wrights.shape_rotation_hint");
+            y += 12;
+            y = drawQuad(graphics, mouseX, mouseY, x, y, leftW,
+                    Shapes.clampYaw(WrightsClientConfig.SHAPE_YAW.get()),
+                    "menu.wrights.shape_rot_0",
+                    "menu.wrights.shape_rot_90",
+                    "menu.wrights.shape_rot_180",
+                    "menu.wrights.shape_rot_270",
+                    "rotation");
+        }
+        // Materials / Replace with sit above Build so exchange setup is filter → place options.
         y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
-                "menu.wrights.shape_section_orientation", "menu.wrights.shape_section_orientation_hint", false);
-        drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_axis", "menu.wrights.shape_axis_hint");
-        y += 12;
-        y = drawTriple(graphics, mouseX, mouseY, x, y, leftW,
-                WrightsClientConfig.SHAPE_PLANE.get(),
-                "menu.wrights.shape_axis_y",
-                "menu.wrights.shape_axis_z",
-                "menu.wrights.shape_axis_x",
-                "plane");
-        y += 4;
-        drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_rotation", "menu.wrights.shape_rotation_hint");
-        y += 12;
-        y = drawQuad(graphics, mouseX, mouseY, x, y, leftW,
-                Shapes.clampYaw(WrightsClientConfig.SHAPE_YAW.get()),
-                "menu.wrights.shape_rot_0",
-                "menu.wrights.shape_rot_90",
-                "menu.wrights.shape_rot_180",
-                "menu.wrights.shape_rot_270",
-                "rotation");
+                exchangeMode ? "menu.wrights.exchange_to" : "menu.wrights.shape_materials",
+                exchangeMode ? "menu.wrights.exchange_to_hint" : "menu.wrights.shape_materials_hint",
+                false);
+        y = drawMaterials(graphics, mouseX, mouseY, x, y, leftW);
+        y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
+                "menu.wrights.shape_priority", "menu.wrights.shape_priority_hint", false);
+        y = drawPriority(graphics, mouseX, mouseY, x, y, leftW);
         y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
                 "menu.wrights.shape_section_build", "menu.wrights.shape_section_build_hint", false);
         drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_place", "menu.wrights.shape_place_hint");
@@ -203,18 +214,21 @@ final class ShapeMenuPanel {
             y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_LOOK_LOCK.get(),
                     "menu.wrights.shape_look_lock", "menu.wrights.shape_look_lock_hint", "look_lock");
         }
-        drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_pivot", "menu.wrights.shape_pivot_hint");
-        y += 12;
-        graphics.drawString(font,
-                font.plainSubstrByWidth(ShapePivotScreen.pivotSummary(WrightsClientConfig.SHAPE_PIVOT.get()).getString(), Math.max(24, leftW - 8)),
-                x, y, WrightsUi.MUTED, false);
-        y += 12;
-        boolean pivotHover = mouseX >= x && mouseX < x + leftW && mouseY >= y && mouseY < y + 18;
-        WrightsUi.choice(graphics, x, y, leftW, 18, false, pivotHover);
-        graphics.drawCenteredString(font, Component.translatable("menu.wrights.shape_pivot_btn"), x + leftW / 2, y + 5, WrightsUi.TEXT);
-        hits.add(new Hit(x, y, leftW, 18, "pivot", 0));
-        y += 22;
-        if (WrightsConfig.allowShapeHollow()) {
+        // Pivot stays for Shape; Exchange pins with the default look/anchor flow.
+        if (!exchangeMode) {
+            drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_pivot", "menu.wrights.shape_pivot_hint");
+            y += 12;
+            graphics.drawString(font,
+                    font.plainSubstrByWidth(ShapePivotScreen.pivotSummary(WrightsClientConfig.SHAPE_PIVOT.get()).getString(), Math.max(24, leftW - 8)),
+                    x, y, WrightsUi.MUTED, false);
+            y += 12;
+            boolean pivotHover = mouseX >= x && mouseX < x + leftW && mouseY >= y && mouseY < y + 18;
+            WrightsUi.choice(graphics, x, y, leftW, 18, false, pivotHover);
+            graphics.drawCenteredString(font, Component.translatable("menu.wrights.shape_pivot_btn"), x + leftW / 2, y + 5, WrightsUi.TEXT);
+            hits.add(new Hit(x, y, leftW, 18, "pivot", 0));
+            y += 22;
+        }
+        if (!exchangeMode && WrightsConfig.allowShapeHollow()) {
             y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_HOLLOW.get(), "menu.wrights.shape_hollow", "menu.wrights.shape_hollow_hint", "hollow");
         }
         if (exchangeMode) {
@@ -227,19 +241,12 @@ final class ShapeMenuPanel {
                     exchangeMode ? "menu.wrights.exchange_void_hint" : "menu.wrights.shape_void_hint",
                     "void");
         }
-        if (WrightsConfig.allowShapeAnchor()) {
+        // Anchor status/editor only when Build at is On anchor (Shape and Exchange).
+        if (useAnchor) {
             y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
                     "menu.wrights.shape_anchor_section", "menu.wrights.shape_anchor_section_hint", false);
             y = drawStatus(graphics, mouseX, mouseY, x, y, leftW);
         }
-        y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
-                exchangeMode ? "menu.wrights.exchange_to" : "menu.wrights.shape_materials",
-                exchangeMode ? "menu.wrights.exchange_to_hint" : "menu.wrights.shape_materials_hint",
-                false);
-        y = drawMaterials(graphics, mouseX, mouseY, x, y, leftW);
-        y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
-                "menu.wrights.shape_priority", "menu.wrights.shape_priority_hint", false);
-        y = drawPriority(graphics, mouseX, mouseY, x, y, leftW);
         contentH = y - (viewTop - scroll) + 8;
         graphics.disableScissor();
         if (contentH > viewH) {
