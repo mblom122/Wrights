@@ -79,7 +79,6 @@ final class ShapeMenuPanel {
         y = drawKinds(graphics, mouseX, mouseY, x, y, width);
         y += 4;
         Shapes.Kind kind = Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
-        boolean volume = kind.volume();
         boolean ring = kind == Shapes.Kind.RING;
         boolean box = kind == Shapes.Kind.CUBE;
         boolean cylinder = kind == Shapes.Kind.CYLINDER;
@@ -126,19 +125,26 @@ final class ShapeMenuPanel {
             graphics.drawString(font, Integer.toString(height), x + sizeW + 8, y, WrightsUi.TEXT, false);
             y += 18;
         }
-        // Plane orients 2D shapes, ring/line beams, and the flat-square box shortcut (height 1).
-        boolean showPlane = !volume || ring || line || (box && WrightsClientConfig.SHAPE_HEIGHT.get() <= 1);
-        if (showPlane) {
-            drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_plane", "menu.wrights.shape_plane_hint");
-            y += 12;
-            y = drawTriple(graphics, mouseX, mouseY, x, y, width,
-                    WrightsClientConfig.SHAPE_PLANE.get(),
-                    "menu.wrights.shape_plane_xz",
-                    "menu.wrights.shape_plane_xy",
-                    "menu.wrights.shape_plane_yz",
-                    "plane");
-            y += 4;
-        }
+        // Axis = height direction; Rotation = quarter-turns around that axis (also Ctrl+scroll).
+        drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_axis", "menu.wrights.shape_axis_hint");
+        y += 12;
+        y = drawTriple(graphics, mouseX, mouseY, x, y, width,
+                WrightsClientConfig.SHAPE_PLANE.get(),
+                "menu.wrights.shape_axis_y",
+                "menu.wrights.shape_axis_z",
+                "menu.wrights.shape_axis_x",
+                "plane");
+        y += 4;
+        drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_rotation", "menu.wrights.shape_rotation_hint");
+        y += 12;
+        y = drawQuad(graphics, mouseX, mouseY, x, y, width,
+                Shapes.clampYaw(WrightsClientConfig.SHAPE_YAW.get()),
+                "menu.wrights.shape_rot_0",
+                "menu.wrights.shape_rot_90",
+                "menu.wrights.shape_rot_180",
+                "menu.wrights.shape_rot_270",
+                "rotation");
+        y += 4;
         drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_place", "menu.wrights.shape_place_hint");
         y += 12;
         boolean useAnchor = WrightsConfig.allowShapeAnchor() && WrightsClientConfig.SHAPE_USE_ANCHOR.get();
@@ -274,6 +280,10 @@ final class ShapeMenuPanel {
             }
             case "plane" -> {
                 WrightsClientConfig.setShapePlane(value);
+                yield true;
+            }
+            case "rotation" -> {
+                WrightsClientConfig.setShapeYaw(value);
                 yield true;
             }
             case "place" -> {
@@ -798,6 +808,16 @@ final class ShapeMenuPanel {
         drawChoice(graphics, mouseX, mouseY, x, y, w, 22, selected == 0, a, id, 0);
         drawChoice(graphics, mouseX, mouseY, x + w + gap, y, w, 22, selected == 1, b, id, 1);
         drawChoice(graphics, mouseX, mouseY, x + (w + gap) * 2, y, x + width - (x + (w + gap) * 2), 22, selected == 2, c, id, 2);
+        return y + 26;
+    }
+
+    private int drawQuad(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width, int selected, String a, String b, String c, String d, String id) {
+        int gap = 4;
+        int w = Math.max(28, (width - gap * 3) / 4);
+        drawChoice(graphics, mouseX, mouseY, x, y, w, 22, selected == 0, a, id, 0);
+        drawChoice(graphics, mouseX, mouseY, x + w + gap, y, w, 22, selected == 1, b, id, 1);
+        drawChoice(graphics, mouseX, mouseY, x + (w + gap) * 2, y, w, 22, selected == 2, c, id, 2);
+        drawChoice(graphics, mouseX, mouseY, x + (w + gap) * 3, y, x + width - (x + (w + gap) * 3), 22, selected == 3, d, id, 3);
         return y + 26;
     }
 

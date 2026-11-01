@@ -47,10 +47,16 @@ public final class Shapes {
         }
     }
 
-    /** Flat shapes sit on this plane. 0 = XZ, 1 = XY, 2 = YZ. */
+    /**
+     * Height / extrusion axis (cross-section is the other two).
+     * 0 = Y upright (XZ), 1 = Z (XY), 2 = X (YZ). Same ids as the old plane control.
+     */
     public static final int PLANE_XZ = 0;
     public static final int PLANE_XY = 1;
     public static final int PLANE_YZ = 2;
+    public static final int AXIS_Y = PLANE_XZ;
+    public static final int AXIS_Z = PLANE_XY;
+    public static final int AXIS_X = PLANE_YZ;
 
     private Shapes() {
     }
@@ -88,10 +94,11 @@ public final class Shapes {
 
     /**
      * @param height box / cylinder / pyramid / dome height (box height 1 = flat square); for rings, tube diameter (1 = flat)
-     * @param thickness ring band width; for lines, square cross-section side length (1 = single-block line)
-     * @param yaw quarter-turns around Y through {@code center} (0–3)
+     * @param thickness ring band width; for lines, beam width in the cross-section
+     * @param axis height axis: {@link #AXIS_Y}, {@link #AXIS_Z}, or {@link #AXIS_X}
+     * @param rotation quarter-turns around the height axis (0–3), Ctrl+scroll in the world
      */
-    public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, int thickness, boolean hollow, int plane, boolean flipVertical, int yaw) {
+    public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, int thickness, boolean hollow, int axis, boolean flipVertical, int rotation) {
         List<BlockPos> out = new ArrayList<>();
         if (center == null || kind == null) {
             return out;
@@ -99,17 +106,17 @@ public final class Shapes {
         int r = clampSize(size);
         int h = clampHeight(height);
         int band = clampHeight(thickness);
-        int flat = clampPlane(plane);
+        // Always build Y-up / XZ cross-section, then orient with axis + rotation.
         switch (kind) {
-            case CIRCLE -> disk(out, center, r, hollow, flat, false);
-            case RING -> ring(out, center, r, band, h, flat, hollow);
-            case SQUARE -> square(out, center, r, hollow, flat);
-            case LINE -> squareLine(out, center, r, band, h, hollow, flat);
+            case CIRCLE -> disk(out, center, r, hollow, AXIS_Y, false);
+            case RING -> ring(out, center, r, band, h, AXIS_Y, hollow);
+            case SQUARE -> square(out, center, r, hollow, AXIS_Y);
+            case LINE -> squareLine(out, center, r, band, h, hollow, AXIS_Y);
             case SPHERE -> sphere(out, center, r, hollow);
             case CUBE -> {
-                // Height 1 is the old Square (plane chooses floor/wall). Taller is a rectangular box.
+                // Height 1 is the old Square. Taller is a rectangular box.
                 if (h <= 1) {
-                    square(out, center, r, hollow, flat);
+                    square(out, center, r, hollow, AXIS_Y);
                 } else {
                     box(out, center, r, h, hollow);
                 }
@@ -125,24 +132,54 @@ public final class Shapes {
                 out.set(i, new BlockPos(pos.getX(), cy - (pos.getY() - cy), pos.getZ()));
             }
         }
-        int turns = clampYaw(yaw);
-        if (turns != 0) {
-            int cx = center.getX();
-            int cz = center.getZ();
-            for (int i = 0; i < out.size(); i++) {
-                BlockPos pos = out.get(i);
-                int dx = pos.getX() - cx;
-                int dz = pos.getZ() - cz;
-                for (int t = 0; t < turns; t++) {
-                    int nextX = dz;
-                    int nextZ = -dx;
-                    dx = nextX;
-                    dz = nextZ;
-                }
-                out.set(i, new BlockPos(cx + dx, pos.getY(), cz + dz));
-            }
-        }
+        orient(out, center, clampPlane(axis), clampYaw(rotation));
         return out;
+    }
+
+    /**
+     * Rotate around local Y, then map local Y (height) onto the chosen world axis.
+     * Axis ids match the old plane control: Y={@link #AXIS_Y}, Z={@link #AXIS_Z}, X={@link #AXIS_X}.
+     */
+    private static void orient(List<BlockPos> out, BlockPos center, int axis, int rotation) {
+        if (out.isEmpty() || (axis == AXIS_Y && rotation == 0)) {
+            return;
+        }
+        int cx = center.getX();
+        int cy = center.getY();
+        int cz = center.getZ();
+        for (int i = 0; i < out.size(); i++) {
+            BlockPos pos = out.get(i);
+            int x = pos.getX() - cx;
+            int y = pos.getY() - cy;
+            int z = pos.getZ() - cz;
+            for (int t = 0; t < rotation; t++) {
+                int nextX = z;
+                int nextZ = -x;
+                x = nextX;
+                z = nextZ;
+            }
+            int wx;
+            int wy;
+            int wz;
+            switch (axis) {
+                case AXIS_Z -> { // local Y -> world Z  (x,y,z) -> (x,z,y)
+                    wx = x;
+                    wy = z;
+                    wz = y;
+                }
+                case AXIS_X -> { // local Y -> world X  (x,y,z) -> (y,x,z)
+                    wx = y;
+                    wy = x;
+                    wz = z;
+                }
+                default -> {
+                    wx = x;
+                    wy = y;
+                    wz = z;
+                }
+            }
+            out.set(i, new BlockPos(cx + wx, cy + wy, cz + wz));
+        }
     }
 
     /**

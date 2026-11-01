@@ -520,26 +520,8 @@ public final class WrightsInput {
             return;
         }
         if (control) {
-            // Shape tool: Ctrl+scroll tips plane-based shapes onto the next plane (floor ↔ walls).
+            // Shape tool: Ctrl+scroll turns the shape 90° around its height axis.
             if (WrightsClientState.shapeToolActive() && com.wrights.WrightsConfig.allowShape()) {
-                com.wrights.blueprint.Shapes.Kind kind =
-                        com.wrights.blueprint.Shapes.Kind.byId(com.wrights.WrightsClientConfig.SHAPE_KIND.get());
-                boolean flatBox = kind == com.wrights.blueprint.Shapes.Kind.CUBE
-                        && com.wrights.WrightsClientConfig.SHAPE_HEIGHT.get() <= 1;
-                boolean planeShape = !kind.volume()
-                        || flatBox
-                        || kind == com.wrights.blueprint.Shapes.Kind.RING
-                        || kind == com.wrights.blueprint.Shapes.Kind.LINE;
-                if (planeShape) {
-                    int plane = com.wrights.WrightsClientConfig.SHAPE_PLANE.get();
-                    int next = event.getScrollDeltaY() > 0.0D
-                            ? (plane + 1) % 3
-                            : Math.floorMod(plane - 1, 3);
-                    com.wrights.WrightsClientConfig.setShapePlane(next);
-                    event.setCanceled(true);
-                    return;
-                }
-                // Volume shapes: yaw the whole box 90° around Y (same idea as templates).
                 int yaw = com.wrights.WrightsClientConfig.SHAPE_YAW.get();
                 int nextYaw = event.getScrollDeltaY() > 0.0D
                         ? (yaw + 1) & 3

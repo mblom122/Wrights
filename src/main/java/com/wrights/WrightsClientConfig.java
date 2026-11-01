@@ -214,10 +214,10 @@ public final class WrightsClientConfig {
             .comment("Ring band / line width. Server maxShapeAxis still caps the real build.")
             .defineInRange("shapeThickness", 1, 1, 512);
     public static final ModConfigSpec.IntValue SHAPE_PLANE = BUILDER
-            .comment("Flat-shape plane. 0 XZ, 1 XY, 2 YZ.")
+            .comment("Shape height axis. 0 = Y upright, 1 = Z, 2 = X.")
             .defineInRange("shapePlane", 0, 0, 2);
     public static final ModConfigSpec.IntValue SHAPE_YAW = BUILDER
-            .comment("Quarter-turns of the shape around Y (0–3). Used by volume shapes and Ctrl+scroll.")
+            .comment("Quarter-turns around the height axis (0–3). Ctrl+scroll in the world.")
             .defineInRange("shapeYaw", 0, 0, 3);
     public static final ModConfigSpec.BooleanValue SHAPE_HOLLOW = BUILDER
             .define("shapeHollow", false);
