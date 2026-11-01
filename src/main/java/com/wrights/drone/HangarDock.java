@@ -29,11 +29,11 @@ public final class HangarDock {
             return;
         }
         if (hangar.placed()) {
-            ServerLevel level = player.getServer() == null ? null : player.getServer().getLevel(hangar.dimension);
-            if (level == null || hangar.pos == null || !level.isLoaded(hangar.pos)) {
+            ServerLevel level = player.getServer() == null ? null : player.getServer().getLevel(hangar.dimension());
+            if (level == null || hangar.pos() == null || !level.isLoaded(hangar.pos())) {
                 return;
             }
-            spawn(player, level, hangar.pos, tiers);
+            spawn(player, level, hangar.pos(), tiers);
             return;
         }
         if (!(player.level() instanceof ServerLevel level)) {
