@@ -935,7 +935,7 @@
   "menu.wrights.shape_void": "Clear first",
   "menu.wrights.shape_void_hint": "Wrights clear mismatched blocks inside the shape before placing.",
   "menu.wrights.shape_materials": "Materials used",
-  "menu.wrights.shape_materials_hint": "Plain blocks only — no chests or other NBT blocks. Random uses weights. Priority and Order use left-to-right list order. At least one is required.",
+  "menu.wrights.shape_materials_hint": "Plain blocks only — no chests or other NBT blocks. Pick from the list or drag a block from JEI onto the panel. Random uses weights. Priority and Order use left-to-right list order. At least one is required.",
   "menu.wrights.shape_materials_empty": "Add at least one block",
   "menu.wrights.shape_materials_pick": "Pick blocks",
   "menu.wrights.shape_fill_random": "Random",
