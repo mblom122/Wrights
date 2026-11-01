@@ -60,6 +60,10 @@ public class WrightsMenuScreen extends Screen {
     private int detailX;
     private int detailY;
     private int detailW;
+    private int detailScroll;
+    private int detailBodyH;
+    private int detailContentH;
+    private int detailFooterH;
     private int scroll;
     private UUID confirmDelete;
     private final List<UUID> marked = new ArrayList<>();
@@ -434,8 +438,10 @@ public class WrightsMenuScreen extends Screen {
         if (listW < 120) {
             listW = Math.max(100, (panelW - 150) / 2);
         }
-        detailH = Math.max(ROW, panelH - 128);
-        listH = Math.max(ROW, detailH - 16);
+        // Detail runs to the panel foot so Build/Close stay inside the card.
+        detailFooterH = 24;
+        detailH = Math.max(ROW + detailFooterH + 8, panelY + panelH - 8 - listY);
+        listH = Math.max(ROW, detailH - detailFooterH - 20);
         detailX = listX + listW + 8;
         detailY = listY;
         detailW = panelX + panelW - 12 - detailX;
@@ -444,7 +450,10 @@ public class WrightsMenuScreen extends Screen {
             detailX = listX + listW + 8;
             detailW = panelX + panelW - 12 - detailX;
         }
-        detailSplit = detailY + detailH / 2;
+        detailBodyH = Math.max(40, detailH - detailFooterH - 4);
+        detailScroll = Mth.clamp(detailScroll, 0, Math.max(0, detailContentH - detailBodyH));
+        int modelPrefer = Math.min(Math.max(56, detailBodyH / 2), Math.max(56, detailBodyH - 110));
+        detailSplit = detailY + 4 - detailScroll + modelPrefer + 6;
     }
 
     public void refresh() {
@@ -564,22 +573,7 @@ public class WrightsMenuScreen extends Screen {
         if (previewButton != null) {
             previewButton.active = tool;
         }
-        if (materialsButton != null) {
-            materialsButton.visible = building;
-            materialsButton.active = blueprint && marked.size() <= 1;
-            materialsButton.setX(detailX + 4);
-            materialsButton.setY(detailSplit + 72);
-            materialsButton.setWidth(Math.max(40, detailW - 8));
-        }
-        if (rename != null) {
-            rename.setX(detailX + 4);
-            rename.setY(detailSplit + 52);
-            rename.setWidth(Math.max(40, detailW - 86));
-        }
-        if (renameButton != null) {
-            renameButton.setX(detailX + Math.max(48, detailW - 78));
-            renameButton.setY(detailSplit + 52);
-        }
+        syncDetailScrollLayout(building, blueprint && marked.size() <= 1);
         if (previewButton.visible) {
             discardButton.visible = false;
         }
@@ -664,6 +658,11 @@ public class WrightsMenuScreen extends Screen {
             if (open) {
                 manage.layoutChrome(manageHost);
             }
+        }
+        boolean blueprints = !options && !jobsPage && !infoPage && !managePage && !mirrorPage;
+        if (blueprints) {
+            BlueprintList.Row row = selectedRow();
+            syncDetailScrollLayout(true, row != null && !row.folder() && marked.size() <= 1);
         }
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, Component.translatable("menu.wrights.title"), panelX + 16, panelY + 10, WrightsUi.COPPER, false);
@@ -1605,7 +1604,9 @@ public class WrightsMenuScreen extends Screen {
         mirrorBodyX = x;
         mirrorBodyW = w;
         mirrorViewTop = panelY + 40;
-        mirrorViewH = Math.max(40, panelY + panelH - 10 - mirrorViewTop);
+        // Keep Clear anchor and the rest above the shared Close button.
+        int closeTop = closeButton != null && closeButton.visible ? closeButton.getY() - 6 : panelY + panelH - 28;
+        mirrorViewH = Math.max(40, closeTop - mirrorViewTop);
         mirrorScroll = Mth.clamp(mirrorScroll, 0, Math.max(0, mirrorContentH - mirrorViewH));
         graphics.enableScissor(x - 4, mirrorViewTop, x + w + 4, mirrorViewTop + mirrorViewH);
         int y = mirrorViewTop - mirrorScroll;
@@ -2180,19 +2181,56 @@ public class WrightsMenuScreen extends Screen {
         }
     }
 
+    /** Keeps the preview/info stack and Materials button aligned with detail scroll. */
+    private void syncDetailScrollLayout(boolean buildingPage, boolean materialsActive) {
+        int bar = detailContentH > detailBodyH ? 8 : 0;
+        int modelPrefer = Math.min(Math.max(56, detailBodyH / 2), Math.max(56, detailBodyH - 110));
+        modelX = detailX + 4;
+        modelW = Math.max(8, detailW - 8 - bar);
+        modelH = modelPrefer;
+        detailContentH = modelPrefer + 6 + 72 + 18;
+        detailScroll = Mth.clamp(detailScroll, 0, Math.max(0, detailContentH - detailBodyH));
+        modelY = detailY + 4 - detailScroll;
+        detailSplit = modelY + modelH + 6;
+        int nameY = detailSplit + 52;
+        int materialsY = detailSplit + 72;
+        boolean nameIn = nameY + 14 > detailY && nameY < detailY + detailBodyH;
+        boolean materialsIn = materialsY + 16 > detailY && materialsY < detailY + detailBodyH;
+        if (rename != null) {
+            rename.setX(detailX + 4);
+            rename.setY(nameY);
+            rename.setWidth(Math.max(40, detailW - 86 - bar));
+            rename.visible = buildingPage && nameIn;
+        }
+        if (renameButton != null) {
+            renameButton.setX(detailX + Math.max(48, detailW - 78 - bar));
+            renameButton.setY(nameY);
+            renameButton.visible = buildingPage && nameIn;
+        }
+        if (materialsButton != null) {
+            materialsButton.setX(detailX + 4);
+            materialsButton.setY(materialsY);
+            materialsButton.setWidth(Math.max(40, detailW - 8 - bar));
+            materialsButton.active = materialsActive;
+            materialsButton.visible = buildingPage && materialsIn;
+        }
+    }
+
     private void renderDetail(GuiGraphics graphics) {
         BlueprintList.Row picked = selectedRow();
-        modelX = detailX + 4;
-        modelY = detailY + 4;
-        modelW = Math.max(8, detailW - 8);
-        modelH = Math.max(8, detailSplit - detailY - 10);
+        int bar = detailContentH > detailBodyH ? 8 : 0;
+        syncDetailScrollLayout(true, picked != null && !picked.folder() && marked.size() <= 1);
+        graphics.enableScissor(detailX, detailY, detailX + detailW, detailY + detailBodyH);
         if (picked != null && picked.folder()) {
             renderFolder(graphics, picked);
+            graphics.disableScissor();
+            WrightsUi.scrollBar(graphics, detailX + detailW - 4, detailY + 2, detailBodyH - 4, detailScroll, detailContentH);
             return;
         }
         BlueprintPayloads.Summary summary = picked == null ? null : picked.summary();
         if (summary == null) {
             graphics.drawString(this.font, Component.translatable("menu.wrights.detail_empty"), detailX + 4, detailY + 8, WrightsUi.MUTED, false);
+            graphics.disableScissor();
             return;
         }
         if (!summary.id().equals(spinId)) {
@@ -2218,16 +2256,22 @@ public class WrightsMenuScreen extends Screen {
         if (ready && WrightsClientState.previewSampled) {
             graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("screen.wrights.sampled").getString(), modelW), modelX, modelY + 2, WrightsUi.MUTED, false);
         }
-        graphics.fill(detailX + 4, detailSplit, detailX + detailW - 4, detailSplit + 1, 0xFF31404E);
+        graphics.fill(detailX + 4, detailSplit, detailX + detailW - 4 - bar, detailSplit + 1, 0xFF31404E);
         int info = detailSplit + 4;
-        graphics.drawString(this.font, this.font.plainSubstrByWidth(summary.name(), detailW - 8), detailX + 4, info, WrightsUi.TEXT, false);
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(summary.name(), modelW), detailX + 4, info, WrightsUi.TEXT, false);
         graphics.drawString(this.font, Component.translatable("menu.wrights.size", summary.sizeX(), summary.sizeY(), summary.sizeZ()), detailX + 4, info + 10, WrightsUi.BLUE, false);
         long box = (long) summary.sizeX() * summary.sizeY() * summary.sizeZ();
-        graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("menu.wrights.blocks", box, summary.blocks()).getString(), detailW - 8), detailX + 4, info + 20, WrightsUi.MUTED, false);
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("menu.wrights.blocks", box, summary.blocks()).getString(), modelW), detailX + 4, info + 20, WrightsUi.MUTED, false);
         if (!summary.source().isEmpty()) {
-            graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("menu.wrights.source", summary.source()).getString(), detailW - 8), detailX + 4, info + 30, WrightsUi.MUTED, false);
+            graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("menu.wrights.source", summary.source()).getString(), modelW), detailX + 4, info + 30, WrightsUi.MUTED, false);
         }
         graphics.drawString(this.font, Component.translatable("screen.wrights.name"), detailX + 4, detailSplit + 42, WrightsUi.MUTED, false);
+        graphics.disableScissor();
+        WrightsUi.scrollBar(graphics, detailX + detailW - 4, detailY + 2, detailBodyH - 4, detailScroll, detailContentH);
+    }
+
+    private boolean insideDetailBody(double mouseX, double mouseY) {
+        return mouseX >= detailX && mouseX < detailX + detailW && mouseY >= detailY && mouseY < detailY + detailBodyH;
     }
 
     private void ensureModel(BlueprintPayloads.Summary summary) {
@@ -2761,8 +2805,13 @@ public class WrightsMenuScreen extends Screen {
         }
         closeButton.visible = true;
         if (blueprintPage) {
+            int footY = detailY + detailH - detailFooterH + 2;
             closeButton.setX(detailX + detailW - closeButton.getWidth());
-            closeButton.setY(panelY + panelH - 26);
+            closeButton.setY(footY);
+            if (buildButton != null) {
+                buildButton.setX(detailX + detailW - 120);
+                buildButton.setY(footY);
+            }
             return;
         }
         int right = panelX + panelW - 12;
@@ -2827,12 +2876,20 @@ public class WrightsMenuScreen extends Screen {
         workGroupH = workBlock;
         workHeaderY = workGroupY + 2;
         workListY = workGroupY + JOB_HEADER + 4;
-        workRows = workOpen ? Math.max(1, (workBlock - JOB_HEADER - 8) / jobStride) : 0;
+        int workListH = Math.max(0, workBlock - JOB_HEADER - 8);
+        workRows = workOpen ? Math.max(0, workListH / jobStride) : 0;
+        if (workOpen && workRows == 0 && workListH >= 36) {
+            workRows = 1;
+        }
         doneGroupY = workGroupY + workBlock + gap;
         doneGroupH = doneBlock;
         doneHeaderY = doneGroupY + 2;
         doneListY = doneGroupY + JOB_HEADER + 4;
-        doneRows = doneOpen ? Math.max(1, (doneBlock - JOB_HEADER - 8) / jobStride) : 0;
+        int doneListH = Math.max(0, doneBlock - JOB_HEADER - 8);
+        doneRows = doneOpen ? Math.max(0, doneListH / jobStride) : 0;
+        if (doneOpen && doneRows == 0 && doneListH >= 36) {
+            doneRows = 1;
+        }
         if (!workingJobs.isEmpty()) {
             UUID lead = workingJobs.get(0).id();
             if (leadJob != null && !leadJob.equals(lead)) {
@@ -2894,19 +2951,27 @@ public class WrightsMenuScreen extends Screen {
         if (!workingJobs.isEmpty()) {
             drawJobButton(graphics, workRemoveRight, workHeaderY, "menu.wrights.remove_all", mouseX, mouseY, workRemoveWidth);
             drawJobButton(graphics, workPauseRight, workHeaderY, workAllPaused ? "menu.wrights.resume_all" : "menu.wrights.pause_all", mouseX, mouseY, workPauseWidth);
+            int workClipBottom = workGroupY + workGroupH - 2;
+            graphics.enableScissor(jobX + 2, workListY, jobX + jobW - 2, workClipBottom);
             for (int row = 0; row < workRows && jobScroll + row < workingJobs.size(); row++) {
                 drawJobRow(graphics, mouseX, mouseY, rowX, jobW - 8 - workGutter, workListY + row * jobStride, workingJobs.get(jobScroll + row));
             }
-            drawJobBar(graphics, workListY, workRows * jobStride, jobScroll, workingJobs.size(), workRows, mouseX, mouseY);
+            graphics.disableScissor();
+            int workBarH = Math.max(12, Math.min(workRows * jobStride, workClipBottom - workListY));
+            drawJobBar(graphics, workListY, workBarH, jobScroll, workingJobs.size(), Math.max(1, workRows), mouseX, mouseY);
         }
         Component doneTitle = finishedTitle();
         drawJobGroup(graphics, jobX, doneGroupY, jobW, doneGroupH, doneTitle, finishedJobs.isEmpty() ? Component.translatable("menu.wrights.jobs_finished_empty") : null, finishedJobs.isEmpty() ? 0 : doneRemoveWidth + 14);
         if (!finishedJobs.isEmpty()) {
             drawJobButton(graphics, doneRemoveRight, doneHeaderY, "menu.wrights.remove_all", mouseX, mouseY, doneRemoveWidth);
+            int doneClipBottom = doneGroupY + doneGroupH - 2;
+            graphics.enableScissor(jobX + 2, doneListY, jobX + jobW - 2, doneClipBottom);
             for (int row = 0; row < doneRows && historyScroll + row < finishedJobs.size(); row++) {
                 drawJobRow(graphics, mouseX, mouseY, rowX, jobW - 8 - doneGutter, doneListY + row * jobStride, finishedJobs.get(historyScroll + row));
             }
-            drawJobBar(graphics, doneListY, doneRows * jobStride, historyScroll, finishedJobs.size(), doneRows, mouseX, mouseY);
+            graphics.disableScissor();
+            int doneBarH = Math.max(12, Math.min(doneRows * jobStride, doneClipBottom - doneListY));
+            drawJobBar(graphics, doneListY, doneBarH, historyScroll, finishedJobs.size(), Math.max(1, doneRows), mouseX, mouseY);
         }
         if (hoveredJob != null) {
             drawJobTooltip(graphics, mouseX, mouseY, hoveredJob);
@@ -3360,13 +3425,13 @@ public class WrightsMenuScreen extends Screen {
             PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(new UUID(0L, 0L), BlueprintPayloads.JobControl.REMOVE_DONE));
             return true;
         }
-        if (mouseY >= workListY && mouseY < workListY + workRows * jobStride) {
+        if (mouseY >= workListY && mouseY < Math.min(workListY + workRows * jobStride, workGroupY + workGroupH - 2)) {
             int row = (int) ((mouseY - workListY) / jobStride);
             if (row >= 0 && row < workRows && jobScroll + row < workingJobs.size()) {
                 return clickJobRow(mouseX, mouseY, workListY + row * jobStride, workingJobs.get(jobScroll + row));
             }
         }
-        if (mouseY >= doneListY && mouseY < doneListY + doneRows * jobStride) {
+        if (mouseY >= doneListY && mouseY < Math.min(doneListY + doneRows * jobStride, doneGroupY + doneGroupH - 2)) {
             int row = (int) ((mouseY - doneListY) / jobStride);
             if (row >= 0 && row < doneRows && historyScroll + row < finishedJobs.size()) {
                 return clickJobRow(mouseX, mouseY, doneListY + row * jobStride, finishedJobs.get(historyScroll + row));
@@ -3477,6 +3542,14 @@ public class WrightsMenuScreen extends Screen {
             int max = Math.max(0, mirrorContentH - mirrorViewH);
             mirrorScroll = Mth.clamp(mirrorScroll - (int) Math.signum(scrollY) * 16, 0, max);
             return true;
+        }
+        if (!options && !jobsPage && !infoPage && !managePage && !mirrorPage && insideDetailBody(mouseX, mouseY)) {
+            int max = Math.max(0, detailContentH - detailBodyH);
+            int next = Mth.clamp(detailScroll - (int) Math.signum(scrollY) * 16, 0, max);
+            if (next != detailScroll) {
+                detailScroll = next;
+                return true;
+            }
         }
         if (insideList(mouseX, mouseY)) {
             scroll = Mth.clamp(scroll - (int) Math.signum(scrollY), 0, Math.max(0, rows.size() - visibleRows()));

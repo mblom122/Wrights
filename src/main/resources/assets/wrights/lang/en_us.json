@@ -369,7 +369,7 @@
   "menu.wrights.source": "Saved at %s",
   "menu.wrights.materials": "Materials needed",
   "menu.wrights.materials_title": "Materials needed",
-  "menu.wrights.need_title": "Need these",
+  "menu.wrights.need_title": "Materials needed",
   "menu.wrights.materials_hint": "Player and Inventory are each compared with Need. Total is both together.",
   "menu.wrights.materials_hint_digital": "Player, Inventory, and Digital are each compared with Need. Total is all three together.",
   "menu.wrights.materials_creative": "Creative places these for free.",
