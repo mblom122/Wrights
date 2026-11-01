@@ -3768,6 +3768,35 @@ public final class JobManager {
         return falling(level, schematic, job, entry) != Falling.SKIP;
     }
 
+    /**
+     * Cells that are not skipped forever, but cannot be placed yet (need the block under them,
+     * or another support that is still coming). Distinct from {@link BuildJob#skipped()}.
+     */
+    public static int countHeld(ServerPlayer player, SchematicLibrary library, BuildJob job) {
+        if (job == null || job.finished() || job.undoing() || job.kind() != BuildJob.Kind.PASTE || job.schematicId() == null) {
+            return 0;
+        }
+        Schematic schematic = library.schematic(job.schematicId()).orElse(null);
+        if (schematic == null || player.getServer() == null) {
+            return 0;
+        }
+        ServerLevel level = player.getServer().getLevel(job.dimension());
+        if (level == null) {
+            return 0;
+        }
+        int held = 0;
+        for (int i = 0; i < schematic.blockCount(); i++) {
+            Schematic.Entry entry = schematic.entry(i);
+            if (job.outsideClip(entry) || satisfied(level, job, entry)) {
+                continue;
+            }
+            if (falling(level, schematic, job, entry) == Falling.WAIT) {
+                held++;
+            }
+        }
+        return held;
+    }
+
     private static int countRefunds(BuildJob job, BuildJob.Hand hand) {
         int count = 0;
         for (BuildJob.Slice slice : hand.slices) {
@@ -4190,7 +4219,10 @@ public final class JobManager {
         return PlaceResult.DONE;
     }
 
-    /** Count a skip once and mark the cell settled so wrap-back does not retry it. */
+    /**
+     * Permanent skip for this job (occupied without void, can't survive, etc.).
+     * Soft waits (need floor first) use {@link Falling#WAIT} and do not call this.
+     */
     private static PlaceResult skipCell(ServerPlayer player, BuildJob job, Schematic.Entry entry) {
         boolean first = !job.isSettled(entry.x(), entry.y(), entry.z());
         clearPlacedGhost(player, job, entry);
@@ -4200,7 +4232,7 @@ public final class JobManager {
         return PlaceResult.DONE;
     }
 
-    /** Falling/ground gave up: count once, settle the cell, never ask for it again. */
+    /** Permanent give-up from falling/ground rules. Count once; never retry this cell. */
     private static void giveUpCell(BuildJob job, Schematic.Entry entry, int index) {
         if (job.retire(index)) {
             job.skippedOne();

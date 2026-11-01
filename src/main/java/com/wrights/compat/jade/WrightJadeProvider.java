@@ -7,12 +7,14 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 
 import com.wrights.WrightsMod;
 import com.wrights.drone.WrightTier;
 import com.wrights.entity.DroneEntity;
 import com.wrights.job.BuildJob;
+import com.wrights.job.JobManager;
 import com.wrights.schematic.Schematic;
 import com.wrights.schematic.SchematicLibrary;
 
@@ -46,7 +48,11 @@ public enum WrightJadeProvider implements IEntityComponentProvider, StreamServer
         decodeFromData(accessor).ifPresent(status -> {
             tooltip.add(Component.translatable(status.kind().key(), status.name()));
             int percent = Mth.clamp(status.done() * 100 / Math.max(1, status.total()), 0, 100);
-            tooltip.add(Component.translatable("hud.wrights.job_detail", status.done(), status.total(), percent, status.skipped()));
+            if (status.held() > 0) {
+                tooltip.add(Component.translatable("hud.wrights.job_detail_held", status.done(), status.total(), percent, status.skipped(), status.held()));
+            } else {
+                tooltip.add(Component.translatable("hud.wrights.job_detail", status.done(), status.total(), percent, status.skipped()));
+            }
             tooltip.add(Component.translatable("jade.wrights.size", status.sizeX(), status.sizeY(), status.sizeZ()));
         });
     }
@@ -72,7 +78,7 @@ public enum WrightJadeProvider implements IEntityComponentProvider, StreamServer
         SchematicLibrary library = SchematicLibrary.get(level.getServer());
         for (BuildJob job : library.jobs()) {
             if (job.ownsDrone(drone.getUUID())) {
-                return WrightStatus.from(job, library);
+                return WrightStatus.from(job, library, level);
             }
         }
         return null;
@@ -88,7 +94,7 @@ public enum WrightJadeProvider implements IEntityComponentProvider, StreamServer
         return UID;
     }
 
-    public record WrightStatus(String name, Kind kind, int done, int total, int skipped, int sizeX, int sizeY, int sizeZ) {
+    public record WrightStatus(String name, Kind kind, int done, int total, int skipped, int held, int sizeX, int sizeY, int sizeZ) {
         enum Kind {
             BUILDING("jade.wrights.building"),
             PAUSED("jade.wrights.paused"),
@@ -116,7 +122,7 @@ public enum WrightJadeProvider implements IEntityComponentProvider, StreamServer
             }
         }
 
-        static WrightStatus from(BuildJob job, SchematicLibrary library) {
+        static WrightStatus from(BuildJob job, SchematicLibrary library, ServerLevel level) {
             Kind kind;
             if (job.undoing()) {
                 kind = Kind.UNDOING;
@@ -145,7 +151,9 @@ public enum WrightJadeProvider implements IEntityComponentProvider, StreamServer
                 sizeY = job.spanY();
                 sizeZ = job.spanZ();
             }
-            return new WrightStatus(nameOf(job, library), kind, done, total, job.progressSkipped(), sizeX, sizeY, sizeZ);
+            ServerPlayer player = level.getServer().getPlayerList().getPlayer(job.owner());
+            int held = player == null ? 0 : JobManager.countHeld(player, library, job);
+            return new WrightStatus(nameOf(job, library), kind, done, total, job.progressSkipped(), held, sizeX, sizeY, sizeZ);
         }
 
         private static String nameOf(BuildJob job, SchematicLibrary library) {
@@ -168,6 +176,7 @@ public enum WrightJadeProvider implements IEntityComponentProvider, StreamServer
             buf.writeVarInt(status.done);
             buf.writeVarInt(status.total);
             buf.writeVarInt(status.skipped);
+            buf.writeVarInt(status.held);
             buf.writeVarInt(status.sizeX);
             buf.writeVarInt(status.sizeY);
             buf.writeVarInt(status.sizeZ);
@@ -177,6 +186,7 @@ public enum WrightJadeProvider implements IEntityComponentProvider, StreamServer
             return new WrightStatus(
                     buf.readUtf(48),
                     Kind.byId(buf.readUnsignedByte()),
+                    buf.readVarInt(),
                     buf.readVarInt(),
                     buf.readVarInt(),
                     buf.readVarInt(),

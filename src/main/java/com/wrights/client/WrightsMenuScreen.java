@@ -3255,12 +3255,19 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private String skippedLine(BlueprintPayloads.JobLine job) {
-        if (job.skipped() <= 0 && !(job.finished() && !job.undoing() && !job.undone())) {
-            return "";
-        }
         int total = Math.max(1, job.total());
-        int percent = job.skipped() * 100 / total;
-        return Component.translatable("menu.wrights.job_skipped", job.skipped(), percent).getString();
+        StringBuilder line = new StringBuilder();
+        if (job.skipped() > 0 || (job.finished() && !job.undoing() && !job.undone())) {
+            int percent = job.skipped() * 100 / total;
+            line.append(Component.translatable("menu.wrights.job_skipped", job.skipped(), percent).getString());
+        }
+        if (job.held() > 0 && !job.finished()) {
+            if (!line.isEmpty()) {
+                line.append("  ·  ");
+            }
+            line.append(Component.translatable("menu.wrights.job_held", job.held()).getString());
+        }
+        return line.toString();
     }
 
     private boolean creativeVisit() {

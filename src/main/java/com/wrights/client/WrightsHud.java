@@ -121,8 +121,12 @@ public final class WrightsHud {
                 String time = WrightsClientState.timeLeft(aimed);
                 int percent = WrightsClientState.percent(aimed);
                 sub = time.isEmpty()
-                        ? Component.translatable("hud.wrights.job_detail", aimed.done(), aimed.total(), percent, aimed.skipped())
-                        : Component.translatable("hud.wrights.job_detail_time", aimed.done(), aimed.total(), percent, aimed.skipped(), time);
+                        ? (aimed.held() > 0
+                                ? Component.translatable("hud.wrights.job_detail_held", aimed.done(), aimed.total(), percent, aimed.skipped(), aimed.held())
+                                : Component.translatable("hud.wrights.job_detail", aimed.done(), aimed.total(), percent, aimed.skipped()))
+                        : (aimed.held() > 0
+                                ? Component.translatable("hud.wrights.job_detail_held_time", aimed.done(), aimed.total(), percent, aimed.skipped(), aimed.held(), time)
+                                : Component.translatable("hud.wrights.job_detail_time", aimed.done(), aimed.total(), percent, aimed.skipped(), time));
                 note = WrightsClientState.jobWait(aimed);
             }
         } else if (WrightsClientState.mode == WrightsClientState.Mode.NONE) {

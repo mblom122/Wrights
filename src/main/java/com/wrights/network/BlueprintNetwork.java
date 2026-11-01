@@ -781,6 +781,7 @@ public final class BlueprintNetwork {
                     done,
                     total,
                     job.progressSkipped(),
+                    JobManager.countHeld(player, library, job),
                     job.paused(),
                     job.kind() == BuildJob.Kind.COPY,
                     job.finished(),

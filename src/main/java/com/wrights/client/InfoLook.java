@@ -220,6 +220,9 @@ public final class InfoLook {
             int total = Math.max(1, job.total());
             lines.add(Component.translatable("menu.wrights.job_skipped", job.skipped(), job.skipped() * 100 / total));
         }
+        if (job.held() > 0 && !job.finished()) {
+            lines.add(Component.translatable("menu.wrights.job_held", job.held()));
+        }
         int wanted = Math.max(job.crew().size(), job.quota());
         if (!job.finished() && wanted > 0) {
             lines.add(Component.translatable("hud.wrights.info_wrights", job.drones(), wanted));
