@@ -230,12 +230,16 @@ public final class WrightsHud {
     private enum CtrlHelp {
         NONE,
         RESIZE,
-        ROTATE
+        ROTATE,
+        SIZE
     }
 
     private static CtrlHelp ctrlHelpKind() {
         if (WrightsClientState.mode == WrightsClientState.Mode.CAPTURE && WrightsClientState.hasBox()) {
             return CtrlHelp.RESIZE;
+        }
+        if (WrightsClientState.exchangeToolActive() && WrightsConfig.allowExchange()) {
+            return CtrlHelp.SIZE;
         }
         if (WrightsClientState.shapeToolActive() && WrightsConfig.allowShape()) {
             return CtrlHelp.ROTATE;
@@ -251,23 +255,38 @@ public final class WrightsHud {
 
     private static void drawCtrlHelp(GuiGraphics graphics, Minecraft minecraft) {
         CtrlHelp kind = ctrlHelpKind();
-        boolean shapeRotate = kind == CtrlHelp.ROTATE && WrightsClientState.shapeToolActive();
-        Component title = Component.translatable(kind == CtrlHelp.ROTATE ? "hud.wrights.ctrl_rotate_title" : "hud.wrights.ctrl_resize_title");
-        Component up = Component.translatable(kind == CtrlHelp.ROTATE ? "hud.wrights.ctrl_rotate_up" : "hud.wrights.ctrl_resize_up");
-        Component down = Component.translatable(kind == CtrlHelp.ROTATE ? "hud.wrights.ctrl_rotate_down" : "hud.wrights.ctrl_resize_down");
-        Component tip = Component.translatable(
-                kind == CtrlHelp.ROTATE
-                        ? (shapeRotate ? "hud.wrights.ctrl_rotate_shape_tip" : "hud.wrights.ctrl_rotate_tip")
-                        : "hud.wrights.ctrl_resize_tip");
-        Component how = Component.translatable("hud.wrights.ctrl_how");
-        int width = 220;
+        String titleKey = switch (kind) {
+            case SIZE -> "hud.wrights.ctrl_size_title";
+            case ROTATE -> "hud.wrights.ctrl_rotate_title";
+            default -> "hud.wrights.ctrl_resize_title";
+        };
+        String upKey = switch (kind) {
+            case SIZE -> "hud.wrights.ctrl_size_up";
+            case ROTATE -> "hud.wrights.ctrl_rotate_up";
+            default -> "hud.wrights.ctrl_resize_up";
+        };
+        String downKey = switch (kind) {
+            case SIZE -> "hud.wrights.ctrl_size_down";
+            case ROTATE -> "hud.wrights.ctrl_rotate_down";
+            default -> "hud.wrights.ctrl_resize_down";
+        };
+        String tipKey = switch (kind) {
+            case SIZE -> "hud.wrights.ctrl_size_tip";
+            case ROTATE -> WrightsClientState.shapeToolActive()
+                    ? "hud.wrights.ctrl_rotate_shape_tip"
+                    : "hud.wrights.ctrl_rotate_tip";
+            default -> "hud.wrights.ctrl_resize_tip";
+        };
+        Component title = Component.translatable(titleKey);
+        Component up = Component.translatable(upKey);
+        Component down = Component.translatable(downKey);
+        Component tip = Component.translatable(tipKey);
+        int width = 180;
         width = Math.max(width, minecraft.font.width(title) + 28);
         width = Math.max(width, minecraft.font.width(up) + 28);
         width = Math.max(width, minecraft.font.width(down) + 28);
-        int textWidth = width - 24;
-        int tipLines = Math.max(1, minecraft.font.split(tip, textWidth).size());
-        int howLines = Math.max(1, minecraft.font.split(how, textWidth).size());
-        int height = 28 + 18 * 2 + 8 + tipLines * 10 + 8 + howLines * 10;
+        width = Math.max(width, minecraft.font.width(tip) + 28);
+        int height = 28 + 18 * 2 + 16;
         int x = HudAnchor.modeX(graphics.guiWidth(), width);
         int y = HudAnchor.modeY(graphics.guiHeight(), height);
         WrightsUi.panel(graphics, x, y, width, height);
@@ -275,9 +294,7 @@ public final class WrightsHud {
         graphics.fill(x + 8, y + 21, x + width - 8, y + 35, 0xA0C47A3A);
         graphics.drawString(minecraft.font, up, x + 14, y + 24, 0xFFFFFFFF, false);
         graphics.drawString(minecraft.font, down, x + 14, y + 42, WrightsUi.MUTED, false);
-        int tipY = y + 62;
-        drawFooter(graphics, minecraft, tip, x + 12, tipY, textWidth, 0xFFF0C14A);
-        drawFooter(graphics, minecraft, how, x + 12, tipY + tipLines * 10 + 6, textWidth, WrightsUi.MUTED);
+        graphics.drawString(minecraft.font, tip, x + 12, y + 62, 0xFFF0C14A, false);
     }
 
     private static Component taskLine() {
@@ -325,14 +342,13 @@ public final class WrightsHud {
     private static void drawMainModes(GuiGraphics graphics, Minecraft minecraft) {
         Component title = Component.translatable("hud.wrights.main_modes");
         Component how = Component.translatable("hud.wrights.main_how");
-        Component undo = Component.translatable("hud.wrights.main_undo");
         Component build = Component.translatable("hud.wrights.main_build");
         Component jobs = Component.translatable("hud.wrights.main_jobs");
         Component manage = Component.translatable("hud.wrights.main_manage");
         Component info = Component.translatable("hud.wrights.main_info");
         Component link = Component.translatable("hud.wrights.main_link");
         Component selected = Component.translatable("hud.wrights.mode_selected");
-        int width = 188;
+        int width = 168;
         width = Math.max(width, minecraft.font.width(title) + 28);
         width = Math.max(width, minecraft.font.width(build) + minecraft.font.width(selected) + 36);
         width = Math.max(width, minecraft.font.width(jobs) + minecraft.font.width(selected) + 36);
@@ -341,9 +357,7 @@ public final class WrightsHud {
         width = Math.max(width, minecraft.font.width(link) + minecraft.font.width(selected) + 36);
         int row = 18;
         int textWidth = width - 24;
-        int howHeight = footerHeight(minecraft, how, textWidth);
-        int undoHeight = footerHeight(minecraft, undo, textWidth);
-        int footer = howHeight + undoHeight;
+        int footer = footerHeight(minecraft, how, textWidth);
         int height = 28 + row * 5 + footer;
         int x = HudAnchor.modeX(graphics.guiWidth(), width);
         int y = HudAnchor.modeY(graphics.guiHeight(), height);
@@ -357,9 +371,7 @@ public final class WrightsHud {
         drawMainRow(graphics, minecraft, x, y + 24 + row * 2, width, WrightsClientState.mode == WrightsClientState.Mode.MANAGE, manage, selected);
         drawMainRow(graphics, minecraft, x, y + 24 + row * 3, width, WrightsClientState.mode == WrightsClientState.Mode.INFO, info, selected);
         drawMainRow(graphics, minecraft, x, y + 24 + row * 4, width, WrightsClientState.mode == WrightsClientState.Mode.LINK, link, selected);
-        int footY = y + height - footer + 4;
-        drawFooter(graphics, minecraft, how, x + 12, footY, textWidth, WrightsUi.MUTED);
-        drawFooter(graphics, minecraft, undo, x + 12, footY + howHeight - 4, textWidth, 0xFFF0C14A);
+        drawFooter(graphics, minecraft, how, x + 12, y + height - footer + 4, textWidth, WrightsUi.MUTED);
     }
 
     private static void drawMainRow(GuiGraphics graphics, Minecraft minecraft, int x, int y, int width, boolean on, Component label, Component selected) {
@@ -384,21 +396,11 @@ public final class WrightsHud {
         Component title = Component.translatable("hud.wrights.build_modes");
         boolean making = WrightsClientState.mode == WrightsClientState.Mode.CAPTURE
                 || WrightsClientState.mode == WrightsClientState.Mode.SAVING;
-        Component how = making
-                ? (WrightsClientState.styleAnnounce
-                        ? Component.translatable("hud.wrights.mode_now", Component.translatable(styleKey(WrightsClientState.captureStyle)))
-                        : Component.translatable("hud.wrights.mode_how"))
-                : WrightsClientState.exchangeAim
-                        ? Component.translatable("hud.wrights.exchange_explain")
-                        : WrightsClientState.shapeAim
-                        ? Component.translatable(shapeFooter(minecraft))
-                        : WrightsClientState.mirrorAim
-                        ? Component.translatable(mirrorFooter(minecraft))
-                        : WrightsClientState.bindSupply
-                                ? Component.translatable("hud.wrights.bind_explain")
-                                : WrightsClientState.buildId == null
-                                        ? Component.translatable("hud.wrights.pick_blueprint")
-                                        : Component.translatable("hud.wrights.build_explain");
+        // Mode strip only lists tools — full keybind catalogs live in Help.
+        Component how = WrightsClientState.styleAnnounce
+                ? Component.translatable("hud.wrights.mode_now", Component.translatable(
+                        making ? styleKey(WrightsClientState.captureStyle) : buildToolKey()))
+                : Component.translatable("hud.wrights.mode_how");
         Component use = Component.translatable("hud.wrights.tool_build");
         Component fresh = Component.translatable("hud.wrights.tool_new");
         Component bind = Component.translatable("hud.wrights.tool_bind");
@@ -417,7 +419,7 @@ public final class WrightsHud {
         boolean showMirror = WrightsConfig.allowMirror();
         boolean showShape = WrightsConfig.allowShape();
         boolean showExchange = WrightsConfig.allowExchange();
-        int width = 188;
+        int width = 168;
         width = Math.max(width, minecraft.font.width(title) + 28);
         width = Math.max(width, minecraft.font.width(use) + minecraft.font.width(selected) + 36);
         width = Math.max(width, minecraft.font.width(fresh) + minecraft.font.width(selected) + 36);
@@ -594,6 +596,22 @@ public final class WrightsHud {
             return "hud.wrights.mode_move";
         }
         return "hud.wrights.mode_corners";
+    }
+
+    private static String buildToolKey() {
+        if (WrightsClientState.exchangeAim) {
+            return "hud.wrights.tool_exchange";
+        }
+        if (WrightsClientState.shapeAim) {
+            return "hud.wrights.tool_shape";
+        }
+        if (WrightsClientState.mirrorAim) {
+            return "hud.wrights.tool_mirror";
+        }
+        if (WrightsClientState.bindSupply) {
+            return "hud.wrights.tool_bind";
+        }
+        return "hud.wrights.tool_build";
     }
 
     private static void drawJobNotices(GuiGraphics graphics, Minecraft minecraft) {
