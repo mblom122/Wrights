@@ -210,7 +210,7 @@ public final class BlueprintActions {
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
         session.startCapture(player.level().dimension(), suggestName(libraryNames(player, null)));
         BlueprintNetwork.syncCapture(player);
-        Messages.actionBar(player, "message.wrights.capture_first");
+        // First-corner tip lives on the controller HUD help tooltip — no action-bar duplicate.
     }
 
     public static void pick(ServerPlayer player, BlockPos pos, int action) {
@@ -787,9 +787,8 @@ public final class BlueprintActions {
             }
         } else if (schematic.hasSource()) {
             Messages.actionBar(player, "message.wrights.edit_other_dimension");
-        } else {
-            Messages.actionBar(player, "message.wrights.capture_first");
         }
+        // First-corner tip lives on the controller HUD help tooltip — no action-bar duplicate.
         BlueprintNetwork.syncCapture(player);
     }
 
