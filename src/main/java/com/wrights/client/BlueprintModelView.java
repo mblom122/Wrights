@@ -87,40 +87,49 @@ public final class BlueprintModelView {
         RenderSystem.enableDepthTest();
         mesh.draw(modelView, projection);
         if (showFrame) {
-            drawFrameAndPivot(pose, sizeX, sizeY, sizeZ, pivotX, pivotY, pivotZ);
+            drawFrameAndPivot(pose, sizeX, sizeY, sizeZ, span, pivotX, pivotY, pivotZ);
         }
         RenderSystem.disableDepthTest();
         pose.popPose();
         graphics.disableScissor();
     }
 
-    /** Thin AABB around the preview blocks, plus a copper cross at the chosen pivot cell. */
-    private static void drawFrameAndPivot(PoseStack pose, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ) {
+    /** Thin AABB around the preview blocks, plus a copper pivot marker that always shows through. */
+    private static void drawFrameAndPivot(PoseStack pose, int sizeX, int sizeY, int sizeZ, float span, int pivotX, int pivotY, int pivotZ) {
         MultiBufferSource.BufferSource buffers = Minecraft.getInstance().renderBuffers().bufferSource();
-        VertexConsumer lines = buffers.getBuffer(RenderType.lines());
-        float pad = 0.02F;
+        float pad = 0.015F;
         float x0 = -pad;
         float y0 = -pad;
         float z0 = -pad;
         float x1 = sizeX + pad;
         float y1 = sizeY + pad;
         float z1 = sizeZ + pad;
-        // Soft steel frame around the shape box.
-        boxEdges(pose, lines, x0, y0, z0, x1, y1, z1, 0.55F, 0.72F, 0.86F, 0.9F);
+        // Soft steel frame — thin line width so the border stays light.
+        RenderSystem.lineWidth(1.0F);
+        VertexConsumer frame = buffers.getBuffer(RenderType.lines());
+        boxEdges(pose, frame, x0, y0, z0, x1, y1, z1, 0.55F, 0.72F, 0.86F, 0.55F);
+        buffers.endBatch(RenderType.lines());
+
         int px = Math.max(0, Math.min(sizeX - 1, pivotX));
         int py = Math.max(0, Math.min(sizeY - 1, pivotY));
         int pz = Math.max(0, Math.min(sizeZ - 1, pivotZ));
         float cx = px + 0.5F;
         float cy = py + 0.5F;
         float cz = pz + 0.5F;
-        float arm = 0.42F;
-        // Pivot marker — copper cross through the pin cell.
-        line(pose, lines, cx - arm, cy, cz, cx + arm, cy, cz, 0.91F, 0.55F, 0.23F, 1.0F);
-        line(pose, lines, cx, cy - arm, cz, cx, cy + arm, cz, 0.91F, 0.55F, 0.23F, 1.0F);
-        line(pose, lines, cx, cy, cz - arm, cx, cy, cz + arm, 0.91F, 0.55F, 0.23F, 1.0F);
-        float box = 0.18F;
-        boxEdges(pose, lines, cx - box, cy - box, cz - box, cx + box, cy + box, cz + box, 0.98F, 0.78F, 0.35F, 1.0F);
+        // Grow with the shape so the pin stays readable on large previews.
+        float arm = Math.max(0.5F, Math.min(3.0F, span * 0.08F));
+        float box = Math.max(0.22F, Math.min(1.2F, span * 0.035F));
+        // Pivot draws without depth so blocks never hide it.
+        RenderSystem.disableDepthTest();
+        RenderSystem.lineWidth(2.0F);
+        VertexConsumer pivot = buffers.getBuffer(RenderType.lines());
+        line(pose, pivot, cx - arm, cy, cz, cx + arm, cy, cz, 0.91F, 0.55F, 0.23F, 1.0F);
+        line(pose, pivot, cx, cy - arm, cz, cx, cy + arm, cz, 0.91F, 0.55F, 0.23F, 1.0F);
+        line(pose, pivot, cx, cy, cz - arm, cx, cy, cz + arm, 0.91F, 0.55F, 0.23F, 1.0F);
+        boxEdges(pose, pivot, cx - box, cy - box, cz - box, cx + box, cy + box, cz + box, 0.98F, 0.78F, 0.35F, 1.0F);
         buffers.endBatch(RenderType.lines());
+        RenderSystem.lineWidth(1.0F);
+        RenderSystem.enableDepthTest();
     }
 
     private static void boxEdges(
