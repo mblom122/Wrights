@@ -759,7 +759,9 @@ final class ShapeMenuPanel {
         int thickness = Shapes.clampHeight(WrightsClientConfig.SHAPE_THICKNESS.get());
         boolean hollow = WrightsClientConfig.SHAPE_HOLLOW.get() && WrightsConfig.allowShapeHollow();
         int plane = WrightsClientConfig.SHAPE_PLANE.get();
-        int yaw = Shapes.clampYaw(WrightsClientConfig.SHAPE_YAW.get());
+        // Match the in-world yaw so we reuse SelectionRenderer's cache when B opens the menu.
+        net.minecraft.client.Minecraft minecraft = net.minecraft.client.Minecraft.getInstance();
+        int yaw = WrightsClientConfig.shapeYawWorld(minecraft.player);
         List<ShapeMaterials.Entry> materials = WrightsClientConfig.shapeMaterials();
         ShapeMaterials.FillMode mode = WrightsClientConfig.shapeFillMode();
         int batch = WrightsClientConfig.SHAPE_ORDER_BATCH.get();
@@ -768,25 +770,19 @@ final class ShapeMenuPanel {
             return;
         }
         previewKey = key;
-        List<BlockPos> worlds = Shapes.blocks(kind, BlockPos.ZERO, size, height, thickness, hollow, plane, yaw);
+        SelectionRenderer.ensureShapeCache(kind, size, height, thickness, hollow, plane, yaw);
+        List<BlockPos> worlds = SelectionRenderer.shapeCacheCells();
         if (worlds.isEmpty()) {
             previewGhosts = List.of();
             previewSizeX = previewSizeY = previewSizeZ = 1;
             previewBlocks = 0;
             return;
         }
-        BlockPos origin = Shapes.origin(worlds);
-        int maxX = 0;
-        int maxY = 0;
-        int maxZ = 0;
-        for (BlockPos pos : worlds) {
-            maxX = Math.max(maxX, pos.getX() - origin.getX());
-            maxY = Math.max(maxY, pos.getY() - origin.getY());
-            maxZ = Math.max(maxZ, pos.getZ() - origin.getZ());
-        }
-        previewSizeX = maxX + 1;
-        previewSizeY = maxY + 1;
-        previewSizeZ = maxZ + 1;
+        BlockPos origin = SelectionRenderer.shapeCacheMin();
+        BlockPos extent = SelectionRenderer.shapeCacheMax();
+        previewSizeX = extent.getX() - origin.getX() + 1;
+        previewSizeY = extent.getY() - origin.getY() + 1;
+        previewSizeZ = extent.getZ() - origin.getZ() + 1;
         previewBlocks = worlds.size();
         // Small spinning panel: keep a strided sample so large shapes still show a silhouette
         // instead of blanking past maxPreviewBlocks.

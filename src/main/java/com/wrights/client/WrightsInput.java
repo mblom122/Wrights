@@ -126,7 +126,9 @@ public final class WrightsInput {
                         new com.wrights.network.BlueprintPayloads.LibraryRequest(WrightsClientState.libraryGlobal));
             } else if (minecraft.screen instanceof BlockPickerScreen
                     || minecraft.screen instanceof BlueprintMapScreen
-                    || minecraft.screen instanceof BlueprintEditScreen) {
+                    || minecraft.screen instanceof BlueprintEditScreen
+                    || minecraft.screen instanceof ShapePivotScreen
+                    || minecraft.screen instanceof ShapeAnchorScreen) {
                 // Return to the parent edit screen, or discard the edit cleanly.
                 minecraft.screen.onClose();
             } else if (minecraft.screen instanceof WrightsMenuScreen
@@ -134,7 +136,8 @@ public final class WrightsInput {
                     || minecraft.screen instanceof PlacementScreen
                     || minecraft.screen instanceof JobActionScreen
                     || minecraft.screen instanceof JobDroneScreen
-                    || minecraft.screen instanceof DroneRosterScreen) {
+                    || minecraft.screen instanceof DroneRosterScreen
+                    || minecraft.screen instanceof ShapeLookSnapScreen) {
                 minecraft.setScreen(null);
             }
         }

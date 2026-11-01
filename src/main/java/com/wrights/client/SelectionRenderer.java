@@ -174,14 +174,13 @@ public final class SelectionRenderer {
         drawShapeBounds(pose, buffers, camera, worldMin, worldMax, target);
 
         boolean voidBlocks = WrightsClientConfig.SHAPE_VOID.get() && WrightsConfig.allowShapeVoid();
-        int budget = previewBudget();
+        int budget = Math.max(1, previewBudget());
         int total = shapeLocal.size();
-        // Rank every in-range cell by camera distance, then draw the nearest budget —
-        // same idea as blueprint ghosts, so the shell beside the player is never skipped
-        // for a strided sample 64 blocks away.
-        prepare(total);
+        // Keep only the nearest `budget` cells with a bounded max-heap — never allocate
+        // order/distance arrays the size of a 64³ shape (that was crashing the menu open).
+        prepare(budget);
         double limit = rangeSqr();
-        int count = 0;
+        int filled = 0;
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
         for (int i = 0; i < total; i++) {
             BlockPos local = shapeLocal.get(i);
@@ -198,15 +197,23 @@ public final class SelectionRenderer {
             if (!voidBlocks && !minecraft.level.getBlockState(cursor.set(wx, wy, wz)).isAir()) {
                 continue;
             }
-            order[count] = i;
-            distanceSq[count] = distance;
-            count++;
+            if (filled < budget) {
+                order[filled] = i;
+                distanceSq[filled] = distance;
+                filled++;
+                if (filled == budget) {
+                    buildFarthestHeap(filled);
+                }
+            } else if (distance < distanceSq[0]) {
+                order[0] = i;
+                distanceSq[0] = distance;
+                siftFarthestDown(0, filled);
+            }
         }
-        if (count <= 0) {
+        if (filled <= 0) {
             return;
         }
-        int keep = Math.min(count, budget);
-        nearest(count, keep);
+        int keep = filled;
         java.util.Random previewRandom = new java.util.Random(target.asLong() ^ materials.hashCode());
         List<BlockState> planned = com.wrights.blueprint.ShapeMaterials.assign(
                 materials,
@@ -232,6 +239,30 @@ public final class SelectionRenderer {
         buffers.endBatch();
     }
 
+    /** Shared with the shape menu so opening B does not rebuild a million-block list. */
+    static void ensureShapeCache(
+            com.wrights.blueprint.Shapes.Kind kind,
+            int size,
+            int height,
+            int thickness,
+            boolean hollow,
+            int plane,
+            int yaw) {
+        ensureShapeLocal(kind, size, height, thickness, hollow, plane, yaw);
+    }
+
+    static List<BlockPos> shapeCacheCells() {
+        return shapeLocal;
+    }
+
+    static BlockPos shapeCacheMin() {
+        return shapeLocalMin;
+    }
+
+    static BlockPos shapeCacheMax() {
+        return shapeLocalMax;
+    }
+
     /** Rebuild local shape cells only when kind/size/etc change — not when the look target moves. */
     private static void ensureShapeLocal(
             com.wrights.blueprint.Shapes.Kind kind,
@@ -252,7 +283,15 @@ public final class SelectionRenderer {
             return;
         }
         shapeLocalKey = key;
-        shapeLocal = com.wrights.blueprint.Shapes.blocks(kind, BlockPos.ZERO, size, height, thickness, hollow, plane, yaw);
+        try {
+            shapeLocal = com.wrights.blueprint.Shapes.blocks(kind, BlockPos.ZERO, size, height, thickness, hollow, plane, yaw);
+        } catch (OutOfMemoryError error) {
+            shapeLocal = List.of();
+            shapeLocalMin = BlockPos.ZERO;
+            shapeLocalMax = BlockPos.ZERO;
+            System.gc();
+            return;
+        }
         if (shapeLocal.isEmpty()) {
             shapeLocalMin = BlockPos.ZERO;
             shapeLocalMax = BlockPos.ZERO;
@@ -260,6 +299,32 @@ public final class SelectionRenderer {
         }
         shapeLocalMin = com.wrights.blueprint.Shapes.origin(shapeLocal);
         shapeLocalMax = com.wrights.blueprint.Shapes.extent(shapeLocal);
+    }
+
+    /** Max-heap on distance so the root is the farthest of the current nearest set. */
+    private static void buildFarthestHeap(int size) {
+        for (int i = (size >>> 1) - 1; i >= 0; i--) {
+            siftFarthestDown(i, size);
+        }
+    }
+
+    private static void siftFarthestDown(int root, int size) {
+        while (true) {
+            int largest = root;
+            int left = (root << 1) + 1;
+            int right = left + 1;
+            if (left < size && distanceSq[left] > distanceSq[largest]) {
+                largest = left;
+            }
+            if (right < size && distanceSq[right] > distanceSq[largest]) {
+                largest = right;
+            }
+            if (largest == root) {
+                return;
+            }
+            swap(root, largest);
+            root = largest;
+        }
     }
 
     /** Wire AABB around the full shape plus a see-through pivot marker at the pin cell. */
@@ -1336,7 +1401,8 @@ public final class SelectionRenderer {
         if (keep <= 0 || keep >= count) {
             return;
         }
-        selectNearest(0, count - 1, keep);
+        // Keep the `keep` nearest: quickselect around index keep-1.
+        selectNearest(0, count - 1, keep - 1);
     }
 
     private static void selectNearest(int left, int right, int keep) {
