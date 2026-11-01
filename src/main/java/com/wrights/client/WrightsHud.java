@@ -258,15 +258,14 @@ public final class WrightsHud {
     }
 
     /**
-     * Large ON/OFF label in the middle of the screen while Bridge or Stairs is selected.
+     * Large ON/OFF label in the middle of the screen while Bridge is selected.
      * The hotbar status line is easy to miss when walking a path.
      */
     private static void drawPathModeBanner(GuiGraphics graphics, Minecraft minecraft) {
-        boolean stairs = WrightsClientConfig.placeStairsStyle();
         boolean on = WrightsClientState.bridgeActive;
-        Component label = Component.translatable(stairs
-                ? (on ? "hud.wrights.place_stairs_banner_on" : "hud.wrights.place_stairs_banner_off")
-                : (on ? "hud.wrights.place_bridge_banner_on" : "hud.wrights.place_bridge_banner_off"));
+        Component label = Component.translatable(on
+                ? "hud.wrights.place_bridge_banner_on"
+                : "hud.wrights.place_bridge_banner_off");
         int color = on ? 0xFF6FCF97 : 0xFFE07A7A;
         int width = minecraft.font.width(label) + 20;
         int height = 16;
@@ -673,35 +672,20 @@ public final class WrightsHud {
                     width,
                     WrightsClientConfig.placeToMeHeight());
         }
-        if (WrightsClientConfig.placeStairsStyle()) {
-            Component dir = Component.translatable(
-                    WrightsClientConfig.placeStairsUp()
-                            ? "menu.wrights.place_stairs_up"
-                            : "menu.wrights.place_stairs_down");
-            return Component.translatable(
-                    "hud.wrights.tool_place_stairs_status",
-                    name,
-                    dir,
-                    pathStateLabel(false, WrightsClientState.bridgeActive),
-                    offset,
-                    width);
-        }
         if (WrightsClientConfig.placeBridgeStyle()) {
             return Component.translatable(
                     "hud.wrights.tool_place_bridge_status",
                     name,
-                    pathStateLabel(true, WrightsClientState.bridgeActive),
+                    pathStateLabel(WrightsClientState.bridgeActive),
                     offset,
                     width);
         }
         return Component.translatable("hud.wrights.tool_place_detail", name, exchangeDimText(form), aim);
     }
 
-    /** Bridge ON / Stairs ON in green; Bridge / Stairs off in red. */
-    private static Component pathStateLabel(boolean bridge, boolean on) {
-        String key = bridge
-                ? (on ? "hud.wrights.place_bridge_state_on" : "hud.wrights.place_bridge_state_off")
-                : (on ? "hud.wrights.place_stairs_state_on" : "hud.wrights.place_stairs_state_off");
+    /** Bridge ON in green; Bridge off in red. */
+    private static Component pathStateLabel(boolean on) {
+        String key = on ? "hud.wrights.place_bridge_state_on" : "hud.wrights.place_bridge_state_off";
         return Component.translatable(key).withStyle(on ? ChatFormatting.GREEN : ChatFormatting.RED);
     }
 
@@ -726,15 +710,6 @@ public final class WrightsHud {
                     : Component.translatable(
                             "hud.wrights.place_bridge_explain",
                             Component.translatable("hud.wrights.place_bridge_state_off").withStyle(ChatFormatting.RED));
-        }
-        if (WrightsClientConfig.placeStairsStyle()) {
-            return WrightsClientState.bridgeActive
-                    ? Component.translatable(
-                            "hud.wrights.place_stairs_ready",
-                            Component.translatable("hud.wrights.place_stairs_state_on").withStyle(ChatFormatting.GREEN))
-                    : Component.translatable(
-                            "hud.wrights.place_stairs_explain",
-                            Component.translatable("hud.wrights.place_stairs_state_off").withStyle(ChatFormatting.RED));
         }
         return Component.translatable("hud.wrights.place_look_explain");
     }

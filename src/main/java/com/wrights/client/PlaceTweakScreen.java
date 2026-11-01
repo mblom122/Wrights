@@ -43,7 +43,6 @@ public class PlaceTweakScreen extends Screen {
         private int offsetY = -1;
     private int widthY = -1;
     private int toMeHeightY = -1;
-    private int stairsDirY = -1;
     private int circleMountY = -1;
     private int rotateY = -1;
     private int matsLabelY = -1;
@@ -73,10 +72,7 @@ public class PlaceTweakScreen extends Screen {
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_aim")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_bridge_offset")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_bridge_width")));
-        labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_stairs_height")));
-        labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_stairs_width")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_to_me_height")));
-        labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_stairs_dir")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_circle_mount")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.shape_rotation")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.shape_materials")));
@@ -92,10 +88,9 @@ public class PlaceTweakScreen extends Screen {
         boolean look = style == 0;
         boolean toMe = style == 1;
         boolean bridge = WrightsClientConfig.placeBridgeStyle();
-        boolean stairsForm = look && WrightsClientConfig.exchangeForm().stairsPath();
-        boolean line = look && !stairsForm && WrightsClientConfig.exchangeForm().line();
-        boolean showFormDims = look && !stairsForm;
-        boolean pathDims = bridge || stairsForm;
+        boolean line = look && WrightsClientConfig.exchangeForm().line();
+        boolean showFormDims = look;
+        boolean pathDims = bridge;
         boolean circleMount = WrightsClientConfig.placeCircleForm();
         boolean yawRotate = WrightsClientConfig.placeFormYawRotatable();
         int rows = 1 // title
@@ -105,7 +100,6 @@ public class PlaceTweakScreen extends Screen {
                 + (showFormDims && (line || WrightsClientConfig.exchangeKind().usesHeight()) ? 1 : 0)
                 + (pathDims ? 2 : 0) // offset + width
                 + (toMe ? 2 : 0) // width + height
-                + (stairsForm ? 1 : 0) // up/down
                 + (circleMount ? 1 : 0) // floor / wall
                 + (yawRotate ? 1 : 0) // rotate left/right
                 + 1 // materials label
@@ -122,7 +116,7 @@ public class PlaceTweakScreen extends Screen {
         int plusX = valueX + fieldW + 2;
         int y = panelY + PAD + 12 + GAP;
 
-        sizeY = alongY = styleLabelY = styleChoicesY = offsetY = widthY = toMeHeightY = stairsDirY = circleMountY = rotateY = matsLabelY = matsRowY = -1;
+        sizeY = alongY = styleLabelY = styleChoicesY = offsetY = widthY = toMeHeightY = circleMountY = rotateY = matsLabelY = matsRowY = -1;
 
         styleLabelY = y;
         y += ROW + GAP;
@@ -159,10 +153,6 @@ public class PlaceTweakScreen extends Screen {
             toMeHeightY = y;
             step(minusX, y, "-", () -> nudgeToMeHeight(-1));
             step(plusX, y, "+", () -> nudgeToMeHeight(1));
-            y += ROW + GAP;
-        }
-        if (stairsForm) {
-            stairsDirY = y;
             y += ROW + GAP;
         }
         if (circleMount) {
@@ -254,19 +244,13 @@ public class PlaceTweakScreen extends Screen {
             drawChoice(graphics, mouseX, mouseY, choiceX + (choiceW + gap) * 2, styleChoicesY,
                     panelW - PAD * 2 - (choiceW + gap) * 2, style == 2, "menu.wrights.place_aim_bridge");
         }
-        boolean stairsLabels = WrightsClientConfig.placeStyle() == 0
-                && WrightsClientConfig.exchangeForm().stairsPath();
         if (offsetY >= 0) {
-            graphics.drawString(this.font, Component.translatable(stairsLabels
-                            ? "menu.wrights.place_stairs_height"
-                            : "menu.wrights.place_bridge_offset"),
+            graphics.drawString(this.font, Component.translatable("menu.wrights.place_bridge_offset"),
                     panelX + PAD, offsetY + 3, WrightsUi.MUTED, false);
             drawValue(graphics, offsetY, WrightsClientConfig.placeBridgeOffset());
         }
         if (widthY >= 0) {
-            graphics.drawString(this.font, Component.translatable(stairsLabels
-                            ? "menu.wrights.place_stairs_width"
-                            : "menu.wrights.place_bridge_width"),
+            graphics.drawString(this.font, Component.translatable("menu.wrights.place_bridge_width"),
                     panelX + PAD, widthY + 3, WrightsUi.MUTED, false);
             drawValue(graphics, widthY, WrightsClientConfig.placeBridgeWidth());
         }
@@ -274,16 +258,6 @@ public class PlaceTweakScreen extends Screen {
             graphics.drawString(this.font, Component.translatable("menu.wrights.place_to_me_height"),
                     panelX + PAD, toMeHeightY + 3, WrightsUi.MUTED, false);
             drawValue(graphics, toMeHeightY, WrightsClientConfig.placeToMeHeight());
-        }
-        if (stairsDirY >= 0) {
-            boolean up = WrightsClientConfig.placeStairsUp();
-            int gap = GAP;
-            int choiceW = (panelW - PAD * 2 - gap) / 2;
-            int choiceX = panelX + PAD;
-            drawChoice(graphics, mouseX, mouseY, choiceX, stairsDirY, choiceW,
-                    up, "menu.wrights.place_stairs_up");
-            drawChoice(graphics, mouseX, mouseY, choiceX + choiceW + gap, stairsDirY,
-                    panelW - PAD * 2 - choiceW - gap, !up, "menu.wrights.place_stairs_down");
         }
         if (circleMountY >= 0) {
             boolean wall = WrightsClientConfig.placeCircleWall();
@@ -381,20 +355,6 @@ public class PlaceTweakScreen extends Screen {
             if (hit(mouseX, mouseY, choiceX + (choiceW + gap) * 2, styleChoicesY, rightW, ROW)) {
                 WrightsClientConfig.setPlaceStyle(2);
                 rebuild();
-                return true;
-            }
-        }
-        if (button == 0 && stairsDirY >= 0) {
-            int gap = GAP;
-            int choiceW = (panelW - PAD * 2 - gap) / 2;
-            int choiceX = panelX + PAD;
-            int rightW = panelW - PAD * 2 - choiceW - gap;
-            if (hit(mouseX, mouseY, choiceX, stairsDirY, choiceW, ROW)) {
-                WrightsClientConfig.setPlaceStairsUp(true);
-                return true;
-            }
-            if (hit(mouseX, mouseY, choiceX + choiceW + gap, stairsDirY, rightW, ROW)) {
-                WrightsClientConfig.setPlaceStairsUp(false);
                 return true;
             }
         }

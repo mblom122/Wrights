@@ -1088,7 +1088,6 @@ final class ShapeMenuPanel {
         boolean toMe = style == 1;
         boolean bridge = WrightsClientConfig.placeBridgeStyle();
         Shapes.ExchangeForm form = WrightsClientConfig.exchangeForm();
-        boolean stairsForm = look && form.stairsPath();
 
         if (bridge) {
             y = drawPathOffsetWidth(graphics, mouseX, mouseY, x, y, leftW, false);
@@ -1116,54 +1115,40 @@ final class ShapeMenuPanel {
                     "menu.wrights.exchange_form", "menu.wrights.exchange_form_hint", false);
             y = drawKinds(graphics, mouseX, mouseY, x, y, leftW);
             form = WrightsClientConfig.exchangeForm();
-            stairsForm = form.stairsPath();
             y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
                     "menu.wrights.shape_section_dimensions", "menu.wrights.shape_section_dimensions_hint", false);
-            if (stairsForm) {
-                y = drawPathOffsetWidth(graphics, mouseX, mouseY, x, y, leftW, true);
+            boolean exchangeLine = form.line();
+            boolean exchangePlate = form.plate();
+            if (exchangeLine) {
+                WrightsClientConfig.enforceExchangeLineFootprint();
+            }
+            if (exchangePlate) {
+                WrightsClientConfig.syncExchangeEqualDims();
+            }
+            Shapes.Kind kind = WrightsClientConfig.exchangeKind();
+            int axis = WrightsClientConfig.SHAPE_PLANE.get();
+            y = drawFormDimensions(graphics, mouseX, mouseY, x, y, leftW, kind, form, exchangeLine, exchangePlate,
+                    kind == Shapes.Kind.RING, kind == Shapes.Kind.BOX, axis);
+            if (form == Shapes.ExchangeForm.CIRCLE) {
                 drawField(graphics, mouseX, mouseY, x, y,
-                        "menu.wrights.place_stairs_dir", "menu.wrights.place_stairs_dir_hint");
+                        "menu.wrights.place_circle_mount", "menu.wrights.place_circle_mount_hint");
                 y += 12;
                 y = drawPair(graphics, mouseX, mouseY, x, y, leftW,
-                        !WrightsClientConfig.placeStairsUp(),
-                        "menu.wrights.place_stairs_up",
-                        "menu.wrights.place_stairs_down",
-                        "place_stairs_dir");
+                        WrightsClientConfig.placeCircleWall(),
+                        "menu.wrights.place_circle_floor",
+                        "menu.wrights.place_circle_wall",
+                        "place_circle_mount");
                 y += 4;
-            } else {
-                boolean exchangeLine = form.line();
-                boolean exchangePlate = form.plate();
-                if (exchangeLine) {
-                    WrightsClientConfig.enforceExchangeLineFootprint();
-                }
-                if (exchangePlate) {
-                    WrightsClientConfig.syncExchangeEqualDims();
-                }
-                Shapes.Kind kind = WrightsClientConfig.exchangeKind();
-                int axis = WrightsClientConfig.SHAPE_PLANE.get();
-                y = drawFormDimensions(graphics, mouseX, mouseY, x, y, leftW, kind, form, exchangeLine, exchangePlate,
-                        kind == Shapes.Kind.RING, kind == Shapes.Kind.BOX, axis);
-                if (form == Shapes.ExchangeForm.CIRCLE) {
-                    drawField(graphics, mouseX, mouseY, x, y,
-                            "menu.wrights.place_circle_mount", "menu.wrights.place_circle_mount_hint");
-                    y += 12;
-                    y = drawPair(graphics, mouseX, mouseY, x, y, leftW,
-                            WrightsClientConfig.placeCircleWall(),
-                            "menu.wrights.place_circle_floor",
-                            "menu.wrights.place_circle_wall",
-                            "place_circle_mount");
-                    y += 4;
-                }
-                if (WrightsClientConfig.placeFormYawRotatable()) {
-                    drawField(graphics, mouseX, mouseY, x, y,
-                            "menu.wrights.shape_rotation", "menu.wrights.place_form_rotation_hint");
-                    y += 12;
-                    y = drawActionPair(graphics, mouseX, mouseY, x, y, leftW,
-                            "screen.wrights.rotate_left",
-                            "screen.wrights.rotate_right",
-                            "place_yaw");
-                    y += 4;
-                }
+            }
+            if (WrightsClientConfig.placeFormYawRotatable()) {
+                drawField(graphics, mouseX, mouseY, x, y,
+                        "menu.wrights.shape_rotation", "menu.wrights.place_form_rotation_hint");
+                y += 12;
+                y = drawActionPair(graphics, mouseX, mouseY, x, y, leftW,
+                        "screen.wrights.rotate_left",
+                        "screen.wrights.rotate_right",
+                        "place_yaw");
+                y += 4;
             }
             y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
                     "menu.wrights.shape_materials", "menu.wrights.shape_materials_hint", false);

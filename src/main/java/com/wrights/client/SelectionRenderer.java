@@ -174,7 +174,7 @@ public final class SelectionRenderer {
         if (formPresets) {
             WrightsClientConfig.enforceExchangeLineFootprint();
         }
-        // Bridge / Stairs / To me: multi-cell path ghosts instead of a form footprint.
+        // Bridge / To me: multi-cell path ghosts instead of a form footprint.
         if (place && WrightsClientConfig.placePathStyle()) {
             drawPlacePathGhosts(pose, buffers, camera, minecraft, materials);
             return;

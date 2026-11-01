@@ -715,14 +715,14 @@ public final class WrightsClientConfig {
         return placeStyle() == 2;
     }
 
-    /** Look + Stairs form — rising/descending path. */
+    /** Look + Stairs form — manual form placement (not a walking-path toggle). */
     public static boolean placeStairsStyle() {
         return placeStyle() == 0 && exchangeForm().stairsPath();
     }
 
-    /** Bridge mode, or Look + Stairs form — RMB toggles continuous path placing. */
+    /** Bridge mode — RMB toggles continuous path placing while you walk. */
     public static boolean placePathStyle() {
-        return placeBridgeStyle() || placeStairsStyle();
+        return placeBridgeStyle();
     }
 
     /** Place Look Floor / Wall / Beam / Circle — Left/Right yaw around the look pin. */

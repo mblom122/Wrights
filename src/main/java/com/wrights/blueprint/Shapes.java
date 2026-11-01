@@ -57,7 +57,7 @@ public final class Shapes {
      * are oriented without the Shape orientation controls.
      * Floor / Wall are plates: equal-sides uses a single Size; otherwise Width × Height.
      * Pillar = vertical 1×1 post; Beam = horizontal 1-thick line across your look.
-     * Stairs (Place Look) toggles rising/descending steps — not shown on the Exchange page.
+     * Stairs (Place Look) is a manual form like Floor — not shown on the Exchange page.
      * Legacy id 6 (square) maps to {@link #FLOOR}. Id 5 is {@link #STAIRS}.
      */
     public enum ExchangeForm {
@@ -91,7 +91,7 @@ public final class Shapes {
             return this == PILLAR || this == BEAM;
         }
 
-        /** Place Look path form — continuous stairs under the player. */
+        /** Place Look Stairs form (manual aim placement, not a walking path). */
         public boolean stairsPath() {
             return this == STAIRS;
         }

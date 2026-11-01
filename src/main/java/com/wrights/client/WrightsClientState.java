@@ -1947,8 +1947,8 @@ public final class WrightsClientState {
 
     /**
      * Place tool: same footprint as Exchange, but builds instead of swaps.
-     * Look → aim form; To me → fill along the aim-face axis to the player's matching coord;
-     * Bridge / Stairs → toggle continuous path.
+     * Look -> aim form (including Stairs); To me -> fill along the aim-face axis;
+     * Bridge -> toggle continuous path.
      */
     public static boolean tryPlace(boolean force, BlockPos pos, Direction face) {
         Minecraft minecraft = Minecraft.getInstance();
@@ -1963,50 +1963,29 @@ public final class WrightsClientState {
         if (WrightsClientConfig.placePathStyle() && !force) {
             bridgeActive = !bridgeActive;
             bridgeCooldown = 0;
-            if (WrightsClientConfig.placeStairsStyle()) {
-                Component state = Component.translatable(
-                                bridgeActive
-                                        ? "hud.wrights.place_stairs_state_on"
-                                        : "hud.wrights.place_stairs_state_off")
-                        .withStyle(bridgeActive
-                                ? net.minecraft.ChatFormatting.GREEN
-                                : net.minecraft.ChatFormatting.RED);
-                minecraft.player.displayClientMessage(
-                        Component.translatable(
-                                "message.wrights.place_stairs_toggle",
-                                state,
-                                Component.translatable(
-                                        WrightsClientConfig.placeStairsUp()
-                                                ? "menu.wrights.place_stairs_up"
-                                                : "menu.wrights.place_stairs_down"),
-                                WrightsClientConfig.placeBridgeOffset()),
-                        true);
-            } else {
-                Component state = Component.translatable(
-                                bridgeActive
-                                        ? "hud.wrights.place_bridge_state_on"
-                                        : "hud.wrights.place_bridge_state_off")
-                        .withStyle(bridgeActive
-                                ? net.minecraft.ChatFormatting.GREEN
-                                : net.minecraft.ChatFormatting.RED);
-                minecraft.player.displayClientMessage(
-                        Component.translatable(
-                                "message.wrights.place_bridge_toggle",
-                                state,
-                                WrightsClientConfig.placeBridgeOffset()),
-                        true);
-            }
+            Component stateMsg = Component.translatable(
+                            bridgeActive
+                                    ? "hud.wrights.place_bridge_state_on"
+                                    : "hud.wrights.place_bridge_state_off")
+                    .withStyle(bridgeActive
+                            ? net.minecraft.ChatFormatting.GREEN
+                            : net.minecraft.ChatFormatting.RED);
+            minecraft.player.displayClientMessage(
+                    Component.translatable(
+                            "message.wrights.place_bridge_toggle",
+                            stateMsg,
+                            WrightsClientConfig.placeBridgeOffset()),
+                    true);
             return true;
         }
         WrightsClientConfig.enforceExchangeLineFootprint();
         if (WrightsClientConfig.placePathStyle()) {
-            // Force-place: one job for the whole path (offset × width), not one job per block.
             boolean voidBlocks = WrightsClientConfig.SHAPE_VOID.get() && WrightsConfig.allowShapeVoid();
             return sendPlaceCells(
                     placePathCells(minecraft.player),
                     voidBlocks,
                     force,
-                    WrightsClientConfig.placeStairsStyle() ? "Place - Stairs" : "Place - Bridge");
+                    "Place - Bridge");
         }
         if (style == 1) {
             BlockHitResult aim = shapeLookHit();
@@ -2085,8 +2064,8 @@ public final class WrightsClientState {
                 player.getDirection(),
                 Math.max(1, WrightsClientConfig.placeBridgeOffset()),
                 Math.max(1, WrightsClientConfig.placeBridgeWidth()),
-                WrightsClientConfig.placeStairsStyle(),
-                WrightsClientConfig.placeStairsUp());
+                false,
+                true);
     }
 
     /**
@@ -2212,7 +2191,7 @@ public final class WrightsClientState {
                 placePathCells(minecraft.player),
                 voidBlocks,
                 false,
-                WrightsClientConfig.placeStairsStyle() ? "Place - Stairs" : "Place - Bridge");
+                "Place - Bridge");
         bridgeCooldown = placed ? 3 : 2;
     }
 
