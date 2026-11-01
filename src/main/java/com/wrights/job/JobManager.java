@@ -972,7 +972,7 @@ public final class JobManager {
         }
         BuildJob job = BuildJob.shape(player.getUUID(), player.getUUID(), player.level().dimension(), min, max);
         job.setShapeStream(kind, size, height, thickness, axis, yaw, pivot, hollow, center, materials, fillMode, orderBatch, seed, exchange, exchangeFrom, exchangeSilk);
-        // Exchange uses the same Void toggle: off skips occupied cells, on clears them (silk or destroy) before placing.
+        // Exchange always swaps; Void only controls whether replaced blocks are returned.
         job.setPasteOptions(false, voidBlocks, voidBlocks, false, false, false, false);
         job.setClip(job.boxSizeX(), job.boxSizeY(), job.boxSizeZ());
         job.setAnchor(min);
@@ -989,22 +989,158 @@ public final class JobManager {
             job.setCrewQuota(1);
             job.setQueued(true);
             library.addJob(job);
+            if (player.level() instanceof ServerLevel queuedLevel) {
+                attachExchangeHologram(player, library, queuedLevel, job);
+            }
             Messages.actionBar(player, "message.wrights.queued", 1);
             BlueprintNetwork.syncJobs(player);
             return true;
         }
         library.addJob(job);
         if (job.deferSupplies()) {
+            if (player.level() instanceof ServerLevel deferredLevel) {
+                attachExchangeHologram(player, library, deferredLevel, job);
+            }
             Messages.actionBar(player, "message.wrights.queued", 1);
             BlueprintNetwork.syncJobs(player);
             return true;
         }
-        if (player.level() instanceof ServerLevel level && !instant(player)) {
-            ensureDrone(level, player, job, min);
+        if (player.level() instanceof ServerLevel level) {
+            attachExchangeHologram(player, library, level, job);
+            if (!instant(player)) {
+                ensureDrone(level, player, job, min);
+            }
         }
         launched(player, job);
         BlueprintNetwork.syncJobs(player);
         return true;
+    }
+
+    /**
+     * Exchange streams without a stored blueprint — build an ephemeral ghost of every
+     * matching cell so queued swaps stay visible until each cell is placed.
+     */
+    private static void attachExchangeHologram(ServerPlayer player, SchematicLibrary library, ServerLevel level, BuildJob job) {
+        if (player == null || library == null || level == null || job == null || !job.exchangeJob()) {
+            return;
+        }
+        Schematic schematic = buildExchangeSchematic(level, job);
+        if (schematic == null || schematic.blockCount() <= 0) {
+            return;
+        }
+        library.putSchematic(schematic);
+        job.setSchematicId(schematic.id());
+        BlueprintNetwork.showJobHologram(player, job, schematic);
+    }
+
+    private static Schematic buildExchangeSchematic(ServerLevel level, BuildJob job) {
+        java.util.List<com.wrights.blueprint.ShapeMaterials.Entry> materials =
+                com.wrights.blueprint.ShapeMaterials.parse(job.shapeMaterials());
+        java.util.List<com.wrights.blueprint.ShapeMaterials.Entry> usable = new java.util.ArrayList<>();
+        for (com.wrights.blueprint.ShapeMaterials.Entry entry : materials) {
+            if (entry != null && entry.state() != null) {
+                usable.add(entry);
+            }
+        }
+        if (usable.isEmpty()) {
+            return null;
+        }
+        com.wrights.blueprint.Shapes.Kind shapeKind = com.wrights.blueprint.Shapes.Kind.byId(job.shapeKind());
+        BlockPos pinLocal = com.wrights.blueprint.Shapes.pinLocal(
+                shapeKind,
+                job.shapeSize(),
+                job.shapeHeight(),
+                job.shapeThickness(),
+                job.shapeHollow(),
+                job.shapeAxis(),
+                job.shapePivot());
+        int width = job.boxSizeX();
+        int height = job.boxSizeY();
+        int depth = job.boxSizeZ();
+        int budget = Math.min(65_536, Math.max(1, WrightsConfig.MAX_BLOCKS.getAsInt()));
+        java.util.List<BlockPos> cells = new java.util.ArrayList<>();
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        outer:
+        for (int z = 0; z < depth; z++) {
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    if (cells.size() >= budget) {
+                        break outer;
+                    }
+                    cursor.set(job.min().getX() + x, job.min().getY() + y, job.min().getZ() + z);
+                    if (!com.wrights.blueprint.Shapes.containsWorld(
+                            shapeKind,
+                            cursor,
+                            job.shapeCenter(),
+                            pinLocal,
+                            job.shapeSize(),
+                            job.shapeHeight(),
+                            job.shapeThickness(),
+                            job.shapeHollow(),
+                            job.shapeAxis(),
+                            job.shapeYaw())) {
+                        continue;
+                    }
+                    if (level.isOutsideBuildHeight(cursor) || !com.wrights.blueprint.BoxEdits.inWorld(cursor)) {
+                        continue;
+                    }
+                    BlockState current = level.getBlockState(cursor);
+                    if (!exchangeMatches(level, cursor, current, job.exchangeFrom())) {
+                        continue;
+                    }
+                    cells.add(cursor.immutable());
+                }
+            }
+        }
+        if (cells.isEmpty()) {
+            return null;
+        }
+        com.wrights.blueprint.ShapeMaterials.FillMode fillMode =
+                com.wrights.blueprint.ShapeMaterials.FillMode.byId(job.shapeFillMode());
+        java.util.List<BlockState> planned = com.wrights.blueprint.ShapeMaterials.assign(
+                usable,
+                cells.size(),
+                fillMode,
+                job.shapeOrderBatch(),
+                new java.util.Random(job.shapeSeed()),
+                true,
+                item -> Long.MAX_VALUE,
+                true);
+        java.util.List<Schematic.Entry> entries = new java.util.ArrayList<>(cells.size());
+        for (int i = 0; i < cells.size() && i < planned.size(); i++) {
+            BlockPos at = cells.get(i);
+            int dx = at.getX() - job.min().getX();
+            int dy = at.getY() - job.min().getY();
+            int dz = at.getZ() - job.min().getZ();
+            if (dx < Short.MIN_VALUE || dx > Short.MAX_VALUE
+                    || dy < Short.MIN_VALUE || dy > Short.MAX_VALUE
+                    || dz < Short.MIN_VALUE || dz > Short.MAX_VALUE) {
+                continue;
+            }
+            BlockState state = planned.get(i);
+            if (state == null || state.isAir()) {
+                continue;
+            }
+            entries.add(new Schematic.Entry((short) dx, (short) dy, (short) dz, state, false));
+        }
+        if (entries.isEmpty()) {
+            return null;
+        }
+        String title = job.blueprintName() == null || job.blueprintName().isBlank() ? "Exchange" : job.blueprintName();
+        return new Schematic(
+                java.util.UUID.randomUUID(),
+                title,
+                width,
+                height,
+                depth,
+                entries,
+                job.min(),
+                job.max(),
+                level.dimension().location().toString(),
+                0,
+                0,
+                0,
+                true);
     }
 
     private static void tickShape(MinecraftServer server, SchematicLibrary library, BuildJob job) {
@@ -1231,6 +1367,13 @@ public final class JobManager {
             parkSolo(level, player, job);
             job.setQueued(true);
             job.setCrewQuota(Math.max(1, job.crewQuota()));
+        }
+        // Large exchange ghosts skip per-block drops — refresh the stepped hologram on a throttle.
+        if (job.exchangeJob() && job.schematicId() != null && job.total() > 8000
+                && level.getGameTime() % 40L == 0L
+                && job.waitKind() != BuildJob.WAIT_ITEMS
+                && job.waitKind() != BuildJob.WAIT_CHUNK) {
+            library.schematic(job.schematicId()).ifPresent(schematic -> BlueprintNetwork.showJobHologram(player, job, schematic));
         }
         library.setDirty();
         if (job.cursor() >= job.total()) {

@@ -997,7 +997,12 @@ public final class BlueprintNetwork {
         PacketDistributor.sendToPlayer(player, BlueprintPayloads.JobHologram.clearAll());
         com.wrights.schematic.SchematicLibrary library = com.wrights.schematic.SchematicLibrary.get(player.getServer());
         for (com.wrights.job.BuildJob job : library.jobsFor(player.getUUID())) {
-            if (job.kind() != com.wrights.job.BuildJob.Kind.PASTE || job.schematicId() == null) {
+            if (job.schematicId() == null) {
+                continue;
+            }
+            // Paste blueprints/mirrors, plus Exchange jobs that carry an ephemeral swap ghost.
+            if (job.kind() != com.wrights.job.BuildJob.Kind.PASTE
+                    && !(job.kind() == com.wrights.job.BuildJob.Kind.SHAPE && job.exchangeJob())) {
                 continue;
             }
             library.schematic(job.schematicId()).ifPresent(schematic -> showJobHologram(player, job, schematic));
