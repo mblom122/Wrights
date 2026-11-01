@@ -117,7 +117,7 @@ public class MaterialsScreen extends Screen {
 
     @Override
     protected void init() {
-        panelW = WrightsUi.fitW(700, this.width);
+        panelW = WrightsUi.fitW(560, this.width);
         panelH = WrightsUi.fitH(240, this.height);
         panelX = WrightsUi.centerX(panelW, this.width);
         panelY = WrightsUi.centerY(panelH, this.height);
@@ -195,9 +195,9 @@ public class MaterialsScreen extends Screen {
             missingW = Math.max(missingW, this.font.width(Long.toString(shortfall)));
         }
         int needX = right - COUNT_W;
-        int totalX = needX - 8 - totalW;
-        int missingX = totalX - 8 - missingW;
-        int digitalX = missingX - 8 - digitalW;
+        int missingX = needX - 8 - missingW;
+        int totalX = missingX - 8 - totalW;
+        int digitalX = totalX - 8 - digitalW;
         int inventoryX = digitalX - 8 - inventoryW;
         int playerX = inventoryX - 8 - COUNT_W;
         int iconX = panelX + 16;
@@ -207,8 +207,8 @@ public class MaterialsScreen extends Screen {
         drawColumn(graphics, Component.translatable("menu.wrights.column_player"), playerX, listY + 2, COUNT_W, true);
         drawColumn(graphics, Component.translatable("menu.wrights.column_inventory"), inventoryX, listY + 2, inventoryW, true);
         drawColumn(graphics, Component.translatable("menu.wrights.column_digital"), digitalX, listY + 2, digitalW, true);
-        drawColumn(graphics, Component.translatable("menu.wrights.column_missing"), missingX, listY + 2, missingW, true);
         drawColumn(graphics, Component.translatable("menu.wrights.column_total"), totalX, listY + 2, totalW, true);
+        drawColumn(graphics, Component.translatable("menu.wrights.column_missing"), missingX, listY + 2, missingW, true);
         drawColumn(graphics, Component.translatable("menu.wrights.column_need"), needX, listY + 2, COUNT_W, true);
         graphics.fill(panelX + 16, listY + HEADER - 2, right, listY + HEADER - 1, 0xFF31404E);
         int rows = Math.max(1, (listH - HEADER) / ROW);
@@ -237,8 +237,8 @@ public class MaterialsScreen extends Screen {
                     supplyBound ? stockColor(creative, line.supply(), need) : WrightsUi.MUTED);
             drawCount(graphics, digitalBound ? Integer.toString(line.digital()) : "-", digitalX, y + 5, digitalW,
                     digitalBound ? stockColor(creative, line.digital(), need) : WrightsUi.MUTED);
-            drawCount(graphics, Long.toString(missing), missingX, y + 5, missingW, missingColor(creative, missing));
             drawCount(graphics, Long.toString(total), totalX, y + 5, totalW, stockColor(creative, total, need));
+            drawCount(graphics, Long.toString(missing), missingX, y + 5, missingW, missingColor(creative, missing));
             drawCount(graphics, Integer.toString(need), needX, y + 5, COUNT_W, WrightsUi.TEXT);
             if (mouseX >= iconX && mouseX < right && mouseY >= y && mouseY < y + ROW) {
                 hovered = stack;
