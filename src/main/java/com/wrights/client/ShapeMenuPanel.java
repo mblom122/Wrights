@@ -36,6 +36,9 @@ final class ShapeMenuPanel {
     private int scroll;
     private int previewX;
     private int previewW;
+    /** Actual 3D preview box (below the size/blocks line). */
+    private int previewBoxY;
+    private int previewBoxH;
     private int sizeY = -1;
     private int heightY = -1;
     private int thicknessY = -1;
@@ -49,6 +52,7 @@ final class ShapeMenuPanel {
     private int previewSizeX = 1;
     private int previewSizeY = 1;
     private int previewSizeZ = 1;
+    private int previewBlocks;
     private long previewKey = Long.MIN_VALUE;
     private float previewYaw = 35.0F;
     private float previewPitch = 28.0F;
@@ -263,10 +267,11 @@ final class ShapeMenuPanel {
 
     private boolean insidePreview(double mouseX, double mouseY) {
         return previewW > 0
+                && previewBoxH > 0
                 && mouseX >= previewX
                 && mouseX < previewX + previewW
-                && mouseY >= viewTop
-                && mouseY < viewTop + viewH;
+                && mouseY >= previewBoxY
+                && mouseY < previewBoxY + previewBoxH;
     }
 
     boolean dragSize(double mouseX) {
@@ -704,11 +709,22 @@ final class ShapeMenuPanel {
     }
 
     private void drawShapePreview(GuiGraphics graphics, int x, int y, int width, int height) {
-        graphics.fill(x, y, x + width, y + height, 0xFF101820);
-        WrightsUi.border(graphics, x, y, width, height, 0xFF31404E);
         refreshShapePreview();
+        // Compact size + block count above the spinning preview.
+        int infoH = 14;
+        String info = Component.translatable(
+                "menu.wrights.shape_preview_info",
+                previewSizeX,
+                previewSizeY,
+                previewSizeZ,
+                previewBlocks).getString();
+        graphics.drawCenteredString(font, font.plainSubstrByWidth(info, width), x + width / 2, y + 2, WrightsUi.MUTED);
+        previewBoxY = y + infoH;
+        previewBoxH = Math.max(24, height - infoH);
+        graphics.fill(x, previewBoxY, x + width, previewBoxY + previewBoxH, 0xFF101820);
+        WrightsUi.border(graphics, x, previewBoxY, width, previewBoxH, 0xFF31404E);
         if (previewGhosts.isEmpty()) {
-            graphics.drawCenteredString(font, Component.translatable("screen.wrights.preview_hidden"), x + width / 2, y + height / 2 - 4, WrightsUi.MUTED);
+            graphics.drawCenteredString(font, Component.translatable("screen.wrights.preview_hidden"), x + width / 2, previewBoxY + previewBoxH / 2 - 4, WrightsUi.MUTED);
             return;
         }
         if (!previewSpinning) {
@@ -721,9 +737,9 @@ final class ShapeMenuPanel {
         BlueprintModelView.render(
                 graphics,
                 x + 1,
-                y + 1,
+                previewBoxY + 1,
                 width - 2,
-                height - 2,
+                previewBoxH - 2,
                 previewGhosts,
                 previewSizeX,
                 previewSizeY,
@@ -734,7 +750,7 @@ final class ShapeMenuPanel {
                 pin.getX(),
                 pin.getY(),
                 pin.getZ());
-        graphics.drawCenteredString(font, Component.translatable("menu.wrights.spin"), x + width / 2, y + height - 12, WrightsUi.MUTED);
+        graphics.drawCenteredString(font, Component.translatable("menu.wrights.spin"), x + width / 2, previewBoxY + previewBoxH - 12, WrightsUi.MUTED);
     }
 
     private void refreshShapePreview() {
@@ -757,6 +773,7 @@ final class ShapeMenuPanel {
         if (worlds.isEmpty()) {
             previewGhosts = List.of();
             previewSizeX = previewSizeY = previewSizeZ = 1;
+            previewBlocks = 0;
             return;
         }
         BlockPos origin = Shapes.origin(worlds);
@@ -771,6 +788,7 @@ final class ShapeMenuPanel {
         previewSizeX = maxX + 1;
         previewSizeY = maxY + 1;
         previewSizeZ = maxZ + 1;
+        previewBlocks = worlds.size();
         if (worlds.size() > WrightsConfig.maxPreviewBlocks()) {
             previewGhosts = List.of();
             return;

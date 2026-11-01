@@ -889,6 +889,7 @@
   "menu.wrights.sub_blueprints": "Blueprints",
   "menu.wrights.sub_mirror": "Mirror",
   "menu.wrights.sub_shape": "Shape",
+  "menu.wrights.shape_preview_info": "%s x %s x %s · %s blocks",
   "menu.wrights.shape_title": "Shape",
   "menu.wrights.shape_kind": "Shape",
   "menu.wrights.shape_kind_hint": "Pick a shape, then set Axis and Rotation. Height grows along the chosen axis.",
