@@ -2181,21 +2181,28 @@ public class WrightsMenuScreen extends Screen {
         }
     }
 
+    /** Short GUI heights put Materials on the Build/Close row. */
+    private boolean compactDetailFooter() {
+        return this.height < 340 || detailBodyH < 150;
+    }
+
     /** Keeps the preview/info stack and Materials button aligned with detail scroll. */
     private void syncDetailScrollLayout(boolean buildingPage, boolean materialsActive) {
+        boolean compact = compactDetailFooter();
         int bar = detailContentH > detailBodyH ? 8 : 0;
-        int modelPrefer = Math.min(Math.max(56, detailBodyH / 2), Math.max(56, detailBodyH - 110));
+        int modelPrefer = Math.min(Math.max(56, detailBodyH / 2), Math.max(56, detailBodyH - (compact ? 90 : 110)));
         modelX = detailX + 4;
         modelW = Math.max(8, detailW - 8 - bar);
         modelH = modelPrefer;
-        detailContentH = modelPrefer + 6 + 72 + 18;
+        // Compact footers keep Materials off the scroll stack so it cannot cover Build/Close.
+        detailContentH = modelPrefer + 6 + (compact ? 52 + 16 : 72 + 18);
         detailScroll = Mth.clamp(detailScroll, 0, Math.max(0, detailContentH - detailBodyH));
         modelY = detailY + 4 - detailScroll;
         detailSplit = modelY + modelH + 6;
         int nameY = detailSplit + 52;
         int materialsY = detailSplit + 72;
         boolean nameIn = nameY + 14 > detailY && nameY < detailY + detailBodyH;
-        boolean materialsIn = materialsY + 16 > detailY && materialsY < detailY + detailBodyH;
+        boolean materialsIn = !compact && materialsY + 16 > detailY && materialsY < detailY + detailBodyH;
         if (rename != null) {
             rename.setX(detailX + 4);
             rename.setY(nameY);
@@ -2208,11 +2215,16 @@ public class WrightsMenuScreen extends Screen {
             renameButton.visible = buildingPage && nameIn;
         }
         if (materialsButton != null) {
-            materialsButton.setX(detailX + 4);
-            materialsButton.setY(materialsY);
-            materialsButton.setWidth(Math.max(40, detailW - 8 - bar));
             materialsButton.active = materialsActive;
-            materialsButton.visible = buildingPage && materialsIn;
+            if (compact) {
+                placeDetailFooter(buildingPage);
+            } else {
+                materialsButton.setMessage(Component.translatable("menu.wrights.materials"));
+                materialsButton.setX(detailX + 4);
+                materialsButton.setY(materialsY);
+                materialsButton.setWidth(Math.max(40, detailW - 8 - bar));
+                materialsButton.visible = buildingPage && materialsIn;
+            }
         }
     }
 
@@ -2805,18 +2817,38 @@ public class WrightsMenuScreen extends Screen {
         }
         closeButton.visible = true;
         if (blueprintPage) {
-            int footY = detailY + detailH - detailFooterH + 2;
-            closeButton.setX(detailX + detailW - closeButton.getWidth());
-            closeButton.setY(footY);
-            if (buildButton != null) {
-                buildButton.setX(detailX + detailW - 120);
-                buildButton.setY(footY);
-            }
+            placeDetailFooter(true);
             return;
         }
         int right = panelX + panelW - 12;
         closeButton.setX(right - 10 - closeButton.getWidth());
         closeButton.setY(wideCardBottom() - 8 - closeButton.getHeight());
+    }
+
+    /** Build/Close always; Materials joins that row when the detail card is short. */
+    private void placeDetailFooter(boolean buildingPage) {
+        int footY = detailY + detailH - detailFooterH + 2;
+        int closeW = closeButton.getWidth();
+        int buildW = buildButton == null ? 58 : buildButton.getWidth();
+        closeButton.setX(detailX + detailW - closeW);
+        closeButton.setY(footY);
+        if (buildButton != null) {
+            buildButton.setX(detailX + detailW - closeW - 4 - buildW);
+            buildButton.setY(footY);
+        }
+        if (materialsButton == null) {
+            return;
+        }
+        if (!compactDetailFooter()) {
+            return;
+        }
+        materialsButton.setMessage(Component.translatable("menu.wrights.materials_short"));
+        int materialsW = Math.min(96, Math.max(56, this.font.width(materialsButton.getMessage()) + 12));
+        int buildX = buildButton == null ? detailX + detailW - closeW : buildButton.getX();
+        materialsButton.setWidth(Math.min(materialsW, Math.max(40, buildX - detailX - 8)));
+        materialsButton.setX(detailX + 4);
+        materialsButton.setY(footY);
+        materialsButton.visible = buildingPage;
     }
 
     private int jobsInsetY() {

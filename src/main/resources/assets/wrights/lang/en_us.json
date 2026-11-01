@@ -368,6 +368,7 @@
   "menu.wrights.detail_empty": "Select a blueprint",
   "menu.wrights.source": "Saved at %s",
   "menu.wrights.materials": "Materials needed",
+  "menu.wrights.materials_short": "Materials",
   "menu.wrights.materials_title": "Materials needed",
   "menu.wrights.need_title": "Materials needed",
   "menu.wrights.materials_hint": "Player and Inventory are each compared with Need. Total is both together.",
