@@ -11,6 +11,10 @@ import net.minecraft.network.chat.Component;
  * step sizes, type coordinates, confirm, cancel, or clear so the preview follows the mouse again.
  */
 public class ShapeLookSnapScreen extends Screen {
+    private static final int PAD = 8;
+    private static final int ROW = 14;
+    private static final int GAP = 4;
+
     private int panelX;
     private int panelY;
     private int panelW;
@@ -29,8 +33,10 @@ public class ShapeLookSnapScreen extends Screen {
 
     @Override
     protected void init() {
+        // Title, XYZ, then Confirm/Cancel/Clear with the same GAP above and below the values.
         panelW = WrightsUi.fitW(220, this.width);
-        panelH = WrightsUi.fitH(128, this.height);
+        panelH = PAD + 12 + GAP + ROW * 3 + GAP * 2 + GAP + ROW + PAD;
+        panelH = WrightsUi.fitH(panelH, this.height);
         panelX = WrightsUi.centerX(panelW, this.width);
         panelY = WrightsUi.centerY(panelH, this.height);
         BlockPos start = WrightsClientState.shapeLookSnapPos;
@@ -46,50 +52,46 @@ public class ShapeLookSnapScreen extends Screen {
         WrightsClientState.setShapeLookSnapTarget(original);
         cleared = false;
 
-        int row0 = panelY + 28;
-        int row1 = panelY + 44;
-        int row2 = panelY + 60;
-        xBox = number(panelX + 40, row0);
-        yBox = number(panelX + 40, row1);
-        zBox = number(panelX + 40, row2);
-        step(panelX + 22, row0, "-", () -> nudge(-1, 0, 0));
-        step(panelX + 100, row0, "+", () -> nudge(1, 0, 0));
-        step(panelX + 22, row1, "-", () -> nudge(0, -1, 0));
-        step(panelX + 100, row1, "+", () -> nudge(0, 1, 0));
-        step(panelX + 22, row2, "-", () -> nudge(0, 0, -1));
-        step(panelX + 100, row2, "+", () -> nudge(0, 0, 1));
+        int row0 = panelY + PAD + 12 + GAP;
+        int row1 = row0 + ROW + GAP;
+        int row2 = row1 + ROW + GAP;
+        int btnY = row2 + ROW + GAP;
+        int fieldX = panelX + 34;
+        int fieldW = 52;
+        int plusX = fieldX + fieldW + 2;
+
+        xBox = number(fieldX, row0, fieldW);
+        yBox = number(fieldX, row1, fieldW);
+        zBox = number(fieldX, row2, fieldW);
+        step(panelX + 18, row0, "-", () -> nudge(-1, 0, 0));
+        step(plusX, row0, "+", () -> nudge(1, 0, 0));
+        step(panelX + 18, row1, "-", () -> nudge(0, -1, 0));
+        step(plusX, row1, "+", () -> nudge(0, 1, 0));
+        step(panelX + 18, row2, "-", () -> nudge(0, 0, -1));
+        step(plusX, row2, "+", () -> nudge(0, 0, 1));
+
+        int btnGap = 4;
+        int btnW = (panelW - PAD * 2 - btnGap * 2) / 3;
+        addRenderableWidget(new WrightsButton(
+                panelX + PAD, btnY, btnW, ROW,
+                Component.translatable("screen.wrights.confirm"),
+                button -> confirm()));
+        addRenderableWidget(new WrightsButton(
+                panelX + PAD + btnW + btnGap, btnY, btnW, ROW,
+                Component.translatable("screen.wrights.cancel"),
+                button -> cancel(),
+                true));
+        addRenderableWidget(new WrightsButton(
+                panelX + PAD + (btnW + btnGap) * 2, btnY, btnW, ROW,
+                Component.translatable("screen.wrights.shape_look_snap_clear"),
+                button -> clearSnap(),
+                true));
+
         suppress = true;
         set(xBox, original.getX());
         set(yBox, original.getY());
         set(zBox, original.getZ());
         suppress = false;
-
-        int gap = 4;
-        int btnW = (panelW - 24 - gap * 2) / 3;
-        int btnY = panelY + panelH - 28;
-        addRenderableWidget(new WrightsButton(
-                panelX + 12,
-                btnY,
-                btnW,
-                16,
-                Component.translatable("screen.wrights.confirm"),
-                button -> confirm()));
-        addRenderableWidget(new WrightsButton(
-                panelX + 12 + btnW + gap,
-                btnY,
-                btnW,
-                16,
-                Component.translatable("screen.wrights.cancel"),
-                button -> cancel(),
-                true));
-        addRenderableWidget(new WrightsButton(
-                panelX + 12 + (btnW + gap) * 2,
-                btnY,
-                btnW,
-                16,
-                Component.translatable("screen.wrights.shape_look_snap_clear"),
-                button -> clearSnap(),
-                true));
     }
 
     @Override
@@ -110,14 +112,18 @@ public class ShapeLookSnapScreen extends Screen {
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         tip = null;
         super.render(graphics, mouseX, mouseY, partialTick);
-        graphics.drawString(this.font, this.title, panelX + 12, panelY + 8, WrightsUi.COPPER, false);
-        drawHelp(graphics, mouseX, mouseY, panelX + 12 + this.font.width(this.title) + 4, panelY + 6,
-                "screen.wrights.shape_look_snap_hint");
-        graphics.drawString(this.font, "X", panelX + 12, panelY + 31, WrightsUi.MUTED, false);
-        graphics.drawString(this.font, "Y", panelX + 12, panelY + 47, WrightsUi.MUTED, false);
-        graphics.drawString(this.font, "Z", panelX + 12, panelY + 63, WrightsUi.MUTED, false);
-        drawHelp(graphics, mouseX, mouseY, panelX + 120, panelY + 44,
-                "screen.wrights.shape_look_snap_steps");
+        int titleY = panelY + PAD;
+        graphics.drawString(this.font, this.title, panelX + PAD, titleY, WrightsUi.COPPER, false);
+        int helpX = panelX + PAD + this.font.width(this.title) + 4;
+        drawHelp(graphics, mouseX, mouseY, helpX, titleY - 2, "screen.wrights.shape_look_snap_hint");
+        drawHelp(graphics, mouseX, mouseY, helpX + 14, titleY - 2, "screen.wrights.shape_look_snap_steps");
+
+        int row0 = panelY + PAD + 12 + GAP;
+        int row1 = row0 + ROW + GAP;
+        int row2 = row1 + ROW + GAP;
+        graphics.drawString(this.font, "X", panelX + PAD + 2, row0 + 3, WrightsUi.MUTED, false);
+        graphics.drawString(this.font, "Y", panelX + PAD + 2, row1 + 3, WrightsUi.MUTED, false);
+        graphics.drawString(this.font, "Z", panelX + PAD + 2, row2 + 3, WrightsUi.MUTED, false);
         if (tip != null) {
             graphics.renderTooltip(this.font, this.font.split(tip, 220), mouseX, mouseY);
         }
@@ -220,8 +226,8 @@ public class ShapeLookSnapScreen extends Screen {
         return new BlockPos(x, y, z);
     }
 
-    private EditBox number(int x, int y) {
-        EditBox box = new EditBox(this.font, x, y, 52, 12, Component.empty());
+    private EditBox number(int x, int y, int width) {
+        EditBox box = new EditBox(this.font, x, y, width, ROW, Component.empty());
         box.setMaxLength(8);
         box.setFilter(text -> text.matches("-?\\d{0,7}"));
         box.setResponder(value -> onFields());
@@ -230,7 +236,7 @@ public class ShapeLookSnapScreen extends Screen {
     }
 
     private void step(int x, int y, String label, Runnable action) {
-        addRenderableWidget(new WrightsButton(x, y, 14, 12, Component.literal(label), button -> action.run()));
+        addRenderableWidget(new WrightsButton(x, y, 14, ROW, Component.literal(label), button -> action.run()));
     }
 
     private void set(EditBox box, int value) {
