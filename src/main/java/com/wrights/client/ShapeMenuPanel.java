@@ -25,6 +25,9 @@ import com.wrights.blueprint.Shapes;
 /** Shape page body drawn inside the Building section of the controller menu. */
 final class ShapeMenuPanel {
     private static final int CHIP = 20;
+    private static final int SLIDER_SIZE = 1;
+    private static final int SLIDER_HEIGHT = 2;
+    private static final int SLIDER_THICKNESS = 3;
 
     private final Font font;
     private Screen host;
@@ -43,6 +46,16 @@ final class ShapeMenuPanel {
     private int heightY = -1;
     private int thicknessY = -1;
     private int sizeW;
+    private int sizeValueX;
+    private int sizeValueW;
+    private int heightValueX;
+    private int heightValueW;
+    private int thicknessValueX;
+    private int thicknessValueW;
+    /** 0 = none, otherwise {@link #SLIDER_SIZE} / {@link #SLIDER_HEIGHT} / {@link #SLIDER_THICKNESS}. */
+    private int draggingSlider;
+    private int editingSlider;
+    private String editText = "";
     private int selectedMaterial;
     private final List<Hit> hits = new ArrayList<>();
     private Component tip;
@@ -111,10 +124,12 @@ final class ShapeMenuPanel {
         int size = WrightsClientConfig.SHAPE_SIZE.get();
         int max = axisMax();
         drawSlider(graphics, x, y, sizeW, size - 1, Math.max(1, max - 1));
-        graphics.drawString(font, Integer.toString(size), x + sizeW + 8, y, WrightsUi.TEXT, false);
+        drawSliderValue(graphics, mouseX, mouseY, x + sizeW + 8, y, size, SLIDER_SIZE);
         y += 18;
         heightY = -1;
         thicknessY = -1;
+        heightValueX = heightValueW = 0;
+        thicknessValueX = thicknessValueW = 0;
         // Ring band / Box depth — Cube is equal on all sides so it only needs Size.
         if (ring || box) {
             drawField(graphics, mouseX, mouseY, x, y,
@@ -124,7 +139,7 @@ final class ShapeMenuPanel {
             thicknessY = y;
             int thickness = Mth.clamp(WrightsClientConfig.SHAPE_THICKNESS.get(), 1, max);
             drawSlider(graphics, x, y, sizeW, thickness - 1, Math.max(1, max - 1));
-            graphics.drawString(font, Integer.toString(thickness), x + sizeW + 8, y, WrightsUi.TEXT, false);
+            drawSliderValue(graphics, mouseX, mouseY, x + sizeW + 8, y, thickness, SLIDER_THICKNESS);
             y += 18;
         }
         if (kind.usesHeight()) {
@@ -133,7 +148,7 @@ final class ShapeMenuPanel {
             heightY = y;
             int height = WrightsClientConfig.SHAPE_HEIGHT.get();
             drawSlider(graphics, x, y, sizeW, height - 1, Math.max(1, max - 1));
-            graphics.drawString(font, Integer.toString(height), x + sizeW + 8, y, WrightsUi.TEXT, false);
+            drawSliderValue(graphics, mouseX, mouseY, x + sizeW + 8, y, height, SLIDER_HEIGHT);
             y += 18;
         }
         // Axis = height direction; Rotation = world yaw around the pin (also Ctrl+scroll).
@@ -231,6 +246,12 @@ final class ShapeMenuPanel {
     }
 
     boolean mouseClicked(double mouseX, double mouseY) {
+        if (editingSlider != 0) {
+            if (hitValue(editingSlider, mouseX, mouseY)) {
+                return true;
+            }
+            commitEdit();
+        }
         if (insidePreview(mouseX, mouseY)) {
             previewSpinning = true;
             return true;
@@ -238,15 +259,30 @@ final class ShapeMenuPanel {
         if (mouseX < bodyX - 4 || mouseX > bodyX + bodyW + 4 || mouseY < viewTop || mouseY > viewTop + viewH) {
             return false;
         }
+        if (hitValue(SLIDER_SIZE, mouseX, mouseY)) {
+            beginEdit(SLIDER_SIZE);
+            return true;
+        }
+        if (hitValue(SLIDER_THICKNESS, mouseX, mouseY)) {
+            beginEdit(SLIDER_THICKNESS);
+            return true;
+        }
+        if (hitValue(SLIDER_HEIGHT, mouseX, mouseY)) {
+            beginEdit(SLIDER_HEIGHT);
+            return true;
+        }
         if (sizeY >= 0 && mouseY >= sizeY && mouseY < sizeY + 12 && mouseX >= bodyX && mouseX < bodyX + sizeW) {
+            draggingSlider = SLIDER_SIZE;
             WrightsClientConfig.setShapeSize(sliderAt(mouseX, axisMax()));
             return true;
         }
         if (thicknessY >= 0 && mouseY >= thicknessY && mouseY < thicknessY + 12 && mouseX >= bodyX && mouseX < bodyX + sizeW) {
+            draggingSlider = SLIDER_THICKNESS;
             WrightsClientConfig.setShapeThickness(sliderAt(mouseX, axisMax()));
             return true;
         }
         if (heightY >= 0 && mouseY >= heightY && mouseY < heightY + 12 && mouseX >= bodyX && mouseX < bodyX + sizeW) {
+            draggingSlider = SLIDER_HEIGHT;
             WrightsClientConfig.setShapeHeight(sliderAt(mouseX, axisMax()));
             return true;
         }
@@ -259,7 +295,19 @@ final class ShapeMenuPanel {
         return false;
     }
 
-    boolean mouseDragged(double dragX, double dragY) {
+    boolean mouseDragged(double mouseX, double mouseY, double dragX, double dragY) {
+        if (draggingSlider == SLIDER_SIZE) {
+            WrightsClientConfig.setShapeSize(sliderAt(mouseX, axisMax()));
+            return true;
+        }
+        if (draggingSlider == SLIDER_THICKNESS) {
+            WrightsClientConfig.setShapeThickness(sliderAt(mouseX, axisMax()));
+            return true;
+        }
+        if (draggingSlider == SLIDER_HEIGHT) {
+            WrightsClientConfig.setShapeHeight(sliderAt(mouseX, axisMax()));
+            return true;
+        }
         if (!previewSpinning) {
             return false;
         }
@@ -269,11 +317,46 @@ final class ShapeMenuPanel {
     }
 
     boolean mouseReleased() {
-        if (!previewSpinning) {
+        boolean handled = draggingSlider != 0 || previewSpinning;
+        draggingSlider = 0;
+        previewSpinning = false;
+        return handled;
+    }
+
+    boolean keyPressed(int keyCode) {
+        if (editingSlider == 0) {
             return false;
         }
-        previewSpinning = false;
+        if (keyCode == 256) {
+            cancelEdit();
+            return true;
+        }
+        if (keyCode == 257 || keyCode == 335) {
+            commitEdit();
+            return true;
+        }
+        if (keyCode == 259) {
+            if (!editText.isEmpty()) {
+                editText = editText.substring(0, editText.length() - 1);
+            }
+            return true;
+        }
         return true;
+    }
+
+    boolean charTyped(char code) {
+        if (editingSlider == 0) {
+            return false;
+        }
+        if (code >= '0' && code <= '9' && editText.length() < 4) {
+            editText = editText + code;
+            return true;
+        }
+        return true;
+    }
+
+    boolean editingValue() {
+        return editingSlider != 0;
     }
 
     private boolean insidePreview(double mouseX, double mouseY) {
@@ -285,28 +368,82 @@ final class ShapeMenuPanel {
                 && mouseY < previewBoxY + previewBoxH;
     }
 
-    boolean dragSize(double mouseX) {
-        if (sizeY < 0) {
-            return false;
-        }
-        WrightsClientConfig.setShapeSize(sliderAt(mouseX, axisMax()));
-        return true;
+    private void beginEdit(int slider) {
+        editingSlider = slider;
+        editText = Integer.toString(sliderValue(slider));
+        draggingSlider = 0;
     }
 
-    boolean dragHeight(double mouseX) {
-        if (heightY < 0) {
-            return false;
-        }
-        WrightsClientConfig.setShapeHeight(sliderAt(mouseX, axisMax()));
-        return true;
+    private void cancelEdit() {
+        editingSlider = 0;
+        editText = "";
     }
 
-    boolean dragThickness(double mouseX) {
-        if (thicknessY < 0) {
-            return false;
+    private void commitEdit() {
+        if (editingSlider == 0) {
+            return;
         }
-        WrightsClientConfig.setShapeThickness(sliderAt(mouseX, axisMax()));
-        return true;
+        int slider = editingSlider;
+        int parsed;
+        try {
+            parsed = editText.isEmpty() ? sliderValue(slider) : Integer.parseInt(editText);
+        } catch (NumberFormatException ignored) {
+            cancelEdit();
+            return;
+        }
+        parsed = Mth.clamp(parsed, 1, axisMax());
+        switch (slider) {
+            case SLIDER_SIZE -> WrightsClientConfig.setShapeSize(parsed);
+            case SLIDER_HEIGHT -> WrightsClientConfig.setShapeHeight(parsed);
+            case SLIDER_THICKNESS -> WrightsClientConfig.setShapeThickness(parsed);
+            default -> {
+            }
+        }
+        cancelEdit();
+    }
+
+    private int sliderValue(int slider) {
+        return switch (slider) {
+            case SLIDER_HEIGHT -> WrightsClientConfig.SHAPE_HEIGHT.get();
+            case SLIDER_THICKNESS -> WrightsClientConfig.SHAPE_THICKNESS.get();
+            default -> WrightsClientConfig.SHAPE_SIZE.get();
+        };
+    }
+
+    private boolean hitValue(int slider, double mouseX, double mouseY) {
+        int x;
+        int y;
+        int w;
+        switch (slider) {
+            case SLIDER_SIZE -> {
+                if (sizeY < 0 || sizeValueW <= 0) {
+                    return false;
+                }
+                x = sizeValueX;
+                y = sizeY;
+                w = sizeValueW;
+            }
+            case SLIDER_HEIGHT -> {
+                if (heightY < 0 || heightValueW <= 0) {
+                    return false;
+                }
+                x = heightValueX;
+                y = heightY;
+                w = heightValueW;
+            }
+            case SLIDER_THICKNESS -> {
+                if (thicknessY < 0 || thicknessValueW <= 0) {
+                    return false;
+                }
+                x = thicknessValueX;
+                y = thicknessY;
+                w = thicknessValueW;
+            }
+            default -> {
+                return false;
+            }
+        }
+        return mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + 12;
     }
 
     private static int axisMax() {
@@ -1072,6 +1209,36 @@ final class ShapeMenuPanel {
         int thumb = max <= 0 ? 0 : width * Mth.clamp(value, 0, max) / max;
         graphics.fill(x, y + 4, x + Math.max(2, thumb), y + 8, WrightsUi.COPPER);
         graphics.fill(x + Math.max(0, thumb - 2), y + 1, x + Math.max(4, thumb + 2), y + 11, WrightsUi.COPPER);
+    }
+
+    /** Number to the right of a slider — click to type; copper outline while editing. */
+    private void drawSliderValue(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int value, int slider) {
+        boolean editing = editingSlider == slider;
+        String shown = editing ? editText : Integer.toString(value);
+        int textW = font.width(shown.isEmpty() ? "0" : shown);
+        int w = Math.max(28, textW + 8);
+        boolean hover = !editing && mouseX >= x - 2 && mouseX < x - 2 + w + 2 && mouseY >= y - 1 && mouseY < y + 11;
+        if (editing || hover) {
+            graphics.fill(x - 2, y - 1, x - 2 + w + 2, y + 11, editing ? 0xFF1C2A37 : 0xFF18222C);
+            WrightsUi.border(graphics, x - 2, y - 1, w + 2, 12, editing ? WrightsUi.COPPER : 0xFF3D4E5E);
+        }
+        graphics.drawString(font, shown.isEmpty() ? "_" : shown, x, y, editing ? WrightsUi.COPPER : WrightsUi.TEXT, false);
+        switch (slider) {
+            case SLIDER_SIZE -> {
+                sizeValueX = x - 2;
+                sizeValueW = w + 2;
+            }
+            case SLIDER_HEIGHT -> {
+                heightValueX = x - 2;
+                heightValueW = w + 2;
+            }
+            case SLIDER_THICKNESS -> {
+                thicknessValueX = x - 2;
+                thicknessValueW = w + 2;
+            }
+            default -> {
+            }
+        }
     }
 
     private record Hit(int x, int y, int w, int h, String id, int value) {

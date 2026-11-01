@@ -2743,7 +2743,7 @@ public class WrightsMenuScreen extends Screen {
             applyDrag(mouseX);
             return true;
         }
-        if (shapePage && shapePanel != null && button == 0 && shapePanel.mouseDragged(dragX, dragY)) {
+        if (shapePage && shapePanel != null && button == 0 && shapePanel.mouseDragged(mouseX, mouseY, dragX, dragY)) {
             return true;
         }
         if (spinning && button == 0) {
@@ -2801,7 +2801,18 @@ public class WrightsMenuScreen extends Screen {
     }
 
     @Override
+    public boolean charTyped(char code, int modifiers) {
+        if (shapePage && shapePanel != null && shapePanel.editingValue() && shapePanel.charTyped(code)) {
+            return true;
+        }
+        return super.charTyped(code, modifiers);
+    }
+
+    @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (shapePage && shapePanel != null && shapePanel.editingValue() && shapePanel.keyPressed(keyCode)) {
+            return true;
+        }
         if (managePage && manage.keyPressed(manageHost, keyCode, scanCode, modifiers)) {
             return true;
         }
