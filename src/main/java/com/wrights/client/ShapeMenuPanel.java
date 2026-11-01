@@ -803,26 +803,13 @@ final class ShapeMenuPanel {
         }
     }
 
-    /** Anchor so the player will stand on the center of the finished shape’s top. */
+    /** Anchor at the block the player is standing in — no shape-size / hologram offset. */
     private void setAnchorUnderPlayer() {
         net.minecraft.client.Minecraft minecraft = net.minecraft.client.Minecraft.getInstance();
         if (minecraft.player == null || minecraft.level == null) {
             return;
         }
-        Shapes.Kind kind = exchangeMode
-                ? WrightsClientConfig.exchangeKind()
-                : Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
-        int pivot = exchangeMode ? WrightsClientConfig.exchangePivot() : WrightsClientConfig.SHAPE_PIVOT.get();
-        BlockPos anchor = Shapes.anchorStandingOnTop(
-                kind,
-                minecraft.player.blockPosition(),
-                WrightsClientConfig.SHAPE_SIZE.get(),
-                WrightsClientConfig.SHAPE_HEIGHT.get(),
-                WrightsClientConfig.SHAPE_THICKNESS.get(),
-                WrightsClientConfig.SHAPE_HOLLOW.get(),
-                WrightsClientConfig.SHAPE_PLANE.get(),
-                WrightsClientConfig.SHAPE_YAW.get(),
-                pivot);
+        BlockPos anchor = minecraft.player.blockPosition();
         WrightsClientState.setShapeAnchor(anchor);
         WrightsClientConfig.setShapeUseAnchor(true);
         minecraft.player.displayClientMessage(
