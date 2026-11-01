@@ -13,8 +13,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * Drag a block item from JEI onto the Pick blocks panel to add it to the materials tray.
- * Only plain (non-NBT) blocks are accepted.
+ * Drag a full-cube block from JEI onto the Pick blocks panel to add it to the materials tray.
+ * Dust, plants, NBT blocks, and other non-cube items are refused.
  */
 public final class PickerGhostHandler implements IGhostIngredientHandler<BlockPickerScreen> {
     @Override
@@ -27,7 +27,7 @@ public final class PickerGhostHandler implements IGhostIngredientHandler<BlockPi
             return List.of();
         }
         BlockState state = BlockFilters.stateForItem(stack.get());
-        if (!BlockFilters.canStore(state)) {
+        if (!BlockFilters.canShapeMaterial(state)) {
             return List.of();
         }
         // Whole panel is a drop target so the block can be released anywhere on Pick blocks.

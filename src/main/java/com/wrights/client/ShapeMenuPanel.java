@@ -370,7 +370,7 @@ final class ShapeMenuPanel {
         List<ShapeMaterials.Entry> next = new ArrayList<>();
         java.util.Set<net.minecraft.world.item.Item> seen = new java.util.HashSet<>();
         for (BlockState state : states) {
-            if (!com.wrights.util.BlockFilters.canStore(state)) {
+            if (!com.wrights.util.BlockFilters.canShapeMaterial(state)) {
                 continue;
             }
             net.minecraft.world.item.Item item = state.getBlock().asItem();

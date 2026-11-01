@@ -116,7 +116,7 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
             return;
         }
         for (BlockState state : initial) {
-            if (!BlockFilters.canStore(state)) {
+            if (!allowsPick(state)) {
                 continue;
             }
             Item item = state.getBlock().asItem();
@@ -132,6 +132,11 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
             }
             selected.add(choice);
         }
+    }
+
+    /** Shape materials need full cubes; blueprint cell picks use the looser store filter. */
+    private boolean allowsPick(BlockState state) {
+        return blocksOnly ? BlockFilters.canShapeMaterial(state) : BlockFilters.canStore(state);
     }
 
     /** Screen that opened this picker — library edit does not need the controller held. */
@@ -171,7 +176,7 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
             clearButton = new WrightsButton(bx, panelY + panelH - 28, third, 16, Component.translatable("screen.wrights.picker_clear"), button -> clearSelected(), true);
             addRenderableWidget(clearButton);
             bx += third + gap;
-            addButton = new WrightsButton(bx, panelY + panelH - 28, panelX + panelW - 12 - bx, 16, Component.translatable("screen.wrights.picker_add"), button -> confirmSelected());
+            addButton = new WrightsButton(bx, panelY + panelH - 28, panelX + panelW - 12 - bx, 16, Component.translatable("screen.wrights.picker_confirm"), button -> confirmSelected());
             addRenderableWidget(addButton);
             markAdd();
         } else {
@@ -424,8 +429,7 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
             if (blocksOnly && choice.fluid() != null) {
                 continue;
             }
-            // Shape materials / plain picks: never list chests, machines, or other NBT blocks.
-            if (blocksOnly && !BlockFilters.canStore(Block.stateById(choice.stateId()))) {
+            if (blocksOnly && !BlockFilters.canShapeMaterial(Block.stateById(choice.stateId()))) {
                 continue;
             }
             if (!query.isEmpty() && !choice.name().getString().toLowerCase(Locale.ROOT).contains(query)) {
@@ -441,7 +445,7 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
             for (RecentBlocks.Pick recent : RecentBlocks.picks()) {
                 if (!blocksOnly && recent.fluid() != null) {
                     addFluid(choices, recent.fluid());
-                } else if (recent.item() instanceof BlockItem blockItem && BlockFilters.canStore(blockItem.getBlock().defaultBlockState())) {
+                } else if (recent.item() instanceof BlockItem blockItem && allowsPick(blockItem.getBlock().defaultBlockState())) {
                     choices.add(Choice.ofBlock(blockItem));
                 }
             }
@@ -458,7 +462,7 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
                     if (fluid != null && seenFluids.add(fluid)) {
                         addFluid(choices, fluid);
                     } else if (stack.getItem() instanceof BlockItem blockItem
-                            && BlockFilters.canStore(blockItem.getBlock().defaultBlockState())
+                            && allowsPick(blockItem.getBlock().defaultBlockState())
                             && seen.add(stack.getItem())) {
                         choices.add(Choice.ofBlock(blockItem));
                     }
@@ -472,7 +476,7 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
             }
         }
         for (Item item : allBlocks()) {
-            if (item instanceof BlockItem blockItem) {
+            if (item instanceof BlockItem blockItem && allowsPick(blockItem.getBlock().defaultBlockState())) {
                 choices.add(Choice.ofBlock(blockItem));
             }
         }
@@ -523,8 +527,7 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
 
     private void choose(Choice choice) {
         BlockState state = Block.stateById(choice.stateId());
-        // Shape material tray only accepts plain blocks (no block-entity / NBT blocks).
-        if (blocksOnly && !BlockFilters.canStore(state)) {
+        if (blocksOnly && !BlockFilters.canShapeMaterial(state)) {
             return;
         }
         if (multi) {
@@ -579,7 +582,7 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
         List<BlockState> states = new ArrayList<>(selected.size());
         for (Choice choice : selected) {
             BlockState state = Block.stateById(choice.stateId());
-            if (!BlockFilters.canStore(state)) {
+            if (!BlockFilters.canShapeMaterial(state)) {
                 continue;
             }
             remember(choice);
@@ -592,9 +595,9 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
         this.minecraft.setScreen(parent);
     }
 
-    /** JEI / external drop into the shape materials tray — plain blocks only. */
+    /** JEI / external drop into the shape materials tray — full cube blocks only. */
     public boolean acceptMaterial(BlockState state) {
-        if (!multi || !blocksOnly || !BlockFilters.canStore(state)) {
+        if (!multi || !blocksOnly || !BlockFilters.canShapeMaterial(state)) {
             return false;
         }
         Item item = state.getBlock().asItem();

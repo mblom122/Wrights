@@ -11,6 +11,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.EmptyBlockGetter;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.BushBlock;
 import net.minecraft.world.level.block.CactusBlock;
@@ -22,7 +23,9 @@ import net.minecraft.world.level.block.EndGatewayBlock;
 import net.minecraft.world.level.block.EndPortalBlock;
 import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.NetherPortalBlock;
+import net.minecraft.world.level.block.RedStoneWireBlock;
 import net.minecraft.world.level.block.SugarCaneBlock;
+import net.minecraft.world.level.block.TorchBlock;
 import net.minecraft.world.level.block.piston.MovingPistonBlock;
 import net.minecraft.world.level.block.piston.PistonHeadBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -192,6 +195,24 @@ public final class BlockFilters {
      */
     public static boolean isNbtBlock(BlockState state) {
         return state != null && (state.hasBlockEntity() || state.getBlock() instanceof EntityBlock);
+    }
+
+    /**
+     * Solid cube blocks for Shape materials. Refuses NBT blocks, plants, dust/wire, and other
+     * non-full cubes that show up as flat items (redstone, sugar cane, torches, slabs, …).
+     */
+    public static boolean canShapeMaterial(BlockState state) {
+        if (!canStore(state)) {
+            return false;
+        }
+        Block block = state.getBlock();
+        if (!(block.asItem() instanceof BlockItem)) {
+            return false;
+        }
+        if (needsGround(state) || block instanceof RedStoneWireBlock || block instanceof TorchBlock) {
+            return false;
+        }
+        return state.isCollisionShapeFullBlock(EmptyBlockGetter.INSTANCE, BlockPos.ZERO);
     }
 
     /** Sand, gravel, anvils, and the other blocks that fall when the block under them is missing. */

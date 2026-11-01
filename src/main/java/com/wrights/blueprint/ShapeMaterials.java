@@ -44,7 +44,7 @@ public final class ShapeMaterials {
                 return null;
             }
             BlockState state = blockItem.getBlock().defaultBlockState();
-            return BlockFilters.canStore(state) ? state : null;
+            return BlockFilters.canShapeMaterial(state) ? state : null;
         }
     }
 
@@ -72,7 +72,7 @@ public final class ShapeMaterials {
                     continue;
                 }
                 Item item = BuiltInRegistries.ITEM.get(id);
-                if (!(item instanceof BlockItem blockItem) || !BlockFilters.canStore(blockItem.getBlock().defaultBlockState())) {
+                if (!(item instanceof BlockItem blockItem) || !BlockFilters.canShapeMaterial(blockItem.getBlock().defaultBlockState())) {
                     continue;
                 }
                 int weight = 1;
@@ -115,7 +115,7 @@ public final class ShapeMaterials {
 
     public static List<Entry> add(List<Entry> current, Item item) {
         List<Entry> next = new ArrayList<>(current == null ? List.of() : current);
-        if (!(item instanceof BlockItem blockItem) || !BlockFilters.canStore(blockItem.getBlock().defaultBlockState())) {
+        if (!(item instanceof BlockItem blockItem) || !BlockFilters.canShapeMaterial(blockItem.getBlock().defaultBlockState())) {
             return next;
         }
         for (int i = 0; i < next.size(); i++) {
