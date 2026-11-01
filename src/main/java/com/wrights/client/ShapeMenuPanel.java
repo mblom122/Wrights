@@ -862,20 +862,34 @@ final class ShapeMenuPanel {
             }
         }
         List<WrightsClientState.Ghost> ghosts = new ArrayList<>(mesh.size());
+        int gMinX = Integer.MAX_VALUE;
+        int gMinY = Integer.MAX_VALUE;
+        int gMinZ = Integer.MAX_VALUE;
+        int gMaxX = Integer.MIN_VALUE;
+        int gMaxY = Integer.MIN_VALUE;
+        int gMaxZ = Integer.MIN_VALUE;
         for (int i = 0; i < mesh.size(); i++) {
             BlockPos pos = mesh.get(i);
             BlockState state = i < planned.size() ? planned.get(i) : planned.get(planned.size() - 1);
             if (state == null || state.isAir()) {
                 state = fallback;
             }
-            ghosts.add(new WrightsClientState.Ghost(
-                    pos.getX() - origin.getX(),
-                    pos.getY() - origin.getY(),
-                    pos.getZ() - origin.getZ(),
-                    1.0F,
-                    1.0F,
-                    1.0F,
-                    Block.getId(state)));
+            int gx = pos.getX() - origin.getX();
+            int gy = pos.getY() - origin.getY();
+            int gz = pos.getZ() - origin.getZ();
+            gMinX = Math.min(gMinX, gx);
+            gMinY = Math.min(gMinY, gy);
+            gMinZ = Math.min(gMinZ, gz);
+            gMaxX = Math.max(gMaxX, gx);
+            gMaxY = Math.max(gMaxY, gy);
+            gMaxZ = Math.max(gMaxZ, gz);
+            ghosts.add(new WrightsClientState.Ghost(gx, gy, gz, 1.0F, 1.0F, 1.0F, Block.getId(state)));
+        }
+        // Keep mesh AABB in lockstep with the baked ghosts (avoids frame/model drift).
+        if (gMinX <= gMaxX) {
+            meshSizeX = gMaxX - gMinX + 1;
+            meshSizeY = gMaxY - gMinY + 1;
+            meshSizeZ = gMaxZ - gMinZ + 1;
         }
         previewGhosts = List.copyOf(ghosts);
     }

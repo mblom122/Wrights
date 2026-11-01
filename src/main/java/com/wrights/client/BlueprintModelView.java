@@ -69,17 +69,57 @@ public final class BlueprintModelView {
         if (ghosts == null || ghosts.isEmpty() || width < 8 || height < 8) {
             return;
         }
+        // Fit/center from the real ghost AABB so a stale or mismatched sizeX/Y/Z cannot shift
+        // the mesh relative to the wireframe (one side clipped, opposite side empty).
+        int minX = Integer.MAX_VALUE;
+        int minY = Integer.MAX_VALUE;
+        int minZ = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE;
+        int maxY = Integer.MIN_VALUE;
+        int maxZ = Integer.MIN_VALUE;
+        for (WrightsClientState.Ghost ghost : ghosts) {
+            minX = Math.min(minX, ghost.x());
+            minY = Math.min(minY, ghost.y());
+            minZ = Math.min(minZ, ghost.z());
+            maxX = Math.max(maxX, ghost.x());
+            maxY = Math.max(maxY, ghost.y());
+            maxZ = Math.max(maxZ, ghost.z());
+        }
+        // Unit cubes occupy [min, max+1]; fall back to caller sizes only if needed.
+        if (minX > maxX) {
+            minX = 0;
+            maxX = Math.max(0, sizeX - 1);
+            minY = 0;
+            maxY = Math.max(0, sizeY - 1);
+            minZ = 0;
+            maxZ = Math.max(0, sizeZ - 1);
+        }
+        float x0 = minX;
+        float y0 = minY;
+        float z0 = minZ;
+        float x1 = maxX + 1.0F;
+        float y1 = maxY + 1.0F;
+        float z1 = maxZ + 1.0F;
+        float cx = (x0 + x1) * 0.5F;
+        float cy = (y0 + y1) * 0.5F;
+        float cz = (z0 + z1) * 0.5F;
+        float sx = Math.max(1.0F, x1 - x0);
+        float sy = Math.max(1.0F, y1 - y0);
+        float sz = Math.max(1.0F, z1 - z0);
+        // Circumscribed sphere so corners stay inside the panel while spinning.
+        float radius = 0.5F * (float) Math.sqrt(sx * sx + sy * sy + sz * sz);
+        float span = Math.max(sx, Math.max(sy, sz));
+
         graphics.flush();
         graphics.enableScissor(x, y, x + width, y + height);
         var pose = graphics.pose();
         pose.pushPose();
         pose.translate(x + width / 2.0D, y + height / 2.0D, 250.0D);
-        float span = Math.max(1, Math.max(sizeX, Math.max(sizeY, sizeZ)));
-        float scale = Math.min(width, height) * 0.62F / span;
+        float scale = Math.min(width, height) * 0.48F / Math.max(0.5F, radius);
         pose.scale(scale, -scale, scale);
         pose.mulPose(Axis.XP.rotationDegrees(pitch));
         pose.mulPose(Axis.YP.rotationDegrees(yaw));
-        pose.translate(-sizeX / 2.0D, -sizeY / 2.0D, -sizeZ / 2.0D);
+        pose.translate(-cx, -cy, -cz);
 
         ModelMesh mesh = meshFor(ghosts);
         Matrix4f modelView = new Matrix4f(RenderSystem.getModelViewMatrix()).mul(pose.last().pose());
@@ -87,7 +127,7 @@ public final class BlueprintModelView {
         RenderSystem.enableDepthTest();
         mesh.draw(modelView, projection);
         if (showFrame) {
-            drawFrameAndPivot(pose, sizeX, sizeY, sizeZ, span, pivotX, pivotY, pivotZ);
+            drawFrameAndPivot(pose, x0, y0, z0, x1, y1, z1, span, pivotX, pivotY, pivotZ, minX, minY, minZ, maxX, maxY, maxZ);
         }
         RenderSystem.disableDepthTest();
         pose.popPose();
@@ -95,27 +135,38 @@ public final class BlueprintModelView {
     }
 
     /** Thin AABB around the preview blocks, plus a copper pivot marker that always shows through. */
-    private static void drawFrameAndPivot(PoseStack pose, int sizeX, int sizeY, int sizeZ, float span, int pivotX, int pivotY, int pivotZ) {
+    private static void drawFrameAndPivot(
+            PoseStack pose,
+            float x0,
+            float y0,
+            float z0,
+            float x1,
+            float y1,
+            float z1,
+            float span,
+            int pivotX,
+            int pivotY,
+            int pivotZ,
+            int minX,
+            int minY,
+            int minZ,
+            int maxX,
+            int maxY,
+            int maxZ) {
         MultiBufferSource.BufferSource buffers = Minecraft.getInstance().renderBuffers().bufferSource();
         float pad = 0.015F;
-        float x0 = -pad;
-        float y0 = -pad;
-        float z0 = -pad;
-        float x1 = sizeX + pad;
-        float y1 = sizeY + pad;
-        float z1 = sizeZ + pad;
         // Soft steel frame — thin line width so the border stays light.
         RenderSystem.lineWidth(1.0F);
         VertexConsumer frame = buffers.getBuffer(RenderType.lines());
-        boxEdges(pose, frame, x0, y0, z0, x1, y1, z1, 0.55F, 0.72F, 0.86F, 0.55F);
+        boxEdges(pose, frame, x0 - pad, y0 - pad, z0 - pad, x1 + pad, y1 + pad, z1 + pad, 0.55F, 0.72F, 0.86F, 0.55F);
         buffers.endBatch(RenderType.lines());
 
-        int px = Math.max(0, Math.min(sizeX - 1, pivotX));
-        int py = Math.max(0, Math.min(sizeY - 1, pivotY));
-        int pz = Math.max(0, Math.min(sizeZ - 1, pivotZ));
-        float cx = px + 0.5F;
-        float cy = py + 0.5F;
-        float cz = pz + 0.5F;
+        int px = Math.max(minX, Math.min(maxX, pivotX));
+        int py = Math.max(minY, Math.min(maxY, pivotY));
+        int pz = Math.max(minZ, Math.min(maxZ, pivotZ));
+        float mx = px + 0.5F;
+        float my = py + 0.5F;
+        float mz = pz + 0.5F;
         // Grow with the shape so the pin stays readable on large previews.
         float arm = Math.max(0.5F, Math.min(3.0F, span * 0.08F));
         float box = Math.max(0.22F, Math.min(1.2F, span * 0.035F));
@@ -123,10 +174,10 @@ public final class BlueprintModelView {
         RenderSystem.disableDepthTest();
         RenderSystem.lineWidth(2.0F);
         VertexConsumer pivot = buffers.getBuffer(RenderType.lines());
-        line(pose, pivot, cx - arm, cy, cz, cx + arm, cy, cz, 0.91F, 0.55F, 0.23F, 1.0F);
-        line(pose, pivot, cx, cy - arm, cz, cx, cy + arm, cz, 0.91F, 0.55F, 0.23F, 1.0F);
-        line(pose, pivot, cx, cy, cz - arm, cx, cy, cz + arm, 0.91F, 0.55F, 0.23F, 1.0F);
-        boxEdges(pose, pivot, cx - box, cy - box, cz - box, cx + box, cy + box, cz + box, 0.98F, 0.78F, 0.35F, 1.0F);
+        line(pose, pivot, mx - arm, my, mz, mx + arm, my, mz, 0.91F, 0.55F, 0.23F, 1.0F);
+        line(pose, pivot, mx, my - arm, mz, mx, my + arm, mz, 0.91F, 0.55F, 0.23F, 1.0F);
+        line(pose, pivot, mx, my, mz - arm, mx, my, mz + arm, 0.91F, 0.55F, 0.23F, 1.0F);
+        boxEdges(pose, pivot, mx - box, my - box, mz - box, mx + box, my + box, mz + box, 0.98F, 0.78F, 0.35F, 1.0F);
         buffers.endBatch(RenderType.lines());
         RenderSystem.lineWidth(1.0F);
         RenderSystem.enableDepthTest();
