@@ -592,11 +592,18 @@ public final class WrightsInput {
             return;
         }
         if (control) {
-            // Exchange: Ctrl+scroll grows/shrinks Size for quicker Floor/Wall/Column tweaks.
+            // Exchange: Ctrl+scroll grows Size (or Column height — footprint stays 1×1).
             if (WrightsClientState.exchangeToolActive() && com.wrights.WrightsConfig.allowExchange()) {
                 int step = event.getScrollDeltaY() > 0.0D ? 1 : -1;
-                com.wrights.WrightsClientConfig.setShapeSize(
-                        com.wrights.WrightsClientConfig.SHAPE_SIZE.get() + step);
+                if (com.wrights.WrightsClientConfig.exchangeForm()
+                        == com.wrights.blueprint.Shapes.ExchangeForm.COLUMN) {
+                    com.wrights.WrightsClientConfig.setShapeHeight(
+                            com.wrights.WrightsClientConfig.SHAPE_HEIGHT.get() + step);
+                    com.wrights.WrightsClientConfig.enforceExchangeColumnFootprint();
+                } else {
+                    com.wrights.WrightsClientConfig.setShapeSize(
+                            com.wrights.WrightsClientConfig.SHAPE_SIZE.get() + step);
+                }
                 event.setCanceled(true);
                 return;
             }

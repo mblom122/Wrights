@@ -154,12 +154,18 @@ public final class SelectionRenderer {
         if (com.wrights.blueprint.ShapeMaterials.states(materials).isEmpty()) {
             return;
         }
-        com.wrights.blueprint.Shapes.Kind kind = WrightsClientState.exchangeToolActive()
+        boolean exchange = WrightsClientState.exchangeToolActive();
+        com.wrights.blueprint.Shapes.Kind kind = exchange
                 ? WrightsClientConfig.exchangeForm().kind()
                 : com.wrights.blueprint.Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
-        int size = WrightsClientConfig.SHAPE_SIZE.get();
+        if (exchange) {
+            WrightsClientConfig.enforceExchangeColumnFootprint();
+        }
+        boolean column = exchange
+                && WrightsClientConfig.exchangeForm() == com.wrights.blueprint.Shapes.ExchangeForm.COLUMN;
+        int size = column ? 1 : WrightsClientConfig.SHAPE_SIZE.get();
         int height = WrightsClientConfig.SHAPE_HEIGHT.get();
-        int thickness = WrightsClientConfig.SHAPE_THICKNESS.get();
+        int thickness = column ? 1 : WrightsClientConfig.SHAPE_THICKNESS.get();
         boolean hollow = WrightsClientConfig.SHAPE_HOLLOW.get() && WrightsConfig.allowShapeHollow();
         int plane = WrightsClientConfig.SHAPE_PLANE.get();
         int yaw = com.wrights.blueprint.Shapes.clampYaw(WrightsClientConfig.SHAPE_YAW.get());
@@ -178,7 +184,6 @@ public final class SelectionRenderer {
             return;
         }
 
-        boolean exchange = WrightsClientState.exchangeToolActive();
         boolean voidBlocks = WrightsClientConfig.SHAPE_VOID.get() && WrightsConfig.allowShapeVoid();
         int budget = Math.max(1, previewBudget());
         int total = shapeLocal.size();

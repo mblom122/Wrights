@@ -125,33 +125,44 @@ final class ShapeMenuPanel {
         Shapes.Kind kind = exchangeMode
                 ? WrightsClientConfig.exchangeForm().kind()
                 : Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
+        boolean exchangeColumn = exchangeMode
+                && WrightsClientConfig.exchangeForm() == Shapes.ExchangeForm.COLUMN;
+        if (exchangeColumn) {
+            WrightsClientConfig.enforceExchangeColumnFootprint();
+        }
         int axis = WrightsClientConfig.SHAPE_PLANE.get();
         boolean ring = kind == Shapes.Kind.RING;
         boolean box = kind == Shapes.Kind.BOX;
         y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
                 "menu.wrights.shape_section_dimensions", "menu.wrights.shape_section_dimensions_hint", false);
-        drawField(graphics, mouseX, mouseY, x, y, sizeLabel(kind, axis), sizeHint(kind, axis));
-        y += 12;
-        sizeY = y;
-        drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_SIZE.get(), SLIDER_SIZE);
-        y += 18;
+        sizeY = -1;
         heightY = -1;
         thicknessY = -1;
         heightValueX = heightValueW = 0;
         thicknessValueX = thicknessValueW = 0;
-        // Ring band / Box depth — Cube is equal on all sides so it only needs Size.
-        if (ring || box) {
-            drawField(graphics, mouseX, mouseY, x, y,
-                    box ? "menu.wrights.shape_depth" : "menu.wrights.shape_thickness",
-                    box ? "menu.wrights.shape_depth_hint" : "menu.wrights.shape_thickness_hint");
+        // Column is always 1×1 — only Height is editable.
+        if (!exchangeColumn) {
+            drawField(graphics, mouseX, mouseY, x, y, sizeLabel(kind, axis), sizeHint(kind, axis));
             y += 12;
-            thicknessY = y;
-            int thickness = Mth.clamp(WrightsClientConfig.SHAPE_THICKNESS.get(), 1, axisMax());
-            drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, thickness, SLIDER_THICKNESS);
+            sizeY = y;
+            drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_SIZE.get(), SLIDER_SIZE);
             y += 18;
+            // Ring band / Box depth — Cube is equal on all sides so it only needs Size.
+            if (ring || box) {
+                drawField(graphics, mouseX, mouseY, x, y,
+                        box ? "menu.wrights.shape_depth" : "menu.wrights.shape_thickness",
+                        box ? "menu.wrights.shape_depth_hint" : "menu.wrights.shape_thickness_hint");
+                y += 12;
+                thicknessY = y;
+                int thickness = Mth.clamp(WrightsClientConfig.SHAPE_THICKNESS.get(), 1, axisMax());
+                drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, thickness, SLIDER_THICKNESS);
+                y += 18;
+            }
         }
-        if (kind.usesHeight()) {
-            drawField(graphics, mouseX, mouseY, x, y, alongLabel(kind, axis), alongHint(kind, axis));
+        if (kind.usesHeight() || exchangeColumn) {
+            drawField(graphics, mouseX, mouseY, x, y,
+                    exchangeColumn ? "menu.wrights.shape_height" : alongLabel(kind, axis),
+                    exchangeColumn ? "menu.wrights.exchange_column_height_hint" : alongHint(kind, axis));
             y += 12;
             heightY = y;
             drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_HEIGHT.get(), SLIDER_HEIGHT);
@@ -1020,9 +1031,14 @@ final class ShapeMenuPanel {
         Shapes.Kind kind = exchangeMode
                 ? WrightsClientConfig.exchangeForm().kind()
                 : Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
-        int size = Shapes.clampSize(WrightsClientConfig.SHAPE_SIZE.get());
+        boolean exchangeColumn = exchangeMode
+                && WrightsClientConfig.exchangeForm() == Shapes.ExchangeForm.COLUMN;
+        if (exchangeColumn) {
+            WrightsClientConfig.enforceExchangeColumnFootprint();
+        }
+        int size = exchangeColumn ? 1 : Shapes.clampSize(WrightsClientConfig.SHAPE_SIZE.get());
         int height = Shapes.clampHeight(WrightsClientConfig.SHAPE_HEIGHT.get());
-        int thickness = Shapes.clampHeight(WrightsClientConfig.SHAPE_THICKNESS.get());
+        int thickness = exchangeColumn ? 1 : Shapes.clampHeight(WrightsClientConfig.SHAPE_THICKNESS.get());
         boolean hollow = WrightsClientConfig.SHAPE_HOLLOW.get() && WrightsConfig.allowShapeHollow();
         int plane = WrightsClientConfig.SHAPE_PLANE.get();
         // Same absolute yaw as the in-world preview so we reuse SelectionRenderer's cache.

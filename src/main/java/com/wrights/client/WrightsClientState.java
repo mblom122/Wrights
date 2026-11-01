@@ -1795,9 +1795,13 @@ public final class WrightsClientState {
                 anchorSet,
                 anchorSet ? WrightsClientConfig.shapeAnchor() : BlockPos.ZERO,
                 WrightsClientConfig.exchangeForm().kind().ordinal(),
-                WrightsClientConfig.SHAPE_SIZE.get(),
+                WrightsClientConfig.exchangeForm() == com.wrights.blueprint.Shapes.ExchangeForm.COLUMN
+                        ? 1
+                        : WrightsClientConfig.SHAPE_SIZE.get(),
                 WrightsClientConfig.SHAPE_HEIGHT.get(),
-                WrightsClientConfig.SHAPE_THICKNESS.get(),
+                WrightsClientConfig.exchangeForm() == com.wrights.blueprint.Shapes.ExchangeForm.COLUMN
+                        ? 1
+                        : WrightsClientConfig.SHAPE_THICKNESS.get(),
                 WrightsClientConfig.SHAPE_PLANE.get(),
                 WrightsClientConfig.SHAPE_YAW.get(),
                 WrightsClientConfig.exchangePivot(),

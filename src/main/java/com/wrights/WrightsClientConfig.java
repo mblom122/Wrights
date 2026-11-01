@@ -281,8 +281,8 @@ public final class WrightsClientConfig {
             .comment("When true, Exchange breaks replaced blocks with silk touch and returns the drops.")
             .define("exchangeSilk", false);
     public static final ModConfigSpec.IntValue EXCHANGE_FORM = BUILDER
-            .comment("Exchange preset: 0 floor, 1 wall, 2 column, 3 circle, 4 ring, 5 rectangle, 6 box, 7 cylinder.")
-            .defineInRange("exchangeForm", 0, 0, 7);
+            .comment("Exchange preset: 0 floor, 1 wall, 2 column, 3 circle, 4 rectangle, 5 square.")
+            .defineInRange("exchangeForm", 0, 0, 5);
 
     static final ModConfigSpec SPEC = BUILDER.build();
 
@@ -1076,27 +1076,32 @@ public final class WrightsClientConfig {
             }
             case COLUMN -> {
                 setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
-                if (SHAPE_SIZE.get() > 5) {
-                    setShapeSize(3);
-                }
+                setShapeSize(1);
+                setShapeThickness(1);
                 if (SHAPE_HEIGHT.get() < 3) {
                     setShapeHeight(5);
                 }
             }
-            case CIRCLE, RECTANGLE -> setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
-            case RING -> {
+            case CIRCLE, SQUARE -> setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
+            case RECTANGLE -> {
                 setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
                 if (SHAPE_HEIGHT.get() < 1) {
                     setShapeHeight(1);
                 }
             }
-            case BOX -> setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
-            case CYLINDER -> {
-                setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
-                if (SHAPE_HEIGHT.get() < 2) {
-                    setShapeHeight(4);
-                }
-            }
+        }
+    }
+
+    /** Column is always a 1×1 footprint; keep Size/Depth locked when that form is active. */
+    public static void enforceExchangeColumnFootprint() {
+        if (exchangeForm() != com.wrights.blueprint.Shapes.ExchangeForm.COLUMN) {
+            return;
+        }
+        if (SHAPE_SIZE.get() != 1) {
+            setShapeSize(1);
+        }
+        if (SHAPE_THICKNESS.get() != 1) {
+            setShapeThickness(1);
         }
     }
 
