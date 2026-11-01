@@ -176,32 +176,41 @@ public final class SelectionRenderer {
         boolean voidBlocks = WrightsClientConfig.SHAPE_VOID.get() && WrightsConfig.allowShapeVoid();
         int budget = previewBudget();
         int total = shapeLocal.size();
-        // Never walk / allocate the whole million-block list for ghosts. Stride the cached locals.
-        int step = Math.max(1, (total + budget - 1) / budget);
-        int capacity = Math.min(budget, (total + step - 1) / step);
-        java.util.ArrayList<BlockPos> drawAt = new java.util.ArrayList<>(capacity);
+        // Rank every in-range cell by camera distance, then draw the nearest budget —
+        // same idea as blueprint ghosts, so the shell beside the player is never skipped
+        // for a strided sample 64 blocks away.
+        prepare(total);
         double limit = rangeSqr();
-        for (int i = 0; i < total && drawAt.size() < budget; i += step) {
+        int count = 0;
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        for (int i = 0; i < total; i++) {
             BlockPos local = shapeLocal.get(i);
-            BlockPos world = local.offset(ox, oy, oz);
-            double dx = world.getX() + 0.5D - camera.x;
-            double dy = world.getY() + 0.5D - camera.y;
-            double dz = world.getZ() + 0.5D - camera.z;
-            if (dx * dx + dy * dy + dz * dz > limit) {
+            int wx = local.getX() + ox;
+            int wy = local.getY() + oy;
+            int wz = local.getZ() + oz;
+            double dx = wx + 0.5D - camera.x;
+            double dy = wy + 0.5D - camera.y;
+            double dz = wz + 0.5D - camera.z;
+            double distance = dx * dx + dy * dy + dz * dz;
+            if (distance > limit) {
                 continue;
             }
-            if (!voidBlocks && !minecraft.level.getBlockState(world).isAir()) {
+            if (!voidBlocks && !minecraft.level.getBlockState(cursor.set(wx, wy, wz)).isAir()) {
                 continue;
             }
-            drawAt.add(world);
+            order[count] = i;
+            distanceSq[count] = distance;
+            count++;
         }
-        if (drawAt.isEmpty()) {
+        if (count <= 0) {
             return;
         }
+        int keep = Math.min(count, budget);
+        nearest(count, keep);
         java.util.Random previewRandom = new java.util.Random(target.asLong() ^ materials.hashCode());
         List<BlockState> planned = com.wrights.blueprint.ShapeMaterials.assign(
                 materials,
-                drawAt.size(),
+                keep,
                 WrightsClientConfig.shapeFillMode(),
                 WrightsClientConfig.SHAPE_ORDER_BATCH.get(),
                 previewRandom,
@@ -209,13 +218,16 @@ public final class SelectionRenderer {
                 item -> Long.MAX_VALUE / 4L,
                 true);
         BlockRenderDispatcher renderer = minecraft.getBlockRenderer();
-        for (int i = 0; i < drawAt.size(); i++) {
-            BlockPos world = drawAt.get(i);
-            BlockState state = i < planned.size() ? planned.get(i) : null;
+        for (int n = 0; n < keep; n++) {
+            BlockPos local = shapeLocal.get(order[n]);
+            int wx = local.getX() + ox;
+            int wy = local.getY() + oy;
+            int wz = local.getZ() + oz;
+            BlockState state = n < planned.size() ? planned.get(n) : null;
             if (state == null || !ghostVisible(state)) {
                 continue;
             }
-            drawGhost(pose, buffers, renderer, camera, world.getX(), world.getY(), world.getZ(), state);
+            drawGhost(pose, buffers, renderer, camera, wx, wy, wz, state);
         }
         buffers.endBatch();
     }

@@ -1354,7 +1354,9 @@ public final class BlueprintActions {
 
     public static BlueprintPayloads.Preview previewOf(Schematic schematic, boolean forBuild, boolean openEditor) {
         List<Schematic.Entry> entries = schematic.entries();
-        int budget = WrightsConfig.previewSampleBudget();
+        // World build needs a denser set so the client can keep the nearest ghosts to the
+        // player; menu/tooltips stay on the lighter sample budget.
+        int budget = forBuild ? WrightsConfig.maxPreviewBlocks() : WrightsConfig.previewSampleBudget();
         boolean sampled = entries.size() > budget;
         int step = sampled ? Math.max(1, (entries.size() + budget - 1) / budget) : 1;
         List<BlueprintPayloads.Bit> bits = new ArrayList<>(Math.min(entries.size(), budget));
