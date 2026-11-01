@@ -28,7 +28,7 @@ public final class BuildJob {
     public enum Kind {
         COPY,
         PASTE,
-        /** RFTools-style: walk the AABB and test membership; never materialize every BlockPos. */
+        /** Walk the AABB and test membership; never materialize every BlockPos. */
         SHAPE
     }
 
@@ -772,7 +772,7 @@ public final class BuildJob {
         return finished && (kind == Kind.PASTE || kind == Kind.SHAPE) && !refunds.isEmpty();
     }
 
-    // --- Shape stream (RFTools-style; no full cell list) ---
+    // --- Shape stream (no full cell list) ---
     private int shapeKind;
     private int shapeSize = 1;
     private int shapeHeight = 1;

@@ -954,7 +954,7 @@ final class ShapeMenuPanel {
             List<BlockPos> full = SelectionRenderer.shapeCacheCells();
             previewBlocks = full.size();
         } else {
-            // Exact count would allocate / walk millions of cells — RFTools skips that too.
+            // Exact count would allocate / walk millions of cells — skip that for the menu.
             previewBlocks = -1;
         }
         // Solid miniature: scale dims down to fit the bake budget instead of striding

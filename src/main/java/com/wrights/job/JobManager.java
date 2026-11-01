@@ -844,7 +844,7 @@ public final class JobManager {
     }
 
     /**
-     * Start an RFTools-style shape build: store formula params and stream cells each tick.
+     * Start a streaming shape build: store formula params and place cells each tick.
      * Never materializes a full BlockPos / Schematic.Entry list.
      */
     public static boolean startShapeBuild(

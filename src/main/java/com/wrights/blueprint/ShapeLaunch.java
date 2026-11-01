@@ -14,7 +14,7 @@ import com.wrights.network.BlueprintPayloads;
 import com.wrights.util.Messages;
 
 /**
- * Starts a shape job. RFTools streams cells with {@code isInside}; Wrights does the same —
+ * Starts a shape job. Membership is tested while the job runs —
  * never materializes a multi-million BlockPos / schematic list at launch.
  */
 public final class ShapeLaunch {

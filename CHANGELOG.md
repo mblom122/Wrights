@@ -9,7 +9,7 @@
 - Selectable AABB pivot for look and anchor placement, with frame and pivot drawn in the menu and in the world.
 - Square (Width×Height), Box (Width×Depth×Height), equal-Size Cube and Rectangle, Circle by diameter, and rings that can grow into a torus.
 - Split shape Plane into Axis and Rotation for every kind; rotate holograms with Ctrl+scroll in the world (relative to facing / around the pin like blueprints).
-- RFTools-scale shape boxes (default max axis 512 / maxBlocks 512³) with streaming placement — no full BlockPos list at launch.
+- Large shape boxes (default max axis 512 / maxBlocks 512³) with streaming placement — no full BlockPos list at launch.
 - Configurable shape air-snap offset (Options) so look-at-air previews sit clear of the player.
 - −/+ beside each shape dimension slider; hold-drag the track; click the value to type. Shared Ctrl/Shift/Alt step scale on all +/- controls.
 - Undo the last finished build with Ctrl+Shift+right-click.
@@ -33,7 +33,7 @@
 - Large shapes and blueprints sample or wire-box preview instead of freezing the client.
 
 ### Fixes
-- Shape builds no longer OutOfMemory on huge solids; cells stream like RFTools instead of materializing millions of BlockPos.
+- Shape builds no longer OutOfMemory on huge solids; cells stream during the job instead of materializing millions of BlockPos.
 - Jobs card buttons no longer ignore clicks on large Waiting builds; the hold-controller warning draws on top of the Jobs card.
 - Large jobs stay responsive: settled-cell checks are O(1), and crew scans plus holograms are capped.
 - Shape ring thickness stays independent of size; tipped shapes yaw around world up so tips swing N/E/S/W.

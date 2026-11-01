@@ -119,7 +119,7 @@ public final class Shapes {
 
     /**
      * Same as {@link #blocks(Kind, BlockPos, int, int, int, boolean, int, int)} but stops once
-     * {@code maxCells} positions are collected (RFTools-style: never allocate a multi-million list).
+     * {@code maxCells} positions are collected (never allocate a multi-million list).
      */
     public static List<BlockPos> blocks(
             Kind kind,
@@ -163,7 +163,7 @@ public final class Shapes {
 
     /**
      * Upper bound on nested-loop visits for this shape (AABB volume). Used to skip materializing
-     * huge lists for preview — RFTools also avoids walking millions of cells just to draw a cue.
+     * huge lists for preview — skip walking millions of cells just to draw a cue.
      */
     public static long scanVolume(Kind kind, int size, int height, int thickness) {
         if (kind == null) {
@@ -840,7 +840,7 @@ public final class Shapes {
 
     /**
      * World-space AABB after pinning {@code worldTarget} to the chosen pivot.
-     * No cell list — RFTools-style streaming uses this + {@link #containsWorld}.
+     * No cell list — streaming placement uses this + {@link #containsWorld}.
      */
     public static Bounds pinnedBounds(
             Kind kind,

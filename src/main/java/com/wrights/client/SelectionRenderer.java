@@ -169,7 +169,7 @@ public final class SelectionRenderer {
         int oz = target.getZ() - pinLocal.getZ();
         BlockPos worldMin = shapeLocalMin.offset(ox, oy, oz);
         BlockPos worldMax = shapeLocalMax.offset(ox, oy, oz);
-        // Bounds are O(1). RFTools-style placement cue — always cheap even for huge volumes.
+        // Bounds are O(1). Wire-box placement cue — always cheap even for huge volumes.
         drawShapeBounds(pose, buffers, camera, worldMin, worldMax, target);
         if (shapeBoundsOnly || shapeLocal.isEmpty()) {
             buffers.endBatch();
@@ -292,7 +292,7 @@ public final class SelectionRenderer {
         shapeLocalMax = box.max();
         long scan = com.wrights.blueprint.Shapes.scanVolume(kind, size, height, thickness);
         int soft = WrightsConfig.shapePreviewListCap();
-        // RFTools tip: huge shapes only show the wire box — never allocate millions of BlockPos.
+        // Huge shapes only show the wire box — never allocate millions of BlockPos.
         if (scan > soft) {
             shapeLocal = List.of();
             shapeBoundsOnly = true;

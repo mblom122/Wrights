@@ -35,13 +35,13 @@ public final class WrightsConfig {
 
     public static final ModConfigSpec.IntValue MAX_AXIS = BUILDER
             .comment(
-                    "Largest selection length on one axis, in blocks. 512 matches Building Gadgets and RFTools.",
+                    "Largest selection length on one axis, in blocks. Default 512.",
                     "A larger box uses more memory and can lag the server while it is copied or built.")
             .defineInRange("maxAxis", 512, 1, 4096);
 
     public static final ModConfigSpec.IntValue MAX_SHAPE_AXIS = BUILDER
             .comment(
-                    "Largest size, height, or thickness a Shape may use, in blocks (512 matches RFTools Builder).",
+                    "Largest size, height, or thickness a Shape may use, in blocks. Default 512.",
                     "Separate from maxAxis (blueprints). Effective cap is min(maxShapeAxis, maxAxis).",
                     "Huge solid shapes are still capped by maxBlocks — preview uses a wire box when over shapePreviewListCap.")
             .defineInRange("maxShapeAxis", 512, 1, 4096);
@@ -49,8 +49,8 @@ public final class WrightsConfig {
     public static final ModConfigSpec.IntValue MAX_BLOCKS = BUILDER
             .comment(
                     "Largest AABB volume for blueprints and Shape builds. Separate from maxShapeAxis (slider length).",
-                    "Default 512³ (134217728) matches RFTools Builder maxBuilderDimension per axis (box volume).",
-                    "Shape mode streams cells like RFTools (isInside) — it does not allocate the full list up front.")
+                    "Default 512³ (134217728) — a full box at the default max axis on every side.",
+                    "Shape mode streams cells during the job — it does not allocate the full list up front.")
             .defineInRange("maxBlocks", 512 * 512 * 512, 1, 512 * 512 * 512);
 
     public static final ModConfigSpec.IntValue BLOCKS_PER_TICK = BUILDER
@@ -104,7 +104,7 @@ public final class WrightsConfig {
     public static final ModConfigSpec.IntValue SHAPE_PREVIEW_LIST_CAP = BUILDER
             .comment(
                     "Most shape cells the client may materialize for ghost previews.",
-                    "Above this, Shape mode draws only the wire box (RFTools-style). 0 uses ghostBudget-derived default.",
+                    "Above this, Shape mode draws only the wire box. 0 uses ghostBudget-derived default.",
                     "Raising this can lag the client on large shapes.")
             .defineInRange("shapePreviewListCap", 0, 0, 1_000_000);
 
@@ -411,7 +411,7 @@ public final class WrightsConfig {
 
     /**
      * Soft cap for materializing shape cell lists on the client.
-     * Above this, Wrights draws the RFTools-style wire box only (no per-block ghost list).
+     * Above this, Wrights draws the wire box only (no per-block ghost list).
      */
     public static int shapePreviewListCap() {
         int configured = read(SHAPE_PREVIEW_LIST_CAP, 0);
