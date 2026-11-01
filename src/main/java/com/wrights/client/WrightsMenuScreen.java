@@ -940,7 +940,6 @@ public class WrightsMenuScreen extends Screen {
         int visible = Math.max(1, bodyH / rowH);
         infoMaxScroll = Math.max(0, lines.size() - visible);
         infoScroll = Mth.clamp(infoScroll, 0, infoMaxScroll);
-        ItemStack hovered = ItemStack.EMPTY;
         graphics.enableScissor(x + 2, bodyY, x + width - 2, y + height - 4);
         boolean creative = this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild;
         for (int i = infoScroll; i < lines.size() && i - infoScroll < visible; i++) {
@@ -969,9 +968,6 @@ public class WrightsMenuScreen extends Screen {
             int chipInk = line.craftable() ? WrightsUi.GREEN : line.stock() > 0 ? WrightsUi.BLUE : WrightsUi.MUTED;
             int chipFill = line.craftable() ? 0xFF143028 : line.stock() > 0 ? 0xFF152433 : 0xFF1A222A;
             drawStatusPill(graphics, pillX + pillW, rowY + 4, chip, chipFill, chipInk);
-            if (mouseX >= x + 4 && mouseX < x + width - 4 && mouseY >= rowY && mouseY < rowY + rowH) {
-                hovered = stack;
-            }
         }
         graphics.disableScissor();
         if (infoMaxScroll > 0) {
@@ -981,9 +977,6 @@ public class WrightsMenuScreen extends Screen {
             int thumbY = bodyY + infoScroll * travel / infoMaxScroll;
             graphics.fill(trackX, bodyY, trackX + 2, bodyY + bodyH, 0xFF1A222A);
             graphics.fill(trackX, thumbY, trackX + 2, thumbY + thumb, WrightsUi.COPPER);
-        }
-        if (!hovered.isEmpty()) {
-            graphics.renderTooltip(this.font, hovered, mouseX, mouseY);
         }
     }
 
