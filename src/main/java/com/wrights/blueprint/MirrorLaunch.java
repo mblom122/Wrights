@@ -155,7 +155,7 @@ public final class MirrorLaunch {
             }
             ready.add(copy);
         }
-        int started = startUnited(player, ready, 0, false, replace, replace, replace, true, true, false, copyNbt, settings, all);
+        int started = startUnited(player, ready, 0, false, replace, replace, replace, ShapeSupply.DEFAULT_ORDER, true, false, copyNbt, settings, all);
         if (started > 0) {
             Messages.actionBar(player, "message.wrights.mirror_started", started);
         }
@@ -193,7 +193,7 @@ public final class MirrorLaunch {
         return reach * reach;
     }
 
-    public static Result spawn(ServerPlayer player, Schematic source, BlockPos origin, int clipX, int clipY, int clipZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean playerFirst, boolean queue, boolean deferSupplies, boolean placeNbt, boolean placeSettings, boolean placeAll, BlockPos plane, int face, int pattern, boolean shapes, int axes) {
+    public static Result spawn(ServerPlayer player, Schematic source, BlockPos origin, int clipX, int clipY, int clipZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, String supplyOrder, boolean queue, boolean deferSupplies, boolean placeNbt, boolean placeSettings, boolean placeAll, BlockPos plane, int face, int pattern, boolean shapes, int axes) {
         Direction direction = Direction.from3DDataValue(Mth.clamp(face, 0, 5));
         java.util.List<Mirror.Placed> copies = Mirror.place(source, origin, clipX, clipY, clipZ, plane, direction, pattern, shapes, axes);
         if (copies.isEmpty()) {
@@ -209,12 +209,12 @@ public final class MirrorLaunch {
             }
             ready.add(placed);
         }
-        int started = startUnited(player, ready, drones, placeFluids, voidBlocks, voidFluids, voidNbt, playerFirst, queue, deferSupplies, placeNbt, placeSettings, placeAll);
+        int started = startUnited(player, ready, drones, placeFluids, voidBlocks, voidFluids, voidNbt, supplyOrder, queue, deferSupplies, placeNbt, placeSettings, placeAll);
         return new Result(started, false);
     }
 
     /** Starts one job that holds every copy. Falls back to a job per copy when they cannot share a schematic. */
-    private static int startUnited(ServerPlayer player, List<Mirror.Placed> copies, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean playerFirst, boolean queue, boolean deferSupplies, boolean placeNbt, boolean placeSettings, boolean placeAll) {
+    private static int startUnited(ServerPlayer player, List<Mirror.Placed> copies, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, String supplyOrder, boolean queue, boolean deferSupplies, boolean placeNbt, boolean placeSettings, boolean placeAll) {
         if (copies.isEmpty()) {
             return 0;
         }
@@ -223,7 +223,7 @@ public final class MirrorLaunch {
         if (united != null) {
             Schematic schematic = united.schematic().withName(Mirror.mirrorName(united.schematic().name()));
             library.putSchematic(schematic);
-            boolean ok = JobManager.startBlueprintBuild(player, schematic.id(), united.origin(), schematic.sizeX(), schematic.sizeY(), schematic.sizeZ(), drones, placeFluids, voidBlocks, voidFluids, voidNbt, playerFirst, queue, deferSupplies, placeNbt, placeSettings, placeAll);
+            boolean ok = JobManager.startBlueprintBuild(player, schematic.id(), united.origin(), schematic.sizeX(), schematic.sizeY(), schematic.sizeZ(), drones, placeFluids, voidBlocks, voidFluids, voidNbt, supplyOrder, queue, deferSupplies, placeNbt, placeSettings, placeAll);
             if (ok) {
                 return copies.size();
             }
@@ -233,7 +233,7 @@ public final class MirrorLaunch {
         for (Mirror.Placed placed : copies) {
             Schematic schematic = placed.schematic().withName(Mirror.mirrorName(placed.schematic().name()));
             library.putSchematic(schematic);
-            boolean ok = JobManager.startBlueprintBuild(player, schematic.id(), placed.origin(), schematic.sizeX(), schematic.sizeY(), schematic.sizeZ(), drones, placeFluids, voidBlocks, voidFluids, voidNbt, playerFirst, queue, deferSupplies, placeNbt, placeSettings, placeAll);
+            boolean ok = JobManager.startBlueprintBuild(player, schematic.id(), placed.origin(), schematic.sizeX(), schematic.sizeY(), schematic.sizeZ(), drones, placeFluids, voidBlocks, voidFluids, voidNbt, supplyOrder, queue, deferSupplies, placeNbt, placeSettings, placeAll);
             if (!ok) {
                 library.removeSchematic(schematic.id());
                 continue;

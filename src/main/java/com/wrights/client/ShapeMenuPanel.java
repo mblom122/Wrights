@@ -1081,15 +1081,7 @@ final class ShapeMenuPanel {
     }
 
     private int drawPriority(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width) {
-        List<Integer> order = WrightsClientConfig.shapeSupplyOrder();
-        StringBuilder summary = new StringBuilder();
-        for (int i = 0; i < order.size(); i++) {
-            if (i > 0) {
-                summary.append(" › ");
-            }
-            summary.append(Component.translatable(ShapeSupply.shortLabelKey(order.get(i))).getString());
-        }
-        String line = font.plainSubstrByWidth(summary.toString(), Math.max(8, width));
+        String line = font.plainSubstrByWidth(WrightsClientConfig.supplyOrderSummary(), Math.max(8, width));
         graphics.drawString(font, line, x, y, WrightsUi.MUTED, false);
         y += 12;
         boolean hover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 18;

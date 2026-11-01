@@ -751,6 +751,7 @@ public final class BuildJob {
     }
 
     private boolean supplyPlayerFirst = true;
+    private String supplyOrder = com.wrights.blueprint.ShapeSupply.DEFAULT_ORDER;
 
     public boolean supplyPlayerFirst() {
         return supplyPlayerFirst;
@@ -758,6 +759,15 @@ public final class BuildJob {
 
     public void setSupplyPlayerFirst(boolean supplyPlayerFirst) {
         this.supplyPlayerFirst = supplyPlayerFirst;
+    }
+
+    public String supplyOrder() {
+        return supplyOrder == null || supplyOrder.isBlank() ? com.wrights.blueprint.ShapeSupply.DEFAULT_ORDER : supplyOrder;
+    }
+
+    public void setSupplyOrder(String supplyOrder) {
+        this.supplyOrder = com.wrights.blueprint.ShapeSupply.encode(com.wrights.blueprint.ShapeSupply.parse(supplyOrder));
+        this.supplyPlayerFirst = com.wrights.blueprint.ShapeSupply.playerSourcesFirst(com.wrights.blueprint.ShapeSupply.parse(this.supplyOrder));
     }
 
     public List<Refund> refunds() {
@@ -1175,6 +1185,7 @@ public final class BuildJob {
             }
         }
         tag.putBoolean("supplyPlayerFirst", supplyPlayerFirst);
+        tag.putString("supplyOrder", supplyOrder());
         if (anchor != null) {
             tag.put("anchor", NbtUtils.writeBlockPos(anchor));
         }
@@ -1356,6 +1367,12 @@ public final class BuildJob {
             }
         }
         job.supplyPlayerFirst = !tag.contains("supplyPlayerFirst") || tag.getBoolean("supplyPlayerFirst");
+        if (tag.contains("supplyOrder")) {
+            job.setSupplyOrder(tag.getString("supplyOrder"));
+        } else if (!job.supplyPlayerFirst) {
+            // Legacy chest-first jobs: bound chest before player slots, then digital.
+            job.setSupplyOrder("4,0,1,2,3,5");
+        }
         if (tag.contains("anchor")) {
             job.anchor = NbtUtils.readBlockPos(tag, "anchor").orElse(null);
         }

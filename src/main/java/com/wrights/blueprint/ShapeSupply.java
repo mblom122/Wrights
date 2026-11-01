@@ -19,8 +19,8 @@ import com.wrights.item.ControllerItem;
 import com.wrights.storage.ItemSource;
 
 /**
- * Ordered material sources for Shape mode. Default order is main hand → offhand →
- * action bar → inventory → bound chest → digital storage.
+ * Shared ordered material sources for Shape, blueprint place, and Options.
+ * Default order is main hand → offhand → action bar → inventory → bound chest → digital storage.
  */
 public final class ShapeSupply {
     public static final int MAIN_HAND = 0;
@@ -162,6 +162,24 @@ public final class ShapeSupply {
     }
 
     public static long available(ServerPlayer player, Item item, List<Integer> order) {
+        return available(player, item, order, null);
+    }
+
+    /** True when any player-hand / inventory source appears before the bound chest in {@code order}. */
+    public static boolean playerSourcesFirst(List<Integer> order) {
+        for (int source : order == null ? List.<Integer>of() : order) {
+            int id = clamp(source);
+            if (id == BOUND_CHEST) {
+                return false;
+            }
+            if (id == MAIN_HAND || id == OFFHAND || id == ACTION_BAR || id == INVENTORY) {
+                return true;
+            }
+        }
+        return true;
+    }
+
+    public static long available(ServerPlayer player, Item item, List<Integer> order, net.minecraft.world.Container chest) {
         if (player == null || item == null) {
             return 0L;
         }
@@ -170,7 +188,7 @@ public final class ShapeSupply {
         }
         long total = 0L;
         boolean countedPlayer = false;
-        for (int source : order) {
+        for (int source : order == null ? parse(DEFAULT_ORDER) : order) {
             switch (clamp(source)) {
                 case MAIN_HAND, OFFHAND, ACTION_BAR, INVENTORY -> {
                     if (!countedPlayer) {
@@ -178,7 +196,13 @@ public final class ShapeSupply {
                         countedPlayer = true;
                     }
                 }
-                case BOUND_CHEST -> total += ItemSource.chestCount(player, item);
+                case BOUND_CHEST -> {
+                    if (chest != null) {
+                        total += countContainer(chest, item);
+                    } else {
+                        total += ItemSource.chestCount(player, item);
+                    }
+                }
                 case DIGITAL -> total += ItemSource.digitalCount(player, item);
                 default -> {
                 }
@@ -188,10 +212,15 @@ public final class ShapeSupply {
     }
 
     /**
-     * Takes one item using the shape priority. Player slots are searched in order;
+     * Takes one item using the shared priority list. Player slots are searched in order;
      * chest and digital follow when listed.
      */
     public static boolean takeOne(ServerPlayer player, Item item, List<Integer> order) {
+        return takeOne(player, item, order, null);
+    }
+
+    /** Like {@link #takeOne(ServerPlayer, Item, List)} but uses {@code chest} when bound-chest is listed. */
+    public static boolean takeOne(ServerPlayer player, Item item, List<Integer> order, net.minecraft.world.Container chest) {
         if (player == null || item == null) {
             return false;
         }
@@ -199,7 +228,7 @@ public final class ShapeSupply {
             return true;
         }
         Inventory inv = player.getInventory();
-        for (int source : order) {
+        for (int source : order == null ? parse(DEFAULT_ORDER) : order) {
             switch (clamp(source)) {
                 case MAIN_HAND -> {
                     if (shrinkSlot(inv, inv.selected, item)) {
@@ -235,7 +264,7 @@ public final class ShapeSupply {
                     }
                 }
                 case BOUND_CHEST -> {
-                    if (takeChestOnly(player, item)) {
+                    if (takeChestOnly(player, item, chest)) {
                         return true;
                     }
                 }
@@ -255,8 +284,8 @@ public final class ShapeSupply {
         return false;
     }
 
-    private static boolean takeChestOnly(ServerPlayer player, Item item) {
-        var container = ItemSource.container(player, ItemSource.chestOf(player));
+    private static boolean takeChestOnly(ServerPlayer player, Item item, net.minecraft.world.Container chest) {
+        var container = chest != null ? chest : ItemSource.container(player, ItemSource.chestOf(player));
         if (container == null) {
             return false;
         }
@@ -273,6 +302,17 @@ public final class ShapeSupply {
             return true;
         }
         return false;
+    }
+
+    private static long countContainer(net.minecraft.world.Container container, Item item) {
+        long total = 0L;
+        for (int slot = 0; slot < container.getContainerSize(); slot++) {
+            ItemStack stack = container.getItem(slot);
+            if (stack.is(item)) {
+                total += stack.getCount();
+            }
+        }
+        return total;
     }
 
     private static boolean shrinkSlot(Inventory inv, int slot, Item item) {

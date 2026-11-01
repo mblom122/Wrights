@@ -10,7 +10,7 @@ import net.minecraft.network.chat.Component;
 import com.wrights.WrightsClientConfig;
 import com.wrights.blueprint.ShapeSupply;
 
-/** Reorder which inventories Shape mode takes blocks from. */
+/** Shared material-source order for Shape, place, and Options. */
 public class ShapePriorityScreen extends Screen {
     private final Screen parent;
     private int panelX;
@@ -20,7 +20,7 @@ public class ShapePriorityScreen extends Screen {
     private final List<Hit> hits = new ArrayList<>();
 
     public ShapePriorityScreen(Screen parent) {
-        super(Component.translatable("screen.wrights.shape_priority_title"));
+        super(Component.translatable("screen.wrights.supply_priority_title"));
         this.parent = parent;
     }
 
@@ -57,7 +57,7 @@ public class ShapePriorityScreen extends Screen {
         graphics.drawString(this.font, this.title, panelX + 16, panelY + 10, WrightsUi.COPPER, false);
         int y = panelY + 28;
         int inner = panelW - 32;
-        for (var line : this.font.split(Component.translatable("menu.wrights.shape_priority_hint"), inner)) {
+        for (var line : this.font.split(Component.translatable("menu.wrights.supply_priority_hint"), inner)) {
             graphics.drawString(this.font, line, panelX + 16, y, WrightsUi.MUTED, false);
             y += 10;
         }

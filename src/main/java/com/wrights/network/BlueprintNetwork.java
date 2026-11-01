@@ -309,7 +309,7 @@ public final class BlueprintNetwork {
                 payload.voidFluids(),
                 payload.voidNbt(),
                 payload.force(),
-                payload.playerFirst(),
+                payload.supplyOrder(),
                 payload.queue(),
                 payload.placeNbt(),
                 payload.placeSettings(),

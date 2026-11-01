@@ -1553,7 +1553,7 @@ public final class WrightsClientState {
                 WrightsClientConfig.VOID_FLUIDS.get(),
                 WrightsClientConfig.VOID_NBT.get(),
                 force,
-                WrightsClientConfig.SUPPLY_PLAYER_FIRST.get(),
+                com.wrights.blueprint.ShapeSupply.encode(WrightsClientConfig.shapeSupplyOrder()),
                 queue,
                 WrightsClientConfig.PLACE_NBT_BLOCKS.get(),
                 placeSettingsChosen(),

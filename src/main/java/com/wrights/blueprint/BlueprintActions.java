@@ -1097,18 +1097,18 @@ public final class BlueprintActions {
     }
 
     public static void launch(ServerPlayer player, java.util.UUID id, BlockPos anchorPoint, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones) {
-        launch(player, id, anchorPoint, sizeX, sizeY, sizeZ, pivotX, pivotY, pivotZ, drones, true, false, false, false, false, true, false);
+        launch(player, id, anchorPoint, sizeX, sizeY, sizeZ, pivotX, pivotY, pivotZ, drones, true, false, false, false, false, ShapeSupply.DEFAULT_ORDER, false);
     }
 
     public static void launch(ServerPlayer player, java.util.UUID id, BlockPos anchorPoint, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt) {
-        launch(player, id, anchorPoint, sizeX, sizeY, sizeZ, pivotX, pivotY, pivotZ, drones, placeFluids, voidBlocks, voidFluids, voidNbt, false, true, false);
+        launch(player, id, anchorPoint, sizeX, sizeY, sizeZ, pivotX, pivotY, pivotZ, drones, placeFluids, voidBlocks, voidFluids, voidNbt, false, ShapeSupply.DEFAULT_ORDER, false);
     }
 
-    public static void launch(ServerPlayer player, java.util.UUID id, BlockPos anchorPoint, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean force, boolean playerFirst, boolean queue) {
-        launch(player, id, anchorPoint, sizeX, sizeY, sizeZ, pivotX, pivotY, pivotZ, drones, placeFluids, voidBlocks, voidFluids, voidNbt, force, playerFirst, queue, true, true, true, false, BlockPos.ZERO, 0, 0, true, 0);
+    public static void launch(ServerPlayer player, java.util.UUID id, BlockPos anchorPoint, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean force, String supplyOrder, boolean queue) {
+        launch(player, id, anchorPoint, sizeX, sizeY, sizeZ, pivotX, pivotY, pivotZ, drones, placeFluids, voidBlocks, voidFluids, voidNbt, force, supplyOrder, queue, true, true, true, false, BlockPos.ZERO, 0, 0, true, 0);
     }
 
-    public static void launch(ServerPlayer player, java.util.UUID id, BlockPos anchorPoint, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean force, boolean playerFirst, boolean queue, boolean placeNbt, boolean placeSettings, boolean placeAll, boolean mirror, BlockPos mirrorAnchor, int mirrorFace, int mirrorPattern, boolean mirrorShapes, int mirrorAxes) {
+    public static void launch(ServerPlayer player, java.util.UUID id, BlockPos anchorPoint, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean force, String supplyOrder, boolean queue, boolean placeNbt, boolean placeSettings, boolean placeAll, boolean mirror, BlockPos mirrorAnchor, int mirrorFace, int mirrorPattern, boolean mirrorShapes, int mirrorAxes) {
         if (!requireTool(player) || WrightsConfig.refuse(player, WrightsConfig.allowPlace())) {
             return;
         }
@@ -1173,12 +1173,13 @@ public final class BlueprintActions {
             buildSchematicId = snapshot.id();
         }
         boolean deferSupplies = force && queue && !player.getAbilities().instabuild && !player.isSpectator();
-        boolean started = JobManager.startBlueprintBuild(player, buildSchematicId, origin, sx, sy, sz, drones, placeFluids, voidBlocks, voidFluids, voidNbt, playerFirst, queue, deferSupplies, placeNbt, placeSettings, placeAll);
+        String order = supplyOrder == null || supplyOrder.isBlank() ? ShapeSupply.DEFAULT_ORDER : ShapeSupply.encode(ShapeSupply.parse(supplyOrder));
+        boolean started = JobManager.startBlueprintBuild(player, buildSchematicId, origin, sx, sy, sz, drones, placeFluids, voidBlocks, voidFluids, voidNbt, order, queue, deferSupplies, placeNbt, placeSettings, placeAll);
         if (!started && snapshot != null) {
             library.removeSchematic(snapshot.id());
         }
         if (started && mirror && mirrorAnchor != null && player.distanceToSqr(mirrorAnchor.getX() + 0.5D, mirrorAnchor.getY() + 0.5D, mirrorAnchor.getZ() + 0.5D) <= rangeSqr()) {
-            MirrorLaunch.Result mirrored = MirrorLaunch.spawn(player, schematic, origin, sx, sy, sz, drones, placeFluids, voidBlocks, voidFluids, voidNbt, playerFirst, queue, deferSupplies, placeNbt, placeSettings, placeAll, mirrorAnchor, mirrorFace, mirrorPattern, mirrorShapes, mirrorAxes);
+            MirrorLaunch.Result mirrored = MirrorLaunch.spawn(player, schematic, origin, sx, sy, sz, drones, placeFluids, voidBlocks, voidFluids, voidNbt, order, queue, deferSupplies, placeNbt, placeSettings, placeAll, mirrorAnchor, mirrorFace, mirrorPattern, mirrorShapes, mirrorAxes);
             if (mirrored.started() > 0) {
                 Messages.actionBar(player, "message.wrights.mirror_started", mirrored.started());
             } else if (mirrored.nowhere()) {

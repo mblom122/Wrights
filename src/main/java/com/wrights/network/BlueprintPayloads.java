@@ -576,7 +576,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record LaunchBuild(UUID id, BlockPos origin, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean force, boolean playerFirst, boolean queue, boolean placeNbt, boolean placeSettings, boolean placeAll, boolean mirror, BlockPos mirrorAnchor, int mirrorFace, int mirrorPattern, boolean mirrorShapes, int mirrorAxes) implements CustomPacketPayload {
+    public record LaunchBuild(UUID id, BlockPos origin, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean force, String supplyOrder, boolean queue, boolean placeNbt, boolean placeSettings, boolean placeAll, boolean mirror, BlockPos mirrorAnchor, int mirrorFace, int mirrorPattern, boolean mirrorShapes, int mirrorAxes) implements CustomPacketPayload {
         public static final Type<LaunchBuild> TYPE = payloadType("launch_build");
         public static final StreamCodec<RegistryFriendlyByteBuf, LaunchBuild> STREAM_CODEC = StreamCodec.of((buf, value) -> value.write(buf), LaunchBuild::read);
 
@@ -595,7 +595,7 @@ public final class BlueprintPayloads {
             buf.writeBoolean(voidFluids);
             buf.writeBoolean(voidNbt);
             buf.writeBoolean(force);
-            buf.writeBoolean(playerFirst);
+            buf.writeUtf(supplyOrder == null || supplyOrder.isBlank() ? com.wrights.blueprint.ShapeSupply.DEFAULT_ORDER : supplyOrder, 64);
             buf.writeBoolean(queue);
             buf.writeBoolean(placeNbt);
             buf.writeBoolean(placeSettings);
@@ -609,7 +609,7 @@ public final class BlueprintPayloads {
         }
 
         public static LaunchBuild read(RegistryFriendlyByteBuf buf) {
-            return new LaunchBuild(buf.readUUID(), buf.readBlockPos(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBlockPos(), buf.readVarInt(), buf.readVarInt(), buf.readBoolean(), buf.readVarInt());
+            return new LaunchBuild(buf.readUUID(), buf.readBlockPos(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readUtf(64), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBlockPos(), buf.readVarInt(), buf.readVarInt(), buf.readBoolean(), buf.readVarInt());
         }
 
         @Override

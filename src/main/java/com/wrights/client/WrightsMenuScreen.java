@@ -1229,12 +1229,11 @@ public class WrightsMenuScreen extends Screen {
         local += 28;
         supplyHeadY = optionY(local);
         local += 18;
-        Component playerFirst = Component.translatable("menu.wrights.supply_player_first");
-        Component chestFirst = Component.translatable("menu.wrights.supply_chest_first");
-        supplyOrderW = Math.max(this.font.width(playerFirst), this.font.width(chestFirst)) + 16;
+        Component editPriority = Component.translatable("menu.wrights.shape_priority_edit");
+        supplyOrderW = Math.max(88, this.font.width(editPriority) + 16);
         supplyOrderX = controls;
         supplyOrderY = optionY(local - 3);
-        local += 28;
+        local += 34;
         messageHeadY = optionY(local);
         local += 18;
         Component moveMessages = Component.translatable("menu.wrights.hud_place");
@@ -1391,13 +1390,14 @@ public class WrightsMenuScreen extends Screen {
         drawOptionHelp(graphics, mouseX, mouseY, x, optionShapeAirY + 3, shapeAirLabel, shapeAirBoxX, shapeAirBoxX + shapeAirOffset.getWidth(),
                 Component.translatable("menu.wrights.shape_air_offset_hint"));
         drawOptionSection(graphics, x, supplyHeadY, "menu.wrights.section_supply", lineEnd);
-        boolean playerFirst = WrightsClientConfig.SUPPLY_PLAYER_FIRST.get();
         Component supplyLabel = Component.translatable("menu.wrights.supply_order");
         graphics.drawString(this.font, supplyLabel, x, supplyOrderY + 3, WrightsUi.MUTED, false);
-        Component order = Component.translatable(playerFirst ? "menu.wrights.supply_player_first" : "menu.wrights.supply_chest_first");
-        WrightsUi.choice(graphics, supplyOrderX, supplyOrderY, supplyOrderW, 16, playerFirst, false);
-        graphics.drawCenteredString(this.font, order, supplyOrderX + supplyOrderW / 2, supplyOrderY + 4, WrightsUi.TEXT);
-        drawOptionHelp(graphics, mouseX, mouseY, x, supplyOrderY + 3, supplyLabel, supplyOrderX, supplyOrderX + supplyOrderW, Component.translatable(playerFirst ? "menu.wrights.supply_order_player_hint" : "menu.wrights.supply_order_chest_hint"));
+        WrightsUi.choice(graphics, supplyOrderX, supplyOrderY, supplyOrderW, 16, false, false);
+        graphics.drawCenteredString(this.font, Component.translatable("menu.wrights.shape_priority_edit"), supplyOrderX + supplyOrderW / 2, supplyOrderY + 4, WrightsUi.TEXT);
+        String summary = WrightsClientConfig.supplyOrderSummary();
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(summary, Math.max(40, optionViewW - 28)),
+                x, supplyOrderY + 20, WrightsUi.MUTED, false);
+        drawOptionHelp(graphics, mouseX, mouseY, x, supplyOrderY + 3, supplyLabel, supplyOrderX, supplyOrderX + supplyOrderW, Component.translatable("menu.wrights.supply_order_hint"));
         drawOptionSection(graphics, x, messageHeadY, "menu.wrights.section_messages", lineEnd);
         WrightsUi.choice(graphics, hudPlaceX, hudPlaceY, hudPlaceW, 16, true, false);
         graphics.drawCenteredString(this.font, Component.translatable("menu.wrights.hud_place"), hudPlaceX + hudPlaceW / 2, hudPlaceY + 4, WrightsUi.TEXT);
@@ -2620,7 +2620,7 @@ public class WrightsMenuScreen extends Screen {
                     return true;
                 }
                 if (mouseX >= supplyOrderX && mouseX < supplyOrderX + supplyOrderW && mouseY >= supplyOrderY && mouseY < supplyOrderY + 16) {
-                    WrightsClientConfig.setSupplyPlayerFirst(!WrightsClientConfig.SUPPLY_PLAYER_FIRST.get());
+                    this.minecraft.setScreen(new ShapePriorityScreen(this));
                     return true;
                 }
                 if (mouseX >= hudPlaceX && mouseX < hudPlaceX + hudPlaceW && mouseY >= hudPlaceY && mouseY < hudPlaceY + 16) {

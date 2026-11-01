@@ -662,6 +662,12 @@ public final class JobManager {
     }
 
     public static boolean startBlueprintBuild(ServerPlayer player, UUID schematicId, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean supplyPlayerFirst, boolean queue, boolean deferSupplies, boolean placeNbt, boolean placeSettings, boolean placeAll) {
+        return startBlueprintBuild(player, schematicId, origin, sizeX, sizeY, sizeZ, drones, placeFluids, voidBlocks, voidFluids, voidNbt,
+                supplyPlayerFirst ? com.wrights.blueprint.ShapeSupply.DEFAULT_ORDER : "4,0,1,2,3,5",
+                queue, deferSupplies, placeNbt, placeSettings, placeAll);
+    }
+
+    public static boolean startBlueprintBuild(ServerPlayer player, UUID schematicId, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, String supplyOrder, boolean queue, boolean deferSupplies, boolean placeNbt, boolean placeSettings, boolean placeAll) {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         Schematic schematic = library.schematic(schematicId).orElse(null);
         if (schematic == null || schematic.blockCount() == 0) {
@@ -684,7 +690,7 @@ public final class JobManager {
         job.setAnchor(origin.offset(schematic.anchorX(), schematic.anchorY(), schematic.anchorZ()));
         com.wrights.blueprint.BlueprintSessions.BlueprintSession session = com.wrights.blueprint.BlueprintSessions.get(player);
         job.setSupply(session.supplyPos(), session.supplyDimension());
-        job.setSupplyPlayerFirst(supplyPlayerFirst);
+        job.setSupplyOrder(supplyOrder);
         if (queue && !instant(player) && freeUnits(player, library, job, 1).isEmpty()) {
             int blocks = placeableBlocks(schematic, job);
             int room = Math.min(Math.max(0, blocks), WrightsConfig.maxWrightsPerJob());
@@ -865,7 +871,7 @@ public final class JobManager {
             int fillMode,
             int orderBatch,
             long seed,
-            boolean supplyPlayerFirst,
+            String supplyOrder,
             boolean deferSupplies) {
         if (player == null || min == null || max == null) {
             return false;
@@ -883,7 +889,7 @@ public final class JobManager {
         job.setBlueprintName("Shape");
         com.wrights.blueprint.BlueprintSessions.BlueprintSession session = com.wrights.blueprint.BlueprintSessions.get(player);
         job.setSupply(session.supplyPos(), session.supplyDimension());
-        job.setSupplyPlayerFirst(supplyPlayerFirst);
+        job.setSupplyOrder(supplyOrder);
         if (deferSupplies && !instant(player)) {
             job.setDeferSupplies(true);
             job.setQueued(true);
@@ -5145,9 +5151,8 @@ public final class JobManager {
         if (hand != null && hand.homePort != null) {
             have = com.wrights.storage.ItemSource.jobSupplyCount(player, level, portChest(level, hand.homePort), link, item);
         } else {
-            have = player.getInventory().countItem(item);
             Container container = supply(level, player, job);
-            have += com.wrights.storage.ItemSource.jobSupplyCount(player, level, container, link, item);
+            have = com.wrights.blueprint.ShapeSupply.available(player, item, com.wrights.blueprint.ShapeSupply.parse(job.supplyOrder()), container);
         }
         if (have >= amount) {
             return true;
@@ -5170,8 +5175,7 @@ public final class JobManager {
             return;
         }
         Container container = supply(level, player, job);
-        boolean playerFirst = job.supplyPos() == null || job.supplyPlayerFirst();
-        com.wrights.storage.ItemSource.consumeForJob(player, level, item, container, playerFirst, link);
+        com.wrights.blueprint.ShapeSupply.takeOne(player, item, com.wrights.blueprint.ShapeSupply.parse(job.supplyOrder()), container);
     }
 
     /** The chest bound to this port, when it is still inside that port's chunk square. */

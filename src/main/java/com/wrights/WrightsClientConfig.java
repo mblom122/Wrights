@@ -876,8 +876,25 @@ public final class WrightsClientConfig {
     }
 
     public static void setShapeSupplyOrder(java.util.List<Integer> order) {
-        SHAPE_SUPPLY.set(com.wrights.blueprint.ShapeSupply.encode(order));
+        String encoded = com.wrights.blueprint.ShapeSupply.encode(order);
+        SHAPE_SUPPLY.set(encoded);
+        // Keep the legacy flag in sync for any leftover readers.
+        SUPPLY_PLAYER_FIRST.set(com.wrights.blueprint.ShapeSupply.playerSourcesFirst(com.wrights.blueprint.ShapeSupply.parse(encoded)));
         save();
+    }
+
+    /** Compact Main › Off › … line for place / options / shape menus. */
+    public static String supplyOrderSummary() {
+        java.util.List<Integer> order = shapeSupplyOrder();
+        StringBuilder summary = new StringBuilder();
+        for (int i = 0; i < order.size(); i++) {
+            if (i > 0) {
+                summary.append(" › ");
+            }
+            summary.append(net.minecraft.network.chat.Component.translatable(
+                    com.wrights.blueprint.ShapeSupply.shortLabelKey(order.get(i))).getString());
+        }
+        return summary.toString();
     }
 
     public static void shapeSupplyRemove(int index) {

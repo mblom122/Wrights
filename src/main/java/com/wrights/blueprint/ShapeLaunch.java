@@ -109,7 +109,6 @@ public final class ShapeLaunch {
                 ^ volume
                 ^ materials.hashCode()
                 ^ fillMode.ordinal();
-        boolean playerFirst = playerSourcesFirst(order);
         boolean creative = player.getAbilities().instabuild || player.isSpectator();
         boolean deferSupplies = payload.force() && !creative;
         boolean ok = JobManager.startShapeBuild(
@@ -130,26 +129,13 @@ public final class ShapeLaunch {
                 fillMode.ordinal(),
                 orderBatch,
                 seed,
-                playerFirst,
+                ShapeSupply.encode(order),
                 deferSupplies);
         if (!ok) {
             Messages.actionBar(player, "message.wrights.shape_failed");
             return;
         }
         Messages.actionBar(player, "message.wrights.shape_started", volume);
-    }
-
-    private static boolean playerSourcesFirst(List<Integer> order) {
-        for (int source : order) {
-            int id = ShapeSupply.clamp(source);
-            if (id == ShapeSupply.BOUND_CHEST) {
-                return false;
-            }
-            if (id == ShapeSupply.MAIN_HAND || id == ShapeSupply.OFFHAND || id == ShapeSupply.ACTION_BAR || id == ShapeSupply.INVENTORY) {
-                return true;
-            }
-        }
-        return true;
     }
 
     private static double range() {
