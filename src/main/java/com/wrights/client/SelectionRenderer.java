@@ -129,7 +129,8 @@ public final class SelectionRenderer {
         }
         String here = minecraft.level.dimension().location().toString();
         BlockPos center;
-        if (WrightsClientConfig.SHAPE_USE_ANCHOR.get()) {
+        boolean useAnchor = WrightsConfig.allowShapeAnchor() && WrightsClientConfig.SHAPE_USE_ANCHOR.get();
+        if (useAnchor) {
             if (!WrightsClientConfig.shapePlaced(here)) {
                 return;
             }
@@ -150,11 +151,11 @@ public final class SelectionRenderer {
         int size = WrightsClientConfig.SHAPE_SIZE.get();
         int height = WrightsClientConfig.SHAPE_HEIGHT.get();
         int thickness = WrightsClientConfig.SHAPE_THICKNESS.get();
-        boolean hollow = WrightsClientConfig.SHAPE_HOLLOW.get();
+        boolean hollow = WrightsClientConfig.SHAPE_HOLLOW.get() && WrightsConfig.allowShapeHollow();
         int plane = WrightsClientConfig.SHAPE_PLANE.get();
         int yaw = WrightsClientConfig.SHAPE_YAW.get();
-        boolean flip = WrightsClientConfig.SHAPE_FLIP_VERTICAL.get();
-        List<BlockPos> worlds = WrightsClientConfig.SHAPE_USE_ANCHOR.get()
+        boolean flip = WrightsClientConfig.SHAPE_FLIP_VERTICAL.get() && WrightsConfig.allowShapeFlip();
+        List<BlockPos> worlds = useAnchor
                 ? com.wrights.blueprint.Shapes.blocks(kind, center, size, height, thickness, hollow, plane, flip, yaw)
                 : com.wrights.blueprint.Shapes.blocksFromCorner(kind, center, size, height, thickness, hollow, plane, flip, yaw);
         boolean replace = WrightsClientConfig.SHAPE_REPLACE.get() && WrightsConfig.allowShapeReplace();

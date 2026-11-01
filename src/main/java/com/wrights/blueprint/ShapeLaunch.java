@@ -48,13 +48,14 @@ public final class ShapeLaunch {
         int thickness = Shapes.clampHeight(payload.thickness());
         int plane = Shapes.clampPlane(payload.plane());
         int yaw = Shapes.clampYaw(payload.yaw());
-        boolean hollow = payload.hollow();
-        boolean flipVertical = payload.flipVertical();
+        boolean hollow = payload.hollow() && WrightsConfig.allowShapeHollow();
+        boolean flipVertical = payload.flipVertical() && WrightsConfig.allowShapeFlip();
         boolean replace = payload.replace() && WrightsConfig.allowShapeReplace();
-        boolean voidBlocks = payload.voidBlocks() && WrightsConfig.allowVoidBlocks();
+        boolean voidBlocks = payload.voidBlocks() && WrightsConfig.allowShapeVoid();
         List<Integer> order = ShapeSupply.parse(payload.supplyOrder());
         BlockPos center;
-        if (payload.useAnchor()) {
+        boolean useAnchor = payload.useAnchor() && WrightsConfig.allowShapeAnchor();
+        if (useAnchor) {
             if (!payload.anchorSet()) {
                 Messages.actionBar(player, "message.wrights.shape_need_anchor");
                 return;
@@ -78,7 +79,7 @@ public final class ShapeLaunch {
             center = Shapes.lookCorner(clicked, face);
         }
         // Anchor mode keeps the shape centered on the anchor. Look mode pins the bottom corner of the box.
-        List<BlockPos> worlds = payload.useAnchor()
+        List<BlockPos> worlds = useAnchor
                 ? Shapes.blocks(kind, center, size, height, thickness, hollow, plane, flipVertical, yaw)
                 : Shapes.blocksFromCorner(kind, center, size, height, thickness, hollow, plane, flipVertical, yaw);
         if (worlds.isEmpty()) {

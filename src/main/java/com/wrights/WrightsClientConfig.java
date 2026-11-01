@@ -205,14 +205,14 @@ public final class WrightsClientConfig {
             .comment("0 circle, 1 ring, 2 square, 3 line, 4 sphere, 5 cube, 6 cylinder, 7 dome, 8 pyramid.")
             .defineInRange("shapeKind", 0, 0, 8);
     public static final ModConfigSpec.IntValue SHAPE_SIZE = BUILDER
-            .comment("Radius or half-width of the shape.")
-            .defineInRange("shapeSize", 4, 1, 64);
+            .comment("Radius or half-width of the shape. Server maxShapeAxis still caps the real build.")
+            .defineInRange("shapeSize", 4, 1, 512);
     public static final ModConfigSpec.IntValue SHAPE_HEIGHT = BUILDER
-            .comment("Height for cylinders, pyramids, and ring/donut extrusion.")
-            .defineInRange("shapeHeight", 6, 1, 64);
+            .comment("Height for cylinders, pyramids, and ring/donut extrusion. Server maxShapeAxis still caps the real build.")
+            .defineInRange("shapeHeight", 6, 1, 512);
     public static final ModConfigSpec.IntValue SHAPE_THICKNESS = BUILDER
-            .comment("Ring band width from the outer edge inward (1 = thin rim).")
-            .defineInRange("shapeThickness", 1, 1, 64);
+            .comment("Ring band / line width. Server maxShapeAxis still caps the real build.")
+            .defineInRange("shapeThickness", 1, 1, 512);
     public static final ModConfigSpec.IntValue SHAPE_PLANE = BUILDER
             .comment("Flat-shape plane. 0 XZ, 1 XY, 2 YZ.")
             .defineInRange("shapePlane", 0, 0, 2);

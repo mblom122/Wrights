@@ -1503,7 +1503,7 @@ public final class WrightsClientState {
             return false;
         }
         String dimension = minecraft.level == null ? "" : minecraft.level.dimension().location().toString();
-        boolean useAnchor = WrightsClientConfig.SHAPE_USE_ANCHOR.get();
+        boolean useAnchor = WrightsConfig.allowShapeAnchor() && WrightsClientConfig.SHAPE_USE_ANCHOR.get();
         boolean anchorSet = WrightsClientConfig.shapePlaced(dimension);
         if (useAnchor && !anchorSet) {
             minecraft.player.displayClientMessage(Component.translatable("message.wrights.shape_need_anchor"), true);

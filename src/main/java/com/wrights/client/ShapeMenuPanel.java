@@ -141,38 +141,51 @@ final class ShapeMenuPanel {
         }
         drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_place", "menu.wrights.shape_place_hint");
         y += 12;
-        y = drawPair(graphics, mouseX, mouseY, x, y, width,
-                WrightsClientConfig.SHAPE_USE_ANCHOR.get(),
-                "menu.wrights.shape_place_look",
-                "menu.wrights.shape_place_anchor",
-                "place");
-        y += 4;
-        if (WrightsClientConfig.SHAPE_USE_ANCHOR.get()) {
-            drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_under_me", "menu.wrights.shape_under_me_hint");
-            y += 12;
-            boolean underHover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 18;
-            WrightsUi.choice(graphics, x, y, width, 18, false, underHover);
-            graphics.drawCenteredString(font, Component.translatable("menu.wrights.shape_under_me_btn"), x + width / 2, y + 5, WrightsUi.TEXT);
-            hits.add(new Hit(x, y, width, 18, "under_me", 0));
-            y += 22;
+        boolean useAnchor = WrightsConfig.allowShapeAnchor() && WrightsClientConfig.SHAPE_USE_ANCHOR.get();
+        if (WrightsConfig.allowShapeAnchor()) {
+            y = drawPair(graphics, mouseX, mouseY, x, y, width,
+                    WrightsClientConfig.SHAPE_USE_ANCHOR.get(),
+                    "menu.wrights.shape_place_look",
+                    "menu.wrights.shape_place_anchor",
+                    "place");
+            y += 4;
+            if (useAnchor) {
+                drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_under_me", "menu.wrights.shape_under_me_hint");
+                y += 12;
+                boolean underHover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 18;
+                WrightsUi.choice(graphics, x, y, width, 18, false, underHover);
+                graphics.drawCenteredString(font, Component.translatable("menu.wrights.shape_under_me_btn"), x + width / 2, y + 5, WrightsUi.TEXT);
+                hits.add(new Hit(x, y, width, 18, "under_me", 0));
+                y += 22;
+            }
         }
         int col = (width - 6) / 2;
         int right = x + col + 6;
-        y = drawToggle(graphics, mouseX, mouseY, x, y, col, WrightsClientConfig.SHAPE_HOLLOW.get(), "menu.wrights.shape_hollow", "menu.wrights.shape_hollow_hint", "hollow");
-        drawToggle(graphics, mouseX, mouseY, right, y - 16, col, WrightsClientConfig.SHAPE_FLIP_VERTICAL.get(), "menu.wrights.shape_flip", "menu.wrights.shape_flip_hint", "flip");
+        boolean showHollow = WrightsConfig.allowShapeHollow();
+        boolean showFlip = WrightsConfig.allowShapeFlip();
+        if (showHollow && showFlip) {
+            y = drawToggle(graphics, mouseX, mouseY, x, y, col, WrightsClientConfig.SHAPE_HOLLOW.get(), "menu.wrights.shape_hollow", "menu.wrights.shape_hollow_hint", "hollow");
+            drawToggle(graphics, mouseX, mouseY, right, y - 16, col, WrightsClientConfig.SHAPE_FLIP_VERTICAL.get(), "menu.wrights.shape_flip", "menu.wrights.shape_flip_hint", "flip");
+        } else if (showHollow) {
+            y = drawToggle(graphics, mouseX, mouseY, x, y, width, WrightsClientConfig.SHAPE_HOLLOW.get(), "menu.wrights.shape_hollow", "menu.wrights.shape_hollow_hint", "hollow");
+        } else if (showFlip) {
+            y = drawToggle(graphics, mouseX, mouseY, x, y, width, WrightsClientConfig.SHAPE_FLIP_VERTICAL.get(), "menu.wrights.shape_flip", "menu.wrights.shape_flip_hint", "flip");
+        }
         if (WrightsConfig.allowShapeReplace()) {
             y = drawToggle(graphics, mouseX, mouseY, x, y, col, WrightsClientConfig.SHAPE_REPLACE.get(), "menu.wrights.shape_replace", "menu.wrights.shape_replace_hint", "replace");
-            if (WrightsConfig.allowVoidBlocks()) {
+            if (WrightsConfig.allowShapeVoid()) {
                 drawToggle(graphics, mouseX, mouseY, right, y - 16, col, WrightsClientConfig.SHAPE_VOID.get(), "menu.wrights.shape_void", "menu.wrights.shape_void_hint", "void");
             }
-        } else if (WrightsConfig.allowVoidBlocks()) {
+        } else if (WrightsConfig.allowShapeVoid()) {
             y = drawToggle(graphics, mouseX, mouseY, x, y, width, WrightsClientConfig.SHAPE_VOID.get(), "menu.wrights.shape_void", "menu.wrights.shape_void_hint", "void");
         }
         y += 6;
-        drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_anchor_section", "menu.wrights.shape_anchor_section_hint");
-        y += 12;
-        y = drawStatus(graphics, mouseX, mouseY, x, y, width);
-        y += 8;
+        if (WrightsConfig.allowShapeAnchor()) {
+            drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_anchor_section", "menu.wrights.shape_anchor_section_hint");
+            y += 12;
+            y = drawStatus(graphics, mouseX, mouseY, x, y, width);
+            y += 8;
+        }
         y = drawMaterials(graphics, mouseX, mouseY, x, y, width);
         y += 8;
         drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_priority", "menu.wrights.shape_priority_hint");
@@ -243,7 +256,7 @@ final class ShapeMenuPanel {
     }
 
     private static int axisMax() {
-        return Math.max(1, Math.min(64, WrightsConfig.MAX_AXIS.getAsInt()));
+        return WrightsConfig.maxShapeAxis();
     }
 
     /** Map a click on the shared slider track to 1..maxInclusive. */
@@ -264,27 +277,41 @@ final class ShapeMenuPanel {
                 yield true;
             }
             case "place" -> {
+                if (!WrightsConfig.allowShapeAnchor()) {
+                    WrightsClientConfig.setShapeUseAnchor(false);
+                    yield true;
+                }
                 WrightsClientConfig.setShapeUseAnchor(value != 0);
                 yield true;
             }
             case "under_me" -> {
-                setAnchorUnderPlayer();
+                if (WrightsConfig.allowShapeAnchor()) {
+                    setAnchorUnderPlayer();
+                }
                 yield true;
             }
             case "hollow" -> {
-                WrightsClientConfig.setShapeHollow(!WrightsClientConfig.SHAPE_HOLLOW.get());
+                if (WrightsConfig.allowShapeHollow()) {
+                    WrightsClientConfig.setShapeHollow(!WrightsClientConfig.SHAPE_HOLLOW.get());
+                }
                 yield true;
             }
             case "flip" -> {
-                WrightsClientConfig.setShapeFlipVertical(!WrightsClientConfig.SHAPE_FLIP_VERTICAL.get());
+                if (WrightsConfig.allowShapeFlip()) {
+                    WrightsClientConfig.setShapeFlipVertical(!WrightsClientConfig.SHAPE_FLIP_VERTICAL.get());
+                }
                 yield true;
             }
             case "replace" -> {
-                WrightsClientConfig.setShapeReplace(!WrightsClientConfig.SHAPE_REPLACE.get());
+                if (WrightsConfig.allowShapeReplace()) {
+                    WrightsClientConfig.setShapeReplace(!WrightsClientConfig.SHAPE_REPLACE.get());
+                }
                 yield true;
             }
             case "void" -> {
-                WrightsClientConfig.setShapeVoid(!WrightsClientConfig.SHAPE_VOID.get());
+                if (WrightsConfig.allowShapeVoid()) {
+                    WrightsClientConfig.setShapeVoid(!WrightsClientConfig.SHAPE_VOID.get());
+                }
                 yield true;
             }
             case "clear" -> {
@@ -582,8 +609,8 @@ final class ShapeMenuPanel {
         int size = Shapes.clampSize(WrightsClientConfig.SHAPE_SIZE.get());
         int height = Shapes.clampHeight(WrightsClientConfig.SHAPE_HEIGHT.get());
         int thickness = Shapes.clampHeight(WrightsClientConfig.SHAPE_THICKNESS.get());
-        boolean hollow = WrightsClientConfig.SHAPE_HOLLOW.get();
-        boolean flip = WrightsClientConfig.SHAPE_FLIP_VERTICAL.get();
+        boolean hollow = WrightsClientConfig.SHAPE_HOLLOW.get() && WrightsConfig.allowShapeHollow();
+        boolean flip = WrightsClientConfig.SHAPE_FLIP_VERTICAL.get() && WrightsConfig.allowShapeFlip();
         int plane = WrightsClientConfig.SHAPE_PLANE.get();
         int yaw = Shapes.clampYaw(WrightsClientConfig.SHAPE_YAW.get());
         List<ShapeMaterials.Entry> materials = WrightsClientConfig.shapeMaterials();

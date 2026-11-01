@@ -39,6 +39,12 @@ public final class WrightsConfig {
                     "A larger box uses more memory and can lag the server while it is copied or built.")
             .defineInRange("maxAxis", 512, 1, 4096);
 
+    public static final ModConfigSpec.IntValue MAX_SHAPE_AXIS = BUILDER
+            .comment(
+                    "Largest size, height, or thickness a Shape may use, in blocks.",
+                    "Separate from maxAxis (blueprints). Kept at or below maxAxis. Raising this can lag the server.")
+            .defineInRange("maxShapeAxis", 64, 1, 512);
+
     public static final ModConfigSpec.IntValue MAX_BLOCKS = BUILDER
             .comment(
                     "Largest selection volume, in blocks. Air counts toward this cap. 100000 matches Building Gadgets.",
@@ -176,6 +182,18 @@ public final class WrightsConfig {
     public static final ModConfigSpec.BooleanValue ALLOW_SHAPE_REPLACE = BUILDER
             .comment("Shape builds may replace a block that is already there.")
             .define("shapeReplace", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_SHAPE_HOLLOW = BUILDER
+            .comment("Shape builds may use Hollow (shell only).")
+            .define("shapeHollow", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_SHAPE_FLIP = BUILDER
+            .comment("Shape builds may flip vertically (e.g. dome to bowl).")
+            .define("shapeFlip", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_SHAPE_VOID = BUILDER
+            .comment("Shape builds may void mismatched blocks inside the shape first. Also needs voidBlocks.")
+            .define("shapeVoid", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_SHAPE_ANCHOR = BUILDER
+            .comment("Shape builds may use On anchor / Set under me. Off forces Where I look.")
+            .define("shapeAnchor", true);
     public static final ModConfigSpec.BooleanValue ALLOW_MIRROR_BLOCKS = BUILDER
             .comment("Mirroring the block in the other hand.")
             .define("mirrorBlocks", true);
@@ -361,6 +379,31 @@ public final class WrightsConfig {
 
     public static boolean allowShapeReplace() {
         return allowShape() && read(ALLOW_SHAPE_REPLACE, true);
+    }
+
+    public static boolean allowShapeHollow() {
+        return allowShape() && read(ALLOW_SHAPE_HOLLOW, true);
+    }
+
+    public static boolean allowShapeFlip() {
+        return allowShape() && read(ALLOW_SHAPE_FLIP, true);
+    }
+
+    public static boolean allowShapeVoid() {
+        return allowShape() && allowVoidBlocks() && read(ALLOW_SHAPE_VOID, true);
+    }
+
+    public static boolean allowShapeAnchor() {
+        return allowShape() && read(ALLOW_SHAPE_ANCHOR, true);
+    }
+
+    /**
+     * Cap for shape size / height / thickness. Never above {@link #MAX_AXIS}.
+     */
+    public static int maxShapeAxis() {
+        int shape = Math.max(1, read(MAX_SHAPE_AXIS, 64));
+        int axis = Math.max(1, read(MAX_AXIS, 512));
+        return Math.min(shape, axis);
     }
 
     public static boolean allowJobs() {

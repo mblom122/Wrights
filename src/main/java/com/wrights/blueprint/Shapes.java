@@ -56,8 +56,7 @@ public final class Shapes {
     }
 
     public static int clampSize(int size) {
-        int cap = Math.max(1, Math.min(64, WrightsConfig.MAX_AXIS.getAsInt()));
-        return Mth.clamp(size, 1, cap);
+        return Mth.clamp(size, 1, WrightsConfig.maxShapeAxis());
     }
 
     public static int clampHeight(int height) {

@@ -497,7 +497,7 @@ public final class WrightsHud {
     }
 
     private static String shapeFooter(Minecraft minecraft) {
-        if (WrightsClientConfig.SHAPE_USE_ANCHOR.get()) {
+        if (WrightsConfig.allowShapeAnchor() && WrightsClientConfig.SHAPE_USE_ANCHOR.get()) {
             boolean placed = minecraft.level != null && WrightsClientConfig.shapePlaced(minecraft.level.dimension().location().toString());
             return placed ? "hud.wrights.shape_anchor_ready" : "hud.wrights.shape_anchor_explain";
         }
