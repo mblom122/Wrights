@@ -17,15 +17,22 @@ import com.wrights.schematic.Schematic;
 
 /**
  * Extra items a schematic cell spends beyond {@link BlockFilters#payment(BlockState)}.
- * Optional mods (Framed Blocks camo, …) register through a soft-loaded collector.
+ * Optional mods register soft-loaded collectors (Framed Blocks camo, AE2 facades, Create copycats, …).
  */
 public final class BlockExtras {
-    private static final String FRAMED_ID = "framedblocks";
-    private static final String FRAMED_CLASS = "com.wrights.compat.framedblocks.FramedBlockExtras";
+    @FunctionalInterface
+    public interface Collector {
+        void collect(BlockState state, CompoundTag nbt, Consumer<Item> out);
+    }
+
+    private static final List<CollectorSpec> SPECS = List.of(
+            new CollectorSpec("framedblocks", "com.wrights.compat.framedblocks.FramedBlockExtras"),
+            new CollectorSpec("ae2", "com.wrights.compat.ae2.Ae2CableExtras"),
+            // Create / Copycats+ material skins — NBT-only, no Create jar required at compile time.
+            new CollectorSpec(null, "com.wrights.compat.create.CopycatExtras"));
 
     private static boolean booted;
-    @Nullable
-    private static Method framedCollect;
+    private static final List<Collector> COLLECTORS = new ArrayList<>();
 
     private BlockExtras() {
     }
@@ -42,18 +49,21 @@ public final class BlockExtras {
             return List.of();
         }
         boot();
-        if (framedCollect == null) {
+        if (COLLECTORS.isEmpty()) {
             return List.of();
         }
         List<Item> out = new ArrayList<>(4);
-        try {
-            framedCollect.invoke(null, state, nbt, (Consumer<Item>) item -> {
-                if (item != null && item != Items.AIR) {
-                    out.add(item);
-                }
-            });
-        } catch (ReflectiveOperationException | LinkageError ignored) {
-            // Optional API mismatch — treat as no extras.
+        Consumer<Item> sink = item -> {
+            if (item != null && item != Items.AIR) {
+                out.add(item);
+            }
+        };
+        for (Collector collector : COLLECTORS) {
+            try {
+                collector.collect(state, nbt, sink);
+            } catch (RuntimeException | LinkageError ignored) {
+                // Optional API mismatch — skip that collector.
+            }
         }
         return out;
     }
@@ -63,13 +73,26 @@ public final class BlockExtras {
             return;
         }
         booted = true;
-        if (!ModList.get().isLoaded(FRAMED_ID)) {
-            return;
+        for (CollectorSpec spec : SPECS) {
+            if (spec.modId != null && !ModList.get().isLoaded(spec.modId)) {
+                continue;
+            }
+            try {
+                Method method = Class.forName(spec.className)
+                        .getMethod("collect", BlockState.class, CompoundTag.class, Consumer.class);
+                COLLECTORS.add((state, nbt, out) -> {
+                    try {
+                        method.invoke(null, state, nbt, out);
+                    } catch (ReflectiveOperationException | LinkageError ignored) {
+                        // Collector unavailable this call.
+                    }
+                });
+            } catch (ReflectiveOperationException | LinkageError ignored) {
+                // Optional class missing or API mismatch.
+            }
         }
-        try {
-            framedCollect = Class.forName(FRAMED_CLASS).getMethod("collect", BlockState.class, CompoundTag.class, Consumer.class);
-        } catch (ReflectiveOperationException | LinkageError ignored) {
-            framedCollect = null;
-        }
+    }
+
+    private record CollectorSpec(@Nullable String modId, String className) {
     }
 }

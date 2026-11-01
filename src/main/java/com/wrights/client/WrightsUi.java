@@ -10,9 +10,42 @@ public final class WrightsUi {
     public static final int COPPER = 0xFFC47A3A;
     public static final int COPPER_DIM = 0xFF8C5A2A;
     public static final int BLUE = 0xFF7EB6FF;
+    /** Selection / place outline yellow (matches default placeEdge and COLORS[0]). */
+    public static final int YELLOW = 0xFFF0C420;
+    /** Selected cell outline in layer grids. */
+    public static final int SELECT = 0xFFF2D48A;
     /** Box / volume size text (e.g. {@code 64 x 129 x 129}). Always use this for dimension triples. */
     public static final int SIZE = BLUE;
     public static final int GOLD = 0xFFE0B060;
+
+    /** 0–1 channel from an ARGB/RGB int (same bit layout as {@code WrightsClientConfig#channel}). */
+    public static float channel(int rgb, int shift) {
+        return ((rgb >> shift) & 255) / 255.0F;
+    }
+
+    public static float anchorR() {
+        return channel(BLUE, 16);
+    }
+
+    public static float anchorG() {
+        return channel(BLUE, 8);
+    }
+
+    public static float anchorB() {
+        return channel(BLUE, 0);
+    }
+
+    public static float borderR() {
+        return channel(YELLOW, 16);
+    }
+
+    public static float borderG() {
+        return channel(YELLOW, 8);
+    }
+
+    public static float borderB() {
+        return channel(YELLOW, 0);
+    }
     public static final int GREEN = 0xFF6FCF97;
     public static final int RED = 0xFFE07A7A;
     /** A job that stopped on its own and will continue when the cause clears. */

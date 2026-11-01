@@ -62,6 +62,10 @@ public final class BlockEntityNbt {
         Iterator<String> keys = Set.copyOf(tag.getAllKeys()).iterator();
         while (keys.hasNext()) {
             String key = keys.next();
+            // Keep decorative skins (Framed camo, AE2 facades, Create copycat Material/Item).
+            if (keepSkin(tag, key)) {
+                continue;
+            }
             if (shouldDrop(key)) {
                 tag.remove(key);
                 continue;
@@ -97,6 +101,22 @@ public final class BlockEntityNbt {
                 }
             }
         }
+    }
+
+    /**
+     * Appearance data that is not an inventory: Framed Blocks camo, AE2 cable facades,
+     * Create / Copycats+ material skins.
+     */
+    private static boolean keepSkin(CompoundTag parent, String key) {
+        if ("camo".equals(key) || "camo_two".equals(key) || "Material".equals(key) || "material".equals(key)) {
+            return true;
+        }
+        if (key.startsWith("facade") && key.length() > "facade".length()) {
+            return true;
+        }
+        // Create copycat consumed item sits beside Material.
+        return ("Item".equals(key) || "item".equals(key))
+                && (parent.contains("Material") || parent.contains("material"));
     }
 
     private static boolean shouldDrop(String key) {

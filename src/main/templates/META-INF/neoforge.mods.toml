@@ -142,6 +142,22 @@ Wrights copy a build and place it again. Mark a structure, save a blueprint, and
     ordering="AFTER"
     side="BOTH"
 
+# Create is optional. Copycat Material / Item skins cost the consumed block on paste.
+[[dependencies.${mod_id}]]
+    modId="create"
+    type="optional"
+    versionRange="[6.0,)"
+    ordering="AFTER"
+    side="BOTH"
+
+# Copycats+ is optional. Same Material / Item skin costing as Create copycats.
+[[dependencies.${mod_id}]]
+    modId="copycats"
+    type="optional"
+    versionRange="[3.0,)"
+    ordering="AFTER"
+    side="BOTH"
+
 # Features are specific properties of the game environment, that you may want to declare you require. This example declares
 # that your mod requires GL version 3.2 or higher. Other features will be added. They are side aware so declaring this won't
 # stop your mod loading on the server for example.
