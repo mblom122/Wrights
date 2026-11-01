@@ -1995,11 +1995,15 @@ public final class JobManager {
             level.levelEvent(2001, pos, Block.getId(current));
             level.playSound(null, pos, current.getSoundType(level, pos, player).getBreakSound(), SoundSource.BLOCKS, 1.0F, 1.0F);
         }
-        level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_SUPPRESS_DROPS);
-        FluidState fluid = current.getFluidState();
-        if (!fluid.isEmpty()) {
-            clearFluidSpread(level, pos, fluid.getType(), job);
+        BlockState putBack = refund.restore() != null ? refund.restore() : Blocks.AIR.defaultBlockState();
+        level.setBlock(pos, putBack, Block.UPDATE_CLIENTS | Block.UPDATE_SUPPRESS_DROPS);
+        if (putBack.isAir()) {
+            FluidState fluid = current.getFluidState();
+            if (!fluid.isEmpty()) {
+                clearFluidSpread(level, pos, fluid.getType(), job);
+            }
         }
+        // Creative / unpaid placements skip returns; paid Survival placements get items back.
         if (refund.paid()) {
             Item item = BlockFilters.payment(refund.state());
             if (item != null) {
@@ -5457,6 +5461,10 @@ public final class JobManager {
             }
             suspendFall = FallingBlock.isFree(level.getBlockState(below));
         }
+        // Exchange undo needs the block that was swapped out (voided or harvested).
+        BlockState restore = job.exchangeJob() && clearFirst && !existing.isAir() && !existing.canBeReplaced()
+                ? existing
+                : null;
         if (clearFirst) {
             if (job.exchangeJob()) {
                 if (job.voidBlocks()) {
@@ -5508,7 +5516,7 @@ public final class JobManager {
         }
         boolean first = !job.isSettled(entry.x(), entry.y(), entry.z());
         applyEntryNbt(level, player, job, pos, entry);
-        job.recordPlaced(entry.x(), entry.y(), entry.z(), after, paid, extraIds);
+        job.recordPlaced(entry.x(), entry.y(), entry.z(), after, paid, extraIds, restore);
         clearPlacedGhost(player, job, entry);
         if (!quiet) {
             level.gameEvent(player, GameEvent.BLOCK_PLACE, pos);

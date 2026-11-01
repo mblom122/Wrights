@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import javax.annotation.Nullable;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderGetter;
 import net.minecraft.core.HolderLookup;
@@ -987,11 +989,20 @@ public final class BuildJob {
     }
 
     public void recordPlaced(short x, short y, short z, BlockState state, boolean paid) {
-        recordPlaced(x, y, z, state, paid, Refund.NO_EXTRAS);
+        recordPlaced(x, y, z, state, paid, Refund.NO_EXTRAS, null);
     }
 
     public void recordPlaced(short x, short y, short z, BlockState state, boolean paid, int[] extras) {
-        refunds.add(new Refund(x, y, z, state, paid, paid ? extras : Refund.NO_EXTRAS));
+        recordPlaced(x, y, z, state, paid, extras, null);
+    }
+
+    /**
+     * @param restore for Exchange: the block that was swapped out, put back on undo.
+     *                Null for normal place undos (remove to air).
+     */
+    public void recordPlaced(short x, short y, short z, BlockState state, boolean paid, int[] extras,
+            @Nullable BlockState restore) {
+        refunds.add(new Refund(x, y, z, state, paid, paid ? extras : Refund.NO_EXTRAS, restore));
         settleGhost(x, y, z);
     }
 
@@ -1068,7 +1079,7 @@ public final class BuildJob {
     }
 
     public boolean beginUndo() {
-        if (refunds.isEmpty() || kind != Kind.PASTE) {
+        if (refunds.isEmpty() || (kind != Kind.PASTE && kind != Kind.SHAPE)) {
             return false;
         }
         undoing = true;
@@ -1579,11 +1590,16 @@ public final class BuildJob {
         public final List<Slice> slices = new ArrayList<>();
     }
 
-    public record Refund(short x, short y, short z, BlockState state, boolean paid, int[] extras) {
+    public record Refund(short x, short y, short z, BlockState state, boolean paid, int[] extras,
+            @Nullable BlockState restore) {
         public static final int[] NO_EXTRAS = new int[0];
 
         public Refund(short x, short y, short z, BlockState state, boolean paid) {
-            this(x, y, z, state, paid, NO_EXTRAS);
+            this(x, y, z, state, paid, NO_EXTRAS, null);
+        }
+
+        public Refund(short x, short y, short z, BlockState state, boolean paid, int[] extras) {
+            this(x, y, z, state, paid, extras, null);
         }
 
         public Refund {
@@ -1600,13 +1616,19 @@ public final class BuildJob {
             if (extras.length > 0) {
                 tag.putIntArray("extras", extras);
             }
+            if (restore != null && !restore.isAir()) {
+                tag.put("restore", NbtUtils.writeBlockState(restore));
+            }
             return tag;
         }
 
         public static Refund load(CompoundTag tag, HolderGetter<Block> blocks) {
             BlockState state = NbtUtils.readBlockState(blocks, tag.getCompound("state"));
             int[] extras = tag.contains("extras") ? tag.getIntArray("extras") : NO_EXTRAS;
-            return new Refund(tag.getShort("x"), tag.getShort("y"), tag.getShort("z"), state, tag.getBoolean("paid"), extras);
+            BlockState restore = tag.contains("restore")
+                    ? NbtUtils.readBlockState(blocks, tag.getCompound("restore"))
+                    : null;
+            return new Refund(tag.getShort("x"), tag.getShort("y"), tag.getShort("z"), state, tag.getBoolean("paid"), extras, restore);
         }
     }
 }
