@@ -129,6 +129,8 @@ final class ShapeMenuPanel {
             y = drawToggle(graphics, mouseX, mouseY, x, y, width, WrightsClientConfig.SHAPE_VOID.get(), "menu.wrights.shape_void", "menu.wrights.shape_void_hint", "void");
         }
         y += 6;
+        drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_anchor_section", "menu.wrights.shape_anchor_section_hint");
+        y += 12;
         y = drawStatus(graphics, mouseX, mouseY, x, y, width);
         y += 8;
         y = drawMaterials(graphics, mouseX, mouseY, x, y, width);
@@ -233,6 +235,12 @@ final class ShapeMenuPanel {
             case "highlight" -> {
                 if (WrightsClientConfig.SHAPE_SET.get()) {
                     WrightsClientState.glowShapeAnchor(WrightsClientConfig.SHAPE_DIM.get(), WrightsClientConfig.shapeAnchor());
+                }
+                yield true;
+            }
+            case "change" -> {
+                if (host != null) {
+                    net.minecraft.client.Minecraft.getInstance().setScreen(new ShapeAnchorScreen(host));
                 }
                 yield true;
             }
@@ -575,24 +583,41 @@ final class ShapeMenuPanel {
 
     private int drawStatus(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width) {
         boolean placed = WrightsClientConfig.SHAPE_SET.get();
-        WrightsUi.status(graphics, x, y, width, placed ? 40 : 28, placed ? WrightsUi.TEAL : WrightsUi.COPPER_DIM);
+        int boxH = placed ? 54 : 42;
+        WrightsUi.status(graphics, x, y, width, boxH, placed ? WrightsUi.TEAL : WrightsUi.COPPER_DIM);
         if (!placed) {
-            graphics.drawString(font, Component.translatable("menu.wrights.shape_none"), x + 10, y + 10, WrightsUi.TEXT, false);
+            graphics.drawString(font, Component.translatable("menu.wrights.shape_none"), x + 10, y + 8, WrightsUi.TEXT, false);
+            int btnY = y + 24;
+            int btnW = Math.min(88, width - 20);
+            drawAction(graphics, mouseX, mouseY, x + 8, btnY, btnW, "menu.wrights.shape_change", "change", 0xFF1C2A37, 0xFF3A5164, WrightsUi.TEXT);
         } else {
             var anchor = WrightsClientConfig.shapeAnchor();
-            graphics.drawString(font, Component.translatable("menu.wrights.shape_anchor", anchor.getX(), anchor.getY(), anchor.getZ()), x + 10, y + 8, WrightsUi.TEXT, false);
-            int btnY = y + 22;
-            int half = (width - 20) / 2;
-            hits.add(new Hit(x + 8, btnY, half, 14, "highlight", 0));
-            hits.add(new Hit(x + 12 + half, btnY, half, 14, "clear", 0));
-            boolean hHover = mouseX >= x + 8 && mouseX < x + 8 + half && mouseY >= btnY && mouseY < btnY + 14;
-            boolean cHover = mouseX >= x + 12 + half && mouseX < x + 12 + half + half && mouseY >= btnY && mouseY < btnY + 14;
-            graphics.fill(x + 8, btnY, x + 8 + half, btnY + 14, hHover ? 0xFF245850 : 0xFF1A3A38);
-            graphics.fill(x + 12 + half, btnY, x + 12 + half + half, btnY + 14, cHover ? 0xFF5A3030 : 0xFF3A2428);
-            graphics.drawString(font, Component.translatable("menu.wrights.shape_highlight"), x + 14, btnY + 3, WrightsUi.TEAL, false);
-            graphics.drawString(font, Component.translatable("menu.wrights.shape_clear"), x + 18 + half, btnY + 3, WrightsUi.RED, false);
+            graphics.drawString(font, Component.translatable("menu.wrights.shape_anchor",
+                    anchor.getX(), anchor.getY(), anchor.getZ()), x + 10, y + 6, WrightsUi.TEXT, false);
+            String dim = WrightsClientConfig.SHAPE_DIM.get();
+            String dimLabel = dim == null || dim.isBlank() ? "-" : dim.contains(":") ? dim.substring(dim.indexOf(':') + 1) : dim;
+            graphics.drawString(font, font.plainSubstrByWidth(
+                    Component.translatable("menu.wrights.shape_anchor_dim", dimLabel).getString(), width - 24),
+                    x + 10, y + 18, WrightsUi.MUTED, false);
+            int btnY = y + 34;
+            int gap = 4;
+            int btnW = Math.max(48, (width - 16 - gap * 2) / 3);
+            int bx = x + 8;
+            drawAction(graphics, mouseX, mouseY, bx, btnY, btnW, "menu.wrights.shape_highlight", "highlight", 0xFF1A3A38, 0xFF245850, WrightsUi.TEAL);
+            bx += btnW + gap;
+            drawAction(graphics, mouseX, mouseY, bx, btnY, btnW, "menu.wrights.shape_clear", "clear", 0xFF3A2428, 0xFF5A3030, WrightsUi.RED);
+            bx += btnW + gap;
+            int changeW = Math.max(48, x + width - 8 - bx);
+            drawAction(graphics, mouseX, mouseY, bx, btnY, changeW, "menu.wrights.shape_change", "change", 0xFF1C2A37, 0xFF3A5164, WrightsUi.TEXT);
         }
-        return y + (placed ? 44 : 32);
+        return y + boxH + 4;
+    }
+
+    private void drawAction(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int w, String label, String id, int fill, int hoverFill, int ink) {
+        boolean hover = mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + 14;
+        graphics.fill(x, y, x + w, y + 14, hover ? hoverFill : fill);
+        graphics.drawCenteredString(font, Component.translatable(label), x + w / 2, y + 3, ink);
+        hits.add(new Hit(x, y, w, 14, id, 0));
     }
 
     private int drawPair(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width, boolean second, String left, String right, String id) {
