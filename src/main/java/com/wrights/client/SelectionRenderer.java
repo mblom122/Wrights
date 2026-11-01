@@ -218,13 +218,27 @@ public final class SelectionRenderer {
         drawBox(pose, lines, box, camera, 0.55F, 0.72F, 0.86F, 0.45F * pulse);
         buffers.endBatch(RenderType.lines());
 
-        if (pin == null) {
+        if (pin != null) {
+            int span = Math.max(1, Math.max(max.getX() - min.getX(), Math.max(max.getY() - min.getY(), max.getZ() - min.getZ())) + 1);
+            drawAnchorMarker(pose, buffers, camera, pin, span);
+        }
+    }
+
+    /**
+     * Shared copper cross + cube used for shape pins, build anchors, and mirror anchors.
+     * Drawn through blocks so the point stays readable.
+     */
+    private static void drawAnchorMarker(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, BlockPos block) {
+        drawAnchorMarker(pose, buffers, camera, block, 10.0D);
+    }
+
+    private static void drawAnchorMarker(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, BlockPos block, double span) {
+        if (block == null) {
             return;
         }
-        double cx = pin.getX() + 0.5D;
-        double cy = pin.getY() + 0.5D;
-        double cz = pin.getZ() + 0.5D;
-        int span = Math.max(1, Math.max(max.getX() - min.getX(), Math.max(max.getY() - min.getY(), max.getZ() - min.getZ())) + 1);
+        double cx = block.getX() + 0.5D;
+        double cy = block.getY() + 0.5D;
+        double cz = block.getZ() + 0.5D;
         double arm = Math.max(0.45D, Math.min(2.8D, span * 0.08D));
         double marker = Math.max(0.2D, Math.min(1.1D, span * 0.035D));
         com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
@@ -417,7 +431,6 @@ public final class SelectionRenderer {
         VertexConsumer lines = buffers.getBuffer(RenderType.lines());
         float lineAlpha = 0.85F + 0.15F * pulse;
         if (faceMode) {
-            drawBox(pose, lines, border, camera, 0.45F, 0.92F, 0.86F, lineAlpha);
             if (!slabs.isEmpty()) {
                 drawBox(pose, lines, slabs.get(0), camera, 0.45F, 0.92F, 0.86F, lineAlpha);
             }
@@ -433,6 +446,7 @@ public final class SelectionRenderer {
             }
         }
         buffers.endBatch(RenderType.lines());
+        drawAnchorMarker(pose, buffers, camera, anchor);
         if (faceMode) {
             drawMirrorCount(pose, buffers, camera, minecraft, anchor, face, pattern);
         }
@@ -938,14 +952,9 @@ public final class SelectionRenderer {
         float placeGreen = com.wrights.WrightsClientConfig.channel(place, 8);
         float placeBlue = com.wrights.WrightsClientConfig.channel(place, 0);
         drawBox(pose, lines, box, camera, placeRed, placeGreen, placeBlue, pulse);
-        AABB marker = new AABB(anchor.getX(), anchor.getY(), anchor.getZ(), anchor.getX() + 1.0D, anchor.getY() + 1.0D, anchor.getZ() + 1.0D);
-        int anchorColor = WrightsUi.BLUE;
-        drawBox(pose, lines, marker, camera,
-                WrightsClientConfig.channel(anchorColor, 16),
-                WrightsClientConfig.channel(anchorColor, 8),
-                WrightsClientConfig.channel(anchorColor, 0),
-                1.0F);
         buffers.endBatch(RenderType.lines());
+        int span = Math.max(WrightsClientState.viewX, Math.max(WrightsClientState.viewY, WrightsClientState.viewZ));
+        drawAnchorMarker(pose, buffers, camera, anchor, Math.max(8, span));
     }
 
     private static void drawActiveBuilds(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft, boolean models) {
@@ -1147,20 +1156,13 @@ public final class SelectionRenderer {
         if (!minecraft.level.dimension().location().toString().equals(WrightsClientState.mirrorGlowDim)) {
             return;
         }
-        boolean on = (System.currentTimeMillis() / 180L) % 2L == 0L;
         BlockPos pos = WrightsClientState.mirrorGlowPos;
-        AABB box = new AABB(pos).inflate(0.08D);
-        VertexConsumer fill = buffers.getBuffer(RenderType.debugFilledBox());
-        AABB local = box.move(-camera.x, -camera.y, -camera.z);
-        LevelRenderer.addChainedFilledBoxVertices(
-                pose, fill, local.minX, local.minY, local.minZ, local.maxX, local.maxY, local.maxZ,
-                0.37F, 0.82F, 0.77F, on ? 0.28F : 0.05F);
-        buffers.endBatch(RenderType.debugFilledBox());
+        if (pos == null) {
+            return;
+        }
+        drawAnchorMarker(pose, buffers, camera, pos, 14.0D);
         VertexConsumer lines = buffers.getBuffer(RenderType.lines());
-        float alpha = on ? 1.0F : 0.18F;
-        drawBox(pose, lines, box, camera, 0.45F, 0.92F, 0.86F, alpha);
-        drawBox(pose, lines, box.inflate(0.06D), camera, 0.70F, 1.0F, 0.94F, alpha * 0.7F);
-        drawGuide(pose, lines, camera, minecraft.player.getBoundingBox(), new AABB(pos), 0.45F, 0.92F, 0.86F, 1.0F);
+        drawGuide(pose, lines, camera, minecraft.player.getBoundingBox(), new AABB(pos), 0.91F, 0.55F, 0.23F, 1.0F);
         buffers.endBatch(RenderType.lines());
     }
 
@@ -1175,18 +1177,9 @@ public final class SelectionRenderer {
         if (pos == null) {
             return;
         }
-        boolean on = (System.currentTimeMillis() / 180L) % 2L == 0L;
-        AABB box = new AABB(pos).inflate(0.08D);
-        VertexConsumer fill = buffers.getBuffer(RenderType.debugFilledBox());
-        AABB local = box.move(-camera.x, -camera.y, -camera.z);
-        LevelRenderer.addChainedFilledBoxVertices(
-                pose, fill, local.minX, local.minY, local.minZ, local.maxX, local.maxY, local.maxZ,
-                0.95F, 0.62F, 0.28F, on ? 0.28F : 0.05F);
-        buffers.endBatch(RenderType.debugFilledBox());
+        drawAnchorMarker(pose, buffers, camera, pos, 14.0D);
         VertexConsumer lines = buffers.getBuffer(RenderType.lines());
-        float alpha = on ? 1.0F : 0.18F;
-        drawBox(pose, lines, box, camera, 0.98F, 0.70F, 0.32F, alpha);
-        drawGuide(pose, lines, camera, minecraft.player.getBoundingBox(), new AABB(pos), 0.98F, 0.70F, 0.32F, 1.0F);
+        drawGuide(pose, lines, camera, minecraft.player.getBoundingBox(), new AABB(pos), 0.91F, 0.55F, 0.23F, 1.0F);
         buffers.endBatch(RenderType.lines());
     }
 
