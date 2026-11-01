@@ -72,8 +72,8 @@ public final class Shapes {
     }
 
     /**
-     * @param height extrusion / cylinder height
-     * @param thickness ring band width (outer radius inward); ignored by other kinds
+     * @param height cylinder / pyramid height; for rings, tube diameter of the torus (1 = flat)
+     * @param thickness ring / torus tube width in the ring plane; ignored by other kinds
      */
     public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, int thickness, boolean hollow, int plane, boolean flipVertical) {
         List<BlockPos> out = new ArrayList<>();
@@ -86,7 +86,7 @@ public final class Shapes {
         int flat = clampPlane(plane);
         switch (kind) {
             case CIRCLE -> disk(out, center, r, hollow, flat, false);
-            case RING -> ring(out, center, r, band, h, flat);
+            case RING -> ring(out, center, r, band, h, flat, hollow);
             case SQUARE -> square(out, center, r, hollow, flat);
             case LINE -> line(out, center, r, flat);
             case SPHERE -> sphere(out, center, r, hollow);
@@ -167,29 +167,57 @@ public final class Shapes {
     }
 
     /**
-     * Annulus / donut: outer radius {@code radius}, band width {@code thickness} (1 = one-block rim),
-     * extruded {@code height} blocks along the plane normal (1 = flat ring, taller = donut tube).
+     * Flat annulus when {@code height} is 1; otherwise a torus (true donut) with elliptical tube
+     * cross-section. {@code thickness} is the tube width in the ring plane; {@code height} is the
+     * tube diameter along the plane normal.
      */
-    private static void ring(List<BlockPos> out, BlockPos center, int radius, int thickness, int height, int plane) {
+    private static void ring(List<BlockPos> out, BlockPos center, int radius, int thickness, int height, int plane, boolean hollow) {
         int band = Mth.clamp(thickness, 1, radius);
         int tall = Math.max(1, height);
-        int inner = Math.max(0, radius - band);
-        int r2 = radius * radius;
-        int inner2 = inner * inner;
-        for (int layer = 0; layer < tall; layer++) {
+        if (tall <= 1) {
+            int inner = Math.max(0, radius - band);
+            int r2 = radius * radius;
+            int inner2 = inner * inner;
             for (int a = -radius; a <= radius; a++) {
                 for (int b = -radius; b <= radius; b++) {
                     int d2 = a * a + b * b;
                     if (d2 > r2 || d2 < inner2) {
                         continue;
                     }
-                    out.add(ringCell(center, a, b, layer, plane));
+                    out.add(ringCell(center, a, b, 0, plane));
+                }
+            }
+            return;
+        }
+        // Major radius to tube centerline; minor radii for elliptical tube section.
+        double rx = band * 0.5D;
+        double ry = tall * 0.5D;
+        double major = Math.max(rx, radius - rx);
+        int alongMax = (tall - 1) / 2;
+        int alongMin = -(tall / 2);
+        // Shell thickness in ellipse-parameter space (~one block of the larger minor axis).
+        double shell = hollow ? Math.max(0.35D, 1.0D / Math.max(rx, ry)) : 0.0D;
+        for (int along = alongMin; along <= alongMax; along++) {
+            for (int a = -radius; a <= radius; a++) {
+                for (int b = -radius; b <= radius; b++) {
+                    double dist = Math.sqrt((double) a * a + (double) b * b);
+                    double da = dist - major;
+                    double nx = da / rx;
+                    double ny = along / ry;
+                    double q = nx * nx + ny * ny;
+                    if (q > 1.0D) {
+                        continue;
+                    }
+                    if (hollow && q < (1.0D - shell) * (1.0D - shell)) {
+                        continue;
+                    }
+                    out.add(ringCell(center, a, b, along, plane));
                 }
             }
         }
     }
 
-    /** Ring in the chosen plane, extruded along that plane’s normal. */
+    /** Ring/torus in the chosen plane; {@code along} is offset on the plane normal. */
     private static BlockPos ringCell(BlockPos center, int a, int b, int along, int plane) {
         return switch (plane) {
             case PLANE_XY -> center.offset(a, b, along);
