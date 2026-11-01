@@ -16,9 +16,7 @@ public final class Shapes {
     public enum Kind {
         CIRCLE(false, false),
         RING(false, true),
-        /** Legacy flat square — kept for saved configs; use {@link #CUBE} with height 1. */
         SQUARE(false, false),
-        /** Legacy line — kept for saved configs; use {@link #CYLINDER} with width 1. */
         LINE(false, false),
         SPHERE(true, false),
         CUBE(true, true),
@@ -41,11 +39,6 @@ public final class Shapes {
         /** True when the Height slider changes this shape. */
         public boolean usesHeight() {
             return usesHeight;
-        }
-
-        /** False for legacy kinds hidden from the picker. */
-        public boolean selectable() {
-            return this != SQUARE && this != LINE;
         }
 
         public static Kind byId(int id) {
@@ -113,7 +106,7 @@ public final class Shapes {
             case CIRCLE -> disk(out, center, r, hollow, flat, false);
             case RING -> ring(out, center, r, band, h, flat, hollow);
             case SQUARE -> square(out, center, r, hollow, flat);
-            case LINE -> lineSegment(out, center, Math.max(h, 2 * r + 1), flat);
+            case LINE -> line(out, center, r, flat);
             case SPHERE -> sphere(out, center, r, hollow);
             case CUBE -> {
                 // Height 1 is the old Square (plane chooses floor/wall). Taller is a rectangular box.
