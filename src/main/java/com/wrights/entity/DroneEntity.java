@@ -36,6 +36,7 @@ public class DroneEntity extends Entity {
     private static final EntityDataAccessor<ItemStack> CURRENT_BLOCK = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.ITEM_STACK);
     private static final EntityDataAccessor<ItemStack> NEXT_BLOCK = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.ITEM_STACK);
     private static final EntityDataAccessor<Integer> WAIT_REASON = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Boolean> RETURNING = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.BOOLEAN);
 
     /** Not waiting — actively flying to or placing the current block. */
     public static final int WAIT_NONE = 0;
@@ -47,7 +48,6 @@ public class DroneEntity extends Entity {
     public static final int WAIT_SHELTER = 6;
     public static final int WAIT_PAUSED = 7;
 
-    private boolean returning;
     private boolean stranded;
     /** Cosmetic Manage-add fly-in; not a job crew member. */
     private boolean manageDock;
@@ -98,7 +98,7 @@ public class DroneEntity extends Entity {
     }
 
     public boolean returning() {
-        return this.returning;
+        return this.entityData.get(RETURNING);
     }
 
     public void forgetStrand() {
@@ -180,7 +180,7 @@ public class DroneEntity extends Entity {
      * this entity only shows the dock, then discards.
      */
     public void dockIn(ServerPlayer player, @Nullable BlockPos port, int slot, int count) {
-        this.returning = true;
+        setReturning(true);
         this.manageDock = true;
         this.returnTicks = 0;
         this.ownerId = player.getUUID();
@@ -213,10 +213,12 @@ public class DroneEntity extends Entity {
 
     /** Returns to the personal port (behind the player) or a placed wrightport hatch. */
     public void flyHome(ServerPlayer player, int slot, int count, @Nullable BlockPos port) {
-        this.returning = true;
+        setReturning(true);
         this.returnTicks = 0;
         this.ownerId = player.getUUID();
         this.setJobId(null);
+        // Keep carried haul for the flight home; only clear the place/mine preview.
+        clearCurrentBlock();
         setWorkStatus(ItemStack.EMPTY, ItemStack.EMPTY, WAIT_HOME);
         setHomePort(port);
         if (!WrightsConfig.flyHome()) {
@@ -256,6 +258,13 @@ public class DroneEntity extends Entity {
         builder.define(CURRENT_BLOCK, ItemStack.EMPTY);
         builder.define(NEXT_BLOCK, ItemStack.EMPTY);
         builder.define(WAIT_REASON, WAIT_NONE);
+        builder.define(RETURNING, false);
+    }
+
+    private void setReturning(boolean value) {
+        if (this.entityData.get(RETURNING) != value) {
+            this.entityData.set(RETURNING, value);
+        }
     }
 
     /** The drop this wright is bringing home. Empty while it is still on the way out. */
@@ -334,7 +343,8 @@ public class DroneEntity extends Entity {
      * </ul>
      */
     public ItemStack displayCargo() {
-        if (returning()) {
+        // Homebound (or WAIT_HOME) always shows haul — never the old place preview.
+        if (returning() || waitReason() == WAIT_HOME) {
             return carried();
         }
         ItemStack placing = currentBlock();
@@ -469,7 +479,7 @@ public class DroneEntity extends Entity {
         if (this.unitId != null) {
             com.wrights.job.JobManager.noteFlyer(this.unitId, this);
         }
-        if (this.returning) {
+        if (returning()) {
             if (this.unitId != null) {
                 com.wrights.job.JobManager.holdReturn(this.unitId);
             }
@@ -540,7 +550,7 @@ public class DroneEntity extends Entity {
         if (tag.contains("Tier")) {
             setTier(tag.getInt("Tier"));
         }
-        this.returning = tag.getBoolean("Returning");
+        setReturning(tag.getBoolean("Returning"));
         if (tag.hasUUID("Owner")) {
             this.ownerId = tag.getUUID("Owner");
         }
@@ -551,7 +561,7 @@ public class DroneEntity extends Entity {
         if (tag.hasUUID("UnitId")) {
             this.unitId = tag.getUUID("UnitId");
         }
-        if (this.returning && this.unitId != null && this.level() instanceof ServerLevel) {
+        if (returning() && this.unitId != null && this.level() instanceof ServerLevel) {
             com.wrights.job.JobManager.holdReturn(this.unitId);
         }
         this.unitName = tag.getString("UnitName");
@@ -564,7 +574,7 @@ public class DroneEntity extends Entity {
     protected void addAdditionalSaveData(CompoundTag tag) {
         jobId().ifPresent(id -> tag.putUUID("JobId", id));
         tag.putInt("Tier", tier());
-        tag.putBoolean("Returning", this.returning);
+        tag.putBoolean("Returning", returning());
         if (this.ownerId != null) {
             tag.putUUID("Owner", this.ownerId);
         }

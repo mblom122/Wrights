@@ -1538,6 +1538,7 @@ public final class JobManager {
                 break;
             }
             statusState = state;
+            BuildJob.Hand actorHand = null;
             if (!fast) {
                 Vec3 hover = Vec3.atCenterOf(pos).add(0.0D, 0.9D, 0.0D);
                 drone = null;
@@ -1552,6 +1553,7 @@ public final class JobManager {
                         }
                         if (candidate.distanceToSqr(hover) <= DRONE_REACH_SQR) {
                             drone = candidate;
+                            actorHand = hand;
                             break;
                         }
                         double step = candidate.distanceToSqr(hover) > 64.0D ? 0.85D : 0.4D;
@@ -1598,7 +1600,7 @@ public final class JobManager {
                 continue;
             }
             Schematic.Entry entry = new Schematic.Entry((short) dx, (short) dy, (short) dz, state, false);
-            PlaceResult result = placeOne(level, player, job, pos, entry, false, null);
+            PlaceResult result = placeOne(level, player, job, pos, entry, false, actorHand, drone);
             if (result == PlaceResult.PAUSE) {
                 job.setWaitKind(BuildJob.WAIT_CHUNK);
                 publishShapeDroneStatus(level, job, state, DroneEntity.WAIT_CHUNK);
@@ -5651,7 +5653,7 @@ public final class JobManager {
             return PlaceResult.DONE;
         }
         java.util.List<ItemStack> drops = com.wrights.blueprint.MirrorLaunch.harvest(player, level, pos, job.mineTool(), job.mineVoid());
-        showCarry(level, job, hand, drops);
+        showCarry(level, job, hand, drops, null);
         clearPlacedGhost(player, job, entry);
         job.placedOne();
         return PlaceResult.DONE;
@@ -5661,20 +5663,63 @@ public final class JobManager {
      * Fold this break’s drops into the wright’s haul, then clear the place/mine preview
      * so the under-wright icon switches to what was actually received (mine / exchange void-off).
      */
-    private static void showCarry(ServerLevel level, BuildJob job, BuildJob.Hand hand, java.util.List<ItemStack> drops) {
+    private static void showCarry(
+            ServerLevel level,
+            BuildJob job,
+            BuildJob.Hand hand,
+            java.util.List<ItemStack> drops,
+            DroneEntity actor) {
         if (drops == null || drops.isEmpty()) {
             return;
         }
-        UUID id = hand != null && hand.entityId != null ? hand.entityId : job.droneId();
-        if (id == null) {
+        DroneEntity drone = resolveCargoDrone(level, job, hand, actor);
+        if (drone == null) {
             return;
         }
-        if (level.getEntity(id) instanceof DroneEntity drone && drone.isAlive()) {
-            drone.takeHaul(drops);
-            if (!drone.carried().isEmpty()) {
-                drone.clearCurrentBlock();
+        drone.takeHaul(drops);
+        if (!drone.carried().isEmpty()) {
+            drone.clearCurrentBlock();
+        }
+    }
+
+    /** Prefer the wright that just acted, then hand / job flyer, then any job-bound flyer nearby. */
+    private static DroneEntity resolveCargoDrone(
+            ServerLevel level,
+            BuildJob job,
+            BuildJob.Hand hand,
+            DroneEntity actor) {
+        if (actor != null && actor.isAlive()) {
+            return actor;
+        }
+        if (hand != null && hand.entityId != null) {
+            Entity existing = level.getEntity(hand.entityId);
+            if (existing instanceof DroneEntity drone && drone.isAlive()) {
+                return drone;
             }
         }
+        if (job.droneId() != null) {
+            Entity existing = level.getEntity(job.droneId());
+            if (existing instanceof DroneEntity drone && drone.isAlive()) {
+                return drone;
+            }
+        }
+        for (BuildJob.Hand other : job.hands()) {
+            if (other.entityId == null) {
+                continue;
+            }
+            Entity existing = level.getEntity(other.entityId);
+            if (existing instanceof DroneEntity drone && drone.isAlive()) {
+                return drone;
+            }
+        }
+        BlockPos at = job.min();
+        for (DroneEntity drone : level.getEntitiesOfClass(
+                DroneEntity.class,
+                new AABB(at).inflate(96.0D),
+                entity -> entity.isAlive() && entity.jobId().filter(job.id()::equals).isPresent())) {
+            return drone;
+        }
+        return null;
     }
 
     /**
@@ -5694,10 +5739,22 @@ public final class JobManager {
     }
 
     private static PlaceResult placeOne(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos pos, Schematic.Entry entry, boolean quiet) {
-        return placeOne(level, player, job, pos, entry, quiet, null);
+        return placeOne(level, player, job, pos, entry, quiet, null, null);
     }
 
     private static PlaceResult placeOne(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos pos, Schematic.Entry entry, boolean quiet, BuildJob.Hand hand) {
+        return placeOne(level, player, job, pos, entry, quiet, hand, null);
+    }
+
+    private static PlaceResult placeOne(
+            ServerLevel level,
+            ServerPlayer player,
+            BuildJob job,
+            BlockPos pos,
+            Schematic.Entry entry,
+            boolean quiet,
+            BuildJob.Hand hand,
+            DroneEntity actor) {
         if (level.isOutsideBuildHeight(pos)) {
             return skipCell(player, job, entry);
         }
@@ -5772,8 +5829,18 @@ public final class JobManager {
                     voidCell(level, pos);
                 } else {
                     // Void off: still swap, but harvest drops back (silk if enabled).
+                    BlockState removed = existing;
                     ItemStack tool = job.exchangeSilk() ? silkTouchPick(level.getServer()) : ItemStack.EMPTY;
-                    showCarry(level, job, hand, com.wrights.blueprint.MirrorLaunch.harvest(player, level, pos, tool, false));
+                    java.util.List<ItemStack> drops =
+                            com.wrights.blueprint.MirrorLaunch.harvest(player, level, pos, tool, false);
+                    // If drop claim missed entities, still show the swapped-out block on the wright.
+                    if (drops.isEmpty()) {
+                        ItemStack visual = BlockFilters.icon(removed);
+                        if (!visual.isEmpty()) {
+                            drops = java.util.List.of(visual);
+                        }
+                    }
+                    showCarry(level, job, hand, drops, actor);
                 }
             } else {
                 voidCell(level, pos);
