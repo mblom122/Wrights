@@ -628,6 +628,8 @@
   "hud.wrights.tool_new": "New template",
   "hud.wrights.tool_bind": "Bind inventory",
   "hud.wrights.build_modes": "Build Mode",
+  "hud.wrights.build_modes_crew": "Wrights per job: %s (max %s)",
+  "hud.wrights.build_modes_crew_max": "Wrights per job: Max %s",
   "hud.wrights.build_explain": "Right-click to place the blueprint.",
   "hud.wrights.build_inventory": "Right-click to build · items from you",
   "hud.wrights.build_chest": "Right-click to build · items from the chest",

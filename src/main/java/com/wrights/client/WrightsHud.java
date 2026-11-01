@@ -546,17 +546,21 @@ public final class WrightsHud {
             width = Math.max(width, minecraft.font.width(box) + minecraft.font.width(selected) + 36 + nest);
             width = Math.max(width, minecraft.font.width(move) + minecraft.font.width(canMove ? selected : need) + 36 + nest);
         }
+        Component crew = buildModesCrewLine();
+        width = Math.max(width, minecraft.font.width(crew) + 28);
         int row = 18;
         int rows = 3 + (showPlace ? 1 : 0) + (showMirror ? 1 : 0) + (showShape ? 1 : 0) + (showExchange ? 1 : 0) + (making ? 3 : 0);
         int textWidth = width - 24;
         int footer = footerHeight(minecraft, how, textWidth);
-        int height = 28 + row * rows + footer;
+        int headerH = 36; // title + wrights-per-job line
+        int height = headerH + row * rows + footer;
         int x = HudAnchor.modeX(graphics.guiWidth(), width);
         int y = HudAnchor.modeY(graphics.guiHeight(), height);
         WrightsUi.panel(graphics, x, y, width, height);
-        graphics.drawString(minecraft.font, title, x + 12, y + 8, WrightsUi.TEXT, false);
+        graphics.drawString(minecraft.font, title, x + 12, y + 6, WrightsUi.TEXT, false);
+        graphics.drawString(minecraft.font, crew, x + 12, y + 18, WrightsUi.MUTED, false);
         boolean building = WrightsClientState.mode == WrightsClientState.Mode.BUILD;
-        int yRow = y + 24;
+        int yRow = y + headerH;
         drawToolRow(graphics, minecraft, x, yRow, width, making, fresh, selected);
         int yAfterNew = yRow + row;
         if (making) {
@@ -591,6 +595,16 @@ public final class WrightsHud {
         drawToolRow(graphics, minecraft, x, toolY, width, building && WrightsClientState.bindSupply, bind, selected);
         int foot = WrightsClientState.styleAnnounce ? 0xFFF2C14E : WrightsUi.MUTED;
         drawFooter(graphics, minecraft, how, x + 12, y + height - footer + 4, textWidth, foot);
+    }
+
+    /** Effective wrights a new job will ask for — always capped by server maxWrightsPerJob. */
+    private static Component buildModesCrewLine() {
+        int cap = WrightsConfig.maxWrightsPerJob();
+        int count = WrightsClientConfig.droneCount();
+        if (WrightsClientConfig.DRONE_MAX.get() || count >= cap) {
+            return Component.translatable("hud.wrights.build_modes_crew_max", cap);
+        }
+        return Component.translatable("hud.wrights.build_modes_crew", count, cap);
     }
 
     private static int footerHeight(Minecraft minecraft, Component text, int width) {
@@ -1065,23 +1079,26 @@ public final class WrightsHud {
     }
 
     static int sampleModeMenuWidth(Minecraft minecraft) {
-        return Math.max(188, minecraft.font.width(Component.translatable("hud.wrights.build_modes")) + 28);
+        int width = Math.max(188, minecraft.font.width(Component.translatable("hud.wrights.build_modes")) + 28);
+        return Math.max(width, minecraft.font.width(buildModesCrewLine()) + 28);
     }
 
     static int sampleModeMenuHeight(Minecraft minecraft) {
-        return 28 + 18 * 6 + 28;
+        return 36 + 18 * 6 + 28;
     }
 
     static void drawSampleModeMenu(GuiGraphics graphics, Minecraft minecraft, int x, int y, int width, int height) {
         Component title = Component.translatable("hud.wrights.build_modes");
+        Component crew = buildModesCrewLine();
         Component use = Component.translatable("hud.wrights.tool_build");
         Component fresh = Component.translatable("hud.wrights.tool_new");
         Component selected = Component.translatable("hud.wrights.mode_selected");
         Component how = Component.translatable("hud.wrights.mode_how");
         WrightsUi.panel(graphics, x, y, width, height);
-        graphics.drawString(minecraft.font, title, x + 12, y + 8, WrightsUi.TEXT, false);
-        drawToolRow(graphics, minecraft, x, y + 24, width, true, fresh, selected);
-        drawToolRow(graphics, minecraft, x, y + 42, width, false, use, selected);
+        graphics.drawString(minecraft.font, title, x + 12, y + 6, WrightsUi.TEXT, false);
+        graphics.drawString(minecraft.font, crew, x + 12, y + 18, WrightsUi.MUTED, false);
+        drawToolRow(graphics, minecraft, x, y + 36, width, true, fresh, selected);
+        drawToolRow(graphics, minecraft, x, y + 54, width, false, use, selected);
         drawFooter(graphics, minecraft, how, x + 12, y + height - 20, width - 24, WrightsUi.MUTED);
     }
 
