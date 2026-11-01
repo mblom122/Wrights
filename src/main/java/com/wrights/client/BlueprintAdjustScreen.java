@@ -253,7 +253,13 @@ public class BlueprintAdjustScreen extends Screen {
         if (saving() || WrightsClientState.cornerA == null || WrightsClientState.cornerB == null) {
             return;
         }
-        BlockPos[] next = BoxEdits.move(WrightsClientState.cornerA, WrightsClientState.cornerB, dx, dy, dz);
+        int step = WrightsUi.nudgeStep();
+        BlockPos[] next = BoxEdits.move(
+                WrightsClientState.cornerA,
+                WrightsClientState.cornerB,
+                dx * step,
+                dy * step,
+                dz * step);
         apply(next[0], next[1]);
     }
 

@@ -203,7 +203,8 @@ public class ShapeAnchorScreen extends Screen {
         if (pos == null) {
             return;
         }
-        apply(pos.offset(dx, dy, dz));
+        int step = WrightsUi.nudgeStep();
+        apply(pos.offset(dx * step, dy * step, dz * step));
     }
 
     private void usePlayer() {

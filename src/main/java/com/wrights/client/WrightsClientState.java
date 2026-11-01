@@ -1459,17 +1459,12 @@ public final class WrightsClientState {
         deployCount = Mth.clamp(Math.max(1, deployCount), 1, cap);
     }
 
+    /** Apply {@link WrightsUi#nudgeStep()} in {@code direction} (±1), clamped to {@code [min, max]}. */
     public static int stepped(int current, int direction, int min, int max) {
         if (max < min) {
             return min;
         }
-        boolean shift = net.minecraft.client.gui.screens.Screen.hasShiftDown();
-        boolean alt = net.minecraft.client.gui.screens.Screen.hasAltDown();
-        boolean control = net.minecraft.client.gui.screens.Screen.hasControlDown();
-        if (control || (shift && alt)) {
-            return direction > 0 ? max : min;
-        }
-        int step = alt ? 64 : shift ? 16 : 1;
+        int step = WrightsUi.nudgeStep();
         return Mth.clamp(current + Integer.signum(direction) * step, min, max);
     }
 

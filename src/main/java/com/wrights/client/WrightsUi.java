@@ -30,24 +30,24 @@ public final class WrightsUi {
     }
 
     /**
-     * +/- nudge size used across Wrights menus: plain 1, Ctrl 5, Shift 10,
-     * Ctrl+Shift 50, Alt 100.
+     * Standard +/- step for every Wrights increment control:
+     * 1 · Ctrl 5 · Shift 10 · Alt 50 · Ctrl+Shift 100.
      */
     public static int nudgeStep() {
         boolean control = net.minecraft.client.gui.screens.Screen.hasControlDown();
         boolean shift = net.minecraft.client.gui.screens.Screen.hasShiftDown();
         boolean alt = net.minecraft.client.gui.screens.Screen.hasAltDown();
         if (control && shift) {
-            return 50;
-        }
-        if (alt) {
             return 100;
         }
-        if (control) {
-            return 5;
+        if (alt) {
+            return 50;
         }
         if (shift) {
             return 10;
+        }
+        if (control) {
+            return 5;
         }
         return 1;
     }

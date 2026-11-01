@@ -440,19 +440,22 @@ public class PlacementScreen extends Screen implements JeiPreview {
 
     private void move(int dx, int dy, int dz) {
         BlockPos anchor = WrightsClientState.anchor == null ? BlockPos.ZERO : WrightsClientState.anchor;
-        setAnchor(anchor.offset(dx, dy, dz));
+        int step = WrightsUi.nudgeStep();
+        setAnchor(anchor.offset(dx * step, dy * step, dz * step));
     }
 
     private void resize(int axis, int delta) {
+        int step = WrightsUi.nudgeStep();
+        int change = delta * step;
         int x = WrightsClientState.viewX;
         int y = WrightsClientState.viewY;
         int z = WrightsClientState.viewZ;
         if (axis == 0) {
-            x += delta;
+            x += change;
         } else if (axis == 1) {
-            y += delta;
+            y += change;
         } else {
-            z += delta;
+            z += change;
         }
         setSize(x, y, z);
     }

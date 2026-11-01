@@ -427,11 +427,13 @@ final class ShapeMenuPanel {
                 yield true;
             }
             case "air_up" -> {
-                WrightsClientConfig.setShapeAirOffset(WrightsClientConfig.SHAPE_AIR_OFFSET.get() + 1);
+                int step = WrightsUi.nudgeStep();
+                WrightsClientConfig.setShapeAirOffset(WrightsClientConfig.SHAPE_AIR_OFFSET.get() + step);
                 yield true;
             }
             case "air_down" -> {
-                WrightsClientConfig.setShapeAirOffset(WrightsClientConfig.SHAPE_AIR_OFFSET.get() - 1);
+                int step = WrightsUi.nudgeStep();
+                WrightsClientConfig.setShapeAirOffset(WrightsClientConfig.SHAPE_AIR_OFFSET.get() - step);
                 yield true;
             }
             case "under_me" -> {
