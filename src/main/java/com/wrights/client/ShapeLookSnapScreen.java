@@ -103,7 +103,8 @@ public class ShapeLookSnapScreen extends Screen {
 
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        WrightsUi.scrim(graphics, this.width, this.height);
+        // Light veil so the live shape preview stays readable while nudging the snap.
+        graphics.fill(0, 0, this.width, this.height, 0x66060C14);
         WrightsUi.panel(graphics, panelX, panelY, panelW, panelH);
     }
 

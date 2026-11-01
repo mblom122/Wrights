@@ -92,7 +92,9 @@ public final class SelectionRenderer {
         drawMineMarks(pose, buffers, camera, minecraft);
         boolean placing = minecraft.screen instanceof PlacementScreen;
         boolean adjust = minecraft.screen instanceof BlueprintAdjustScreen;
+        boolean shapeSnap = minecraft.screen instanceof ShapeLookSnapScreen;
         boolean gui = minecraft.screen != null;
+        boolean guiOk = !gui || placing || shapeSnap;
         boolean capture = WrightsClientState.mode == WrightsClientState.Mode.CAPTURE || WrightsClientState.mode == WrightsClientState.Mode.SAVING;
         if (!ControllerItem.isHeld(player)) {
             return;
@@ -103,15 +105,15 @@ public final class SelectionRenderer {
         if ((adjust || !gui) && capture) {
             drawCapture(pose, buffers, camera);
             drawCaptureGhosts(pose, buffers, camera, minecraft);
-        } else if ((!gui || placing) && WrightsClientState.shapeToolActive()) {
+        } else if (guiOk && WrightsClientState.shapeToolActive()) {
             drawShapeGhosts(pose, buffers, camera, minecraft);
-        } else if ((!gui || placing) && WrightsClientState.mode == WrightsClientState.Mode.BUILD && !WrightsClientState.bindSupply && !mirrorBlocks()) {
+        } else if (guiOk && WrightsClientState.mode == WrightsClientState.Mode.BUILD && !WrightsClientState.bindSupply && !mirrorBlocks()) {
             drawPreview(pose, buffers, camera);
-        } else if ((!gui || placing) && mirrorBlocks()) {
+        } else if (guiOk && mirrorBlocks()) {
             drawMirrorBlockGhosts(pose, buffers, camera, minecraft);
             drawMirrorMine(pose, buffers, camera, minecraft);
         }
-        if ((!gui || placing) && WrightsClientState.mode == WrightsClientState.Mode.BUILD && (WrightsClientState.bindSupply || WrightsClientState.supplyBound)) {
+        if (guiOk && WrightsClientState.mode == WrightsClientState.Mode.BUILD && (WrightsClientState.bindSupply || WrightsClientState.supplyBound)) {
             drawSupplyMarkers(pose, buffers, camera, minecraft);
         }
         drawMarkedJobs(pose, buffers, camera, minecraft);
