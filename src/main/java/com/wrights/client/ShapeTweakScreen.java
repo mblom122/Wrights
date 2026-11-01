@@ -1,24 +1,38 @@
 package com.wrights.client;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.state.BlockState;
 
 import com.wrights.WrightsClientConfig;
 import com.wrights.WrightsConfig;
+import com.wrights.blueprint.ShapeMaterials;
 import com.wrights.blueprint.Shapes;
+import com.wrights.util.BlockFilters;
 
 /**
  * Compact translucent Shift+right-click tweak for Shape / Exchange:
- * size (and height/length when needed), Look vs On-anchor, and a link
- * into the existing look-snap / world-anchor editors. Same light-veil panel style
- * as {@link ShapeLookSnapScreen} so the world preview stays visible underneath.
+ * size, Look vs Anchor, materials / Replace with icons + Change, and Edit point.
+ * Same light-veil panel style as {@link ShapeLookSnapScreen}.
  */
 public class ShapeTweakScreen extends Screen {
     private static final int PAD = 8;
     private static final int ROW = 14;
     private static final int GAP = 4;
     private static final int STEP = 14;
+    private static final int ICON = 16;
+    private static final int MAX_ICONS = 6;
 
     private final boolean exchange;
     private int panelX;
@@ -32,6 +46,8 @@ public class ShapeTweakScreen extends Screen {
     private int placeChoicesY = -1;
     private int matchLabelY = -1;
     private int matchChoicesY = -1;
+    private int matsLabelY = -1;
+    private int matsRowY = -1;
     private int valueX;
     private int valueW;
     private Component tip;
@@ -57,14 +73,19 @@ public class ShapeTweakScreen extends Screen {
         labelW = Math.max(labelW, this.font.width(Component.translatable("screen.wrights.shape_tweak_length")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("screen.wrights.shape_tweak_depth")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.shape_place")));
+        labelW = Math.max(labelW, this.font.width(Component.translatable(
+                exchange ? "menu.wrights.exchange_to" : "menu.wrights.shape_materials")));
         if (exchange) {
             labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.exchange_match")));
         }
         int rowInner = labelW + 4 + stepW + 2 + fieldW + 2 + stepW;
         Component done = Component.translatable("screen.wrights.done");
         Component edit = Component.translatable("screen.wrights.shape_tweak_edit_point");
+        Component change = Component.translatable("screen.wrights.shape_tweak_change");
+        int changeW = Math.max(48, this.font.width(change) + 12);
         int btnW = Math.max(this.font.width(done), this.font.width(edit)) + 14;
-        panelW = WrightsUi.fitW(PAD * 2 + Math.max(rowInner, btnW * 2 + GAP), this.width);
+        int matsNeed = ICON * MAX_ICONS + GAP * (MAX_ICONS - 1) + GAP + changeW;
+        panelW = WrightsUi.fitW(PAD * 2 + Math.max(Math.max(rowInner, btnW * 2 + GAP), matsNeed), this.width);
 
         boolean anchors = WrightsConfig.allowShapeAnchor();
         boolean line = exchange && WrightsClientConfig.exchangeForm().line();
@@ -72,7 +93,6 @@ public class ShapeTweakScreen extends Screen {
         boolean showSize = !line;
         boolean showAlong = line || kind.usesHeight();
         boolean showThickness = !line && (kind == Shapes.Kind.BOX || kind == Shapes.Kind.RING);
-        // Shape keeps Lock before in this compact menu; Exchange does not.
         boolean showLookLock = !exchange && anchors && !WrightsClientConfig.SHAPE_USE_ANCHOR.get();
         int rows = 1 // title
                 + (showSize ? 1 : 0)
@@ -80,9 +100,11 @@ public class ShapeTweakScreen extends Screen {
                 + (showThickness ? 1 : 0)
                 + 1 // Build at label
                 + 1 // Build at choices
-                + (exchange ? 2 : 0) // Match label + Same/Any
-                + (showLookLock ? 2 : 0) // lock label + Off/On
-                + 1; // buttons
+                + (exchange ? 2 : 0) // Match label + Match look / Any
+                + 1 // materials label
+                + 1 // materials icons + Change
+                + (showLookLock ? 2 : 0)
+                + 1; // Edit / Done
         panelH = PAD + 12 + GAP + rows * (ROW + GAP) + PAD;
         panelH = WrightsUi.fitH(panelH, this.height);
         panelX = WrightsUi.centerX(panelW, this.width);
@@ -94,7 +116,7 @@ public class ShapeTweakScreen extends Screen {
         int plusX = valueX + fieldW + 2;
         int y = panelY + PAD + 12 + GAP;
 
-        sizeY = alongY = thicknessY = placeLabelY = placeChoicesY = matchLabelY = matchChoicesY = -1;
+        sizeY = alongY = thicknessY = placeLabelY = placeChoicesY = matchLabelY = matchChoicesY = matsLabelY = matsRowY = -1;
         if (showSize) {
             sizeY = y;
             step(minusX, y, "-", () -> nudgeSize(-1));
@@ -124,9 +146,15 @@ public class ShapeTweakScreen extends Screen {
             matchChoicesY = y;
             y += ROW + GAP;
         }
+        matsLabelY = y;
+        y += ROW + GAP;
+        matsRowY = y;
+        int changeX = panelX + panelW - PAD - changeW;
+        addRenderableWidget(new WrightsButton(changeX, matsRowY, changeW, ROW, change, button -> openMaterialsPicker()));
+        y += ROW + GAP;
         if (showLookLock) {
-            y += ROW + GAP; // lock label
-            y += ROW + GAP; // Off / On
+            y += ROW + GAP;
+            y += ROW + GAP;
         }
 
         int half = (panelW - PAD * 2 - GAP) / 2;
@@ -137,7 +165,6 @@ public class ShapeTweakScreen extends Screen {
 
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        // Same light veil + translucent panel as the look-snap tweak.
         graphics.fill(0, 0, this.width, this.height, 0x66060C14);
         graphics.fill(panelX + 3, panelY + 4, panelX + panelW + 3, panelY + panelH + 4, 0x33000000);
         graphics.fill(panelX, panelY, panelX + panelW, panelY + panelH, 0xB0101822);
@@ -206,8 +233,23 @@ public class ShapeTweakScreen extends Screen {
                     panelW - PAD * 2 - choiceW - GAP, !same, "menu.wrights.exchange_match_any");
         }
 
+        if (matsLabelY >= 0) {
+            graphics.drawString(this.font, Component.translatable(
+                            exchange ? "menu.wrights.exchange_to" : "menu.wrights.shape_materials"),
+                    panelX + PAD, matsLabelY + 3, WrightsUi.MUTED, false);
+        }
+        if (matsRowY >= 0) {
+            drawMaterialIcons(graphics, mouseX, mouseY);
+        }
+
         if (!exchange && anchors && !useAnchor && placeChoicesY >= 0) {
-            int lockLabelY = placeChoicesY + ROW + GAP;
+            int lockLabelY = matsRowY >= 0 ? matsRowY + ROW + GAP : placeChoicesY + ROW + GAP;
+            // Lock sits after materials when present.
+            if (matsRowY >= 0) {
+                lockLabelY = matsRowY + ROW + GAP;
+            } else {
+                lockLabelY = placeChoicesY + ROW + GAP;
+            }
             int lockChoicesY = lockLabelY + ROW + GAP;
             int choiceX = panelX + PAD;
             int choiceW = (panelW - PAD * 2 - GAP) / 2;
@@ -221,6 +263,38 @@ public class ShapeTweakScreen extends Screen {
 
         if (tip != null) {
             graphics.renderTooltip(this.font, this.font.split(tip, 220), mouseX, mouseY);
+        }
+    }
+
+    private void drawMaterialIcons(GuiGraphics graphics, int mouseX, int mouseY) {
+        List<ShapeMaterials.Entry> entries = WrightsClientConfig.shapeMaterials();
+        int x = panelX + PAD;
+        int y = matsRowY;
+        Component change = Component.translatable("screen.wrights.shape_tweak_change");
+        int changeW = Math.max(48, this.font.width(change) + 12);
+        int iconRight = panelX + panelW - PAD - changeW - GAP;
+        if (entries.isEmpty()) {
+            graphics.drawString(this.font, Component.translatable("screen.wrights.shape_tweak_materials_empty"),
+                    x, y + 3, WrightsUi.MUTED, false);
+            return;
+        }
+        int shown = Math.min(MAX_ICONS, entries.size());
+        for (int i = 0; i < shown; i++) {
+            int cx = x + i * (ICON + 2);
+            if (cx + ICON > iconRight) {
+                break;
+            }
+            ItemStack stack = entries.get(i).item().getDefaultInstance();
+            graphics.renderItem(stack, cx, y - 1);
+            if (mouseX >= cx && mouseX < cx + ICON && mouseY >= y - 1 && mouseY < y - 1 + ICON) {
+                tip = stack.getHoverName();
+            }
+        }
+        if (entries.size() > shown) {
+            int moreX = x + shown * (ICON + 2);
+            if (moreX + 12 <= iconRight) {
+                graphics.drawString(this.font, "+" + (entries.size() - shown), moreX, y + 3, WrightsUi.MUTED, false);
+            }
         }
     }
 
@@ -263,7 +337,6 @@ public class ShapeTweakScreen extends Screen {
         int choiceX = panelX + PAD;
         int choiceW = (panelW - PAD * 2 - GAP) / 2;
         if (hit(mouseX, mouseY, choiceX, placeChoicesY, choiceW, ROW)) {
-            // Where I look: drop any stale snap so the hologram follows the crosshair again.
             WrightsClientConfig.setShapeUseAnchor(false);
             WrightsClientState.clearShapeLookSnap();
             if (exchange) {
@@ -290,8 +363,8 @@ public class ShapeTweakScreen extends Screen {
                 return true;
             }
         }
-        if (!exchange && anchors && !useAnchor) {
-            int lockChoicesY = placeChoicesY + ROW + GAP + ROW + GAP;
+        if (!exchange && anchors && !useAnchor && matsRowY >= 0) {
+            int lockChoicesY = matsRowY + ROW + GAP + ROW + GAP;
             if (hit(mouseX, mouseY, choiceX, lockChoicesY, choiceW, ROW)) {
                 WrightsClientConfig.setShapeLookLock(false);
                 WrightsClientState.clearShapeLookSnap();
@@ -339,6 +412,43 @@ public class ShapeTweakScreen extends Screen {
     private void nudgeThickness(int dir) {
         int step = WrightsUi.nudgeStep() * dir;
         WrightsClientConfig.setShapeThickness(WrightsClientConfig.SHAPE_THICKNESS.get() + step);
+    }
+
+    private void openMaterialsPicker() {
+        List<BlockState> initial = new ArrayList<>();
+        for (ShapeMaterials.Entry entry : WrightsClientConfig.shapeMaterials()) {
+            BlockState state = entry.state();
+            if (state != null && !state.isAir()) {
+                initial.add(state);
+            }
+        }
+        BlockPickerScreen.openBlocks(this, initial, this::applyMaterials);
+    }
+
+    private void applyMaterials(List<BlockState> states) {
+        if (states == null || states.isEmpty()) {
+            return;
+        }
+        Map<Item, Integer> weights = new HashMap<>();
+        for (ShapeMaterials.Entry entry : WrightsClientConfig.shapeMaterials()) {
+            weights.put(entry.item(), entry.weight());
+        }
+        List<ShapeMaterials.Entry> next = new ArrayList<>();
+        Set<Item> seen = new HashSet<>();
+        for (BlockState state : states) {
+            if (!BlockFilters.canShapeMaterial(state)) {
+                continue;
+            }
+            Item item = state.getBlock().asItem();
+            if (!(item instanceof BlockItem) || !seen.add(item)) {
+                continue;
+            }
+            next.add(new ShapeMaterials.Entry(item, weights.getOrDefault(item, 1)));
+        }
+        if (!next.isEmpty()) {
+            WrightsClientConfig.setShapeMaterials(next);
+        }
+        rebuild();
     }
 
     private void openPointEditor() {
