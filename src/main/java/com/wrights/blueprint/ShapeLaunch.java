@@ -183,7 +183,7 @@ public final class ShapeLaunch {
                 0,
                 0,
                 0,
-                true).withPaste(false, voidBlocks, false, false);
+                true).withPaste(false, voidBlocks, voidBlocks, false);
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         library.putSchematic(schematic);
         boolean playerFirst = playerSourcesFirst(order);
@@ -198,7 +198,7 @@ public final class ShapeLaunch {
                 0,
                 false,
                 voidBlocks,
-                false,
+                voidBlocks,
                 false,
                 playerFirst,
                 true,

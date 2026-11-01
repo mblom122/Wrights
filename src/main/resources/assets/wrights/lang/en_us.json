@@ -966,7 +966,7 @@
   "menu.wrights.shape_randomize": "Randomize hotbar",
   "menu.wrights.shape_randomize_hint": "Each block is picked at random from block items on your action bar.",
   "menu.wrights.shape_void": "Void blocks",
-  "menu.wrights.shape_void_hint": "Wrights void the block where each shape cell should go before placing, same as blueprints.",
+  "menu.wrights.shape_void_hint": "Voids the block or fluid in each cell before placing the shape block.",
   "menu.wrights.shape_materials": "Materials used",
   "menu.wrights.shape_materials_hint": "Full cube blocks only — no dust, plants, chests, or other NBT blocks. Pick from the list or drag a block from JEI onto the panel. Random uses weights. Priority and Order use left-to-right list order. At least one is required.",
   "menu.wrights.shape_materials_empty": "Add at least one block",
