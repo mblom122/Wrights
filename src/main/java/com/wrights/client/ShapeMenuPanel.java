@@ -716,7 +716,7 @@ final class ShapeMenuPanel {
         WrightsUi.section(graphics, font, x, y, "menu.wrights.job_preview", x + width);
         Component size = Component.translatable("menu.wrights.size", previewSizeX, previewSizeY, previewSizeZ);
         graphics.drawString(font, font.plainSubstrByWidth(size.getString(), width), x, y + 12, WrightsUi.SIZE, false);
-        Component blocks = Component.translatable("menu.wrights.job_preview_blocks", previewBlocks);
+        Component blocks = Component.translatable("menu.wrights.job_preview_blocks", WrightsUi.count(previewBlocks));
         graphics.drawString(font, font.plainSubstrByWidth(blocks.getString(), width), x, y + 22, WrightsUi.MUTED, false);
         previewBoxY = y + infoH;
         previewBoxH = Math.max(24, height - infoH);

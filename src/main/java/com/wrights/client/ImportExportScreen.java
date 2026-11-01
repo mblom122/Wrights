@@ -63,7 +63,7 @@ public class ImportExportScreen extends Screen {
                     summary.sizeX(),
                     summary.sizeY(),
                     summary.sizeZ(),
-                    summary.blocks());
+                    WrightsUi.count(summary.blocks()));
         }
     }
 

@@ -76,7 +76,7 @@ public class JobActionScreen extends Screen {
         WrightsUi.status(graphics, panelX + 16, panelY + 24, inner, Math.min(48, panelH - 140), statusColor);
         graphics.drawString(this.font, Component.translatable(status), panelX + 26, panelY + 30, statusColor, false);
         int percent = job.finished() ? 100 : WrightsClientState.percent(job);
-        graphics.drawString(this.font, Component.translatable("menu.wrights.job_percent", percent, job.done(), job.total()), panelX + 26, panelY + 42, WrightsUi.MUTED, false);
+        graphics.drawString(this.font, Component.translatable("menu.wrights.job_percent", percent, WrightsUi.count(job.done()), WrightsUi.count(job.total())), panelX + 26, panelY + 42, WrightsUi.MUTED, false);
         graphics.drawString(this.font, Component.translatable("menu.wrights.job_drone_count", job.crew().size()), panelX + 26, panelY + 54, WrightsUi.TEXT, false);
     }
 

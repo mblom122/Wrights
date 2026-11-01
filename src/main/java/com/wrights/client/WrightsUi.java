@@ -1,5 +1,7 @@
 package com.wrights.client;
 
+import java.text.NumberFormat;
+
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
@@ -25,6 +27,15 @@ public final class WrightsUi {
     public static final int SHADE = 0xFF101820;
 
     private WrightsUi() {
+    }
+
+    /** Block / item counts with thousand separators (locale-aware). */
+    public static String count(long value) {
+        return NumberFormat.getIntegerInstance().format(value);
+    }
+
+    public static String count(int value) {
+        return count((long) value);
     }
 
     /** Preferred panel width, never wider than the window. */

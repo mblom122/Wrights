@@ -432,10 +432,10 @@ public class PlacementScreen extends Screen implements JeiPreview {
             return Component.translatable("screen.wrights.extra_empty");
         }
         if (smaller) {
-            return Component.translatable("screen.wrights.in_view", inside, WrightsClientState.blockCount);
+            return Component.translatable("screen.wrights.in_view", WrightsUi.count(inside), WrightsUi.count(WrightsClientState.blockCount));
         }
         long box = BoxEdits.volume(WrightsClientState.fullX, WrightsClientState.fullY, WrightsClientState.fullZ);
-        return Component.translatable("menu.wrights.blocks", box, WrightsClientState.blockCount);
+        return Component.translatable("menu.wrights.blocks", WrightsUi.count(box), WrightsUi.count(WrightsClientState.blockCount));
     }
 
     private void move(int dx, int dy, int dz) {

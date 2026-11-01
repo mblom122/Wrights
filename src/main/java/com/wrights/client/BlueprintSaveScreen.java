@@ -113,7 +113,7 @@ public class BlueprintSaveScreen extends Screen {
                     graphics.fill(listX + 2, y, listX + 4, y + ROW - 1, WrightsUi.COPPER);
                 }
                 graphics.drawString(this.font, this.font.plainSubstrByWidth(summary.name(), listW - 16), listX + 6, y + 2, WrightsUi.TEXT, false);
-                graphics.drawString(this.font, Component.translatable("screen.wrights.slip_row", summary.sizeX(), summary.sizeY(), summary.sizeZ(), summary.blocks()), listX + 6, y + 12, WrightsUi.MUTED, false);
+                graphics.drawString(this.font, Component.translatable("screen.wrights.slip_row", summary.sizeX(), summary.sizeY(), summary.sizeZ(), WrightsUi.count(summary.blocks())), listX + 6, y + 12, WrightsUi.MUTED, false);
             }
             y += ROW;
         }

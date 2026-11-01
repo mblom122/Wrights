@@ -2387,7 +2387,7 @@ public class WrightsMenuScreen extends Screen {
         graphics.drawString(this.font, this.font.plainSubstrByWidth(summary.name(), modelW), detailX + 4, info, WrightsUi.TEXT, false);
         graphics.drawString(this.font, Component.translatable("menu.wrights.size", summary.sizeX(), summary.sizeY(), summary.sizeZ()), detailX + 4, info + 10, WrightsUi.SIZE, false);
         long box = (long) summary.sizeX() * summary.sizeY() * summary.sizeZ();
-        graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("menu.wrights.blocks", box, summary.blocks()).getString(), modelW), detailX + 4, info + 20, WrightsUi.MUTED, false);
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("menu.wrights.blocks", WrightsUi.count(box), WrightsUi.count(summary.blocks())).getString(), modelW), detailX + 4, info + 20, WrightsUi.MUTED, false);
         if (!summary.source().isEmpty()) {
             graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("menu.wrights.source", summary.source()).getString(), modelW), detailX + 4, info + 30, WrightsUi.MUTED, false);
         }
@@ -3299,7 +3299,7 @@ public class WrightsMenuScreen extends Screen {
         graphics.drawString(this.font, statusText, x + width - 8 - this.font.width(statusText), y + 4, jobColor(job), false);
         WrightsUi.section(graphics, this.font, x + 6, y + 15, "menu.wrights.job_preview", x + width - 8);
         graphics.drawString(this.font, Component.translatable("menu.wrights.size", job.sizeX(), job.sizeY(), job.sizeZ()), x + 6, y + 25, WrightsUi.SIZE, false);
-        graphics.drawString(this.font, Component.translatable("menu.wrights.job_preview_blocks", job.total()), x + 6, y + 35, WrightsUi.MUTED, false);
+        graphics.drawString(this.font, Component.translatable("menu.wrights.job_preview_blocks", WrightsUi.count(job.total())), x + 6, y + 35, WrightsUi.MUTED, false);
         Component source = jobSource(job);
         if (!source.getString().isEmpty()) {
             graphics.drawString(this.font, this.font.plainSubstrByWidth(source.getString(), Math.max(40, width - 12)), x + 6, y + 46, WrightsUi.MUTED, false);
@@ -3551,10 +3551,12 @@ public class WrightsMenuScreen extends Screen {
     private Component progressLine(BlueprintPayloads.JobLine job) {
         int percent = progressPercent(job);
         String left = WrightsClientState.timeLeft(job);
+        String done = WrightsUi.count(job.done());
+        String total = WrightsUi.count(job.total());
         if (job.finished() || left.isEmpty()) {
-            return Component.translatable("menu.wrights.job_percent", percent, job.done(), job.total());
+            return Component.translatable("menu.wrights.job_percent", percent, done, total);
         }
-        return Component.translatable("menu.wrights.job_eta", percent, job.done(), job.total(), left);
+        return Component.translatable("menu.wrights.job_eta", percent, done, total, left);
     }
 
     private int progressPercent(BlueprintPayloads.JobLine job) {
@@ -3569,13 +3571,13 @@ public class WrightsMenuScreen extends Screen {
         StringBuilder line = new StringBuilder();
         if (job.skipped() > 0 || (job.finished() && !job.undoing() && !job.undone())) {
             int percent = job.skipped() * 100 / total;
-            line.append(Component.translatable("menu.wrights.job_skipped", job.skipped(), percent).getString());
+            line.append(Component.translatable("menu.wrights.job_skipped", WrightsUi.count(job.skipped()), percent).getString());
         }
         if (job.held() > 0 && !job.finished()) {
             if (!line.isEmpty()) {
                 line.append("  ·  ");
             }
-            line.append(Component.translatable("menu.wrights.job_held", job.held()).getString());
+            line.append(Component.translatable("menu.wrights.job_held", WrightsUi.count(job.held())).getString());
         }
         return line.toString();
     }

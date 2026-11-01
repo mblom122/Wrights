@@ -266,7 +266,7 @@ public class BlueprintLoadScreen extends Screen {
                     graphics.drawString(this.font, name, listX + 6, y + 3, color, false);
                     String tag = tagKey(view.line.kind());
                     graphics.drawString(this.font, Component.translatable(tag), listX + listW - 8 - this.font.width(Component.translatable(tag)), y + 3, tagColor(view.line.kind()), false);
-                    graphics.drawString(this.font, Component.translatable("screen.wrights.slip_row", view.line.sizeX(), view.line.sizeY(), view.line.sizeZ(), view.line.blocks()), listX + 6, y + 13, WrightsUi.MUTED, false);
+                    graphics.drawString(this.font, Component.translatable("screen.wrights.slip_row", view.line.sizeX(), view.line.sizeY(), view.line.sizeZ(), WrightsUi.count(view.line.blocks())), listX + 6, y + 13, WrightsUi.MUTED, false);
                 }
             }
             y += height;
@@ -298,7 +298,7 @@ public class BlueprintLoadScreen extends Screen {
         graphics.drawString(this.font, this.font.plainSubstrByWidth(line.name(), detailW - 12), detailX + 6, y, line.kind() == BlueprintSlips.EXACT ? WrightsUi.MUTED : WrightsUi.TEXT, false);
         y += 14;
         Component body = switch (line.kind()) {
-            case BlueprintSlips.DIFFERENT -> Component.translatable("screen.wrights.slip_different", line.name(), line.libraryBlocks(), line.blocks());
+            case BlueprintSlips.DIFFERENT -> Component.translatable("screen.wrights.slip_different", line.name(), WrightsUi.count(line.libraryBlocks()), WrightsUi.count(line.blocks()));
             case BlueprintSlips.EXACT -> Component.translatable("screen.wrights.slip_exact", line.name());
             default -> Component.translatable("screen.wrights.slip_new");
         };
