@@ -245,6 +245,9 @@ public final class WrightsHud {
                 }
             }
         }
+        if (WrightsClientState.placeToolActive() && WrightsClientConfig.placePathStyle()) {
+            drawPathModeBanner(graphics, minecraft);
+        }
         if (showMainModes(minecraft)) {
             drawMainModes(graphics, minecraft);
         } else if (showCtrlHelp(minecraft)) {
@@ -252,6 +255,26 @@ public final class WrightsHud {
         } else if (showModes(minecraft)) {
             drawBuildModes(graphics, minecraft);
         }
+    }
+
+    /**
+     * Large ON/OFF label in the middle of the screen while Bridge or Stairs is selected.
+     * The hotbar status line is easy to miss when walking a path.
+     */
+    private static void drawPathModeBanner(GuiGraphics graphics, Minecraft minecraft) {
+        boolean stairs = WrightsClientConfig.placeStyle() == 3;
+        boolean on = WrightsClientState.bridgeActive;
+        Component label = Component.translatable(stairs
+                ? (on ? "hud.wrights.place_stairs_banner_on" : "hud.wrights.place_stairs_banner_off")
+                : (on ? "hud.wrights.place_bridge_banner_on" : "hud.wrights.place_bridge_banner_off"));
+        int color = on ? 0xFF6FCF97 : 0xFFE07A7A;
+        int width = minecraft.font.width(label) + 20;
+        int height = 16;
+        int x = (graphics.guiWidth() - width) / 2;
+        int y = graphics.guiHeight() / 2 - 36;
+        graphics.fill(x, y, x + width, y + height, 0xC0101822);
+        graphics.fill(x, y, x + 2, y + height, color);
+        graphics.drawCenteredString(minecraft.font, label, graphics.guiWidth() / 2, y + 4, color);
     }
 
     private static boolean controlDown(Minecraft minecraft) {
