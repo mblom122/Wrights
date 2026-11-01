@@ -2001,9 +2001,10 @@ public final class WrightsClientState {
         WrightsClientConfig.enforceExchangeLineFootprint();
         if (WrightsClientConfig.placePathStyle()) {
             // Force-place: one job for the whole path (offset × width), not one job per block.
+            boolean voidBlocks = WrightsClientConfig.SHAPE_VOID.get() && WrightsConfig.allowShapeVoid();
             return sendPlaceCells(
                     placePathCells(minecraft.player),
-                    false,
+                    voidBlocks,
                     force,
                     WrightsClientConfig.placeStairsStyle() ? "Place - Stairs" : "Place - Bridge");
         }
@@ -2190,9 +2191,10 @@ public final class WrightsClientState {
         if (WrightsClientConfig.shapeMaterials().isEmpty()) {
             return;
         }
+        boolean voidBlocks = WrightsClientConfig.SHAPE_VOID.get() && WrightsConfig.allowShapeVoid();
         boolean placed = sendPlaceCells(
                 placePathCells(minecraft.player),
-                false,
+                voidBlocks,
                 false,
                 WrightsClientConfig.placeStairsStyle() ? "Place - Stairs" : "Place - Bridge");
         bridgeCooldown = placed ? 3 : 2;
