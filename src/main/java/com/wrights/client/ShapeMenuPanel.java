@@ -49,10 +49,15 @@ final class ShapeMenuPanel {
     private ItemStack hoveredStack = ItemStack.EMPTY;
     /** Menu preview mesh — kept as one list so {@link BlueprintModelView} can reuse the bake. */
     private List<WrightsClientState.Ghost> previewGhosts = List.of();
+    /** Real shape AABB / block count shown in the info lines. */
     private int previewSizeX = 1;
     private int previewSizeY = 1;
     private int previewSizeZ = 1;
     private int previewBlocks;
+    /** Solid miniature AABB used only for the spinning model (may be scaled down). */
+    private int meshSizeX = 1;
+    private int meshSizeY = 1;
+    private int meshSizeZ = 1;
     private long previewKey = Long.MIN_VALUE;
     private float previewYaw = 35.0F;
     private float previewPitch = 28.0F;
@@ -733,7 +738,7 @@ final class ShapeMenuPanel {
         }
         net.minecraft.core.BlockPos pin = Shapes.pivotBlock(
                 BlockPos.ZERO,
-                new BlockPos(Math.max(0, previewSizeX - 1), Math.max(0, previewSizeY - 1), Math.max(0, previewSizeZ - 1)),
+                new BlockPos(Math.max(0, meshSizeX - 1), Math.max(0, meshSizeY - 1), Math.max(0, meshSizeZ - 1)),
                 WrightsClientConfig.SHAPE_PIVOT.get());
         BlueprintModelView.render(
                 graphics,
@@ -742,9 +747,9 @@ final class ShapeMenuPanel {
                 width - 2,
                 previewBoxH - 2,
                 previewGhosts,
-                previewSizeX,
-                previewSizeY,
-                previewSizeZ,
+                meshSizeX,
+                meshSizeY,
+                meshSizeZ,
                 previewYaw,
                 previewPitch,
                 true,
@@ -773,27 +778,53 @@ final class ShapeMenuPanel {
         }
         previewKey = key;
         SelectionRenderer.ensureShapeCache(kind, size, height, thickness, hollow, plane, yaw);
-        List<BlockPos> worlds = SelectionRenderer.shapeCacheCells();
-        if (worlds.isEmpty()) {
+        List<BlockPos> full = SelectionRenderer.shapeCacheCells();
+        if (full.isEmpty()) {
             previewGhosts = List.of();
             previewSizeX = previewSizeY = previewSizeZ = 1;
+            meshSizeX = meshSizeY = meshSizeZ = 1;
             previewBlocks = 0;
             return;
         }
-        BlockPos origin = SelectionRenderer.shapeCacheMin();
-        BlockPos extent = SelectionRenderer.shapeCacheMax();
-        previewSizeX = extent.getX() - origin.getX() + 1;
-        previewSizeY = extent.getY() - origin.getY() + 1;
-        previewSizeZ = extent.getZ() - origin.getZ() + 1;
-        previewBlocks = worlds.size();
-        // Small spinning panel: keep a strided sample so large shapes still show a silhouette
-        // instead of blanking past maxPreviewBlocks.
+        BlockPos fullMin = SelectionRenderer.shapeCacheMin();
+        BlockPos fullMax = SelectionRenderer.shapeCacheMax();
+        previewSizeX = fullMax.getX() - fullMin.getX() + 1;
+        previewSizeY = fullMax.getY() - fullMin.getY() + 1;
+        previewSizeZ = fullMax.getZ() - fullMin.getZ() + 1;
+        previewBlocks = full.size();
+        // Solid miniature: scale dims down to fit the bake budget instead of striding
+        // (stride left growing gaps that looked worse the bigger the shape).
         int budget = WrightsConfig.previewSampleBudget();
-        int step = Math.max(1, (worlds.size() + budget - 1) / budget);
-        int sampleCount = (worlds.size() + step - 1) / step;
+        List<BlockPos> mesh = full;
+        BlockPos origin = fullMin;
+        if (full.size() > budget) {
+            double scale = Math.cbrt((double) budget / (double) full.size());
+            int meshSize = Math.max(1, (int) Math.floor(size * scale));
+            int meshHeight = Math.max(1, (int) Math.floor(height * scale));
+            int meshThickness = Math.max(1, (int) Math.floor(thickness * scale));
+            mesh = Shapes.blocks(kind, BlockPos.ZERO, meshSize, meshHeight, meshThickness, hollow, plane, yaw);
+            int guard = 0;
+            while (mesh.size() > budget && guard++ < 512 && (meshSize > 1 || meshHeight > 1 || meshThickness > 1)) {
+                if (meshSize >= meshHeight && meshSize >= meshThickness && meshSize > 1) {
+                    meshSize--;
+                } else if (meshHeight >= meshThickness && meshHeight > 1) {
+                    meshHeight--;
+                } else if (meshThickness > 1) {
+                    meshThickness--;
+                } else {
+                    break;
+                }
+                mesh = Shapes.blocks(kind, BlockPos.ZERO, meshSize, meshHeight, meshThickness, hollow, plane, yaw);
+            }
+            origin = Shapes.origin(mesh);
+        }
+        BlockPos extent = mesh == full ? fullMax : Shapes.extent(mesh);
+        meshSizeX = extent.getX() - origin.getX() + 1;
+        meshSizeY = extent.getY() - origin.getY() + 1;
+        meshSizeZ = extent.getZ() - origin.getZ() + 1;
         List<BlockState> planned = ShapeMaterials.assign(
                 materials,
-                sampleCount,
+                mesh.size(),
                 mode,
                 batch,
                 new Random(key),
@@ -802,17 +833,15 @@ final class ShapeMenuPanel {
                 true);
         BlockState fallback = Blocks.STONE.defaultBlockState();
         if (planned.isEmpty()) {
-            planned = new ArrayList<>(sampleCount);
-            for (int i = 0; i < sampleCount; i++) {
+            planned = new ArrayList<>(mesh.size());
+            for (int i = 0; i < mesh.size(); i++) {
                 planned.add(fallback);
             }
         }
-        List<WrightsClientState.Ghost> ghosts = new ArrayList<>(sampleCount);
-        int sample = 0;
-        for (int i = 0; i < worlds.size(); i += step) {
-            BlockPos pos = worlds.get(i);
-            BlockState state = sample < planned.size() ? planned.get(sample) : planned.get(planned.size() - 1);
-            sample++;
+        List<WrightsClientState.Ghost> ghosts = new ArrayList<>(mesh.size());
+        for (int i = 0; i < mesh.size(); i++) {
+            BlockPos pos = mesh.get(i);
+            BlockState state = i < planned.size() ? planned.get(i) : planned.get(planned.size() - 1);
             if (state == null || state.isAir()) {
                 state = fallback;
             }
