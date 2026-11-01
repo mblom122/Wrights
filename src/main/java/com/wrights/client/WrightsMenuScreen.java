@@ -1821,7 +1821,11 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private int subsBottom() {
-        int count = (WrightsConfig.allowBlueprints() ? 1 : 0) + (WrightsConfig.allowMirror() ? 1 : 0) + (WrightsConfig.allowShape() ? 1 : 0) + (WrightsConfig.allowExchange() ? 1 : 0);
+        int count = (WrightsConfig.allowBlueprints() ? 1 : 0)
+                + (WrightsConfig.allowPlaceTool() ? 1 : 0)
+                + (WrightsConfig.allowMirror() ? 1 : 0)
+                + (WrightsConfig.allowExchange() ? 1 : 0)
+                + (WrightsConfig.allowShape() ? 1 : 0);
         if (count == 0) {
             return 26;
         }
