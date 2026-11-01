@@ -49,9 +49,9 @@ public final class WrightsConfig {
     public static final ModConfigSpec.IntValue MAX_BLOCKS = BUILDER
             .comment(
                     "Largest volume, in blocks, for blueprints and Shape builds. Separate from maxShapeAxis (slider length).",
-                    "A 512-wide solid shape needs far more than this — raise maxBlocks for big solids, or use Hollow.",
-                    "Raising uses more memory and can lag the server.")
-            .defineInRange("maxBlocks", 1_000_000, 1, 16_777_216);
+                    "Default 512³ (134217728) matches RFTools Builder’s max box. Huge solids use a lot of memory and can lag.",
+                    "Hollow shapes stay much cheaper. Lower this if the server struggles.")
+            .defineInRange("maxBlocks", 512 * 512 * 512, 1, 512 * 512 * 512);
 
     public static final ModConfigSpec.IntValue BLOCKS_PER_TICK = BUILDER
             .comment(
