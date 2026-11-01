@@ -158,6 +158,7 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
                     WrightsClientState.keepStoredSettings(),
                     WrightsClientState.keepStoredAll()));
         }
+        WrightsMenuScreen.preferBlueprintsStrip();
         this.minecraft.setScreen(new WrightsMenuScreen());
     }
 

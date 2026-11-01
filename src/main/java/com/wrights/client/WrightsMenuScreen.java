@@ -1490,6 +1490,15 @@ public class WrightsMenuScreen extends Screen {
         }
     }
 
+    /** After Edit Save/Cancel, land on Blueprints instead of a sticky Shape/Mirror strip. */
+    static void preferBlueprintsStrip() {
+        savedShape = false;
+        savedMirror = false;
+        WrightsClientState.mirrorAim = false;
+        WrightsClientState.shapeAim = false;
+        WrightsClientState.bindSupply = false;
+    }
+
     private void honorFeatures() {
         if (!WrightsConfig.allowGlobal() && WrightsClientState.libraryGlobal) {
             WrightsClientState.setLibraryScope(false);
@@ -2438,6 +2447,14 @@ public class WrightsMenuScreen extends Screen {
             shapePage = false;
             savedMirror = false;
             savedShape = false;
+            // Drop Shape/Mirror aim so reopening (e.g. after Edit → Cancel) stays on Blueprints.
+            if (requireTool()) {
+                WrightsClientState.selectBlueprintTool();
+            } else {
+                WrightsClientState.mirrorAim = false;
+                WrightsClientState.shapeAim = false;
+                WrightsClientState.bindSupply = false;
+            }
             sortOpen = false;
             setFocused(null);
             refresh();

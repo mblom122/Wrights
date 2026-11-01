@@ -1907,6 +1907,11 @@ public final class WrightsClientState {
         return styleSteps();
     }
 
+    /** Use-template / blueprints strip — clears Mirror, Shape, and Bind inventory aims. */
+    public static void selectBlueprintTool() {
+        selectBuildTool(false);
+    }
+
     public static void selectMirrorTool() {
         selectBuildTool(false);
         mirrorAim = true;
