@@ -716,7 +716,9 @@ final class ShapeMenuPanel {
         WrightsUi.section(graphics, font, x, y, "menu.wrights.job_preview", x + width);
         Component size = Component.translatable("menu.wrights.size", previewSizeX, previewSizeY, previewSizeZ);
         graphics.drawString(font, font.plainSubstrByWidth(size.getString(), width), x, y + 12, WrightsUi.SIZE, false);
-        Component blocks = Component.translatable("menu.wrights.job_preview_blocks", WrightsUi.count(previewBlocks));
+        Component blocks = previewBlocks < 0
+                ? Component.translatable("menu.wrights.shape_preview_wire")
+                : Component.translatable("menu.wrights.job_preview_blocks", WrightsUi.count(previewBlocks));
         graphics.drawString(font, font.plainSubstrByWidth(blocks.getString(), width), x, y + 22, WrightsUi.MUTED, false);
         previewBoxY = y + infoH;
         previewBoxH = Math.max(24, height - infoH);
@@ -769,34 +771,38 @@ final class ShapeMenuPanel {
             return;
         }
         previewKey = key;
-        SelectionRenderer.ensureShapeCache(kind, size, height, thickness, hollow, plane, yaw);
-        List<BlockPos> full = SelectionRenderer.shapeCacheCells();
-        if (full.isEmpty()) {
-            previewGhosts = List.of();
-            previewSizeX = previewSizeY = previewSizeZ = 1;
-            meshSizeX = meshSizeY = meshSizeZ = 1;
-            previewBlocks = 0;
-            return;
+        Shapes.Bounds fullBox = Shapes.bounds(kind, BlockPos.ZERO, size, height, thickness, hollow, plane, yaw);
+        previewSizeX = fullBox.sizeX();
+        previewSizeY = fullBox.sizeY();
+        previewSizeZ = fullBox.sizeZ();
+        long scan = Shapes.scanVolume(kind, size, height, thickness);
+        int soft = WrightsConfig.shapePreviewListCap();
+        // Only materialize the full cell list when it stays cheap; otherwise show AABB size + a scaled mesh.
+        if (scan <= soft) {
+            SelectionRenderer.ensureShapeCache(kind, size, height, thickness, hollow, plane, yaw);
+            List<BlockPos> full = SelectionRenderer.shapeCacheCells();
+            previewBlocks = full.size();
+        } else {
+            // Exact count would allocate / walk millions of cells — RFTools skips that too.
+            previewBlocks = -1;
         }
-        BlockPos fullMin = SelectionRenderer.shapeCacheMin();
-        BlockPos fullMax = SelectionRenderer.shapeCacheMax();
-        previewSizeX = fullMax.getX() - fullMin.getX() + 1;
-        previewSizeY = fullMax.getY() - fullMin.getY() + 1;
-        previewSizeZ = fullMax.getZ() - fullMin.getZ() + 1;
-        previewBlocks = full.size();
         // Solid miniature: scale dims down to fit the bake budget instead of striding
         // (stride left growing gaps that looked worse the bigger the shape).
         int budget = WrightsConfig.previewSampleBudget();
-        List<BlockPos> mesh = full;
-        BlockPos origin = fullMin;
-        if (full.size() > budget) {
-            double scale = Math.cbrt((double) budget / (double) full.size());
+        List<BlockPos> mesh;
+        BlockPos origin;
+        if (scan <= budget) {
+            SelectionRenderer.ensureShapeCache(kind, size, height, thickness, hollow, plane, yaw);
+            mesh = SelectionRenderer.shapeCacheCells();
+            origin = SelectionRenderer.shapeCacheMin();
+        } else {
+            double scale = Math.cbrt((double) budget / (double) Math.max(1L, scan));
             int meshSize = Math.max(1, (int) Math.floor(size * scale));
             int meshHeight = Math.max(1, (int) Math.floor(height * scale));
             int meshThickness = Math.max(1, (int) Math.floor(thickness * scale));
-            mesh = Shapes.blocks(kind, BlockPos.ZERO, meshSize, meshHeight, meshThickness, hollow, plane, yaw);
+            mesh = Shapes.blocks(kind, BlockPos.ZERO, meshSize, meshHeight, meshThickness, hollow, plane, yaw, budget);
             int guard = 0;
-            while (mesh.size() > budget && guard++ < 512 && (meshSize > 1 || meshHeight > 1 || meshThickness > 1)) {
+            while (mesh.size() >= budget && guard++ < 512 && (meshSize > 1 || meshHeight > 1 || meshThickness > 1)) {
                 if (meshSize >= meshHeight && meshSize >= meshThickness && meshSize > 1) {
                     meshSize--;
                 } else if (meshHeight >= meshThickness && meshHeight > 1) {
@@ -806,11 +812,16 @@ final class ShapeMenuPanel {
                 } else {
                     break;
                 }
-                mesh = Shapes.blocks(kind, BlockPos.ZERO, meshSize, meshHeight, meshThickness, hollow, plane, yaw);
+                mesh = Shapes.blocks(kind, BlockPos.ZERO, meshSize, meshHeight, meshThickness, hollow, plane, yaw, budget);
             }
-            origin = Shapes.origin(mesh);
+            origin = mesh.isEmpty() ? BlockPos.ZERO : Shapes.origin(mesh);
         }
-        BlockPos extent = mesh == full ? fullMax : Shapes.extent(mesh);
+        if (mesh.isEmpty()) {
+            previewGhosts = List.of();
+            meshSizeX = meshSizeY = meshSizeZ = 1;
+            return;
+        }
+        BlockPos extent = Shapes.extent(mesh);
         meshSizeX = extent.getX() - origin.getX() + 1;
         meshSizeY = extent.getY() - origin.getY() + 1;
         meshSizeZ = extent.getZ() - origin.getZ() + 1;

@@ -79,8 +79,21 @@ public final class ShapeLaunch {
                     ? clicked.immutable()
                     : Shapes.lookCorner(clicked, Direction.from3DDataValue(Mth.clamp(payload.face(), 0, 5)));
         }
-        // Both modes pin the chosen shape AABB pivot to the world target.
-        List<BlockPos> worlds = Shapes.blocksPinned(kind, target, size, height, thickness, hollow, plane, yaw, pivot);
+        // Cap materialization like RFTools: never allocate a multi-million BlockPos list.
+        // maxBlocks is the hard volume budget; +1 detects overflow without a second full pass.
+        int maxBlocks = Math.max(1, WrightsConfig.MAX_BLOCKS.getAsInt());
+        long scan = Shapes.scanVolume(kind, size, height, thickness);
+        if (scan > maxBlocks * 8L) {
+            // AABB walk would thrash even with early exit (e.g. solid 256³). Refuse up front.
+            Messages.actionBar(player, "message.wrights.shape_too_many", maxBlocks);
+            return;
+        }
+        List<BlockPos> worlds = Shapes.blocksPinned(
+                kind, target, size, height, thickness, hollow, plane, yaw, pivot, maxBlocks + 1);
+        if (worlds.size() > maxBlocks) {
+            Messages.actionBar(player, "message.wrights.shape_too_many", maxBlocks);
+            return;
+        }
         if (worlds.isEmpty()) {
             Messages.actionBar(player, "message.wrights.shape_empty");
             return;

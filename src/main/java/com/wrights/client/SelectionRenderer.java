@@ -286,22 +286,31 @@ public final class SelectionRenderer {
             return;
         }
         shapeLocalKey = key;
+        com.wrights.blueprint.Shapes.Bounds box = com.wrights.blueprint.Shapes.bounds(
+                kind, BlockPos.ZERO, size, height, thickness, hollow, plane, yaw);
+        shapeLocalMin = box.min();
+        shapeLocalMax = box.max();
+        long scan = com.wrights.blueprint.Shapes.scanVolume(kind, size, height, thickness);
+        int soft = WrightsConfig.shapePreviewListCap();
+        // RFTools tip: huge shapes only show the wire box — never allocate millions of BlockPos.
+        if (scan > soft) {
+            shapeLocal = List.of();
+            shapeBoundsOnly = true;
+            return;
+        }
+        shapeBoundsOnly = false;
         try {
-            shapeLocal = com.wrights.blueprint.Shapes.blocks(kind, BlockPos.ZERO, size, height, thickness, hollow, plane, yaw);
+            shapeLocal = com.wrights.blueprint.Shapes.blocks(
+                    kind, BlockPos.ZERO, size, height, thickness, hollow, plane, yaw, soft + 1);
+            if (shapeLocal.size() > soft) {
+                shapeLocal = List.of();
+                shapeBoundsOnly = true;
+            }
         } catch (OutOfMemoryError error) {
             shapeLocal = List.of();
-            shapeLocalMin = BlockPos.ZERO;
-            shapeLocalMax = BlockPos.ZERO;
+            shapeBoundsOnly = true;
             System.gc();
-            return;
         }
-        if (shapeLocal.isEmpty()) {
-            shapeLocalMin = BlockPos.ZERO;
-            shapeLocalMax = BlockPos.ZERO;
-            return;
-        }
-        shapeLocalMin = com.wrights.blueprint.Shapes.origin(shapeLocal);
-        shapeLocalMax = com.wrights.blueprint.Shapes.extent(shapeLocal);
     }
 
     /** Max-heap on distance so the root is the farthest of the current nearest set. */
