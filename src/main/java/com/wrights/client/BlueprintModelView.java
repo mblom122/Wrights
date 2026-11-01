@@ -10,10 +10,12 @@ import org.joml.Matrix4f;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.ByteBufferBuilder;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexBuffer;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.math.Axis;
 
 import net.minecraft.client.Minecraft;
@@ -122,85 +124,78 @@ public final class BlueprintModelView {
         pose.translate(-cx, -cy, -cz);
 
         ModelMesh mesh = meshFor(ghosts);
-        // Compose once and reuse for mesh + frame so the AABB cannot drift from the blocks
-        // (BufferSource lines used to bake pose into vertices while ModelViewMat could still
-        // hold the mesh matrix, which double-transformed the wireframe).
+        // Same matrix for blocks and frame — BufferSource lines were drifting because the
+        // modern line shader expands in screen space (and glLineWidth is ignored).
         Matrix4f modelView = new Matrix4f(RenderSystem.getModelViewMatrix()).mul(pose.last().pose());
         Matrix4f projection = new Matrix4f(RenderSystem.getProjectionMatrix());
         RenderSystem.enableDepthTest();
         mesh.draw(modelView, projection);
         if (showFrame) {
-            var mvStack = RenderSystem.getModelViewStack();
-            mvStack.pushMatrix();
-            mvStack.mul(pose.last().pose());
-            RenderSystem.applyModelViewMatrix();
-            // Local block space — ModelView already carries screen / spin / center.
-            drawFrameAndPivot(
-                    new PoseStack(),
-                    x0, y0, z0, x1, y1, z1,
-                    span,
-                    pivotX, pivotY, pivotZ,
-                    minX, minY, minZ, maxX, maxY, maxZ);
-            mvStack.popMatrix();
-            RenderSystem.applyModelViewMatrix();
+            // Half the old shader-line look: thin solid edge beams in local block space.
+            float frameThick = Math.max(0.012F, span * 0.004F);
+            drawFrameBeams(modelView, projection, x0, y0, z0, x1, y1, z1, frameThick, 0.55F, 0.72F, 0.86F, 0.85F);
+            int px = Math.max(minX, Math.min(maxX, pivotX));
+            int py = Math.max(minY, Math.min(maxY, pivotY));
+            int pz = Math.max(minZ, Math.min(maxZ, pivotZ));
+            float mx = px + 0.5F;
+            float my = py + 0.5F;
+            float mz = pz + 0.5F;
+            float arm = Math.max(0.35F, Math.min(2.0F, span * 0.06F));
+            float pin = Math.max(0.12F, Math.min(0.7F, span * 0.025F));
+            float pinThick = Math.max(frameThick, span * 0.006F);
+            RenderSystem.disableDepthTest();
+            drawFrameBeams(modelView, projection, mx - arm, my, mz, mx + arm, my, mz, pinThick, 0.91F, 0.55F, 0.23F, 1.0F);
+            drawFrameBeams(modelView, projection, mx, my - arm, mz, mx, my + arm, mz, pinThick, 0.91F, 0.55F, 0.23F, 1.0F);
+            drawFrameBeams(modelView, projection, mx, my, mz - arm, mx, my, mz + arm, pinThick, 0.91F, 0.55F, 0.23F, 1.0F);
+            drawSolidBox(modelView, projection, mx - pin, my - pin, mz - pin, mx + pin, my + pin, mz + pin, 0.98F, 0.78F, 0.35F, 1.0F);
+            RenderSystem.enableDepthTest();
         }
         RenderSystem.disableDepthTest();
         pose.popPose();
         graphics.disableScissor();
     }
 
-    /** Thin AABB around the preview blocks, plus a copper pivot marker that always shows through. */
-    private static void drawFrameAndPivot(
-            PoseStack pose,
+    /** Twelve AABB edges as thin beams, or a single segment when only one edge is passed. */
+    private static void drawFrameBeams(
+            Matrix4f modelView,
+            Matrix4f projection,
             float x0,
             float y0,
             float z0,
             float x1,
             float y1,
             float z1,
-            float span,
-            int pivotX,
-            int pivotY,
-            int pivotZ,
-            int minX,
-            int minY,
-            int minZ,
-            int maxX,
-            int maxY,
-            int maxZ) {
-        MultiBufferSource.BufferSource buffers = Minecraft.getInstance().renderBuffers().bufferSource();
-        float pad = 0.015F;
-        // Soft steel frame — half the usual line width so the AABB stays light in the menu.
-        RenderSystem.lineWidth(0.5F);
-        VertexConsumer frame = buffers.getBuffer(RenderType.lines());
-        boxEdges(pose, frame, x0 - pad, y0 - pad, z0 - pad, x1 + pad, y1 + pad, z1 + pad, 0.55F, 0.72F, 0.86F, 0.55F);
-        buffers.endBatch(RenderType.lines());
-
-        int px = Math.max(minX, Math.min(maxX, pivotX));
-        int py = Math.max(minY, Math.min(maxY, pivotY));
-        int pz = Math.max(minZ, Math.min(maxZ, pivotZ));
-        float mx = px + 0.5F;
-        float my = py + 0.5F;
-        float mz = pz + 0.5F;
-        // Grow with the shape so the pin stays readable on large previews.
-        float arm = Math.max(0.5F, Math.min(3.0F, span * 0.08F));
-        float box = Math.max(0.22F, Math.min(1.2F, span * 0.035F));
-        // Pivot draws without depth so blocks never hide it.
-        RenderSystem.disableDepthTest();
-        RenderSystem.lineWidth(2.0F);
-        VertexConsumer pivot = buffers.getBuffer(RenderType.lines());
-        line(pose, pivot, mx - arm, my, mz, mx + arm, my, mz, 0.91F, 0.55F, 0.23F, 1.0F);
-        line(pose, pivot, mx, my - arm, mz, mx, my + arm, mz, 0.91F, 0.55F, 0.23F, 1.0F);
-        line(pose, pivot, mx, my, mz - arm, mx, my, mz + arm, 0.91F, 0.55F, 0.23F, 1.0F);
-        boxEdges(pose, pivot, mx - box, my - box, mz - box, mx + box, my + box, mz + box, 0.98F, 0.78F, 0.35F, 1.0F);
-        buffers.endBatch(RenderType.lines());
-        RenderSystem.lineWidth(1.0F);
-        RenderSystem.enableDepthTest();
+            float thick,
+            float red,
+            float green,
+            float blue,
+            float alpha) {
+        // Full box when all three axes span; otherwise one beam between the two points.
+        boolean box = Math.abs(x1 - x0) > 1.0E-4F && Math.abs(y1 - y0) > 1.0E-4F && Math.abs(z1 - z0) > 1.0E-4F;
+        ByteBufferBuilder bytes = new ByteBufferBuilder(4096);
+        BufferBuilder buffer = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        if (box) {
+            beam(buffer, x0, y0, z0, x1, y0, z0, thick, red, green, blue, alpha);
+            beam(buffer, x1, y0, z0, x1, y0, z1, thick, red, green, blue, alpha);
+            beam(buffer, x1, y0, z1, x0, y0, z1, thick, red, green, blue, alpha);
+            beam(buffer, x0, y0, z1, x0, y0, z0, thick, red, green, blue, alpha);
+            beam(buffer, x0, y1, z0, x1, y1, z0, thick, red, green, blue, alpha);
+            beam(buffer, x1, y1, z0, x1, y1, z1, thick, red, green, blue, alpha);
+            beam(buffer, x1, y1, z1, x0, y1, z1, thick, red, green, blue, alpha);
+            beam(buffer, x0, y1, z1, x0, y1, z0, thick, red, green, blue, alpha);
+            beam(buffer, x0, y0, z0, x0, y1, z0, thick, red, green, blue, alpha);
+            beam(buffer, x1, y0, z0, x1, y1, z0, thick, red, green, blue, alpha);
+            beam(buffer, x1, y0, z1, x1, y1, z1, thick, red, green, blue, alpha);
+            beam(buffer, x0, y0, z1, x0, y1, z1, thick, red, green, blue, alpha);
+        } else {
+            beam(buffer, x0, y0, z0, x1, y1, z1, thick, red, green, blue, alpha);
+        }
+        drawBuilt(buffer, bytes, modelView, projection, RenderType.debugQuads());
     }
 
-    private static void boxEdges(
-            PoseStack pose,
-            VertexConsumer lines,
+    private static void drawSolidBox(
+            Matrix4f modelView,
+            Matrix4f projection,
             float x0,
             float y0,
             float z0,
@@ -211,46 +206,145 @@ public final class BlueprintModelView {
             float green,
             float blue,
             float alpha) {
-        line(pose, lines, x0, y0, z0, x1, y0, z0, red, green, blue, alpha);
-        line(pose, lines, x1, y0, z0, x1, y0, z1, red, green, blue, alpha);
-        line(pose, lines, x1, y0, z1, x0, y0, z1, red, green, blue, alpha);
-        line(pose, lines, x0, y0, z1, x0, y0, z0, red, green, blue, alpha);
-        line(pose, lines, x0, y1, z0, x1, y1, z0, red, green, blue, alpha);
-        line(pose, lines, x1, y1, z0, x1, y1, z1, red, green, blue, alpha);
-        line(pose, lines, x1, y1, z1, x0, y1, z1, red, green, blue, alpha);
-        line(pose, lines, x0, y1, z1, x0, y1, z0, red, green, blue, alpha);
-        line(pose, lines, x0, y0, z0, x0, y1, z0, red, green, blue, alpha);
-        line(pose, lines, x1, y0, z0, x1, y1, z0, red, green, blue, alpha);
-        line(pose, lines, x1, y0, z1, x1, y1, z1, red, green, blue, alpha);
-        line(pose, lines, x0, y0, z1, x0, y1, z1, red, green, blue, alpha);
+        ByteBufferBuilder bytes = new ByteBufferBuilder(1024);
+        BufferBuilder buffer = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        filledBox(buffer, x0, y0, z0, x1, y1, z1, red, green, blue, alpha);
+        drawBuilt(buffer, bytes, modelView, projection, RenderType.debugQuads());
     }
 
-    private static void line(
-            PoseStack pose,
-            VertexConsumer lines,
-            float x1,
-            float y1,
-            float z1,
-            float x2,
-            float y2,
-            float z2,
-            float red,
-            float green,
-            float blue,
-            float alpha) {
-        float dx = x2 - x1;
-        float dy = y2 - y1;
-        float dz = z2 - z1;
-        float length = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
-        if (length < 1.0E-4F) {
+    private static void drawBuilt(
+            BufferBuilder buffer,
+            ByteBufferBuilder bytes,
+            Matrix4f modelView,
+            Matrix4f projection,
+            RenderType type) {
+        MeshData mesh = buffer.build();
+        if (mesh == null) {
+            bytes.close();
             return;
         }
-        dx /= length;
-        dy /= length;
-        dz /= length;
-        PoseStack.Pose last = pose.last();
-        lines.addVertex(last, x1, y1, z1).setColor(red, green, blue, alpha).setNormal(last, dx, dy, dz);
-        lines.addVertex(last, x2, y2, z2).setColor(red, green, blue, alpha).setNormal(last, dx, dy, dz);
+        VertexBuffer vb = new VertexBuffer(VertexBuffer.Usage.STATIC);
+        try {
+            vb.bind();
+            vb.upload(mesh);
+            type.setupRenderState();
+            ShaderInstance shader = RenderSystem.getShader();
+            if (shader != null) {
+                vb.drawWithShader(modelView, projection, shader);
+            }
+            type.clearRenderState();
+            VertexBuffer.unbind();
+        } finally {
+            vb.close();
+            bytes.close();
+        }
+    }
+
+    /** Thin rectangular beam from A to B in local block space. */
+    private static void beam(
+            BufferBuilder buffer,
+            float ax,
+            float ay,
+            float az,
+            float bx,
+            float by,
+            float bz,
+            float thick,
+            float red,
+            float green,
+            float blue,
+            float alpha) {
+        float dx = bx - ax;
+        float dy = by - ay;
+        float dz = bz - az;
+        float len = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (len < 1.0E-4F) {
+            return;
+        }
+        dx /= len;
+        dy /= len;
+        dz /= len;
+        float hx = Math.abs(dx) < 0.9F ? 0.0F : 1.0F;
+        float hy = Math.abs(dx) < 0.9F ? 1.0F : 0.0F;
+        float hz = 0.0F;
+        // Perpendicular pair for the beam cross-section.
+        float px = hy * dz - hz * dy;
+        float py = hz * dx - hx * dz;
+        float pz = hx * dy - hy * dx;
+        float pl = (float) Math.sqrt(px * px + py * py + pz * pz);
+        if (pl < 1.0E-4F) {
+            return;
+        }
+        px = px / pl * thick * 0.5F;
+        py = py / pl * thick * 0.5F;
+        pz = pz / pl * thick * 0.5F;
+        float qx = dy * pz - dz * py;
+        float qy = dz * px - dx * pz;
+        float qz = dx * py - dy * px;
+        // 8 corners of the beam prism.
+        float x00 = ax - px - qx;
+        float y00 = ay - py - qy;
+        float z00 = az - pz - qz;
+        float x01 = ax - px + qx;
+        float y01 = ay - py + qy;
+        float z01 = az - pz + qz;
+        float x10 = ax + px - qx;
+        float y10 = ay + py - qy;
+        float z10 = az + pz - qz;
+        float x11 = ax + px + qx;
+        float y11 = ay + py + qy;
+        float z11 = az + pz + qz;
+        float X00 = bx - px - qx;
+        float Y00 = by - py - qy;
+        float Z00 = bz - pz - qz;
+        float X01 = bx - px + qx;
+        float Y01 = by - py + qy;
+        float Z01 = bz - pz + qz;
+        float X10 = bx + px - qx;
+        float Y10 = by + py - qy;
+        float Z10 = bz + pz - qz;
+        float X11 = bx + px + qx;
+        float Y11 = by + py + qy;
+        float Z11 = bz + pz + qz;
+        coloredQuad(buffer, x00, y00, z00, x10, y10, z10, X10, Y10, Z10, X00, Y00, Z00, red, green, blue, alpha);
+        coloredQuad(buffer, x01, y01, z01, X01, Y01, Z01, X11, Y11, Z11, x11, y11, z11, red, green, blue, alpha);
+        coloredQuad(buffer, x00, y00, z00, X00, Y00, Z00, X01, Y01, Z01, x01, y01, z01, red, green, blue, alpha);
+        coloredQuad(buffer, x10, y10, z10, x11, y11, z11, X11, Y11, Z11, X10, Y10, Z10, red, green, blue, alpha);
+        coloredQuad(buffer, x00, y00, z00, x01, y01, z01, x11, y11, z11, x10, y10, z10, red, green, blue, alpha);
+        coloredQuad(buffer, X00, Y00, Z00, X10, Y10, Z10, X11, Y11, Z11, X01, Y01, Z01, red, green, blue, alpha);
+    }
+
+    private static void filledBox(
+            BufferBuilder buffer,
+            float x0,
+            float y0,
+            float z0,
+            float x1,
+            float y1,
+            float z1,
+            float red,
+            float green,
+            float blue,
+            float alpha) {
+        coloredQuad(buffer, x0, y0, z0, x1, y0, z0, x1, y0, z1, x0, y0, z1, red, green, blue, alpha);
+        coloredQuad(buffer, x0, y1, z0, x0, y1, z1, x1, y1, z1, x1, y1, z0, red, green, blue, alpha);
+        coloredQuad(buffer, x0, y0, z0, x0, y1, z0, x1, y1, z0, x1, y0, z0, red, green, blue, alpha);
+        coloredQuad(buffer, x0, y0, z1, x1, y0, z1, x1, y1, z1, x0, y1, z1, red, green, blue, alpha);
+        coloredQuad(buffer, x0, y0, z0, x0, y0, z1, x0, y1, z1, x0, y1, z0, red, green, blue, alpha);
+        coloredQuad(buffer, x1, y0, z0, x1, y1, z0, x1, y1, z1, x1, y0, z1, red, green, blue, alpha);
+    }
+
+    private static void coloredQuad(
+            BufferBuilder buffer,
+            float x0, float y0, float z0,
+            float x1, float y1, float z1,
+            float x2, float y2, float z2,
+            float x3, float y3, float z3,
+            float red, float green, float blue, float alpha) {
+        buffer.addVertex(x0, y0, z0).setColor(red, green, blue, alpha);
+        buffer.addVertex(x1, y1, z1).setColor(red, green, blue, alpha);
+        buffer.addVertex(x2, y2, z2).setColor(red, green, blue, alpha);
+        buffer.addVertex(x3, y3, z3).setColor(red, green, blue, alpha);
     }
 
     /** Every block stays on its real coordinate. The mesh is built once so turning it stays cheap. */
