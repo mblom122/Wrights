@@ -54,6 +54,7 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
     private WrightsButton inventoryButton;
     private WrightsButton allButton;
     private WrightsButton addButton;
+    private WrightsButton clearButton;
     private Tab tab = Tab.RECENT;
     private String builtQuery = "\0";
     private Tab builtTab;
@@ -96,10 +97,41 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
 
     /** Shape materials picker: collect several blocks, then confirm. */
     public static void openBlocks(Screen parent, Consumer<List<BlockState>> onDone) {
+        openBlocks(parent, List.of(), onDone);
+    }
+
+    /** Shape materials picker, prefilled with the blocks already chosen so reopening does not start over. */
+    public static void openBlocks(Screen parent, List<BlockState> initial, Consumer<List<BlockState>> onDone) {
         if (onDone == null) {
             return;
         }
-        net.minecraft.client.Minecraft.getInstance().setScreen(new BlockPickerScreen(parent, null, 0, 0, 0, null, onDone, true));
+        BlockPickerScreen screen = new BlockPickerScreen(parent, null, 0, 0, 0, null, onDone, true);
+        screen.seedSelected(initial);
+        net.minecraft.client.Minecraft.getInstance().setScreen(screen);
+    }
+
+    private void seedSelected(List<BlockState> initial) {
+        selected.clear();
+        if (initial == null) {
+            return;
+        }
+        for (BlockState state : initial) {
+            if (state == null || state.isAir()) {
+                continue;
+            }
+            Item item = state.getBlock().asItem();
+            if (!(item instanceof BlockItem blockItem)) {
+                continue;
+            }
+            Choice choice = Choice.ofBlock(blockItem);
+            if (indexInSelected(choice) >= 0) {
+                continue;
+            }
+            if (selected.size() >= TRAY_MAX_ROWS * COLS) {
+                break;
+            }
+            selected.add(choice);
+        }
     }
 
     /** Screen that opened this picker — library edit does not need the controller held. */
@@ -131,9 +163,15 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
         listY = tabY + 22;
         layoutLists();
         if (multi) {
-            int half = (panelW - 28) / 2;
-            addRenderableWidget(new WrightsButton(panelX + 12, panelY + panelH - 28, half, 16, Component.translatable("menu.wrights.close"), button -> onClose()));
-            addButton = new WrightsButton(panelX + 16 + half, panelY + panelH - 28, panelW - 28 - half, 16, Component.translatable("screen.wrights.picker_add"), button -> confirmSelected());
+            int gap = 4;
+            int third = (panelW - 24 - gap * 2) / 3;
+            int bx = panelX + 12;
+            addRenderableWidget(new WrightsButton(bx, panelY + panelH - 28, third, 16, Component.translatable("menu.wrights.close"), button -> onClose()));
+            bx += third + gap;
+            clearButton = new WrightsButton(bx, panelY + panelH - 28, third, 16, Component.translatable("screen.wrights.picker_clear"), button -> clearSelected(), true);
+            addRenderableWidget(clearButton);
+            bx += third + gap;
+            addButton = new WrightsButton(bx, panelY + panelH - 28, panelX + panelW - 12 - bx, 16, Component.translatable("screen.wrights.picker_add"), button -> confirmSelected());
             addRenderableWidget(addButton);
             markAdd();
         } else {
@@ -169,6 +207,16 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
         if (addButton != null) {
             addButton.active = !selected.isEmpty();
         }
+        if (clearButton != null) {
+            clearButton.active = !selected.isEmpty();
+        }
+    }
+
+    private void clearSelected() {
+        selected.clear();
+        dragIndex = -1;
+        dragHover = -1;
+        markAdd();
     }
 
     @Override
