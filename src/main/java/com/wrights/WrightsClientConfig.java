@@ -216,7 +216,7 @@ public final class WrightsClientConfig {
             .defineInRange("shapeKind", 0, 0, 9);
     public static final ModConfigSpec.IntValue SHAPE_SIZE = BUILDER
             .comment("Radius or half-width of the shape. Server maxShapeAxis still caps the real build.")
-            .defineInRange("shapeSize", 4, 1, 4096);
+            .defineInRange("shapeSize", 3, 1, 4096);
     public static final ModConfigSpec.IntValue SHAPE_HEIGHT = BUILDER
             .comment("Height for cylinders, pyramids, and ring/donut extrusion. Server maxShapeAxis still caps the real build.")
             .defineInRange("shapeHeight", 6, 1, 4096);
@@ -1181,7 +1181,10 @@ public final class WrightsClientConfig {
         switch (form) {
             case FLOOR -> {
                 setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
-                if (SHAPE_HEIGHT.get() < 1) {
+                // Equal sides → Size×Size plate; bump a leftover 1×1 (e.g. after Pillar) to 3×3.
+                if (exchangeEqualSides() && SHAPE_SIZE.get() <= 1) {
+                    setShapeSize(3);
+                } else if (SHAPE_HEIGHT.get() < 1) {
                     setShapeHeight(1);
                 }
                 syncExchangeEqualDims();
@@ -1191,7 +1194,9 @@ public final class WrightsClientConfig {
                 setShapePlane(facing.getAxis() == net.minecraft.core.Direction.Axis.X
                         ? com.wrights.blueprint.Shapes.AXIS_X
                         : com.wrights.blueprint.Shapes.AXIS_Z);
-                if (SHAPE_HEIGHT.get() < 2) {
+                if (exchangeEqualSides() && SHAPE_SIZE.get() <= 1) {
+                    setShapeSize(3);
+                } else if (SHAPE_HEIGHT.get() < 2) {
                     setShapeHeight(3);
                 }
                 syncExchangeEqualDims();
