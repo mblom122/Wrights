@@ -5111,16 +5111,16 @@ public final class JobManager {
             clearPlacedGhost(player, job, entry);
             return PlaceResult.DONE;
         }
-        ItemStack carried = com.wrights.blueprint.MirrorLaunch.harvest(player, level, pos, job.mineTool(), job.mineVoid());
-        showCarry(level, job, hand, carried);
+        java.util.List<ItemStack> drops = com.wrights.blueprint.MirrorLaunch.harvest(player, level, pos, job.mineTool(), job.mineVoid());
+        showCarry(level, job, hand, drops);
         clearPlacedGhost(player, job, entry);
         job.placedOne();
         return PlaceResult.DONE;
     }
 
-    /** The wright that just mined keeps that drop visible until it docks. */
-    private static void showCarry(ServerLevel level, BuildJob job, BuildJob.Hand hand, ItemStack stack) {
-        if (stack == null || stack.isEmpty()) {
+    /** Fold this break’s drops into the wright’s haul; the cargo icon shows majority / last-picked. */
+    private static void showCarry(ServerLevel level, BuildJob job, BuildJob.Hand hand, java.util.List<ItemStack> drops) {
+        if (drops == null || drops.isEmpty()) {
             return;
         }
         UUID id = hand != null && hand.entityId != null ? hand.entityId : job.droneId();
@@ -5128,7 +5128,7 @@ public final class JobManager {
             return;
         }
         if (level.getEntity(id) instanceof DroneEntity drone && drone.isAlive()) {
-            drone.setCarried(stack);
+            drone.takeHaul(drops);
         }
     }
 
@@ -5204,8 +5204,7 @@ public final class JobManager {
             if (job.exchangeJob()) {
                 // Same as Mirror mine: harvest into the player and show the drop on the wright.
                 ItemStack tool = job.exchangeSilk() ? silkTouchPick(level.getServer()) : ItemStack.EMPTY;
-                ItemStack carried = com.wrights.blueprint.MirrorLaunch.harvest(player, level, pos, tool, false);
-                showCarry(level, job, hand, carried);
+                showCarry(level, job, hand, com.wrights.blueprint.MirrorLaunch.harvest(player, level, pos, tool, false));
             } else {
                 voidCell(level, pos);
             }

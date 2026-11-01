@@ -317,15 +317,18 @@ public final class MirrorLaunch {
         JobManager.startMirrorMine(player, schematic, origin, payload.any(), voiding, miningTool(player));
     }
 
-    /** Breaks the block with the tool that started the job. The first drop is what the wright shows on the way home. */
-    public static ItemStack harvest(ServerPlayer player, ServerLevel level, BlockPos pos, ItemStack tool, boolean voiding) {
+    /**
+     * Breaks the block with the tool that started the job.
+     * Returns every drop given to the player (merged by item) so the wright can tally its haul icon.
+     */
+    public static List<ItemStack> harvest(ServerPlayer player, ServerLevel level, BlockPos pos, ItemStack tool, boolean voiding) {
         if (voiding) {
             BlockEntity stored = level.getBlockEntity(pos);
             if (stored instanceof net.minecraft.world.Container container) {
                 container.clearContent();
             }
             level.setBlock(pos, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS | net.minecraft.world.level.block.Block.UPDATE_SUPPRESS_DROPS);
-            return ItemStack.EMPTY;
+            return List.of();
         }
         BlockState state = level.getBlockState(pos);
         BlockEntity entity = level.getBlockEntity(pos);
@@ -338,7 +341,7 @@ public final class MirrorLaunch {
         level.destroyBlock(pos, false, player);
         if (creative) {
             net.minecraft.world.item.Item item = state.getBlock().asItem();
-            return item == net.minecraft.world.item.Items.AIR ? ItemStack.EMPTY : new ItemStack(item);
+            return item == net.minecraft.world.item.Items.AIR ? List.of() : List.of(new ItemStack(item));
         }
         return claimDrops(player, level, pos, already);
     }
@@ -365,21 +368,38 @@ public final class MirrorLaunch {
         return ids;
     }
 
-    /** Mirror drops go into the inventory. Whatever does not fit lands at the player. The first drop is shown on the wright. */
-    private static ItemStack claimDrops(ServerPlayer player, ServerLevel level, BlockPos pos, Set<UUID> already) {
-        ItemStack shown = ItemStack.EMPTY;
+    /**
+     * Mirror drops go into the inventory. Whatever does not fit lands at the player.
+     * Returns one stack per item type with the total count claimed from this break.
+     */
+    private static List<ItemStack> claimDrops(ServerPlayer player, ServerLevel level, BlockPos pos, Set<UUID> already) {
+        List<ItemStack> claimed = new ArrayList<>();
         for (ItemEntity entity : level.getEntitiesOfClass(ItemEntity.class, new AABB(pos).inflate(1.0D))) {
             if (!entity.isAlive() || already.contains(entity.getUUID())) {
                 continue;
             }
             ItemStack stack = entity.getItem().copy();
             entity.discard();
-            if (shown.isEmpty() && !stack.isEmpty()) {
-                shown = stack.copyWithCount(1);
+            if (stack.isEmpty()) {
+                continue;
             }
-            giveOrDrop(player, stack);
+            mergeClaim(claimed, stack);
+            giveOrDrop(player, stack.copy());
         }
-        return shown;
+        return claimed;
+    }
+
+    private static void mergeClaim(List<ItemStack> claimed, ItemStack stack) {
+        for (int i = 0; i < claimed.size(); i++) {
+            ItemStack existing = claimed.get(i);
+            if (ItemStack.isSameItemSameComponents(existing, stack)) {
+                existing.grow(stack.getCount());
+                claimed.remove(i);
+                claimed.add(existing);
+                return;
+            }
+        }
+        claimed.add(stack.copy());
     }
 
     private static void giveOrDrop(ServerPlayer player, ItemStack stack) {

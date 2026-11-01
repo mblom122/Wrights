@@ -1,5 +1,7 @@
 package com.wrights.entity;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -55,6 +57,9 @@ public class DroneEntity extends Entity {
     /** Null = personal wrightport (player back). Set = placed wrightport block. */
     @Nullable
     private BlockPos homePort;
+    /** Server-side haul totals for the cargo icon under the wright (majority / last-picked). */
+    private final List<HaulLine> haul = new ArrayList<>();
+    private int haulSeq;
 
     public DroneEntity(EntityType<? extends DroneEntity> type, Level level) {
         super(type, level);
@@ -213,8 +218,64 @@ public class DroneEntity extends Entity {
         return this.entityData.get(CARRIED);
     }
 
+    /** Replace the haul with one stack (NBT load / clear). */
     public void setCarried(ItemStack stack) {
-        this.entityData.set(CARRIED, stack == null || stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1));
+        this.haul.clear();
+        this.haulSeq = 0;
+        if (stack == null || stack.isEmpty()) {
+            this.entityData.set(CARRIED, ItemStack.EMPTY);
+            return;
+        }
+        this.haul.add(new HaulLine(stack.copyWithCount(1), Math.max(1, stack.getCount()), ++this.haulSeq));
+        this.entityData.set(CARRIED, stack.copyWithCount(1));
+    }
+
+    /**
+     * Fold mined drops into this wright’s haul, then show the type with the highest total.
+     * Ties go to the type picked most recently.
+     */
+    public void takeHaul(Iterable<ItemStack> stacks) {
+        if (this.level().isClientSide || stacks == null) {
+            return;
+        }
+        boolean changed = false;
+        for (ItemStack stack : stacks) {
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
+            HaulLine line = null;
+            for (HaulLine entry : this.haul) {
+                if (ItemStack.isSameItemSameComponents(entry.sample, stack)) {
+                    line = entry;
+                    break;
+                }
+            }
+            if (line == null) {
+                line = new HaulLine(stack.copyWithCount(1), 0, 0);
+                this.haul.add(line);
+            }
+            line.count += Math.max(1, stack.getCount());
+            line.order = ++this.haulSeq;
+            changed = true;
+        }
+        if (changed) {
+            refreshHaulDisplay();
+        }
+    }
+
+    private void refreshHaulDisplay() {
+        HaulLine best = null;
+        for (HaulLine line : this.haul) {
+            if (best == null
+                    || line.count > best.count
+                    || (line.count == best.count && line.order > best.order)) {
+                best = line;
+            }
+        }
+        ItemStack show = best == null ? ItemStack.EMPTY : best.sample.copyWithCount(1);
+        if (!ItemStack.isSameItemSameComponents(show, this.entityData.get(CARRIED))) {
+            this.entityData.set(CARRIED, show);
+        }
     }
 
     /**
@@ -230,6 +291,18 @@ public class DroneEntity extends Entity {
             return placing;
         }
         return carried();
+    }
+
+    private static final class HaulLine {
+        private final ItemStack sample;
+        private int count;
+        private int order;
+
+        private HaulLine(ItemStack sample, int count, int order) {
+            this.sample = sample;
+            this.count = count;
+            this.order = order;
+        }
     }
 
     /** Block this wright is placing or waiting on right now. */
