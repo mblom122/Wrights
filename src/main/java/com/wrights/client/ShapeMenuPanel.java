@@ -106,8 +106,8 @@ final class ShapeMenuPanel {
                     line ? "menu.wrights.shape_line_thickness_hint" : "menu.wrights.shape_thickness_hint");
             y += 12;
             thicknessY = y;
-            // Same track scale as Size (axis max) so changing size does not slide the thickness thumb.
-            int thickness = Mth.clamp(WrightsClientConfig.SHAPE_THICKNESS.get(), 1, thicknessCap(size, ring, line, max));
+            // Thickness is independent of Size — same axis-max track for ring and line.
+            int thickness = Mth.clamp(WrightsClientConfig.SHAPE_THICKNESS.get(), 1, max);
             drawSlider(graphics, x, y, sizeW, thickness - 1, Math.max(1, max - 1));
             graphics.drawString(font, Integer.toString(thickness), x + sizeW + 8, y, WrightsUi.TEXT, false);
             y += 18;
@@ -193,13 +193,7 @@ final class ShapeMenuPanel {
             return true;
         }
         if (thicknessY >= 0 && mouseY >= thicknessY && mouseY < thicknessY + 12 && mouseX >= bodyX && mouseX < bodyX + sizeW) {
-            Shapes.Kind kind = Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
-            int max = axisMax();
-            int value = sliderAt(mouseX, max);
-            if (kind == Shapes.Kind.RING) {
-                value = Math.min(value, Math.max(1, WrightsClientConfig.SHAPE_SIZE.get()));
-            }
-            WrightsClientConfig.setShapeThickness(value);
+            WrightsClientConfig.setShapeThickness(sliderAt(mouseX, axisMax()));
             return true;
         }
         if (heightY >= 0 && mouseY >= heightY && mouseY < heightY + 12 && mouseX >= bodyX && mouseX < bodyX + sizeW) {
@@ -235,25 +229,12 @@ final class ShapeMenuPanel {
         if (thicknessY < 0) {
             return false;
         }
-        Shapes.Kind kind = Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
-        int value = sliderAt(mouseX, axisMax());
-        if (kind == Shapes.Kind.RING) {
-            value = Math.min(value, Math.max(1, WrightsClientConfig.SHAPE_SIZE.get()));
-        }
-        WrightsClientConfig.setShapeThickness(value);
+        WrightsClientConfig.setShapeThickness(sliderAt(mouseX, axisMax()));
         return true;
     }
 
     private static int axisMax() {
         return Math.max(1, Math.min(64, WrightsConfig.MAX_AXIS.getAsInt()));
-    }
-
-    /** Cap for the thickness value (ring band ≤ size; line width ≤ axis). */
-    private static int thicknessCap(int size, boolean ring, boolean line, int max) {
-        if (ring) {
-            return Math.max(1, size);
-        }
-        return max;
     }
 
     /** Map a click on the shared slider track to 1..maxInclusive. */

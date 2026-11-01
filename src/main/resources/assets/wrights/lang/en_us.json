@@ -916,7 +916,7 @@
   "menu.wrights.shape_cylinder_height_hint": "How tall the cylinder grows upward from the base.",
   "menu.wrights.shape_ring_height_hint": "Tube height of the donut. 1 stays a flat ring; higher rounds into a torus.",
   "menu.wrights.shape_thickness": "Thickness",
-  "menu.wrights.shape_thickness_hint": "How wide the ring or donut tube is in the ring plane.",
+  "menu.wrights.shape_thickness_hint": "How wide the ring or donut tube is in the ring plane. Independent of Size; if thicker than the radius, the hole fills in.",
   "menu.wrights.shape_line_thickness_hint": "Width of the beam across the plane. With Height, this makes a rectangular 3D beam.",
   "menu.wrights.shape_line_height_hint": "Height of the beam’s cross-section. 1 with Thickness 1 is a single-block line.",
   "menu.wrights.shape_plane": "Plane",
