@@ -122,12 +122,27 @@ public final class BlueprintModelView {
         pose.translate(-cx, -cy, -cz);
 
         ModelMesh mesh = meshFor(ghosts);
+        // Compose once and reuse for mesh + frame so the AABB cannot drift from the blocks
+        // (BufferSource lines used to bake pose into vertices while ModelViewMat could still
+        // hold the mesh matrix, which double-transformed the wireframe).
         Matrix4f modelView = new Matrix4f(RenderSystem.getModelViewMatrix()).mul(pose.last().pose());
         Matrix4f projection = new Matrix4f(RenderSystem.getProjectionMatrix());
         RenderSystem.enableDepthTest();
         mesh.draw(modelView, projection);
         if (showFrame) {
-            drawFrameAndPivot(pose, x0, y0, z0, x1, y1, z1, span, pivotX, pivotY, pivotZ, minX, minY, minZ, maxX, maxY, maxZ);
+            var mvStack = RenderSystem.getModelViewStack();
+            mvStack.pushMatrix();
+            mvStack.mul(pose.last().pose());
+            RenderSystem.applyModelViewMatrix();
+            // Local block space — ModelView already carries screen / spin / center.
+            drawFrameAndPivot(
+                    new PoseStack(),
+                    x0, y0, z0, x1, y1, z1,
+                    span,
+                    pivotX, pivotY, pivotZ,
+                    minX, minY, minZ, maxX, maxY, maxZ);
+            mvStack.popMatrix();
+            RenderSystem.applyModelViewMatrix();
         }
         RenderSystem.disableDepthTest();
         pose.popPose();

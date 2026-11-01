@@ -52,7 +52,7 @@ public final class ShapeMaterials {
     }
 
     public static int clampWeight(int weight) {
-        return Mth.clamp(weight, 1, 1000);
+        return Mth.clamp(weight, 1, 999);
     }
 
     public static int clampBatch(int batch) {
