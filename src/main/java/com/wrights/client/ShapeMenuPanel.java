@@ -1372,6 +1372,14 @@ final class ShapeMenuPanel {
     }
 
     private void refreshShapePreview() {
+        List<ShapeMaterials.Entry> materials = WrightsClientConfig.shapeMaterials();
+        ShapeMaterials.FillMode mode = WrightsClientConfig.shapeFillMode();
+        int batch = WrightsClientConfig.SHAPE_ORDER_BATCH.get();
+        // Bridge / Stairs use path cells — not the Exchange form footprint (world ghosts already do).
+        if (placeMode && WrightsClientConfig.placePathStyle()) {
+            refreshPlacePathPreview(materials, mode, batch);
+            return;
+        }
         Shapes.Kind kind = formPresets()
                 ? WrightsClientConfig.exchangeKind()
                 : Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
@@ -1389,9 +1397,6 @@ final class ShapeMenuPanel {
         int plane = WrightsClientConfig.SHAPE_PLANE.get();
         // Same absolute yaw as the in-world preview so we reuse SelectionRenderer's cache.
         int yaw = Shapes.clampYaw(WrightsClientConfig.SHAPE_YAW.get());
-        List<ShapeMaterials.Entry> materials = WrightsClientConfig.shapeMaterials();
-        ShapeMaterials.FillMode mode = WrightsClientConfig.shapeFillMode();
-        int batch = WrightsClientConfig.SHAPE_ORDER_BATCH.get();
         long key = previewMaterialsKey(kind, size, height, thickness, plane, yaw, hollow, materials, mode, batch);
         if (key == previewKey) {
             return;
@@ -1442,6 +1447,51 @@ final class ShapeMenuPanel {
             }
             origin = mesh.isEmpty() ? BlockPos.ZERO : Shapes.origin(mesh);
         }
+        bakePreviewMesh(mesh, origin, materials, mode, batch, key);
+    }
+
+    /** Menu miniature for Bridge / Stairs — same cells as the in-world path ghosts. */
+    private void refreshPlacePathPreview(
+            List<ShapeMaterials.Entry> materials,
+            ShapeMaterials.FillMode mode,
+            int batch) {
+        int offset = Math.max(1, WrightsClientConfig.placeBridgeOffset());
+        int width = Math.max(1, WrightsClientConfig.placeBridgeWidth());
+        long key = previewPathKey(offset, width, false, true, materials, mode, batch);
+        if (key == previewKey) {
+            return;
+        }
+        previewKey = key;
+        List<BlockPos> mesh = WrightsClientState.placePathCells(
+                BlockPos.ZERO,
+                net.minecraft.core.Direction.SOUTH,
+                offset,
+                width,
+                false,
+                true);
+        if (mesh.isEmpty()) {
+            previewGhosts = List.of();
+            previewBlocks = 0;
+            previewSizeX = previewSizeY = previewSizeZ = 1;
+            meshSizeX = meshSizeY = meshSizeZ = 1;
+            return;
+        }
+        BlockPos origin = Shapes.origin(mesh);
+        BlockPos extent = Shapes.extent(mesh);
+        previewSizeX = extent.getX() - origin.getX() + 1;
+        previewSizeY = extent.getY() - origin.getY() + 1;
+        previewSizeZ = extent.getZ() - origin.getZ() + 1;
+        previewBlocks = mesh.size();
+        bakePreviewMesh(mesh, origin, materials, mode, batch, key);
+    }
+
+    private void bakePreviewMesh(
+            List<BlockPos> mesh,
+            BlockPos origin,
+            List<ShapeMaterials.Entry> materials,
+            ShapeMaterials.FillMode mode,
+            int batch,
+            long key) {
         if (mesh.isEmpty()) {
             previewGhosts = List.of();
             meshSizeX = meshSizeY = meshSizeZ = 1;
@@ -1498,6 +1548,35 @@ final class ShapeMenuPanel {
             meshSizeZ = gMaxZ - gMinZ + 1;
         }
         previewGhosts = List.copyOf(ghosts);
+    }
+
+    /** Fingerprint for Bridge / Stairs path miniature (distinct salt from shape keys). */
+    private static long previewPathKey(
+            int offset,
+            int width,
+            boolean stairs,
+            boolean up,
+            List<ShapeMaterials.Entry> materials,
+            ShapeMaterials.FillMode mode,
+            int batch) {
+        long key = 0xB71D1C4E5A97F301L;
+        key = key * 31L + offset;
+        key = key * 31L + width;
+        key = key * 31L + (stairs ? 1 : 0);
+        key = key * 31L + (up ? 1 : 0);
+        key = key * 31L + (mode == null ? 0 : mode.ordinal());
+        key = key * 31L + batch;
+        if (materials != null) {
+            for (ShapeMaterials.Entry entry : materials) {
+                if (entry == null) {
+                    continue;
+                }
+                Item item = entry.item();
+                key = key * 31L + (item == null ? 0 : Item.getId(item));
+                key = key * 31L + entry.weight();
+            }
+        }
+        return key;
     }
 
     /** Fingerprint so the sample rebuilds when materials, weights, or fill mode change. */

@@ -432,7 +432,15 @@ public final class SelectionRenderer {
         if (minecraft.player == null) {
             return;
         }
-        drawPlaceCellGhosts(pose, buffers, camera, minecraft, materials, WrightsClientState.placePathCells(minecraft.player), false);
+        boolean voidBlocks = WrightsClientConfig.SHAPE_VOID.get() && WrightsConfig.allowShapeVoid();
+        drawPlaceCellGhosts(
+                pose,
+                buffers,
+                camera,
+                minecraft,
+                materials,
+                WrightsClientState.placePathCells(minecraft.player),
+                voidBlocks);
     }
 
     /** Ghost the To me axis line from the aimed block to the player's matching axis value. */

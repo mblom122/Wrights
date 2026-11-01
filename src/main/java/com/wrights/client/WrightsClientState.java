@@ -2080,21 +2080,37 @@ public final class WrightsClientState {
      * Stairs down: descending steps under the floor ahead.
      */
     public static java.util.List<BlockPos> placePathCells(Player player) {
-        Direction forward = player.getDirection();
+        return placePathCells(
+                player.blockPosition(),
+                player.getDirection(),
+                Math.max(1, WrightsClientConfig.placeBridgeOffset()),
+                Math.max(1, WrightsClientConfig.placeBridgeWidth()),
+                WrightsClientConfig.placeStairsStyle(),
+                WrightsClientConfig.placeStairsUp());
+    }
+
+    /**
+     * Path cells for Bridge / Stairs from an arbitrary feet position (menu preview uses
+     * {@link BlockPos#ZERO} + south so the miniature matches in-world geometry).
+     */
+    public static java.util.List<BlockPos> placePathCells(
+            BlockPos feet,
+            Direction forward,
+            int offset,
+            int width,
+            boolean stairs,
+            boolean up) {
         Direction side = forward.getClockWise();
-        int offset = Math.max(1, WrightsClientConfig.placeBridgeOffset());
-        int width = Math.max(1, WrightsClientConfig.placeBridgeWidth());
-        int sideStart = -(width - 1) / 2;
-        BlockPos feet = player.blockPosition();
-        boolean stairs = WrightsClientConfig.placeStairsStyle();
-        boolean up = WrightsClientConfig.placeStairsUp();
-        java.util.ArrayList<BlockPos> cells = new java.util.ArrayList<>(offset * width);
-        for (int d = 1; d <= offset; d++) {
+        int length = Math.max(1, offset);
+        int span = Math.max(1, width);
+        int sideStart = -(span - 1) / 2;
+        java.util.ArrayList<BlockPos> cells = new java.util.ArrayList<>(length * span);
+        for (int d = 1; d <= length; d++) {
             BlockPos ahead = feet.relative(forward, d);
             BlockPos center = stairs
                     ? (up ? ahead.above(d - 1) : ahead.below(d + 1))
                     : ahead.below();
-            for (int s = 0; s < width; s++) {
+            for (int s = 0; s < span; s++) {
                 cells.add(center.relative(side, sideStart + s));
             }
         }
