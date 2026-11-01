@@ -33,8 +33,17 @@ public class ShapeLookSnapScreen extends Screen {
 
     @Override
     protected void init() {
-        // Left: XYZ. Right: Clear / Cancel / Confirm stacked top-to-bottom on the same rows.
-        panelW = WrightsUi.fitW(236, this.width);
+        // Left: X/Y/Z label, − value +, gap, then Clear / Cancel / Confirm (text-sized).
+        int stepW = 14;
+        int fieldW = 48;
+        int labelW = 10;
+        int colGap = 8;
+        Component clear = Component.translatable("screen.wrights.shape_look_snap_clear");
+        Component cancel = Component.translatable("screen.wrights.cancel");
+        Component confirm = Component.translatable("screen.wrights.confirm");
+        int actionW = Math.max(this.font.width(clear), Math.max(this.font.width(cancel), this.font.width(confirm))) + 12;
+        int contentW = PAD + labelW + 2 + stepW + 2 + fieldW + 2 + stepW + colGap + actionW + PAD;
+        panelW = WrightsUi.fitW(contentW, this.width);
         panelH = PAD + 12 + GAP + ROW * 3 + GAP * 2 + PAD;
         panelH = WrightsUi.fitH(panelH, this.height);
         panelX = WrightsUi.centerX(panelW, this.width);
@@ -55,36 +64,24 @@ public class ShapeLookSnapScreen extends Screen {
         int row0 = panelY + PAD + 12 + GAP;
         int row1 = row0 + ROW + GAP;
         int row2 = row1 + ROW + GAP;
-        int fieldX = panelX + 22;
-        int fieldW = 48;
+        int minusX = panelX + PAD + labelW + 2;
+        int fieldX = minusX + stepW + 2;
         int plusX = fieldX + fieldW + 2;
-        int actionX = plusX + 16 + 6;
-        int actionW = panelX + panelW - PAD - actionX;
+        int actionX = plusX + stepW + colGap;
 
         xBox = number(fieldX, row0, fieldW);
         yBox = number(fieldX, row1, fieldW);
         zBox = number(fieldX, row2, fieldW);
-        step(panelX + 8, row0, "-", () -> nudge(-1, 0, 0));
+        step(minusX, row0, "-", () -> nudge(-1, 0, 0));
         step(plusX, row0, "+", () -> nudge(1, 0, 0));
-        step(panelX + 8, row1, "-", () -> nudge(0, -1, 0));
+        step(minusX, row1, "-", () -> nudge(0, -1, 0));
         step(plusX, row1, "+", () -> nudge(0, 1, 0));
-        step(panelX + 8, row2, "-", () -> nudge(0, 0, -1));
+        step(minusX, row2, "-", () -> nudge(0, 0, -1));
         step(plusX, row2, "+", () -> nudge(0, 0, 1));
 
-        addRenderableWidget(new WrightsButton(
-                actionX, row0, actionW, ROW,
-                Component.translatable("screen.wrights.shape_look_snap_clear"),
-                button -> clearSnap(),
-                true));
-        addRenderableWidget(new WrightsButton(
-                actionX, row1, actionW, ROW,
-                Component.translatable("screen.wrights.cancel"),
-                button -> cancel(),
-                true));
-        addRenderableWidget(new WrightsButton(
-                actionX, row2, actionW, ROW,
-                Component.translatable("screen.wrights.confirm"),
-                button -> confirm()));
+        addRenderableWidget(new WrightsButton(actionX, row0, actionW, ROW, clear, button -> clearSnap(), true));
+        addRenderableWidget(new WrightsButton(actionX, row1, actionW, ROW, cancel, button -> cancel(), true));
+        addRenderableWidget(new WrightsButton(actionX, row2, actionW, ROW, confirm, button -> confirm()));
 
         suppress = true;
         set(xBox, original.getX());
@@ -125,9 +122,9 @@ public class ShapeLookSnapScreen extends Screen {
         int row0 = panelY + PAD + 12 + GAP;
         int row1 = row0 + ROW + GAP;
         int row2 = row1 + ROW + GAP;
-        graphics.drawString(this.font, "X", panelX + PAD + 2, row0 + 3, WrightsUi.MUTED, false);
-        graphics.drawString(this.font, "Y", panelX + PAD + 2, row1 + 3, WrightsUi.MUTED, false);
-        graphics.drawString(this.font, "Z", panelX + PAD + 2, row2 + 3, WrightsUi.MUTED, false);
+        graphics.drawString(this.font, "X", panelX + PAD, row0 + 3, WrightsUi.MUTED, false);
+        graphics.drawString(this.font, "Y", panelX + PAD, row1 + 3, WrightsUi.MUTED, false);
+        graphics.drawString(this.font, "Z", panelX + PAD, row2 + 3, WrightsUi.MUTED, false);
         if (tip != null) {
             graphics.renderTooltip(this.font, this.font.split(tip, 220), mouseX, mouseY);
         }
