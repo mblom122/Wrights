@@ -1060,9 +1060,10 @@ public class WrightsMenuScreen extends Screen {
         int controls = optionControlsX(x);
         int local = 2;
         hologramHeadY = optionY(local);
-        optionPreviewX = x + 220;
+        // Keep the hologram sample clear of the color swatches on the left.
+        optionPreviewX = optionViewX + optionViewW - 16 - 48;
         optionPreviewY = optionY(local);
-        local = 22;
+        local = 34;
         wallSwatchY = optionY(local - 2);
         local += 20;
         int sliderW = Mth.clamp(optionViewX + optionViewW - 18 - controls - 42, 48, 120);
