@@ -665,7 +665,26 @@ final class ShapeMenuPanel {
             return;
         }
         previewYaw += 0.35F;
-        BlueprintModelView.render(graphics, x + 1, y + 1, width - 2, height - 2, previewGhosts, previewSizeX, previewSizeY, previewSizeZ, previewYaw, 28.0F);
+        net.minecraft.core.BlockPos pin = Shapes.pivotBlock(
+                BlockPos.ZERO,
+                new BlockPos(Math.max(0, previewSizeX - 1), Math.max(0, previewSizeY - 1), Math.max(0, previewSizeZ - 1)),
+                WrightsClientConfig.SHAPE_PIVOT.get());
+        BlueprintModelView.render(
+                graphics,
+                x + 1,
+                y + 1,
+                width - 2,
+                height - 2,
+                previewGhosts,
+                previewSizeX,
+                previewSizeY,
+                previewSizeZ,
+                previewYaw,
+                28.0F,
+                true,
+                pin.getX(),
+                pin.getY(),
+                pin.getZ());
     }
 
     private void refreshShapePreview() {

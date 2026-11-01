@@ -43,6 +43,29 @@ public final class BlueprintModelView {
     }
 
     public static void render(GuiGraphics graphics, int x, int y, int width, int height, List<WrightsClientState.Ghost> ghosts, int sizeX, int sizeY, int sizeZ, float yaw, float pitch) {
+        render(graphics, x, y, width, height, ghosts, sizeX, sizeY, sizeZ, yaw, pitch, false, 0, 0, 0);
+    }
+
+    /**
+     * @param showFrame when true, draws the AABB wireframe and a marker at the pivot block
+     * @param pivotX pivot block coords relative to the preview origin (0..size-1)
+     */
+    public static void render(
+            GuiGraphics graphics,
+            int x,
+            int y,
+            int width,
+            int height,
+            List<WrightsClientState.Ghost> ghosts,
+            int sizeX,
+            int sizeY,
+            int sizeZ,
+            float yaw,
+            float pitch,
+            boolean showFrame,
+            int pivotX,
+            int pivotY,
+            int pivotZ) {
         if (ghosts == null || ghosts.isEmpty() || width < 8 || height < 8) {
             return;
         }
@@ -63,9 +86,96 @@ public final class BlueprintModelView {
         Matrix4f projection = new Matrix4f(RenderSystem.getProjectionMatrix());
         RenderSystem.enableDepthTest();
         mesh.draw(modelView, projection);
+        if (showFrame) {
+            drawFrameAndPivot(pose, sizeX, sizeY, sizeZ, pivotX, pivotY, pivotZ);
+        }
         RenderSystem.disableDepthTest();
         pose.popPose();
         graphics.disableScissor();
+    }
+
+    /** Thin AABB around the preview blocks, plus a copper cross at the chosen pivot cell. */
+    private static void drawFrameAndPivot(PoseStack pose, int sizeX, int sizeY, int sizeZ, int pivotX, int pivotY, int pivotZ) {
+        MultiBufferSource.BufferSource buffers = Minecraft.getInstance().renderBuffers().bufferSource();
+        VertexConsumer lines = buffers.getBuffer(RenderType.lines());
+        float pad = 0.02F;
+        float x0 = -pad;
+        float y0 = -pad;
+        float z0 = -pad;
+        float x1 = sizeX + pad;
+        float y1 = sizeY + pad;
+        float z1 = sizeZ + pad;
+        // Soft steel frame around the shape box.
+        boxEdges(pose, lines, x0, y0, z0, x1, y1, z1, 0.55F, 0.72F, 0.86F, 0.9F);
+        int px = Math.max(0, Math.min(sizeX - 1, pivotX));
+        int py = Math.max(0, Math.min(sizeY - 1, pivotY));
+        int pz = Math.max(0, Math.min(sizeZ - 1, pivotZ));
+        float cx = px + 0.5F;
+        float cy = py + 0.5F;
+        float cz = pz + 0.5F;
+        float arm = 0.42F;
+        // Pivot marker — copper cross through the pin cell.
+        line(pose, lines, cx - arm, cy, cz, cx + arm, cy, cz, 0.91F, 0.55F, 0.23F, 1.0F);
+        line(pose, lines, cx, cy - arm, cz, cx, cy + arm, cz, 0.91F, 0.55F, 0.23F, 1.0F);
+        line(pose, lines, cx, cy, cz - arm, cx, cy, cz + arm, 0.91F, 0.55F, 0.23F, 1.0F);
+        float box = 0.18F;
+        boxEdges(pose, lines, cx - box, cy - box, cz - box, cx + box, cy + box, cz + box, 0.98F, 0.78F, 0.35F, 1.0F);
+        buffers.endBatch(RenderType.lines());
+    }
+
+    private static void boxEdges(
+            PoseStack pose,
+            VertexConsumer lines,
+            float x0,
+            float y0,
+            float z0,
+            float x1,
+            float y1,
+            float z1,
+            float red,
+            float green,
+            float blue,
+            float alpha) {
+        line(pose, lines, x0, y0, z0, x1, y0, z0, red, green, blue, alpha);
+        line(pose, lines, x1, y0, z0, x1, y0, z1, red, green, blue, alpha);
+        line(pose, lines, x1, y0, z1, x0, y0, z1, red, green, blue, alpha);
+        line(pose, lines, x0, y0, z1, x0, y0, z0, red, green, blue, alpha);
+        line(pose, lines, x0, y1, z0, x1, y1, z0, red, green, blue, alpha);
+        line(pose, lines, x1, y1, z0, x1, y1, z1, red, green, blue, alpha);
+        line(pose, lines, x1, y1, z1, x0, y1, z1, red, green, blue, alpha);
+        line(pose, lines, x0, y1, z1, x0, y1, z0, red, green, blue, alpha);
+        line(pose, lines, x0, y0, z0, x0, y1, z0, red, green, blue, alpha);
+        line(pose, lines, x1, y0, z0, x1, y1, z0, red, green, blue, alpha);
+        line(pose, lines, x1, y0, z1, x1, y1, z1, red, green, blue, alpha);
+        line(pose, lines, x0, y0, z1, x0, y1, z1, red, green, blue, alpha);
+    }
+
+    private static void line(
+            PoseStack pose,
+            VertexConsumer lines,
+            float x1,
+            float y1,
+            float z1,
+            float x2,
+            float y2,
+            float z2,
+            float red,
+            float green,
+            float blue,
+            float alpha) {
+        float dx = x2 - x1;
+        float dy = y2 - y1;
+        float dz = z2 - z1;
+        float length = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (length < 1.0E-4F) {
+            return;
+        }
+        dx /= length;
+        dy /= length;
+        dz /= length;
+        PoseStack.Pose last = pose.last();
+        lines.addVertex(last, x1, y1, z1).setColor(red, green, blue, alpha).setNormal(last, dx, dy, dz);
+        lines.addVertex(last, x2, y2, z2).setColor(red, green, blue, alpha).setNormal(last, dx, dy, dz);
     }
 
     /** Every block stays on its real coordinate. The mesh is built once so turning it stays cheap. */
