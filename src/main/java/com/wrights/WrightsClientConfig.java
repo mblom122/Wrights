@@ -163,8 +163,8 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.IntValue HUD_TOAST_Y = BUILDER
             .defineInRange("hudToastY", 80, 0, 1000);
     public static final ModConfigSpec.IntValue HUD_MODE = BUILDER
-            .comment("Where Ctrl/Shift mode menus sit. 0 top, 1 above hotbar, 2 left, 3 right (default, above hotbar), 4 middle, 5 dragged.")
-            .defineInRange("hudMode", 3, 0, 5);
+            .comment("Where Ctrl/Shift mode menus sit. 0 top, 1 above hotbar, 2 left of hotbar (default: menu's right edge meets the hotbar), 3 right of hotbar, 4 middle, 5 dragged.")
+            .defineInRange("hudMode", 2, 0, 5);
     public static final ModConfigSpec.IntValue HUD_MODE_X = BUILDER
             .defineInRange("hudModeX", 900, 0, 1000);
     public static final ModConfigSpec.IntValue HUD_MODE_Y = BUILDER

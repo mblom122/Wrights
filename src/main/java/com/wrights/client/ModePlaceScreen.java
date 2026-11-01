@@ -47,7 +47,7 @@ public class ModePlaceScreen extends Screen {
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         graphics.fill(0, 0, this.width, this.height, 0x88060C14);
-        int barW = Math.min(182, this.width - 16);
+        int barW = Math.min(HudAnchor.HOTBAR_WIDTH, this.width - 16);
         int barX = (this.width - barW) / 2;
         int barY = this.height - 22;
         graphics.fill(barX, barY, barX + barW, barY + 20, 0xCC101820);

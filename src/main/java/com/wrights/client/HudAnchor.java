@@ -14,8 +14,22 @@ public final class HudAnchor {
     public static final int CUSTOM = 5;
     /** Leaves the vanilla action-bar text and the hotbar clear. */
     public static final int HOTBAR_CLEARANCE = 70;
+    /** Vanilla hotbar width; used to park Ctrl/Shift menus beside it. */
+    public static final int HOTBAR_WIDTH = 182;
+    /** Gap between the mode menu and the hotbar edge. */
+    public static final int HOTBAR_GAP = 4;
 
     private HudAnchor() {
+    }
+
+    /** Left edge of the centered vanilla hotbar. */
+    public static int hotbarLeft(int screen) {
+        return (screen - HOTBAR_WIDTH) / 2;
+    }
+
+    /** Right edge of the centered vanilla hotbar. */
+    public static int hotbarRight(int screen) {
+        return hotbarLeft(screen) + HOTBAR_WIDTH;
     }
 
     public static int hintSpot() {
@@ -66,12 +80,23 @@ public final class HudAnchor {
         return Mth.clamp(WrightsClientConfig.HUD_MODE.get(), TOP, CUSTOM);
     }
 
+    /**
+     * Left/Right park beside the hotbar: Left ends just left of it, Right starts just right of
+     * it, both clear of the centered action-bar text. Other spots match hint/toast placement.
+     */
     public static int modeX(int screen, int size) {
-        return x(modeSpot(), WrightsClientConfig.HUD_MODE_X.get(), screen, size);
+        int spot = modeSpot();
+        int raw = switch (spot) {
+            case LEFT -> hotbarLeft(screen) - HOTBAR_GAP - size;
+            case RIGHT -> hotbarRight(screen) + HOTBAR_GAP;
+            case CUSTOM -> WrightsClientConfig.HUD_MODE_X.get() * screen / 1000 - size / 2;
+            default -> (screen - size) / 2;
+        };
+        return Mth.clamp(raw, 2, Math.max(2, screen - size - 2));
     }
 
     /**
-     * Left/right sit above the hotbar on that side so Shift/Ctrl menus clear the action bar.
+     * Left/right sit above the hotbar so Shift/Ctrl menus clear the action-bar text.
      * Other spots match hint/toast placement.
      */
     public static int modeY(int screen, int size) {
