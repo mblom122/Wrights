@@ -836,6 +836,14 @@ public final class WrightsClientState {
     }
 
     public static void enterManage() {
+        if (dockWaiting()) {
+            Minecraft minecraft = Minecraft.getInstance();
+            if (minecraft.player != null) {
+                minecraft.player.displayClientMessage(
+                        net.minecraft.network.chat.Component.translatable("message.wrights.dock_wait_busy"), true);
+            }
+            return;
+        }
         leaveCapture();
         mode = Mode.MANAGE;
         clearBuildAims();
@@ -1387,6 +1395,32 @@ public final class WrightsClientState {
             return;
         }
         dockNotice = new DockNotice(toast);
+    }
+
+    /** Manage-add fly-ins still in the air. Manage stays closed until this hits zero. */
+    public static int dockWaitRemaining;
+
+    public static boolean dockWaiting() {
+        return dockWaitRemaining > 0;
+    }
+
+    public static void dockWait(int remaining) {
+        int next = Math.max(0, remaining);
+        boolean started = next > 0 && dockWaitRemaining <= 0;
+        dockWaitRemaining = next;
+        if (next <= 0) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.screen instanceof WrightsMenuScreen || minecraft.screen instanceof WrightportScreen) {
+            minecraft.setScreen(null);
+        }
+        if (started && minecraft.player != null) {
+            // Keep the controller out of Manage so reopening the menu does not jump back there mid-dock.
+            if (mode == Mode.MANAGE) {
+                enterJobs();
+            }
+        }
     }
 
     public static void applyDeploy() {

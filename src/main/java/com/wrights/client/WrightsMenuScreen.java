@@ -296,11 +296,19 @@ public class WrightsMenuScreen extends Screen {
             managePage = false;
             helpPage = false;
         } else if (WrightsClientState.mode == WrightsClientState.Mode.MANAGE) {
-            managePage = true;
-            jobsPage = false;
-            options = false;
-            infoPage = false;
-            helpPage = false;
+            if (WrightsClientState.dockWaiting()) {
+                managePage = false;
+                jobsPage = WrightsConfig.allowJobs();
+                options = !jobsPage;
+                infoPage = false;
+                helpPage = false;
+            } else {
+                managePage = true;
+                jobsPage = false;
+                options = false;
+                infoPage = false;
+                helpPage = false;
+            }
         } else if (WrightsClientState.mode == WrightsClientState.Mode.INFO
                 || WrightsClientState.mode == WrightsClientState.Mode.LINK) {
             infoPage = true;
@@ -2716,6 +2724,12 @@ public class WrightsMenuScreen extends Screen {
             return true;
         }
         if (button == 0 && hitTask(mouseX, mouseY, taskManageY())) {
+            if (WrightsClientState.dockWaiting()) {
+                if (this.minecraft != null && this.minecraft.player != null) {
+                    this.minecraft.player.displayClientMessage(Component.translatable("message.wrights.dock_wait_busy"), true);
+                }
+                return true;
+            }
             rememberStrip();
             options = false;
             jobsPage = false;

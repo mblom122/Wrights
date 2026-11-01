@@ -113,6 +113,7 @@ public final class BlueprintNetwork {
         registrar.playToClient(BlueprintPayloads.UndoPrompt.TYPE, BlueprintPayloads.UndoPrompt.STREAM_CODEC, BlueprintNetwork::clientUndoPrompt);
         registrar.playToClient(BlueprintPayloads.JobDone.TYPE, BlueprintPayloads.JobDone.STREAM_CODEC, BlueprintNetwork::clientJobDone);
         registrar.playToClient(BlueprintPayloads.DockToast.TYPE, BlueprintPayloads.DockToast.STREAM_CODEC, BlueprintNetwork::clientDockToast);
+        registrar.playToClient(BlueprintPayloads.DockWait.TYPE, BlueprintPayloads.DockWait.STREAM_CODEC, BlueprintNetwork::clientDockWait);
         registrar.playToClient(BlueprintPayloads.BlueprintItemList.TYPE, BlueprintPayloads.BlueprintItemList.STREAM_CODEC, BlueprintNetwork::clientBlueprintItems);
         registrar.playToClient(BlueprintPayloads.FolderItemList.TYPE, BlueprintPayloads.FolderItemList.STREAM_CODEC, BlueprintNetwork::clientFolderItems);
         registrar.playToClient(BlueprintPayloads.ClipboardOffer.TYPE, BlueprintPayloads.ClipboardOffer.STREAM_CODEC, BlueprintNetwork::clientClipboardOffer);
@@ -663,6 +664,13 @@ public final class BlueprintNetwork {
             return;
         }
         context.enqueueWork(() -> com.wrights.client.WrightsClientState.showDockToast(payload));
+    }
+
+    private static void clientDockWait(BlueprintPayloads.DockWait payload, IPayloadContext context) {
+        if (FMLEnvironment.dist != Dist.CLIENT) {
+            return;
+        }
+        context.enqueueWork(() -> com.wrights.client.WrightsClientState.dockWait(payload.remaining()));
     }
 
     public static void dockToast(ServerPlayer player, int docked, BlockPos dock, String port, int digital, BlockPos storage, int dropped, BlockPos ground) {

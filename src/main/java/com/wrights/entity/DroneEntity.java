@@ -49,6 +49,8 @@ public class DroneEntity extends Entity {
 
     private boolean returning;
     private boolean stranded;
+    /** Cosmetic Manage-add fly-in; not a job crew member. */
+    private boolean manageDock;
     private int returnTicks;
     private int returnLimit;
     private UUID ownerId;
@@ -179,6 +181,7 @@ public class DroneEntity extends Entity {
      */
     public void dockIn(ServerPlayer player, @Nullable BlockPos port, int slot, int count) {
         this.returning = true;
+        this.manageDock = true;
         this.returnTicks = 0;
         this.ownerId = player.getUUID();
         this.unitId = null;
@@ -235,6 +238,10 @@ public class DroneEntity extends Entity {
 
     @Override
     public void remove(RemovalReason reason) {
+        if (this.manageDock && this.ownerId != null && this.level() instanceof ServerLevel server) {
+            this.manageDock = false;
+            com.wrights.drone.HangarDock.arrived(server, this.ownerId, this.getUUID());
+        }
         if (reason.shouldDestroy() && this.unitId != null && this.level() instanceof ServerLevel) {
             com.wrights.job.JobManager.releaseReturn(this.unitId);
         }

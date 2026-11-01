@@ -37,6 +37,7 @@ public final class WrightsHud {
         if (minecraft.player == null || minecraft.options.hideGui) {
             return;
         }
+        drawDockWait(event.getGuiGraphics(), minecraft);
         drawJobNotices(event.getGuiGraphics(), minecraft);
         if (minecraft.screen != null || !com.wrights.item.ControllerItem.isHeld(minecraft.player)) {
             return;
@@ -689,6 +690,21 @@ public final class WrightsHud {
             return "hud.wrights.tool_bind";
         }
         return "hud.wrights.tool_build";
+    }
+
+    private static void drawDockWait(GuiGraphics graphics, Minecraft minecraft) {
+        int left = WrightsClientState.dockWaitRemaining;
+        if (left <= 0) {
+            return;
+        }
+        Component line = left == 1
+                ? Component.translatable("hud.wrights.dock_wait_one")
+                : Component.translatable("hud.wrights.dock_wait", left);
+        int width = minecraft.font.width(line);
+        int x = (minecraft.getWindow().getGuiScaledWidth() - width) / 2;
+        int y = minecraft.getWindow().getGuiScaledHeight() / 2 - 12;
+        graphics.fill(x - 8, y - 6, x + width + 8, y + 14, 0xAA060C14);
+        graphics.drawString(minecraft.font, line, x, y, 0xFFE8DCC8, false);
     }
 
     private static void drawJobNotices(GuiGraphics graphics, Minecraft minecraft) {

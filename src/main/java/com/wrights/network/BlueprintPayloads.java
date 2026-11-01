@@ -1004,6 +1004,19 @@ public final class BlueprintPayloads {
         }
     }
 
+    /** Remaining manage-add fly-ins still docking. Zero unlocks the Manage menu again. */
+    public record DockWait(int remaining) implements CustomPacketPayload {
+        public static final Type<DockWait> TYPE = payloadType("dock_wait");
+        public static final StreamCodec<RegistryFriendlyByteBuf, DockWait> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> buf.writeVarInt(value.remaining),
+                buf -> new DockWait(buf.readVarInt()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public record JobDone(Component name, Component detail, int seconds) implements CustomPacketPayload {
         public static final Type<JobDone> TYPE = payloadType("job_done");
         public static final StreamCodec<RegistryFriendlyByteBuf, JobDone> STREAM_CODEC = StreamCodec.of(

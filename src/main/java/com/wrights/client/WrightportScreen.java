@@ -37,6 +37,13 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         this.imageWidth = WrightsUi.fitW(368, this.width);
         this.imageHeight = WrightsUi.fitH(348, this.height);
         super.init();
+        if (WrightsClientState.dockWaiting()) {
+            if (getMinecraft().player != null) {
+                getMinecraft().player.displayClientMessage(Component.translatable("message.wrights.dock_wait_busy"), true);
+            }
+            onClose();
+            return;
+        }
         manage.setActive(true);
         clearWidgets();
         manage.addWidgets(this);
