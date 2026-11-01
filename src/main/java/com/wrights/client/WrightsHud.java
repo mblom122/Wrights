@@ -108,11 +108,12 @@ public final class WrightsHud {
             } else if (WrightsClientState.mirrorToolActive()) {
                 line = mirrorStatusLine();
                 sub = Component.translatable(mirrorFooter(minecraft));
-            } else if (WrightsClientState.buildId == null) {
-                line = Component.translatable("hud.wrights.pick_blueprint");
             } else if (WrightsClientState.bindSupply) {
+                // Must run before buildId == null — Bind inventory does not need a blueprint.
                 line = Component.translatable("hud.wrights.bind_explain");
                 sub = supplyChoice(minecraft);
+            } else if (WrightsClientState.buildId == null) {
+                line = Component.translatable("hud.wrights.pick_blueprint");
             } else {
                 line = Component.translatable("hud.wrights.build", WrightsClientState.buildName);
                 sub = Component.translatable(WrightsClientState.supplyBound ? "hud.wrights.build_chest" : "hud.wrights.build_inventory");
