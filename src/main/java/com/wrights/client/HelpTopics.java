@@ -115,7 +115,7 @@ public final class HelpTopics {
                     line("P", "help.wrights.bind.p1"),
                     line("H", "help.wrights.bind.h2"),
                     line("P", "help.wrights.bind.p2"),
-                    line("K", "Right-click|Ctrl+Shift+Right-click"),
+                    line("K", "Right-click|Shift+Right-click|Ctrl+Shift+Right-click"),
                     line("T", "help.wrights.bind.tip")
             };
             case "jobs" -> new Line[] {

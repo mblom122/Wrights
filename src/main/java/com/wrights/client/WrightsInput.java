@@ -379,7 +379,7 @@ public final class WrightsInput {
     /**
      * Shared controller chords:
      * Ctrl+right-click = set / clear that mode’s anchor,
-     * Shift+right-click = mode special action (second corner, Shape look/anchor tweak, …),
+     * Shift+right-click = mode special action (second corner, Shape look/anchor tweak, Bind menu, …),
      * Middle-click = pick the aimed block as Shape / Exchange material (like creative pick),
      * Ctrl+Shift+right-click = that mode’s options page (Shape / Exchange / Mirror / …),
      * Alt+right-click = undo last finished build.
@@ -452,8 +452,9 @@ public final class WrightsInput {
             return;
         }
         if (WrightsClientState.bindSupply) {
-            // Ctrl+Shift = bind menu. Plain = bind chest / clear air.
-            if (menuChord(player)) {
+            // Ctrl+Shift = bind options (same chord as Shape / Exchange).
+            // Shift = bind tweak menu (teleport / highlight / clear).
+            if (menuChord(player) || player.isShiftKeyDown()) {
                 Minecraft.getInstance().setScreen(new SupplyBindScreen());
                 return;
             }
