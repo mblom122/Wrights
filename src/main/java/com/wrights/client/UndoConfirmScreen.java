@@ -35,7 +35,7 @@ public class UndoConfirmScreen extends Screen {
         panelY = WrightsUi.centerY(panelH, this.height);
         int half = (panelW - 40) / 2;
         addRenderableWidget(new WrightsButton(panelX + 16, panelY + panelH - 36, half, 20, Component.translatable("screen.wrights.undo_confirm"), button -> confirm()));
-        addRenderableWidget(new WrightsButton(panelX + 24 + half, panelY + panelH - 36, panelW - 40 - half, 20, Component.translatable("menu.wrights.cancel_preview"), button -> onClose()));
+        addRenderableWidget(new WrightsButton(panelX + 24 + half, panelY + panelH - 36, panelW - 40 - half, 20, Component.translatable("screen.wrights.cancel"), button -> onClose()));
     }
 
     private void confirm() {

@@ -101,7 +101,6 @@ public class WrightsMenuScreen extends Screen {
     private WrightsButton renameButton;
     private WrightsButton discardButton;
     private WrightsButton resumeButton;
-    private WrightsButton previewButton;
     private WrightsButton materialsButton;
     private int detailSplit;
     private UUID modelAsked;
@@ -400,7 +399,6 @@ public class WrightsMenuScreen extends Screen {
         materialsButton = add(new WrightsButton(detailX + 4, detailSplit + 72, Math.max(40, detailW - 8), 16, Component.translatable("menu.wrights.materials"), button -> openMaterials()));
         discardButton = add(new WrightsButton(panelX + 14, panelY + panelH - 48, 92, 16, Component.translatable("menu.wrights.discard"), button -> discard()));
         resumeButton = add(new WrightsButton(panelX + 14, panelY + panelH - 68, 92, 16, Component.translatable("menu.wrights.resume"), button -> closeKeepingMode()));
-        previewButton = add(new WrightsButton(panelX + 14, panelY + panelH - 48, 92, 16, Component.translatable("menu.wrights.cancel_preview"), button -> cancelPreview()));
         wallPercent = percentBox(value -> WrightsClientConfig.setWallTransparency(value));
         edgePercent = percentBox(value -> WrightsClientConfig.setEdgeOpacity(value));
         ghostPercent = percentBox(value -> WrightsClientConfig.setGhostTransparency(value));
@@ -589,9 +587,6 @@ public class WrightsMenuScreen extends Screen {
         renameButton.visible = building;
         discardButton.visible = building && (capture || WrightsClientState.mode == WrightsClientState.Mode.SAVING);
         resumeButton.visible = building && capture;
-        if (previewButton != null) {
-            previewButton.visible = building && WrightsClientState.mode == WrightsClientState.Mode.BUILD;
-        }
         if (newButton != null) {
             newButton.active = tool;
         }
@@ -605,13 +600,7 @@ public class WrightsMenuScreen extends Screen {
         if (resumeButton != null) {
             resumeButton.active = tool;
         }
-        if (previewButton != null) {
-            previewButton.active = tool;
-        }
         syncDetailScrollLayout(building, blueprint && marked.size() <= 1);
-        if (previewButton.visible) {
-            discardButton.visible = false;
-        }
         placeModeButtons(building);
         boolean showOptions = options;
         wallPercent.visible = showOptions;
@@ -673,9 +662,6 @@ public class WrightsMenuScreen extends Screen {
             }
             discardButton.visible = false;
             resumeButton.visible = false;
-            if (previewButton != null) {
-                previewButton.visible = false;
-            }
             wallPercent.visible = false;
             edgePercent.visible = false;
             ghostPercent.visible = false;
@@ -3105,11 +3091,14 @@ public class WrightsMenuScreen extends Screen {
     }
 
     /**
-     * Cancel place / Resume / Discard sit in the detail footer — never on the left task strip,
+     * Capture Resume / Discard sit in the detail footer — never on the left task strip,
      * where a short panel (large GUI scale) would overlap Info/Options.
      */
     private void placeModeButtons(boolean building) {
         if (!building) {
+            return;
+        }
+        if ((resumeButton == null || !resumeButton.visible) && (discardButton == null || !discardButton.visible)) {
             return;
         }
         int footY = detailY + detailH - detailFooterH + 2;
@@ -3121,17 +3110,6 @@ public class WrightsMenuScreen extends Screen {
         int rightLimit = buildButton != null && buildButton.visible
                 ? buildButton.getX() - 4
                 : closeButton != null ? closeButton.getX() - 4 : detailX + detailW;
-        if (previewButton != null && previewButton.visible) {
-            int w = Math.max(52, this.font.width(previewButton.getMessage()) + 12);
-            if (left + w > rightLimit) {
-                left = Math.max(detailX + 4, rightLimit - w);
-            }
-            previewButton.setWidth(Math.min(w, Math.max(40, rightLimit - left)));
-            previewButton.setHeight(h);
-            previewButton.setX(left);
-            previewButton.setY(footY);
-            return;
-        }
         if (resumeButton != null && resumeButton.visible) {
             int w = Math.max(52, this.font.width(resumeButton.getMessage()) + 12);
             resumeButton.setWidth(Math.min(w, Math.max(40, rightLimit - left)));
@@ -4203,16 +4181,6 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private void discard() {
-        if (!requireTool()) {
-            return;
-        }
-        PacketDistributor.sendToServer(new BlueprintPayloads.CaptureCancel());
-        WrightsClientState.clearLocal();
-        WrightsClientState.forgetMode();
-        refresh();
-    }
-
-    private void cancelPreview() {
         if (!requireTool()) {
             return;
         }

@@ -258,7 +258,6 @@
   "menu.wrights.stop": "Stop",
   "menu.wrights.discard": "Discard",
   "menu.wrights.resume": "Resume",
-  "menu.wrights.cancel_preview": "Cancel place",
   "menu.wrights.blocks": "Box %s · %s blocks",
   "menu.wrights.size": "%s x %s x %s",
   "menu.wrights.busy": "Wright is working",
