@@ -30,6 +30,7 @@ final class ShapeMenuPanel {
     private static final int SLIDER_THICKNESS = 3;
     private static final int SLIDER_BRIDGE = 4;
     private static final int SLIDER_PATH_WIDTH = 5;
+    private static final int SLIDER_PATH_HEIGHT = 6;
 
     private final Font font;
     private Screen host;
@@ -49,6 +50,7 @@ final class ShapeMenuPanel {
     private int thicknessY = -1;
     private int bridgeY = -1;
     private int pathWidthY = -1;
+    private int pathHeightY = -1;
     /** Left edge of the slider track (between − and +). */
     private int sizeTrackX;
     private int sizeW;
@@ -62,6 +64,8 @@ final class ShapeMenuPanel {
     private int bridgeValueW;
     private int pathWidthValueX;
     private int pathWidthValueW;
+    private int pathHeightValueX;
+    private int pathHeightValueW;
     /** 0 = none, otherwise {@link #SLIDER_SIZE} / {@link #SLIDER_HEIGHT} / {@link #SLIDER_THICKNESS}. */
     private int draggingSlider;
     private int editingSlider;
@@ -172,10 +176,12 @@ final class ShapeMenuPanel {
         thicknessY = -1;
         bridgeY = -1;
         pathWidthY = -1;
+        pathHeightY = -1;
         heightValueX = heightValueW = 0;
         thicknessValueX = thicknessValueW = 0;
         bridgeValueX = bridgeValueW = 0;
         pathWidthValueX = pathWidthValueW = 0;
+        pathHeightValueX = pathHeightValueW = 0;
         // Pillar / Beam: only the run length is editable (1-block thick otherwise).
         if (exchangeLine) {
             boolean pillar = exchangeForm == Shapes.ExchangeForm.PILLAR;
@@ -269,12 +275,23 @@ final class ShapeMenuPanel {
                 drawDimSlider(graphics, mouseX, mouseY, x, y, leftW,
                         WrightsClientConfig.placeBridgeOffset(), SLIDER_BRIDGE);
                 y += 18;
+            }
+            if (WrightsClientConfig.placePathStyle() || WrightsClientConfig.placeStyle() == 1) {
                 drawField(graphics, mouseX, mouseY, x, y,
                         "menu.wrights.place_bridge_width", "menu.wrights.place_bridge_width_hint");
                 y += 12;
                 pathWidthY = y;
                 drawDimSlider(graphics, mouseX, mouseY, x, y, leftW,
                         WrightsClientConfig.placeBridgeWidth(), SLIDER_PATH_WIDTH);
+                y += 18;
+            }
+            if (WrightsClientConfig.placeStyle() == 1) {
+                drawField(graphics, mouseX, mouseY, x, y,
+                        "menu.wrights.place_to_me_height", "menu.wrights.place_to_me_height_hint");
+                y += 12;
+                pathHeightY = y;
+                drawDimSlider(graphics, mouseX, mouseY, x, y, leftW,
+                        WrightsClientConfig.placeToMeHeight(), SLIDER_PATH_HEIGHT);
                 y += 18;
             }
             if (WrightsClientConfig.placeStyle() == 3) {
@@ -413,6 +430,10 @@ final class ShapeMenuPanel {
             beginEdit(SLIDER_PATH_WIDTH);
             return true;
         }
+        if (hitValue(SLIDER_PATH_HEIGHT, mouseX, mouseY)) {
+            beginEdit(SLIDER_PATH_HEIGHT);
+            return true;
+        }
         if (sizeY >= 0 && mouseY >= sizeY && mouseY < sizeY + 12 && mouseX >= sizeTrackX && mouseX < sizeTrackX + sizeW) {
             draggingSlider = SLIDER_SIZE;
             WrightsClientConfig.setShapeSize(sliderAt(mouseX, axisMax()));
@@ -436,6 +457,11 @@ final class ShapeMenuPanel {
         if (pathWidthY >= 0 && mouseY >= pathWidthY && mouseY < pathWidthY + 12 && mouseX >= sizeTrackX && mouseX < sizeTrackX + sizeW) {
             draggingSlider = SLIDER_PATH_WIDTH;
             WrightsClientConfig.setPlaceBridgeWidth(sliderAt(mouseX, 12));
+            return true;
+        }
+        if (pathHeightY >= 0 && mouseY >= pathHeightY && mouseY < pathHeightY + 12 && mouseX >= sizeTrackX && mouseX < sizeTrackX + sizeW) {
+            draggingSlider = SLIDER_PATH_HEIGHT;
+            WrightsClientConfig.setPlaceToMeHeight(sliderAt(mouseX, 12));
             return true;
         }
         for (Hit hit : hits) {
@@ -466,6 +492,10 @@ final class ShapeMenuPanel {
         }
         if (draggingSlider == SLIDER_PATH_WIDTH) {
             WrightsClientConfig.setPlaceBridgeWidth(sliderAt(mouseX, 12));
+            return true;
+        }
+        if (draggingSlider == SLIDER_PATH_HEIGHT) {
+            WrightsClientConfig.setPlaceToMeHeight(sliderAt(mouseX, 12));
             return true;
         }
         if (!previewSpinning) {
@@ -551,7 +581,7 @@ final class ShapeMenuPanel {
             cancelEdit();
             return;
         }
-        int max = (slider == SLIDER_BRIDGE || slider == SLIDER_PATH_WIDTH) ? 12 : axisMax();
+        int max = (slider == SLIDER_BRIDGE || slider == SLIDER_PATH_WIDTH || slider == SLIDER_PATH_HEIGHT) ? 12 : axisMax();
         parsed = Mth.clamp(parsed, 1, max);
         switch (slider) {
             case SLIDER_SIZE -> WrightsClientConfig.setShapeSize(parsed);
@@ -559,6 +589,7 @@ final class ShapeMenuPanel {
             case SLIDER_THICKNESS -> WrightsClientConfig.setShapeThickness(parsed);
             case SLIDER_BRIDGE -> WrightsClientConfig.setPlaceBridgeOffset(parsed);
             case SLIDER_PATH_WIDTH -> WrightsClientConfig.setPlaceBridgeWidth(parsed);
+            case SLIDER_PATH_HEIGHT -> WrightsClientConfig.setPlaceToMeHeight(parsed);
             default -> {
             }
         }
@@ -571,6 +602,7 @@ final class ShapeMenuPanel {
             case SLIDER_THICKNESS -> WrightsClientConfig.SHAPE_THICKNESS.get();
             case SLIDER_BRIDGE -> WrightsClientConfig.placeBridgeOffset();
             case SLIDER_PATH_WIDTH -> WrightsClientConfig.placeBridgeWidth();
+            case SLIDER_PATH_HEIGHT -> WrightsClientConfig.placeToMeHeight();
             default -> WrightsClientConfig.SHAPE_SIZE.get();
         };
     }
@@ -638,6 +670,14 @@ final class ShapeMenuPanel {
                 x = pathWidthValueX;
                 y = pathWidthY;
                 w = pathWidthValueW;
+            }
+            case SLIDER_PATH_HEIGHT -> {
+                if (pathHeightY < 0 || pathHeightValueW <= 0) {
+                    return false;
+                }
+                x = pathHeightValueX;
+                y = pathHeightY;
+                w = pathHeightValueW;
             }
             default -> {
                 return false;
@@ -939,6 +979,14 @@ final class ShapeMenuPanel {
                 nudgeDim(SLIDER_PATH_WIDTH, -1);
                 yield true;
             }
+            case "path_height_up" -> {
+                nudgeDim(SLIDER_PATH_HEIGHT, 1);
+                yield true;
+            }
+            case "path_height_down" -> {
+                nudgeDim(SLIDER_PATH_HEIGHT, -1);
+                yield true;
+            }
             case "height_up" -> {
                 nudgeDim(SLIDER_HEIGHT, 1);
                 yield true;
@@ -967,6 +1015,7 @@ final class ShapeMenuPanel {
             case SLIDER_THICKNESS -> WrightsClientConfig.setShapeThickness(WrightsClientConfig.SHAPE_THICKNESS.get() + step);
             case SLIDER_BRIDGE -> WrightsClientConfig.setPlaceBridgeOffset(WrightsClientConfig.placeBridgeOffset() + step);
             case SLIDER_PATH_WIDTH -> WrightsClientConfig.setPlaceBridgeWidth(WrightsClientConfig.placeBridgeWidth() + step);
+            case SLIDER_PATH_HEIGHT -> WrightsClientConfig.setPlaceToMeHeight(WrightsClientConfig.placeToMeHeight() + step);
             default -> WrightsClientConfig.setShapeSize(WrightsClientConfig.SHAPE_SIZE.get() + step);
         }
     }
@@ -1648,13 +1697,14 @@ final class ShapeMenuPanel {
         int valueReserve = 36;
         sizeW = Math.max(28, leftW - stepW * 2 - gap * 2 - valueReserve);
         sizeTrackX = x + stepW + gap;
-        int max = (slider == SLIDER_BRIDGE || slider == SLIDER_PATH_WIDTH) ? 12 : axisMax();
+        int max = (slider == SLIDER_BRIDGE || slider == SLIDER_PATH_WIDTH || slider == SLIDER_PATH_HEIGHT) ? 12 : axisMax();
         int clamped = Mth.clamp(value, 1, max);
         String downId = switch (slider) {
             case SLIDER_HEIGHT -> "height_down";
             case SLIDER_THICKNESS -> "thickness_down";
             case SLIDER_BRIDGE -> "bridge_down";
             case SLIDER_PATH_WIDTH -> "path_width_down";
+            case SLIDER_PATH_HEIGHT -> "path_height_down";
             default -> "size_down";
         };
         String upId = switch (slider) {
@@ -1662,6 +1712,7 @@ final class ShapeMenuPanel {
             case SLIDER_THICKNESS -> "thickness_up";
             case SLIDER_BRIDGE -> "bridge_up";
             case SLIDER_PATH_WIDTH -> "path_width_up";
+            case SLIDER_PATH_HEIGHT -> "path_height_up";
             default -> "size_up";
         };
         drawMini(graphics, mouseX, mouseY, x, y - 1, stepW, "-", downId, 0, clamped > 1);
@@ -1702,6 +1753,10 @@ final class ShapeMenuPanel {
             case SLIDER_PATH_WIDTH -> {
                 pathWidthValueX = x - 2;
                 pathWidthValueW = w + 2;
+            }
+            case SLIDER_PATH_HEIGHT -> {
+                pathHeightValueX = x - 2;
+                pathHeightValueW = w + 2;
             }
             default -> {
             }

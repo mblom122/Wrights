@@ -43,6 +43,7 @@ public class PlaceTweakScreen extends Screen {
     private int styleRow2Y = -1;
     private int offsetY = -1;
     private int widthY = -1;
+    private int toMeHeightY = -1;
     private int stairsDirY = -1;
     private int matsLabelY = -1;
     private int matsRowY = -1;
@@ -71,6 +72,7 @@ public class PlaceTweakScreen extends Screen {
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_aim")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_bridge_offset")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_bridge_width")));
+        labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_to_me_height")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_stairs_dir")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.shape_materials")));
         int rowInner = labelW + 4 + stepW + 2 + fieldW + 2 + stepW;
@@ -83,13 +85,16 @@ public class PlaceTweakScreen extends Screen {
 
         boolean line = WrightsClientConfig.exchangeForm().line();
         boolean path = WrightsClientConfig.placePathStyle();
+        boolean toMe = WrightsClientConfig.placeStyle() == 1;
         boolean stairs = WrightsClientConfig.placeStyle() == 3;
         int rows = 1 // title
                 + (line ? 0 : 1) // size
                 + (line || WrightsClientConfig.exchangeKind().usesHeight() ? 1 : 0)
                 + 1 // aim label
                 + 2 // aim choices (2×2)
-                + (path ? 2 : 0) // offset + width
+                + (path ? 1 : 0) // offset
+                + (path || toMe ? 1 : 0) // width (Bridge/Stairs/To me)
+                + (toMe ? 1 : 0) // To me height
                 + (stairs ? 1 : 0) // up/down
                 + 1 // materials label
                 + 1 // icons
@@ -105,7 +110,7 @@ public class PlaceTweakScreen extends Screen {
         int plusX = valueX + fieldW + 2;
         int y = panelY + PAD + 12 + GAP;
 
-        sizeY = alongY = styleLabelY = styleChoicesY = styleRow2Y = offsetY = widthY = stairsDirY = matsLabelY = matsRowY = -1;
+        sizeY = alongY = styleLabelY = styleChoicesY = styleRow2Y = offsetY = widthY = toMeHeightY = stairsDirY = matsLabelY = matsRowY = -1;
         if (!line) {
             sizeY = y;
             step(minusX, y, "-", () -> nudgeSize(-1));
@@ -130,9 +135,17 @@ public class PlaceTweakScreen extends Screen {
             step(minusX, y, "-", () -> nudgeOffset(-1));
             step(plusX, y, "+", () -> nudgeOffset(1));
             y += ROW + GAP;
+        }
+        if (path || toMe) {
             widthY = y;
             step(minusX, y, "-", () -> nudgeWidth(-1));
             step(plusX, y, "+", () -> nudgeWidth(1));
+            y += ROW + GAP;
+        }
+        if (toMe) {
+            toMeHeightY = y;
+            step(minusX, y, "-", () -> nudgeToMeHeight(-1));
+            step(plusX, y, "+", () -> nudgeToMeHeight(1));
             y += ROW + GAP;
         }
         if (stairs) {
@@ -212,6 +225,11 @@ public class PlaceTweakScreen extends Screen {
             graphics.drawString(this.font, Component.translatable("menu.wrights.place_bridge_width"),
                     panelX + PAD, widthY + 3, WrightsUi.MUTED, false);
             drawValue(graphics, widthY, WrightsClientConfig.placeBridgeWidth());
+        }
+        if (toMeHeightY >= 0) {
+            graphics.drawString(this.font, Component.translatable("menu.wrights.place_to_me_height"),
+                    panelX + PAD, toMeHeightY + 3, WrightsUi.MUTED, false);
+            drawValue(graphics, toMeHeightY, WrightsClientConfig.placeToMeHeight());
         }
         if (stairsDirY >= 0) {
             boolean up = WrightsClientConfig.placeStairsUp();
@@ -372,6 +390,11 @@ public class PlaceTweakScreen extends Screen {
     private void nudgeWidth(int dir) {
         int step = WrightsUi.nudgeStep() * dir;
         WrightsClientConfig.setPlaceBridgeWidth(WrightsClientConfig.placeBridgeWidth() + step);
+    }
+
+    private void nudgeToMeHeight(int dir) {
+        int step = WrightsUi.nudgeStep() * dir;
+        WrightsClientConfig.setPlaceToMeHeight(WrightsClientConfig.placeToMeHeight() + step);
     }
 
     private void openMaterialsPicker() {

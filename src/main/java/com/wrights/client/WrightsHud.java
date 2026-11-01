@@ -627,6 +627,15 @@ public final class WrightsHud {
         int style = WrightsClientConfig.placeStyle();
         int offset = WrightsClientConfig.placeBridgeOffset();
         int width = WrightsClientConfig.placeBridgeWidth();
+        if (style == 1) {
+            return Component.translatable(
+                    "hud.wrights.tool_place_to_me_status",
+                    name,
+                    exchangeDimText(form),
+                    aim,
+                    width,
+                    WrightsClientConfig.placeToMeHeight());
+        }
         if (style == 2) {
             return Component.translatable(
                     "hud.wrights.tool_place_bridge_status",

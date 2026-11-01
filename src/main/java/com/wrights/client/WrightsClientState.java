@@ -2104,22 +2104,40 @@ public final class WrightsClientState {
 
     /**
      * To me: from the aimed block, along the face axis, to the player's matching axis value.
-     * Other two coordinates stay on the aimed block — the line need not pass through the player.
+     * Width / height thicken a rectangular cross-section on the two axes perpendicular to that fill.
      */
     public static java.util.List<BlockPos> placeToMeCells(Player player, BlockPos aim, Direction face) {
         Direction.Axis axis = face.getAxis();
+        Direction.Axis widthAxis;
+        Direction.Axis heightAxis;
+        if (axis == Direction.Axis.Y) {
+            Direction forward = player.getDirection();
+            widthAxis = forward.getClockWise().getAxis();
+            heightAxis = forward.getAxis();
+        } else {
+            heightAxis = Direction.Axis.Y;
+            widthAxis = axis == Direction.Axis.X ? Direction.Axis.Z : Direction.Axis.X;
+        }
         int from = aim.get(axis);
         int to = player.blockPosition().get(axis);
         int step = Integer.compare(to, from);
         int max = WrightsConfig.maxShapeAxis();
+        int width = Math.max(1, WrightsClientConfig.placeBridgeWidth());
+        int height = Math.max(1, WrightsClientConfig.placeToMeHeight());
+        int widthStart = -(width - 1) / 2;
+        int heightStart = -(height - 1) / 2;
         java.util.ArrayList<BlockPos> cells = new java.util.ArrayList<>();
-        if (step == 0) {
-            cells.add(aim.immutable());
-            return cells;
-        }
-        int span = Math.abs(to - from);
+        int span = step == 0 ? 0 : Math.abs(to - from);
         for (int i = 0; i <= span && i < max; i++) {
-            cells.add(aim.relative(axis, i * step));
+            BlockPos along = step == 0 ? aim.immutable() : aim.relative(axis, i * step);
+            for (int w = 0; w < width; w++) {
+                for (int h = 0; h < height; h++) {
+                    cells.add(along.relative(widthAxis, widthStart + w).relative(heightAxis, heightStart + h));
+                }
+            }
+            if (step == 0) {
+                break;
+            }
         }
         return cells;
     }

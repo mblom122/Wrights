@@ -137,8 +137,11 @@ public final class WrightsClientConfig {
             .comment("Blocks in front of the player for Bridge / Stairs path modes. Max 12.")
             .defineInRange("placeBridgeOffset", 3, 1, 12);
     public static final ModConfigSpec.IntValue PLACE_BRIDGE_WIDTH = BUILDER
-            .comment("How wide Bridge / Stairs paths are (left–right across facing). Max 12.")
+            .comment("How wide Bridge / Stairs / To me paths are across the fill. Max 12.")
             .defineInRange("placeBridgeWidth", 1, 1, 12);
+    public static final ModConfigSpec.IntValue PLACE_TO_ME_HEIGHT = BUILDER
+            .comment("To me path: cross-section height (vertical when filling sideways). Max 12.")
+            .defineInRange("placeToMeHeight", 1, 1, 12);
     public static final ModConfigSpec.BooleanValue PLACE_STAIRS_UP = BUILDER
             .comment("Stairs path: true builds a step up ahead, false builds a step down.")
             .define("placeStairsUp", true);
@@ -710,6 +713,15 @@ public final class WrightsClientConfig {
 
     public static void setPlaceBridgeWidth(int width) {
         PLACE_BRIDGE_WIDTH.set(clamp(width, 1, 12));
+        save();
+    }
+
+    public static int placeToMeHeight() {
+        return PLACE_TO_ME_HEIGHT.get();
+    }
+
+    public static void setPlaceToMeHeight(int height) {
+        PLACE_TO_ME_HEIGHT.set(clamp(height, 1, 12));
         save();
     }
 
