@@ -15,9 +15,9 @@ import com.wrights.WrightsConfig;
 public final class Shapes {
     public enum Kind {
         CIRCLE(false, false),
-        RING(false, true),
+        RING(true, true),
         SQUARE(false, false),
-        LINE(false, true),
+        LINE(true, true),
         SPHERE(true, false),
         CUBE(true, true),
         CYLINDER(true, true),

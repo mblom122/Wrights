@@ -520,13 +520,17 @@ public final class WrightsInput {
             return;
         }
         if (control) {
-            // Shape tool: Ctrl+scroll tips flat/ring shapes onto the next plane (floor ↔ walls).
+            // Shape tool: Ctrl+scroll tips plane-based shapes onto the next plane (floor ↔ walls).
             if (WrightsClientState.shapeToolActive() && com.wrights.WrightsConfig.allowShape()) {
                 com.wrights.blueprint.Shapes.Kind kind =
                         com.wrights.blueprint.Shapes.Kind.byId(com.wrights.WrightsClientConfig.SHAPE_KIND.get());
                 boolean flatBox = kind == com.wrights.blueprint.Shapes.Kind.CUBE
                         && com.wrights.WrightsClientConfig.SHAPE_HEIGHT.get() <= 1;
-                if (!kind.volume() || flatBox) {
+                boolean planeShape = !kind.volume()
+                        || flatBox
+                        || kind == com.wrights.blueprint.Shapes.Kind.RING
+                        || kind == com.wrights.blueprint.Shapes.Kind.LINE;
+                if (planeShape) {
                     int plane = com.wrights.WrightsClientConfig.SHAPE_PLANE.get();
                     int next = event.getScrollDeltaY() > 0.0D
                             ? (plane + 1) % 3

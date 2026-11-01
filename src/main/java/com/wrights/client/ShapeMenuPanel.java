@@ -126,8 +126,8 @@ final class ShapeMenuPanel {
             graphics.drawString(font, Integer.toString(height), x + sizeW + 8, y, WrightsUi.TEXT, false);
             y += 18;
         }
-        // Flat shapes tip with Plane. Box at height 1 keeps Plane for the flat-square shortcut.
-        boolean showPlane = !volume || (box && WrightsClientConfig.SHAPE_HEIGHT.get() <= 1);
+        // Plane orients 2D shapes, ring/line beams, and the flat-square box shortcut (height 1).
+        boolean showPlane = !volume || ring || line || (box && WrightsClientConfig.SHAPE_HEIGHT.get() <= 1);
         if (showPlane) {
             drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_plane", "menu.wrights.shape_plane_hint");
             y += 12;
