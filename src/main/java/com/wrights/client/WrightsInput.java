@@ -699,13 +699,18 @@ public final class WrightsInput {
             openToolMenu();
             return;
         }
-        // Ctrl = set world anchor (and switch Look → On anchor). Air clears.
+        // Ctrl = set world anchor (and switch Look → On anchor). Air clears + Look mode.
         if (controlHeld()) {
             setShapeWorldAnchor(player, pos);
             return;
         }
-        // Shift = look-snap / world-anchor tweak menu.
+        // Shift+air = clear anchor and switch to Where I look.
+        // Shift+block = look-snap / world-anchor tweak menu.
         if (player.isShiftKeyDown()) {
+            if (aimingAtAir()) {
+                clearShapeAnchorToLook(player);
+                return;
+            }
             openShapeSpecialMenu(player);
             return;
         }
@@ -741,6 +746,20 @@ public final class WrightsInput {
         WrightsClientState.tryShape(false, pos, face);
     }
 
+    /** True when the crosshair is not on a block (Shift+air clear uses this). */
+    private static boolean aimingAtAir() {
+        BlockHitResult aim = WrightsClientState.lookHit();
+        return aim == null || aim.getType() != net.minecraft.world.phys.HitResult.Type.BLOCK;
+    }
+
+    /** Clear the shared world anchor and switch Shape / Exchange back to Where I look. */
+    private static void clearShapeAnchorToLook(net.minecraft.world.entity.player.Player player) {
+        com.wrights.WrightsClientConfig.clearShapeAnchor();
+        com.wrights.WrightsClientConfig.setShapeUseAnchor(false);
+        WrightsClientState.clearShapeLookSnap();
+        player.displayClientMessage(Component.translatable("message.wrights.shape_look_mode"), true);
+    }
+
     /** Ctrl+right-click: pin the shared shape/exchange world anchor and prefer On-anchor place. */
     private static void setShapeWorldAnchor(net.minecraft.world.entity.player.Player player, BlockPos clicked) {
         if (!com.wrights.WrightsConfig.allowShapeAnchor()) {
@@ -748,7 +767,12 @@ public final class WrightsInput {
             return;
         }
         BlockHitResult aim = WrightsClientState.lookHit();
-        BlockPos at = aim != null ? aim.getBlockPos() : clicked;
+        BlockPos at = aim != null && aim.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK
+                ? aim.getBlockPos()
+                : null;
+        if (at == null) {
+            at = clicked;
+        }
         if (at != null) {
             WrightsClientState.setShapeAnchor(at);
             com.wrights.WrightsClientConfig.setShapeUseAnchor(true);
@@ -758,8 +782,7 @@ public final class WrightsInput {
                     true);
             return;
         }
-        com.wrights.WrightsClientConfig.clearShapeAnchor();
-        player.displayClientMessage(Component.translatable("message.wrights.shape_cleared"), true);
+        clearShapeAnchorToLook(player);
     }
 
     private static void openShapeSpecialMenu(net.minecraft.world.entity.player.Player player) {
@@ -792,6 +815,16 @@ public final class WrightsInput {
         }
         if (controlHeld()) {
             setShapeWorldAnchor(player, pos);
+            return;
+        }
+        // Shift+air = clear anchor and switch to Where I look (same as Shape).
+        // Shift+block = look-snap / world-anchor tweak menu.
+        if (player.isShiftKeyDown()) {
+            if (aimingAtAir()) {
+                clearShapeAnchorToLook(player);
+                return;
+            }
+            openShapeSpecialMenu(player);
             return;
         }
         boolean lookMode = !com.wrights.WrightsClientConfig.SHAPE_USE_ANCHOR.get()
