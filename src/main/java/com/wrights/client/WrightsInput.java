@@ -523,12 +523,13 @@ public final class WrightsInput {
             return;
         }
         if (control) {
-            // Shape tool: Ctrl+scroll dials the four sides around the player (±90° relative to facing).
+            // Shape tool: Ctrl+scroll rotates 90° around the look/anchor pin (same as blueprints).
+            // Scroll up = clockwise so the AABB swings around the pin.
             if (WrightsClientState.shapeToolActive() && com.wrights.WrightsConfig.allowShape()) {
-                int yaw = com.wrights.WrightsClientConfig.shapeYawRelative();
+                int yaw = com.wrights.WrightsClientConfig.SHAPE_YAW.get();
                 int nextYaw = event.getScrollDeltaY() > 0.0D
-                        ? (yaw + 1) & 3
-                        : (yaw + 3) & 3;
+                        ? (yaw + 3) & 3
+                        : (yaw + 1) & 3;
                 com.wrights.WrightsClientConfig.setShapeYaw(nextYaw);
                 event.setCanceled(true);
                 return;

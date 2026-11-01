@@ -78,26 +78,6 @@ public final class Shapes {
         return Math.floorMod(yaw, 4);
     }
 
-    /**
-     * Quarter-turns so the shape’s default forward (local +Z / south) aims along {@code facing}.
-     * Vertical facing counts as south. Matches Ctrl+scroll dialing the four sides around the player.
-     */
-    public static int facingYaw(Direction facing) {
-        if (facing == null || facing.getAxis() == Direction.Axis.Y) {
-            return 0;
-        }
-        // get2DDataValue: S=0 W=1 N=2 E=3; we need S=0 E=1 N=2 W=3.
-        return Math.floorMod(-facing.get2DDataValue(), 4);
-    }
-
-    /**
-     * World yaw from a player-relative offset: 0 = toward facing, then +90° CW per step
-     * (the four sides around the player).
-     */
-    public static int worldYaw(Direction facing, int relative) {
-        return clampYaw(facingYaw(facing) + relative);
-    }
-
     /** World positions for one shape centered on {@code center}. */
     public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, boolean hollow, int axis) {
         return blocks(kind, center, size, height, 1, hollow, axis, 0);
