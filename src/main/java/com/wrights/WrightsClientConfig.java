@@ -201,6 +201,44 @@ public final class WrightsClientConfig {
             .defineInRange("mirrorZ", 0, -30000000, 30000000);
     public static final ModConfigSpec.ConfigValue<String> MIRROR_DIM = BUILDER
             .define("mirrorDim", "");
+    public static final ModConfigSpec.IntValue SHAPE_KIND = BUILDER
+            .comment("0 circle, 1 ring, 2 square, 3 line, 4 sphere, 5 cube, 6 cylinder, 7 dome, 8 pyramid.")
+            .defineInRange("shapeKind", 0, 0, 8);
+    public static final ModConfigSpec.IntValue SHAPE_SIZE = BUILDER
+            .comment("Radius or half-width of the shape.")
+            .defineInRange("shapeSize", 4, 1, 64);
+    public static final ModConfigSpec.IntValue SHAPE_HEIGHT = BUILDER
+            .comment("Height for cylinders and pyramids.")
+            .defineInRange("shapeHeight", 6, 1, 64);
+    public static final ModConfigSpec.IntValue SHAPE_PLANE = BUILDER
+            .comment("Flat-shape plane. 0 XZ, 1 XY, 2 YZ.")
+            .defineInRange("shapePlane", 0, 0, 2);
+    public static final ModConfigSpec.BooleanValue SHAPE_HOLLOW = BUILDER
+            .define("shapeHollow", false);
+    public static final ModConfigSpec.BooleanValue SHAPE_RANDOMIZE = BUILDER
+            .comment("When true, each block is picked at random from block items on the action bar.")
+            .define("shapeRandomize", false);
+    public static final ModConfigSpec.BooleanValue SHAPE_USE_ANCHOR = BUILDER
+            .comment("When true, builds on the shape anchor. When false, builds where you look.")
+            .define("shapeUseAnchor", false);
+    public static final ModConfigSpec.BooleanValue SHAPE_REPLACE = BUILDER
+            .define("shapeReplace", false);
+    public static final ModConfigSpec.BooleanValue SHAPE_VOID = BUILDER
+            .comment("When true, clears mismatched blocks inside the shape before placing.")
+            .define("shapeVoid", false);
+    public static final ModConfigSpec.BooleanValue SHAPE_SET = BUILDER
+            .define("shapeSet", false);
+    public static final ModConfigSpec.IntValue SHAPE_X = BUILDER
+            .defineInRange("shapeX", 0, -30000000, 30000000);
+    public static final ModConfigSpec.IntValue SHAPE_Y = BUILDER
+            .defineInRange("shapeY", 0, -30000000, 30000000);
+    public static final ModConfigSpec.IntValue SHAPE_Z = BUILDER
+            .defineInRange("shapeZ", 0, -30000000, 30000000);
+    public static final ModConfigSpec.ConfigValue<String> SHAPE_DIM = BUILDER
+            .define("shapeDim", "");
+    public static final ModConfigSpec.ConfigValue<String> SHAPE_SUPPLY = BUILDER
+            .comment("Priority list for shape materials. 0 main, 1 offhand, 2 action bar, 3 inventory, 4 bound chest, 5 digital.")
+            .define("shapeSupply", com.wrights.blueprint.ShapeSupply.DEFAULT_ORDER);
 
     static final ModConfigSpec SPEC = BUILDER.build();
 
@@ -700,6 +738,112 @@ public final class WrightsClientConfig {
     public static void clearMirror() {
         MIRROR_SET.set(false);
         save();
+    }
+
+    public static boolean shapePlaced(String dimension) {
+        return SHAPE_SET.get() && dimension != null && !dimension.isEmpty() && dimension.equals(SHAPE_DIM.get());
+    }
+
+    public static BlockPos shapeAnchor() {
+        return new BlockPos(SHAPE_X.get(), SHAPE_Y.get(), SHAPE_Z.get());
+    }
+
+    public static void setShapeAnchor(BlockPos pos, String dimension) {
+        SHAPE_SET.set(true);
+        SHAPE_X.set(pos.getX());
+        SHAPE_Y.set(pos.getY());
+        SHAPE_Z.set(pos.getZ());
+        SHAPE_DIM.set(dimension == null ? "" : dimension);
+        save();
+    }
+
+    public static void clearShapeAnchor() {
+        SHAPE_SET.set(false);
+        save();
+    }
+
+    public static void setShapeKind(int kind) {
+        SHAPE_KIND.set(clamp(kind, 0, 8));
+        save();
+    }
+
+    public static void setShapeSize(int size) {
+        SHAPE_SIZE.set(com.wrights.blueprint.Shapes.clampSize(size));
+        save();
+    }
+
+    public static void setShapeHeight(int height) {
+        SHAPE_HEIGHT.set(com.wrights.blueprint.Shapes.clampHeight(height));
+        save();
+    }
+
+    public static void setShapePlane(int plane) {
+        SHAPE_PLANE.set(com.wrights.blueprint.Shapes.clampPlane(plane));
+        save();
+    }
+
+    public static void setShapeHollow(boolean hollow) {
+        SHAPE_HOLLOW.set(hollow);
+        save();
+    }
+
+    public static void setShapeRandomize(boolean randomize) {
+        SHAPE_RANDOMIZE.set(randomize);
+        save();
+    }
+
+    public static void setShapeUseAnchor(boolean useAnchor) {
+        SHAPE_USE_ANCHOR.set(useAnchor);
+        save();
+    }
+
+    public static void setShapeReplace(boolean replace) {
+        SHAPE_REPLACE.set(replace);
+        save();
+    }
+
+    public static void setShapeVoid(boolean voiding) {
+        SHAPE_VOID.set(voiding);
+        save();
+    }
+
+    public static java.util.List<Integer> shapeSupplyOrder() {
+        return com.wrights.blueprint.ShapeSupply.parse(SHAPE_SUPPLY.get());
+    }
+
+    public static void setShapeSupplyOrder(java.util.List<Integer> order) {
+        SHAPE_SUPPLY.set(com.wrights.blueprint.ShapeSupply.encode(order));
+        save();
+    }
+
+    public static void shapeSupplyRemove(int index) {
+        java.util.List<Integer> order = new java.util.ArrayList<>(shapeSupplyOrder());
+        if (index < 0 || index >= order.size() || order.size() <= 1) {
+            return;
+        }
+        order.remove(index);
+        setShapeSupplyOrder(order);
+    }
+
+    public static void shapeSupplyAdd(int source) {
+        java.util.List<Integer> order = new java.util.ArrayList<>(shapeSupplyOrder());
+        int id = com.wrights.blueprint.ShapeSupply.clamp(source);
+        if (order.contains(id)) {
+            return;
+        }
+        order.add(id);
+        setShapeSupplyOrder(order);
+    }
+
+    public static void shapeSupplyMove(int index, int delta) {
+        java.util.List<Integer> order = new java.util.ArrayList<>(shapeSupplyOrder());
+        int next = index + delta;
+        if (index < 0 || index >= order.size() || next < 0 || next >= order.size()) {
+            return;
+        }
+        int value = order.remove(index);
+        order.add(next, value);
+        setShapeSupplyOrder(order);
     }
 
     private static int clamp(int value, int min, int max) {

@@ -1,5 +1,6 @@
 package com.wrights.client;
 
+import java.util.List;
 import java.util.UUID;
 
 import com.wrights.WrightsMod;
@@ -102,6 +103,8 @@ public final class SelectionRenderer {
         if ((adjust || !gui) && capture) {
             drawCapture(pose, buffers, camera);
             drawCaptureGhosts(pose, buffers, camera, minecraft);
+        } else if ((!gui || placing) && WrightsClientState.shapeToolActive()) {
+            drawShapeGhosts(pose, buffers, camera, minecraft);
         } else if ((!gui || placing) && WrightsClientState.mode == WrightsClientState.Mode.BUILD && !WrightsClientState.bindSupply && !mirrorBlocks()) {
             drawPreview(pose, buffers, camera);
         } else if ((!gui || placing) && mirrorBlocks()) {
@@ -113,10 +116,68 @@ public final class SelectionRenderer {
         }
         drawMarkedJobs(pose, buffers, camera, minecraft);
         drawMirror(pose, buffers, camera, minecraft);
+        drawShapeAnchorGlow(pose, buffers, camera, minecraft);
     }
 
     private static boolean mirrorBlocks() {
         return WrightsClientState.mirrorToolActive() && WrightsClientConfig.mirrorBlocks();
+    }
+
+    private static void drawShapeGhosts(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
+        if (minecraft.player == null || minecraft.level == null || !WrightsConfig.allowShape()) {
+            return;
+        }
+        String here = minecraft.level.dimension().location().toString();
+        BlockPos center;
+        if (WrightsClientConfig.SHAPE_USE_ANCHOR.get()) {
+            if (!WrightsClientConfig.shapePlaced(here)) {
+                return;
+            }
+            center = WrightsClientConfig.shapeAnchor();
+        } else if (minecraft.hitResult instanceof BlockHitResult hit && hit.getType() == HitResult.Type.BLOCK) {
+            center = com.wrights.blueprint.Shapes.lookCenter(hit.getBlockPos(), hit.getDirection());
+        } else {
+            return;
+        }
+        List<BlockState> palette = com.wrights.blueprint.ShapeSupply.palette(
+                minecraft.player,
+                WrightsClientConfig.shapeSupplyOrder(),
+                WrightsClientConfig.SHAPE_RANDOMIZE.get());
+        if (palette.isEmpty()) {
+            return;
+        }
+        List<BlockPos> worlds = com.wrights.blueprint.Shapes.blocks(
+                com.wrights.blueprint.Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get()),
+                center,
+                WrightsClientConfig.SHAPE_SIZE.get(),
+                WrightsClientConfig.SHAPE_HEIGHT.get(),
+                WrightsClientConfig.SHAPE_HOLLOW.get(),
+                WrightsClientConfig.SHAPE_PLANE.get());
+        boolean replace = WrightsClientConfig.SHAPE_REPLACE.get() && WrightsConfig.allowShapeReplace();
+        BlockRenderDispatcher renderer = minecraft.getBlockRenderer();
+        int budget = previewBudget();
+        int drawn = 0;
+        for (BlockPos world : worlds) {
+            if (drawn >= budget) {
+                break;
+            }
+            double dx = world.getX() + 0.5D - camera.x;
+            double dy = world.getY() + 0.5D - camera.y;
+            double dz = world.getZ() + 0.5D - camera.z;
+            if (dx * dx + dy * dy + dz * dz > rangeSqr()) {
+                continue;
+            }
+            if (!replace && !minecraft.level.getBlockState(world).isAir()) {
+                continue;
+            }
+            BlockState state = palette.get(drawn % palette.size());
+            if (!ghostVisible(state)) {
+                continue;
+            }
+            drawGhost(pose, buffers, renderer, camera, world.getX(), world.getY(), world.getZ(), state);
+            drawn++;
+        }
+        buffers.endBatch();
     }
 
     private static void drawMirrorBlockGhosts(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
@@ -1043,6 +1104,32 @@ public final class SelectionRenderer {
         drawBox(pose, lines, box, camera, 0.45F, 0.92F, 0.86F, alpha);
         drawBox(pose, lines, box.inflate(0.06D), camera, 0.70F, 1.0F, 0.94F, alpha * 0.7F);
         drawGuide(pose, lines, camera, minecraft.player.getBoundingBox(), new AABB(pos), 0.45F, 0.92F, 0.86F, 1.0F);
+        buffers.endBatch(RenderType.lines());
+    }
+
+    private static void drawShapeAnchorGlow(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
+        if (!WrightsClientState.shapeGlowing() || minecraft.level == null || minecraft.player == null) {
+            return;
+        }
+        if (!minecraft.level.dimension().location().toString().equals(WrightsClientState.shapeGlowDim)) {
+            return;
+        }
+        BlockPos pos = WrightsClientState.shapeGlowPos;
+        if (pos == null) {
+            return;
+        }
+        boolean on = (System.currentTimeMillis() / 180L) % 2L == 0L;
+        AABB box = new AABB(pos).inflate(0.08D);
+        VertexConsumer fill = buffers.getBuffer(RenderType.debugFilledBox());
+        AABB local = box.move(-camera.x, -camera.y, -camera.z);
+        LevelRenderer.addChainedFilledBoxVertices(
+                pose, fill, local.minX, local.minY, local.minZ, local.maxX, local.maxY, local.maxZ,
+                0.95F, 0.62F, 0.28F, on ? 0.28F : 0.05F);
+        buffers.endBatch(RenderType.debugFilledBox());
+        VertexConsumer lines = buffers.getBuffer(RenderType.lines());
+        float alpha = on ? 1.0F : 0.18F;
+        drawBox(pose, lines, box, camera, 0.98F, 0.70F, 0.32F, alpha);
+        drawGuide(pose, lines, camera, minecraft.player.getBoundingBox(), new AABB(pos), 0.98F, 0.70F, 0.32F, 1.0F);
         buffers.endBatch(RenderType.lines());
     }
 

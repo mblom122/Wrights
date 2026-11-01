@@ -88,10 +88,17 @@ public final class WrightsClientState {
     public static boolean bindSupply;
     /** Build-tool slot that sets the face a mirror is measured from. */
     public static boolean mirrorAim;
+    /** Build-tool slot for Shape mode. */
+    public static boolean shapeAim;
 
     /** True only while the mirror build-tool is the active tool in Build mode. */
     public static boolean mirrorToolActive() {
         return mode == Mode.BUILD && mirrorAim;
+    }
+
+    /** True only while the shape build-tool is the active tool in Build mode. */
+    public static boolean shapeToolActive() {
+        return mode == Mode.BUILD && shapeAim;
     }
     /** Placed wrightport waiting for a chest click. Null when not binding. */
     public static BlockPos bindPort;
@@ -106,6 +113,9 @@ public final class WrightsClientState {
     public static String mirrorGlowDim = "";
     public static BlockPos mirrorGlowPos;
     public static long mirrorGlowUntil;
+    public static String shapeGlowDim = "";
+    public static BlockPos shapeGlowPos;
+    public static long shapeGlowUntil;
     public static int digitalKind;
     public static boolean digitalOnline;
     public static boolean digitalBound;
@@ -1467,6 +1477,13 @@ public final class WrightsClientState {
         WrightsClientConfig.setMirror(pos, face.get3DDataValue(), dimension);
     }
 
+    public static void setShapeAnchor(BlockPos pos) {
+        Minecraft minecraft = Minecraft.getInstance();
+        String dimension = minecraft.level == null ? "" : minecraft.level.dimension().location().toString();
+        WrightsClientConfig.setShapeAnchor(pos, dimension);
+        glowShapeAnchor(dimension, pos);
+    }
+
     public static boolean showStoredSettings() {
         return storedSettings || storedAll;
     }
@@ -1593,16 +1610,35 @@ public final class WrightsClientState {
             return;
         }
         int styles = styleSteps();
-        int count = styles + 3;
+        int extras = 2 + (WrightsConfig.allowMirror() ? 1 : 0) + (WrightsConfig.allowShape() ? 1 : 0);
+        int count = styles + extras;
         int next = Math.floorMod(buildToolSlot() + direction, count);
         if (next < styles) {
             selectNewStyle(styleAt(next));
-        } else if (next == styles) {
-            selectBuildTool(false);
-        } else if (next == styles + 1) {
-            selectMirrorTool();
         } else {
-            selectBuildTool(true);
+            int tool = next - styles;
+            int cursor = 0;
+            if (tool == cursor) {
+                selectBuildTool(false);
+            } else {
+                cursor++;
+                if (WrightsConfig.allowMirror()) {
+                    if (tool == cursor) {
+                        selectMirrorTool();
+                    } else {
+                        cursor++;
+                        if (WrightsConfig.allowShape() && tool == cursor) {
+                            selectShapeTool();
+                        } else {
+                            selectBuildTool(true);
+                        }
+                    }
+                } else if (WrightsConfig.allowShape() && tool == cursor) {
+                    selectShapeTool();
+                } else {
+                    selectBuildTool(true);
+                }
+            }
         }
         styleHudTicks = STYLE_HUD_TICKS;
         styleAnnounce = true;
@@ -1622,7 +1658,7 @@ public final class WrightsClientState {
         return CaptureStyle.MOVE;
     }
 
-    /** New template styles, then Use template, Mirror, and Bind inventory. */
+    /** New template styles, then Use template, Mirror, Shape, and Bind inventory. */
     private static int buildToolSlot() {
         if (mode == Mode.CAPTURE) {
             int offset = switch (captureStyle) {
@@ -1632,19 +1668,40 @@ public final class WrightsClientState {
             };
             return Math.min(offset, styleSteps() - 1);
         }
-        if (mode == Mode.BUILD && mirrorAim) {
-            return styleSteps() + 1;
+        int slot = styleSteps();
+        if (mode == Mode.BUILD && !bindSupply && !mirrorAim && !shapeAim) {
+            return slot;
+        }
+        slot++;
+        if (WrightsConfig.allowMirror()) {
+            if (mode == Mode.BUILD && mirrorAim) {
+                return slot;
+            }
+            slot++;
+        }
+        if (WrightsConfig.allowShape()) {
+            if (mode == Mode.BUILD && shapeAim) {
+                return slot;
+            }
+            slot++;
         }
         if (mode == Mode.BUILD && bindSupply) {
-            return styleSteps() + 2;
+            return slot;
         }
         return styleSteps();
     }
 
-    private static void selectMirrorTool() {
+    public static void selectMirrorTool() {
         selectBuildTool(false);
         mirrorAim = true;
+        shapeAim = false;
         WrightsClientConfig.setMirrorBlocks(true);
+    }
+
+    public static void selectShapeTool() {
+        selectBuildTool(false);
+        shapeAim = true;
+        mirrorAim = false;
     }
 
     private static void selectBuildTool(boolean bind) {
@@ -1661,6 +1718,7 @@ public final class WrightsClientState {
         }
         bindSupply = bind;
         mirrorAim = false;
+        shapeAim = false;
         if (bind) {
             bindFromMenu = false;
         }
@@ -1668,6 +1726,7 @@ public final class WrightsClientState {
 
     private static void selectNewStyle(CaptureStyle style) {
         mirrorAim = false;
+        shapeAim = false;
         if (mode == Mode.SAVING) {
             return;
         }
@@ -1712,6 +1771,16 @@ public final class WrightsClientState {
 
     public static boolean mirrorGlowing() {
         return mirrorGlowPos != null && System.currentTimeMillis() < mirrorGlowUntil;
+    }
+
+    public static void glowShapeAnchor(String dimension, BlockPos pos) {
+        shapeGlowDim = dimension == null ? "" : dimension;
+        shapeGlowPos = pos == null ? null : pos.immutable();
+        shapeGlowUntil = System.currentTimeMillis() + 5000L;
+    }
+
+    public static boolean shapeGlowing() {
+        return shapeGlowPos != null && System.currentTimeMillis() < shapeGlowUntil;
     }
 
     public static void applySupply(BlueprintPayloads.SupplySync payload) {

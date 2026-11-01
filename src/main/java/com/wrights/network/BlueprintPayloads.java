@@ -2003,6 +2003,51 @@ public final class BlueprintPayloads {
         }
     }
 
+    public record ShapePlace(BlockPos pos, int face, boolean useAnchor, boolean anchorSet, BlockPos anchor, int kind, int size, int height, int plane, boolean hollow, boolean randomizeHotbar, boolean replace, boolean voidBlocks, String supplyOrder) implements CustomPacketPayload {
+        public static final Type<ShapePlace> TYPE = payloadType("shape_place");
+        public static final StreamCodec<RegistryFriendlyByteBuf, ShapePlace> STREAM_CODEC = StreamCodec.of((buf, value) -> value.write(buf), ShapePlace::read);
+
+        public void write(RegistryFriendlyByteBuf buf) {
+            buf.writeBlockPos(pos);
+            buf.writeVarInt(face);
+            buf.writeBoolean(useAnchor);
+            buf.writeBoolean(anchorSet);
+            buf.writeBlockPos(anchor);
+            buf.writeVarInt(kind);
+            buf.writeVarInt(size);
+            buf.writeVarInt(height);
+            buf.writeVarInt(plane);
+            buf.writeBoolean(hollow);
+            buf.writeBoolean(randomizeHotbar);
+            buf.writeBoolean(replace);
+            buf.writeBoolean(voidBlocks);
+            buf.writeUtf(supplyOrder == null ? "" : supplyOrder, 64);
+        }
+
+        public static ShapePlace read(RegistryFriendlyByteBuf buf) {
+            return new ShapePlace(
+                    buf.readBlockPos(),
+                    buf.readVarInt(),
+                    buf.readBoolean(),
+                    buf.readBoolean(),
+                    buf.readBlockPos(),
+                    buf.readVarInt(),
+                    buf.readVarInt(),
+                    buf.readVarInt(),
+                    buf.readVarInt(),
+                    buf.readBoolean(),
+                    buf.readBoolean(),
+                    buf.readBoolean(),
+                    buf.readBoolean(),
+                    buf.readUtf(64));
+        }
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     private static void writeBlob(RegistryFriendlyByteBuf buf, byte[] data) {
         byte[] bytes = data == null ? new byte[0] : data;
         buf.writeVarInt(bytes.length);

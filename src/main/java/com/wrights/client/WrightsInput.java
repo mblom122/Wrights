@@ -355,6 +355,10 @@ public final class WrightsInput {
             useMirrorClick(player, pos, face, hit);
             return;
         }
+        if (WrightsClientState.shapeToolActive()) {
+            useShapeClick(player, pos, face);
+            return;
+        }
         if (WrightsClientState.buildId == null) {
             Minecraft.getInstance().setScreen(new WrightsMenuScreen());
             net.neoforged.neoforge.network.PacketDistributor.sendToServer(
@@ -487,7 +491,8 @@ public final class WrightsInput {
             if (WrightsClientState.mode == WrightsClientState.Mode.BUILD
                     && WrightsClientState.buildId != null
                     && !WrightsClientState.bindSupply
-                    && !(WrightsClientState.mirrorToolActive() && com.wrights.WrightsClientConfig.mirrorBlocks())) {
+                    && !(WrightsClientState.mirrorToolActive() && com.wrights.WrightsClientConfig.mirrorBlocks())
+                    && !WrightsClientState.shapeToolActive()) {
                 var op = event.getScrollDeltaY() > 0.0D
                         ? com.wrights.blueprint.BlueprintTransforms.Op.ROTATE
                         : com.wrights.blueprint.BlueprintTransforms.Op.ROTATE_CCW;
@@ -509,6 +514,50 @@ public final class WrightsInput {
             WrightsClientState.cycleBuildTool(event.getScrollDeltaY() > 0.0D ? -1 : 1);
             event.setCanceled(true);
         }
+    }
+
+    private static void useShapeClick(net.minecraft.world.entity.player.Player player, BlockPos pos, Direction face) {
+        if (!com.wrights.WrightsConfig.allowShape()) {
+            player.displayClientMessage(Component.translatable("message.wrights.feature_off"), true);
+            return;
+        }
+        if (player.isShiftKeyDown()) {
+            if (pos != null) {
+                WrightsClientState.setShapeAnchor(pos);
+                player.displayClientMessage(Component.translatable("message.wrights.shape_set", pos.getX(), pos.getY(), pos.getZ()), true);
+            } else {
+                com.wrights.WrightsClientConfig.clearShapeAnchor();
+                player.displayClientMessage(Component.translatable("message.wrights.shape_cleared"), true);
+            }
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        String dimension = minecraft.level == null ? "" : minecraft.level.dimension().location().toString();
+        boolean useAnchor = com.wrights.WrightsClientConfig.SHAPE_USE_ANCHOR.get();
+        boolean anchorSet = com.wrights.WrightsClientConfig.shapePlaced(dimension);
+        if (useAnchor && !anchorSet) {
+            player.displayClientMessage(Component.translatable("message.wrights.shape_need_anchor"), true);
+            return;
+        }
+        if (!useAnchor && (pos == null || face == null)) {
+            player.displayClientMessage(Component.translatable("message.wrights.shape_look"), true);
+            return;
+        }
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(new BlueprintPayloads.ShapePlace(
+                pos == null ? BlockPos.ZERO : pos,
+                face == null ? 0 : face.get3DDataValue(),
+                useAnchor,
+                anchorSet,
+                anchorSet ? com.wrights.WrightsClientConfig.shapeAnchor() : BlockPos.ZERO,
+                com.wrights.WrightsClientConfig.SHAPE_KIND.get(),
+                com.wrights.WrightsClientConfig.SHAPE_SIZE.get(),
+                com.wrights.WrightsClientConfig.SHAPE_HEIGHT.get(),
+                com.wrights.WrightsClientConfig.SHAPE_PLANE.get(),
+                com.wrights.WrightsClientConfig.SHAPE_HOLLOW.get(),
+                com.wrights.WrightsClientConfig.SHAPE_RANDOMIZE.get(),
+                com.wrights.WrightsClientConfig.SHAPE_REPLACE.get(),
+                com.wrights.WrightsClientConfig.SHAPE_VOID.get(),
+                com.wrights.WrightsClientConfig.SHAPE_SUPPLY.get()));
     }
 
     private static String mirrorAxisKey(Direction.Axis axis) {

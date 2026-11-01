@@ -170,6 +170,12 @@ public final class WrightsConfig {
     public static final ModConfigSpec.BooleanValue ALLOW_MIRROR = BUILDER
             .comment("Mirroring. Off hides the mirror page and refuses mirrored copies.")
             .define("mirror", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_SHAPE = BUILDER
+            .comment("Shape building. Off hides the shape page and refuses shape jobs.")
+            .define("shape", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_SHAPE_REPLACE = BUILDER
+            .comment("Shape builds may replace a block that is already there.")
+            .define("shapeReplace", true);
     public static final ModConfigSpec.BooleanValue ALLOW_MIRROR_BLOCKS = BUILDER
             .comment("Mirroring the block in the other hand.")
             .define("mirrorBlocks", true);
@@ -349,6 +355,14 @@ public final class WrightsConfig {
         return allowMirror() && read(ALLOW_MIRROR_AXES, true);
     }
 
+    public static boolean allowShape() {
+        return allowBuilding() && read(ALLOW_SHAPE, true);
+    }
+
+    public static boolean allowShapeReplace() {
+        return allowShape() && read(ALLOW_SHAPE_REPLACE, true);
+    }
+
     public static boolean allowJobs() {
         return read(ALLOW_JOBS, true);
     }
@@ -365,9 +379,9 @@ public final class WrightsConfig {
         return read(ALLOW_LINK, true);
     }
 
-    /** Building has a blueprint list or a mirror page to show. */
+    /** Building has a blueprint list, mirror page, or shape page to show. */
     public static boolean showBuilding() {
-        return allowBlueprints() || allowMirror();
+        return allowBlueprints() || allowMirror() || allowShape();
     }
 
     /** Highest copy count the server still allows. */

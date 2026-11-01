@@ -20,6 +20,7 @@ import net.neoforged.neoforge.client.event.RenderGuiEvent;
 
 import com.wrights.WrightsMod;
 import com.wrights.WrightsClientConfig;
+import com.wrights.WrightsConfig;
 import com.wrights.blueprint.BoxEdits;
 
 @EventBusSubscriber(modid = WrightsMod.MOD_ID, value = Dist.CLIENT)
@@ -85,7 +86,10 @@ public final class WrightsHud {
         } else if (WrightsClientState.mode == WrightsClientState.Mode.SAVING) {
             line = Component.translatable("hud.wrights.saving", WrightsClientState.name);
         } else if (WrightsClientState.mode == WrightsClientState.Mode.BUILD) {
-            if (WrightsClientState.mirrorToolActive() && WrightsClientConfig.mirrorBlocks()) {
+            if (WrightsClientState.shapeToolActive()) {
+                line = Component.translatable("hud.wrights.tool_shape");
+                sub = Component.translatable(shapeFooter(minecraft));
+            } else if (WrightsClientState.mirrorToolActive() && WrightsClientConfig.mirrorBlocks()) {
                 line = Component.translatable("hud.wrights.tool_mirror");
                 sub = Component.translatable(mirrorFooter(minecraft));
             } else if (WrightsClientState.buildId == null) {
@@ -357,7 +361,9 @@ public final class WrightsHud {
                 ? (WrightsClientState.styleAnnounce
                         ? Component.translatable("hud.wrights.mode_now", Component.translatable(styleKey(WrightsClientState.captureStyle)))
                         : Component.translatable("hud.wrights.mode_how"))
-                : WrightsClientState.mirrorAim
+                : WrightsClientState.shapeAim
+                        ? Component.translatable(shapeFooter(minecraft))
+                        : WrightsClientState.mirrorAim
                         ? Component.translatable(mirrorFooter(minecraft))
                         : WrightsClientState.bindSupply
                                 ? Component.translatable("hud.wrights.bind_explain")
@@ -368,19 +374,28 @@ public final class WrightsHud {
         Component fresh = Component.translatable("hud.wrights.tool_new");
         Component bind = Component.translatable("hud.wrights.tool_bind");
         Component mirror = Component.translatable("hud.wrights.tool_mirror");
+        Component shape = Component.translatable("hud.wrights.tool_shape");
         Component mirrorMark = Component.translatable(WrightsClientConfig.mirrorBlocks() ? "menu.wrights.mirror_blocks" : "menu.wrights.mirror_blueprints");
+        Component shapeMark = Component.translatable("menu.wrights.shape_kind_" + com.wrights.blueprint.Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get()).name().toLowerCase());
         Component selected = Component.translatable("hud.wrights.mode_selected");
         Component corners = Component.translatable("hud.wrights.mode_corners");
         Component box = Component.translatable("hud.wrights.mode_box");
         Component move = Component.translatable("hud.wrights.mode_move");
         Component need = Component.translatable("hud.wrights.mode_move_need");
         boolean canMove = WrightsClientState.hasBox();
+        boolean showMirror = WrightsConfig.allowMirror();
+        boolean showShape = WrightsConfig.allowShape();
         int width = 188;
         width = Math.max(width, minecraft.font.width(title) + 28);
         width = Math.max(width, minecraft.font.width(use) + minecraft.font.width(selected) + 36);
         width = Math.max(width, minecraft.font.width(fresh) + minecraft.font.width(selected) + 36);
         width = Math.max(width, minecraft.font.width(bind) + minecraft.font.width(selected) + 36);
-        width = Math.max(width, minecraft.font.width(mirror) + minecraft.font.width(mirrorMark) + 36);
+        if (showMirror) {
+            width = Math.max(width, minecraft.font.width(mirror) + minecraft.font.width(mirrorMark) + 36);
+        }
+        if (showShape) {
+            width = Math.max(width, minecraft.font.width(shape) + minecraft.font.width(shapeMark) + 36);
+        }
         int nest = 18;
         if (making) {
             width = Math.max(width, minecraft.font.width(corners) + minecraft.font.width(selected) + 36 + nest);
@@ -388,7 +403,7 @@ public final class WrightsHud {
             width = Math.max(width, minecraft.font.width(move) + minecraft.font.width(canMove ? selected : need) + 36 + nest);
         }
         int row = 18;
-        int rows = 4 + (making ? 3 : 0);
+        int rows = 3 + (showMirror ? 1 : 0) + (showShape ? 1 : 0) + (making ? 3 : 0);
         int textWidth = width - 24;
         int footer = footerHeight(minecraft, how, textWidth);
         int height = 28 + row * rows + footer;
@@ -410,9 +425,18 @@ public final class WrightsHud {
             drawModeRow(graphics, minecraft, x, subY + row * 2, width, nest, WrightsClientState.CaptureStyle.MOVE, move, selected, canMove, need);
             yAfterNew = subY + row * 3;
         }
-        drawToolRow(graphics, minecraft, x, yAfterNew, width, building && !WrightsClientState.bindSupply && !WrightsClientState.mirrorAim, use, selected);
-        drawToolRow(graphics, minecraft, x, yAfterNew + row, width, building && WrightsClientState.mirrorAim, mirror, mirrorMark);
-        drawToolRow(graphics, minecraft, x, yAfterNew + row * 2, width, building && WrightsClientState.bindSupply, bind, selected);
+        int toolY = yAfterNew;
+        drawToolRow(graphics, minecraft, x, toolY, width, building && !WrightsClientState.bindSupply && !WrightsClientState.mirrorAim && !WrightsClientState.shapeAim, use, selected);
+        toolY += row;
+        if (showMirror) {
+            drawToolRow(graphics, minecraft, x, toolY, width, building && WrightsClientState.mirrorAim, mirror, mirrorMark);
+            toolY += row;
+        }
+        if (showShape) {
+            drawToolRow(graphics, minecraft, x, toolY, width, building && WrightsClientState.shapeAim, shape, shapeMark);
+            toolY += row;
+        }
+        drawToolRow(graphics, minecraft, x, toolY, width, building && WrightsClientState.bindSupply, bind, selected);
         int foot = WrightsClientState.styleAnnounce ? 0xFFF2C14E : WrightsUi.MUTED;
         drawFooter(graphics, minecraft, how, x + 12, y + height - footer + 4, textWidth, foot);
     }
@@ -458,6 +482,14 @@ public final class WrightsHud {
             return placed ? "hud.wrights.mirror_blocks_ready" : "hud.wrights.mirror_blocks_explain";
         }
         return placed ? "hud.wrights.mirror_blueprint_ready" : "hud.wrights.mirror_blueprint_explain";
+    }
+
+    private static String shapeFooter(Minecraft minecraft) {
+        if (WrightsClientConfig.SHAPE_USE_ANCHOR.get()) {
+            boolean placed = minecraft.level != null && WrightsClientConfig.shapePlaced(minecraft.level.dimension().location().toString());
+            return placed ? "hud.wrights.shape_anchor_ready" : "hud.wrights.shape_anchor_explain";
+        }
+        return "hud.wrights.shape_look_explain";
     }
 
     private static void drawToolRow(GuiGraphics graphics, Minecraft minecraft, int x, int y, int width, boolean on, Component label, Component selected) {
