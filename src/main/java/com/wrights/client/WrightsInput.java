@@ -137,7 +137,8 @@ public final class WrightsInput {
                     || minecraft.screen instanceof JobActionScreen
                     || minecraft.screen instanceof JobDroneScreen
                     || minecraft.screen instanceof DroneRosterScreen
-                    || minecraft.screen instanceof ShapeLookSnapScreen) {
+                    || minecraft.screen instanceof ShapeLookSnapScreen
+                    || minecraft.screen instanceof ShapeTweakScreen) {
                 minecraft.setScreen(null);
             }
         }
@@ -379,7 +380,7 @@ public final class WrightsInput {
     /**
      * Shared controller chords:
      * Ctrl+right-click = set / clear that mode’s anchor,
-     * Shift+right-click = mode special action (second corner, Shape look/anchor tweak, Bind menu, …),
+     * Shift+right-click = mode special action (second corner, Shape/Exchange size tweak, Bind menu, …),
      * Middle-click = pick the aimed block as Shape / Exchange material (like creative pick),
      * Ctrl+Shift+right-click = that mode’s options page (Shape / Exchange / Mirror / …),
      * Alt+right-click = undo last finished build.
@@ -711,7 +712,7 @@ public final class WrightsInput {
                 clearShapeAnchorToLook(player);
                 return;
             }
-            openShapeSpecialMenu(player);
+            openShapeTweakMenu(false);
             return;
         }
         boolean lookMode = !com.wrights.WrightsClientConfig.SHAPE_USE_ANCHOR.get()
@@ -785,22 +786,9 @@ public final class WrightsInput {
         clearShapeAnchorToLook(player);
     }
 
-    private static void openShapeSpecialMenu(net.minecraft.world.entity.player.Player player) {
-        boolean lookMode = !com.wrights.WrightsClientConfig.SHAPE_USE_ANCHOR.get()
-                || !com.wrights.WrightsConfig.allowShapeAnchor();
-        if (lookMode) {
-            if (!WrightsClientState.shapeLookSnapActive()) {
-                BlockHitResult aim = WrightsClientState.shapeLookHit();
-                if (aim == null) {
-                    player.displayClientMessage(Component.translatable("message.wrights.shape_look"), true);
-                    return;
-                }
-                WrightsClientState.lockShapeLookSnap(aim.getBlockPos(), aim.getDirection());
-            }
-            Minecraft.getInstance().setScreen(new ShapeLookSnapScreen());
-            return;
-        }
-        Minecraft.getInstance().setScreen(new ShapeAnchorScreen(null));
+    /** Shift+block: compact translucent size / aim tweak (Style matches look-snap). */
+    private static void openShapeTweakMenu(boolean exchange) {
+        Minecraft.getInstance().setScreen(new ShapeTweakScreen(exchange));
     }
 
     /** Same look/anchor flow as Shape. Middle-click picks Replace with. Ctrl+Shift opens Exchange options. */
@@ -824,7 +812,7 @@ public final class WrightsInput {
                 clearShapeAnchorToLook(player);
                 return;
             }
-            openShapeSpecialMenu(player);
+            openShapeTweakMenu(true);
             return;
         }
         boolean lookMode = !com.wrights.WrightsClientConfig.SHAPE_USE_ANCHOR.get()
