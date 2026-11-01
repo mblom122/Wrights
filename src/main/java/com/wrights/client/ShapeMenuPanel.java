@@ -316,8 +316,8 @@ final class ShapeMenuPanel {
     /** Primary size slider label — what SHAPE_SIZE actually builds for this kind. */
     private static String sizeLabel(Shapes.Kind kind, int axis) {
         return switch (kind) {
-            case BOX -> "menu.wrights.shape_width";
-            case CUBE -> "menu.wrights.shape_size";
+            case BOX, SQUARE -> "menu.wrights.shape_width";
+            case CUBE, RECTANGLE -> "menu.wrights.shape_size";
             case CIRCLE -> "menu.wrights.shape_diameter";
             case CYLINDER, SPHERE, DOME -> "menu.wrights.shape_radius";
             default -> "menu.wrights.shape_size";
@@ -327,24 +327,25 @@ final class ShapeMenuPanel {
     private static String sizeHint(Shapes.Kind kind, int axis) {
         return switch (kind) {
             case BOX -> "menu.wrights.shape_width_hint";
+            case SQUARE -> "menu.wrights.shape_square_width_hint";
             case CUBE -> "menu.wrights.shape_cube_size_hint";
+            case RECTANGLE -> "menu.wrights.shape_rectangle_size_hint";
             case CIRCLE -> "menu.wrights.shape_circle_diameter_hint";
             case CYLINDER -> "menu.wrights.shape_cylinder_radius_hint";
             case SPHERE -> "menu.wrights.shape_sphere_radius_hint";
             case DOME -> "menu.wrights.shape_dome_radius_hint";
             case PYRAMID -> "menu.wrights.shape_pyramid_size_hint";
             case RING -> "menu.wrights.shape_ring_size_hint";
-            case SQUARE -> "menu.wrights.shape_square_size_hint";
             default -> "menu.wrights.shape_size_hint";
         };
     }
 
     /**
-     * Along-axis extent (SHAPE_HEIGHT). Box always says Height (W/D/H); other shapes rename
-     * for the chosen Axis so Width/Height are not swapped when tipped onto X or Z.
+     * Along-axis extent (SHAPE_HEIGHT). Box/Square always say Height (W×H / W×D×H); other shapes
+     * rename for the chosen Axis so Width/Height are not swapped when tipped onto X or Z.
      */
     private static String alongLabel(Shapes.Kind kind, int axis) {
-        if (kind == Shapes.Kind.BOX) {
+        if (kind == Shapes.Kind.BOX || kind == Shapes.Kind.SQUARE) {
             return "menu.wrights.shape_height";
         }
         return switch (Shapes.clampPlane(axis)) {
@@ -361,6 +362,9 @@ final class ShapeMenuPanel {
         }
         if (kind == Shapes.Kind.BOX) {
             return "menu.wrights.shape_box_height_hint";
+        }
+        if (kind == Shapes.Kind.SQUARE) {
+            return "menu.wrights.shape_square_height_hint";
         }
         if (kind == Shapes.Kind.CYLINDER) {
             return switch (a) {

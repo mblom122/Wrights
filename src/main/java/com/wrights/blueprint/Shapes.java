@@ -16,7 +16,8 @@ public final class Shapes {
     public enum Kind {
         CIRCLE(false, false),
         RING(true, true),
-        SQUARE(false, false),
+        /** Flat plate: Width × Height (full block counts). */
+        SQUARE(false, true),
         /** Rectangular prism: Width × Depth × Height (full block counts). */
         BOX(true, true),
         SPHERE(true, false),
@@ -24,7 +25,9 @@ public final class Shapes {
         CUBE(true, false),
         CYLINDER(true, true),
         DOME(true, true),
-        PYRAMID(true, true);
+        PYRAMID(true, true),
+        /** Flat equal sides — only Size is used (like Cube, but 2D). */
+        RECTANGLE(false, false);
 
         private final boolean volume;
         private final boolean usesHeight;
@@ -141,7 +144,8 @@ public final class Shapes {
             // Size is diameter (full width in blocks), not radius.
             case CIRCLE -> diskDiameter(out, center, r, hollow, AXIS_Y, limit);
             case RING -> ring(out, center, r, band, h, AXIS_Y, hollow, limit);
-            case SQUARE -> square(out, center, r, hollow, AXIS_Y, limit);
+            // Width × Height flat plate (local X × local Z, one block thick).
+            case SQUARE -> box(out, center, r, Math.max(1, h), 1, hollow, limit);
             // Size / thickness / height are full block counts: Width × Depth × Height.
             case BOX -> box(out, center, r, band, Math.max(1, h), hollow, limit);
             case SPHERE -> sphere(out, center, r, hollow, limit);
@@ -150,6 +154,8 @@ public final class Shapes {
             case CYLINDER -> cylinder(out, center, r, h, hollow, limit);
             case DOME -> dome(out, center, r, h, hollow, limit);
             case PYRAMID -> pyramid(out, center, r, h, hollow, limit);
+            // Equal edge flat — Size alone sets Width = Height.
+            case RECTANGLE -> box(out, center, r, r, 1, hollow, limit);
         }
         orient(out, center, clampPlane(axis), clampYaw(rotation));
         return out;
@@ -169,7 +175,8 @@ public final class Shapes {
         long diam = 2L * r + 1L;
         return switch (kind) {
             case CIRCLE -> (long) r * (long) r;
-            case SQUARE -> diam * diam;
+            case SQUARE -> (long) r * (long) h;
+            case RECTANGLE -> (long) r * (long) r;
             case RING -> {
                 int tall = Math.max(1, h);
                 long along = tall <= 1 ? 1L : (long) tall;
@@ -209,12 +216,23 @@ public final class Shapes {
                 maxZ = a0 + r - 1;
             }
             case SQUARE -> {
-                minX = -r;
-                maxX = r;
+                int x0 = -(r - 1) / 2;
+                int z0 = -(h - 1) / 2;
+                minX = x0;
+                maxX = x0 + r - 1;
                 minY = 0;
                 maxY = 0;
-                minZ = -r;
-                maxZ = r;
+                minZ = z0;
+                maxZ = z0 + h - 1;
+            }
+            case RECTANGLE -> {
+                int x0 = -(r - 1) / 2;
+                minX = x0;
+                maxX = x0 + r - 1;
+                minY = 0;
+                maxY = 0;
+                minZ = x0;
+                maxZ = x0 + r - 1;
             }
             case RING -> {
                 minX = -r;
@@ -634,20 +652,6 @@ public final class Shapes {
             case PLANE_YZ -> center.offset(along, a, b);
             default -> center.offset(a, along, b);
         };
-    }
-
-    private static void square(List<BlockPos> out, BlockPos center, int radius, boolean hollow, int plane, int limit) {
-        for (int a = -radius; a <= radius; a++) {
-            for (int b = -radius; b <= radius; b++) {
-                boolean edge = Math.abs(a) == radius || Math.abs(b) == radius;
-                if (hollow && !edge) {
-                    continue;
-                }
-                if (!take(out, flat(center, a, b, plane), limit)) {
-                    return;
-                }
-            }
-        }
     }
 
     private static void sphere(List<BlockPos> out, BlockPos center, int radius, boolean hollow, int limit) {

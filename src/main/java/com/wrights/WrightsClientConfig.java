@@ -205,8 +205,8 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.ConfigValue<String> MIRROR_DIM = BUILDER
             .define("mirrorDim", "");
     public static final ModConfigSpec.IntValue SHAPE_KIND = BUILDER
-            .comment("0 circle, 1 ring, 2 square, 3 line, 4 sphere, 5 cube, 6 cylinder, 7 dome, 8 pyramid.")
-            .defineInRange("shapeKind", 0, 0, 8);
+            .comment("0 circle, 1 ring, 2 square, 3 box, 4 sphere, 5 cube, 6 cylinder, 7 dome, 8 pyramid, 9 rectangle.")
+            .defineInRange("shapeKind", 0, 0, 9);
     public static final ModConfigSpec.IntValue SHAPE_SIZE = BUILDER
             .comment("Radius or half-width of the shape. Server maxShapeAxis still caps the real build.")
             .defineInRange("shapeSize", 4, 1, 4096);
@@ -793,7 +793,7 @@ public final class WrightsClientConfig {
     }
 
     public static void setShapeKind(int kind) {
-        SHAPE_KIND.set(clamp(kind, 0, 8));
+        SHAPE_KIND.set(clamp(kind, 0, com.wrights.blueprint.Shapes.Kind.values().length - 1));
         save();
     }
 
