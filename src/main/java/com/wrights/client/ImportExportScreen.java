@@ -40,6 +40,7 @@ public class ImportExportScreen extends Screen {
     private WrightsButton nextButton;
     private WrightsButton useNameButton;
     private WrightsButton saveButton;
+    private int actionY;
 
     public ImportExportScreen(Screen parent, BlueprintList.Row row) {
         super(Component.translatable("screen.wrights.transfer_title"));
@@ -86,26 +87,26 @@ public class ImportExportScreen extends Screen {
     @Override
     protected void init() {
         panelW = Math.min(520, this.width - 16);
-        panelH = Math.min(300, this.height - 16);
+        // Room for selection line, columns, and a 3-row conflict stack above Close.
+        panelH = Math.min(320, this.height - 16);
         panelX = (this.width - panelW) / 2;
         panelY = (this.height - panelH) / 2;
         leftX = panelX + 14;
         columnW = (panelW - 36) / 2;
         rightX = leftX + columnW + 8;
         bodyY = panelY + 70;
-        int buttonY = panelY + panelH - 78;
-        copyButton = addRenderableWidget(new WrightsButton(leftX, buttonY, columnW, 18, Component.translatable("screen.wrights.transfer_copy"), button -> copy()));
-        pasteButton = addRenderableWidget(new WrightsButton(leftX, buttonY + 22, columnW, 18, Component.translatable("screen.wrights.transfer_paste"), button -> pasteClicked()));
-        int half = Math.max(36, (columnW - 4) / 2);
-        replaceButton = addRenderableWidget(new WrightsButton(leftX, buttonY, half, 18, Component.translatable("screen.wrights.slip_replace"), button -> importClip(BlueprintSlips.REPLACE), true));
-        anotherButton = addRenderableWidget(new WrightsButton(leftX + half + 4, buttonY, columnW - half - 4, 18, Component.translatable("screen.wrights.folder_another"), button -> importClip(BlueprintSlips.LOAD)));
-        nextButton = addRenderableWidget(new WrightsButton(leftX, buttonY + 22, columnW, 18, Component.translatable("screen.wrights.slip_as", ""), button -> importClip(BlueprintSlips.NEXT_NUMBER)));
-        nameBox = new EditBox(this.font, leftX, buttonY + 44, Math.max(40, columnW - 78), 18, Component.translatable("screen.wrights.slip_name_hint"));
+        actionY = panelY + panelH - 92;
+        copyButton = addRenderableWidget(new WrightsButton(leftX, actionY, columnW, 18, Component.translatable("screen.wrights.transfer_copy"), button -> copy()));
+        pasteButton = addRenderableWidget(new WrightsButton(leftX, actionY + 20, columnW, 18, Component.translatable("screen.wrights.transfer_paste"), button -> pasteClicked()));
+        replaceButton = addRenderableWidget(new WrightsButton(leftX, actionY, columnW, 18, Component.translatable("screen.wrights.slip_replace"), button -> importClip(BlueprintSlips.REPLACE), true));
+        anotherButton = addRenderableWidget(new WrightsButton(leftX, actionY, columnW, 18, Component.translatable("screen.wrights.folder_another"), button -> importClip(BlueprintSlips.LOAD)));
+        nextButton = addRenderableWidget(new WrightsButton(leftX, actionY + 20, columnW, 18, Component.translatable("screen.wrights.slip_as", ""), button -> importClip(BlueprintSlips.NEXT_NUMBER)));
+        nameBox = new EditBox(this.font, leftX, actionY + 40, Math.max(40, columnW - 78), 18, Component.translatable("screen.wrights.slip_name_hint"));
         nameBox.setMaxLength(48);
         nameBox.setHint(Component.translatable("screen.wrights.slip_name_hint"));
         nameBox.setResponder(value -> refreshName());
         addRenderableWidget(nameBox);
-        useNameButton = addRenderableWidget(new WrightsButton(leftX + columnW - 74, buttonY + 44, 74, 18, Component.translatable("screen.wrights.slip_use_name"), button -> importClip(BlueprintSlips.NAMED)));
+        useNameButton = addRenderableWidget(new WrightsButton(leftX + columnW - 74, actionY + 40, 74, 18, Component.translatable("screen.wrights.slip_use_name"), button -> importClip(BlueprintSlips.NAMED)));
         saveButton = addRenderableWidget(new WrightsButton(rightX, bodyY + 28, columnW, 18, Component.translatable("screen.wrights.transfer_save_blueprint"), button -> saveItem()));
         addRenderableWidget(new WrightsButton(rightX, bodyY + 52, columnW, 18, Component.translatable("screen.wrights.transfer_load_blueprints"), button -> {
             this.minecraft.setScreen(new BlueprintLoadScreen(this));
@@ -115,7 +116,7 @@ public class ImportExportScreen extends Screen {
             this.minecraft.setScreen(new FolderLoadScreen(this));
             PacketDistributor.sendToServer(new BlueprintPayloads.RequestFolderItems());
         }));
-        addRenderableWidget(new WrightsButton(panelX + panelW - 78, panelY + panelH - 24, 66, 16, Component.translatable("menu.wrights.close"), button -> onClose()));
+        addRenderableWidget(new WrightsButton(panelX + panelW - 78, panelY + panelH - 22, 66, 16, Component.translatable("menu.wrights.close"), button -> onClose()));
         copyButton.active = selectedId != null;
         saveButton.active = selectedId != null;
         saveButton.setMessage(Component.translatable(selectedFolder ? "screen.wrights.transfer_save_folder" : "screen.wrights.transfer_save_blueprint"));
@@ -133,25 +134,47 @@ public class ImportExportScreen extends Screen {
         boolean conflict = ready && status.kind() != BlueprintSlips.NEW;
         boolean different = ready && status.kind() == BlueprintSlips.DIFFERENT;
         boolean canImport = ready && status.kind() == BlueprintSlips.NEW;
-        copyButton.visible = !conflict;
-        pasteButton.visible = !conflict;
-        pasteButton.active = !waitingPreview && (!reviewing || canImport);
-        pasteButton.setMessage(Component.translatable(canImport ? "screen.wrights.transfer_paste_confirm" : "screen.wrights.transfer_paste"));
-        replaceButton.visible = different;
-        anotherButton.visible = different && status.folder();
-        if (different && !status.folder()) {
-            replaceButton.setWidth(columnW);
-        } else if (different) {
-            int half = Math.max(36, (columnW - 4) / 2);
-            replaceButton.setWidth(half);
-            anotherButton.setX(leftX + half + 4);
-            anotherButton.setWidth(columnW - half - 4);
+        boolean folderConflict = different && status.folder();
+        copyButton.setShown(!conflict);
+        pasteButton.setShown(!conflict);
+        if (!conflict) {
+            copyButton.active = selectedId != null;
+            pasteButton.active = !waitingPreview && (!reviewing || canImport);
+            pasteButton.setMessage(Component.translatable(canImport ? "screen.wrights.transfer_paste_confirm" : "screen.wrights.transfer_paste"));
+            copyButton.setY(actionY);
+            pasteButton.setY(actionY + 20);
         }
-        nextButton.visible = conflict;
+        // Conflict stack: replace/another, then save-as, then custom name — never share rows with copy/paste.
+        replaceButton.setShown(different);
+        anotherButton.setShown(folderConflict);
+        if (different) {
+            replaceButton.setY(actionY);
+            if (folderConflict) {
+                int half = Math.max(36, (columnW - 4) / 2);
+                replaceButton.setX(leftX);
+                replaceButton.setWidth(half);
+                anotherButton.setX(leftX + half + 4);
+                anotherButton.setY(actionY);
+                anotherButton.setWidth(columnW - half - 4);
+            } else {
+                replaceButton.setX(leftX);
+                replaceButton.setWidth(columnW);
+            }
+        }
+        int renameY = conflict ? (different ? actionY + 20 : actionY) : actionY + 20;
+        nextButton.setShown(conflict);
         nameBox.visible = conflict;
-        useNameButton.visible = conflict;
+        useNameButton.setShown(conflict);
         if (conflict) {
+            nextButton.setX(leftX);
+            nextButton.setY(renameY);
+            nextButton.setWidth(columnW);
             nextButton.setMessage(Component.translatable("screen.wrights.slip_as", status.nextName()));
+            nameBox.setX(leftX);
+            nameBox.setY(renameY + 20);
+            nameBox.setWidth(Math.max(40, columnW - 78));
+            useNameButton.setX(leftX + columnW - 74);
+            useNameButton.setY(renameY + 20);
         }
         refreshName();
     }
@@ -251,8 +274,7 @@ public class ImportExportScreen extends Screen {
         int y = bodyY + 4;
         if (reviewing && status.present() && !status.folder() && BlueprintClipboard.has()) {
             SchematicViews.Shot shot = SchematicViews.fromClipboard();
-            int buttonTop = panelY + panelH - 82;
-            int modelH = Math.min(96, buttonTop - y - 28);
+            int modelH = Math.min(96, actionY - y - 10);
             if (shot.visible() && modelH >= 36) {
                 SchematicViews.draw(graphics, this.font, leftX, y, columnW, modelH, shot);
                 y += modelH + 6;
