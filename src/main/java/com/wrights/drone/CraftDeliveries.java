@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import javax.annotation.Nullable;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
@@ -44,6 +46,12 @@ public final class CraftDeliveries {
 
     public static void pop() {
         ACTIVE.remove();
+    }
+
+    /** Hangar currently being edited from Manage (personal or placed). */
+    @Nullable
+    public static Hangar active() {
+        return ACTIVE.get();
     }
 
     /** Remember that this hangar is waiting for up to {@code amount} crafted wrights. */
@@ -153,6 +161,7 @@ public final class CraftDeliveries {
         }
         WrightportPlaces.write(player, hangar.kind, hangar.index, next);
         ManageLock.hold(player, hangar.kind, hangar.index);
+        HangarDock.show(player, hangar, tiers);
         Messages.actionBar(player, "message.wrights.wrights_added", tiers.size());
         return tiers.size();
     }
@@ -180,6 +189,7 @@ public final class CraftDeliveries {
         }
         port.setSwarm(next);
         PlacedPortManage.swarm(player, hangar.dimension.location().toString(), hangar.pos);
+        HangarDock.show(player, hangar, tiers);
         Messages.actionBar(player, "message.wrights.wrights_added", tiers.size());
         return tiers.size();
     }

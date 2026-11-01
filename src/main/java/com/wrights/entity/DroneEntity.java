@@ -134,8 +134,8 @@ public class DroneEntity extends Entity {
         }
     }
 
-    /** Last launch height so two wrights in a row never pop in on the same Y. */
-    private static int lastLaunchHeight = -1;
+    /** Last manage-add dock height so consecutive arrivals do not stack on the same Y. */
+    private static int lastDockHeight = -1;
 
     /** Leaves the personal port behind the player, aimed at the work site. */
     public void departFromPlayer(ServerPlayer player, Vec3 work, int lane, int lanes) {
@@ -164,9 +164,7 @@ public class DroneEntity extends Entity {
             side = side.normalize();
         }
         double spread = lanes <= 1 ? 0.0D : (lane - (lanes - 1) * 0.5D) * 0.45D;
-        // Pop in above the player / port at a random height so a swarm does not stack.
-        double lift = nextLaunchHeight();
-        Vec3 start = from.add(toward.scale(0.35D)).add(side.scale(spread)).add(0.0D, lift, 0.0D);
+        Vec3 start = from.add(toward.scale(0.35D)).add(side.scale(spread));
         float yaw = (float) (Mth.atan2(toward.z, toward.x) * Mth.RAD_TO_DEG) - 90.0F;
         if (!Float.isFinite(yaw)) {
             yaw = fallbackYaw;
@@ -175,13 +173,38 @@ public class DroneEntity extends Entity {
         this.setYRot(yaw);
     }
 
-    /** Random 3–10 blocks above the hatch / player; never repeats the previous pick. */
-    private int nextLaunchHeight() {
+    /**
+     * Cosmetic fly-in when a wright is added from Manage. Already counted in the hangar —
+     * this entity only shows the dock, then discards.
+     */
+    public void dockIn(ServerPlayer player, @Nullable BlockPos port, int slot, int count) {
+        this.returning = true;
+        this.returnTicks = 0;
+        this.ownerId = player.getUUID();
+        this.unitId = null;
+        this.setJobId(null);
+        setWorkStatus(ItemStack.EMPTY, ItemStack.EMPTY, WAIT_HOME);
+        setHomePort(port);
+        int n = Math.max(1, count);
+        double angle = (Math.PI * 2.0D * slot) / n;
+        double radius = n <= 1 ? 0.0D : 0.55D;
+        double lift = nextDockHeight();
+        Vec3 above = port != null
+                ? WrightHomes.hatch(port).add(Math.cos(angle) * radius, lift, Math.sin(angle) * radius)
+                : WrightHomes.behindPlayer(player).add(Math.cos(angle) * radius, lift, Math.sin(angle) * radius);
+        this.moveTo(above.x, above.y, above.z, player.getYRot(), 0.0F);
+        this.setYRot(player.getYRot());
+        Vec3 dock = port != null ? WrightHomes.hatch(port) : WrightHomes.behindPlayer(player);
+        this.returnLimit = returnBudget(dock);
+    }
+
+    /** Random 3–10 blocks above the dock; never repeats the previous manage-add pick. */
+    private int nextDockHeight() {
         int height = 3 + this.getRandom().nextInt(8);
-        if (height == lastLaunchHeight) {
+        if (height == lastDockHeight) {
             height = 3 + (height - 3 + 1 + this.getRandom().nextInt(7)) % 8;
         }
-        lastLaunchHeight = height;
+        lastDockHeight = height;
         return height;
     }
 

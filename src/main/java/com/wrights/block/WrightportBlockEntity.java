@@ -172,7 +172,7 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
         if (level != null) {
             BlockPos pos = this.worldPosition;
             AABB box = new AABB(pos.getX() - 6.0D, pos.getY() - 0.5D, pos.getZ() - 6.0D,
-                    pos.getX() + 7.0D, pos.getY() + 7.5D, pos.getZ() + 7.0D);
+                    pos.getX() + 7.0D, pos.getY() + 12.0D, pos.getZ() + 7.0D);
             traffic = !level.getEntitiesOfClass(DroneEntity.class, box, Entity::isAlive).isEmpty();
         }
         if (traffic) {

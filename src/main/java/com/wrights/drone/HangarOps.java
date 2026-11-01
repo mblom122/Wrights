@@ -225,6 +225,7 @@ public final class HangarOps {
         for (Taken taken : tiers) {
             next = next.addUnit(taken.tier(), taken.name());
         }
+        HangarDock.show(player, tiers.stream().map(Taken::tier).toList());
         if (tiers.size() >= capRoom) {
             Messages.actionBar(player, "message.wrights.wright_cap_added", tiers.size(), WrightsConfig.maxWrightsOwned());
         } else {
@@ -799,6 +800,7 @@ public final class HangarOps {
             return swarm;
         }
         Messages.actionBar(player, "message.wrights.drone_built", swarm.units().size() + 1);
+        HangarDock.show(player, List.of(WrightTier.BASE));
         return swarm.addUnit();
     }
 
