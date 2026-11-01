@@ -10,6 +10,8 @@ import java.util.UUID;
 import javax.annotation.Nullable;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.TickTask;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -25,6 +27,7 @@ import com.wrights.network.BlueprintPayloads;
  * Job depart / return flight is unchanged.
  */
 public final class HangarDock {
+    private static final int REOPEN_DELAY_TICKS = 20;
     private static final Map<UUID, Set<UUID>> PENDING = new HashMap<>();
     private static final Map<UUID, CraftDeliveries.Hangar> TARGETS = new HashMap<>();
 
@@ -93,15 +96,24 @@ public final class HangarDock {
     private static void sync(ServerPlayer player, int remaining) {
         CraftDeliveries.Hangar hangar = TARGETS.get(player.getUUID());
         int left = Math.max(0, remaining);
-        PacketDistributor.sendToPlayer(player, encode(left, hangar));
         if (left > 0) {
+            PacketDistributor.sendToPlayer(player, encode(left, hangar));
             return;
         }
         TARGETS.remove(player.getUUID());
-        // Next tick so the client clears dock-wait before the menu packet arrives.
+        CraftDeliveries.Hangar target = hangar;
+        MinecraftServer server = player.getServer();
+        // Extra second after the last physical dock so the lid can settle before Manage reopens.
+        server.tell(new TickTask(server.getTickCount() + REOPEN_DELAY_TICKS, () -> finishWait(player, target)));
+    }
+
+    private static void finishWait(ServerPlayer player, @Nullable CraftDeliveries.Hangar hangar) {
+        if (player == null || !player.isAlive()) {
+            return;
+        }
+        PacketDistributor.sendToPlayer(player, encode(0, hangar));
         if (hangar != null && hangar.placed()) {
-            CraftDeliveries.Hangar target = hangar;
-            player.getServer().execute(() -> reopenPlaced(player, target));
+            reopenPlaced(player, hangar);
         }
     }
 
