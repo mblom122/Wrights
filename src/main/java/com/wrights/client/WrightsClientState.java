@@ -1757,11 +1757,8 @@ public final class WrightsClientState {
             if (style == 1) {
                 return minecraft.player.blockPosition().below();
             }
-            if (style == 2) {
-                Direction forward = minecraft.player.getDirection();
-                return minecraft.player.blockPosition()
-                        .relative(forward, WrightsClientConfig.placeBridgeOffset())
-                        .below();
+            if (WrightsClientConfig.placePathStyle()) {
+                return placePathCell(minecraft.player);
             }
             if (shapeLookSnapActive()) {
                 return shapeLookSnapPos;
@@ -1942,7 +1939,7 @@ public final class WrightsClientState {
 
     /**
      * Place tool: same footprint as Exchange, but builds instead of swaps.
-     * Style Look → aim cell; To me → under the player; Bridge → toggle continuous path.
+     * Look → aim; To me → under feet; Bridge / Stairs → toggle continuous path.
      */
     public static boolean tryPlace(boolean force, BlockPos pos, Direction face) {
         Minecraft minecraft = Minecraft.getInstance();
@@ -1954,23 +1951,32 @@ public final class WrightsClientState {
             return false;
         }
         int style = WrightsClientConfig.placeStyle();
-        if (style == 2 && !force) {
+        if (WrightsClientConfig.placePathStyle() && !force) {
             bridgeActive = !bridgeActive;
             bridgeCooldown = 0;
-            minecraft.player.displayClientMessage(
-                    Component.translatable(
-                            bridgeActive ? "message.wrights.place_bridge_on" : "message.wrights.place_bridge_off",
-                            WrightsClientConfig.placeBridgeOffset()),
-                    true);
+            if (style == 3) {
+                minecraft.player.displayClientMessage(
+                        Component.translatable(
+                                bridgeActive ? "message.wrights.place_stairs_on" : "message.wrights.place_stairs_off",
+                                Component.translatable(
+                                        WrightsClientConfig.placeStairsUp()
+                                                ? "menu.wrights.place_stairs_up"
+                                                : "menu.wrights.place_stairs_down"),
+                                WrightsClientConfig.placeBridgeOffset()),
+                        true);
+            } else {
+                minecraft.player.displayClientMessage(
+                        Component.translatable(
+                                bridgeActive ? "message.wrights.place_bridge_on" : "message.wrights.place_bridge_off",
+                                WrightsClientConfig.placeBridgeOffset()),
+                        true);
+            }
             return true;
         }
         WrightsClientConfig.enforceExchangeLineFootprint();
-        if (style == 1 || style == 2) {
-            if (style == 2) {
-                Direction forward = minecraft.player.getDirection();
-                pos = minecraft.player.blockPosition()
-                        .relative(forward, WrightsClientConfig.placeBridgeOffset())
-                        .below();
+        if (style == 1 || WrightsClientConfig.placePathStyle()) {
+            if (WrightsClientConfig.placePathStyle()) {
+                pos = placePathCell(minecraft.player);
             } else {
                 pos = minecraft.player.blockPosition().below();
             }
@@ -2012,9 +2018,25 @@ public final class WrightsClientState {
         return true;
     }
 
-    /** Place a single bridge cell under the player, offset forward. */
+    /**
+     * Path cell for Bridge / Stairs.
+     * Bridge: floor under feet, shifted forward.
+     * Stairs up: one step above that floor ahead (block at feet Y).
+     * Stairs down: one step below that floor ahead.
+     */
+    public static BlockPos placePathCell(Player player) {
+        Direction forward = player.getDirection();
+        int offset = WrightsClientConfig.placeBridgeOffset();
+        BlockPos ahead = player.blockPosition().relative(forward, offset);
+        if (WrightsClientConfig.placeStyle() == 3) {
+            return WrightsClientConfig.placeStairsUp() ? ahead : ahead.below(2);
+        }
+        return ahead.below();
+    }
+
+    /** Place a single Bridge / Stairs path cell while the toggle is on. */
     public static void tickBridge() {
-        if (!placeToolActive() || !bridgeActive || WrightsClientConfig.placeStyle() != 2) {
+        if (!placeToolActive() || !bridgeActive || !WrightsClientConfig.placePathStyle()) {
             return;
         }
         Minecraft minecraft = Minecraft.getInstance();
@@ -2029,9 +2051,7 @@ public final class WrightsClientState {
         if (WrightsClientConfig.shapeMaterials().isEmpty()) {
             return;
         }
-        Direction forward = minecraft.player.getDirection();
-        int offset = WrightsClientConfig.placeBridgeOffset();
-        BlockPos at = minecraft.player.blockPosition().relative(forward, offset).below();
+        BlockPos at = placePathCell(minecraft.player);
         BlockState state = minecraft.level.getBlockState(at);
         if (!state.isAir() && !state.canBeReplaced()) {
             bridgeCooldown = 2;

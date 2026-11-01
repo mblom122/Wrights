@@ -131,11 +131,14 @@ public final class WrightsClientConfig {
             .comment("Last build sub-tool. 0 use template, 1 mirror, 2 shape, 3 bind inventory, 4 exchange, 5 place.")
             .defineInRange("lastBuildTool", 0, 0, 5);
     public static final ModConfigSpec.IntValue PLACE_STYLE = BUILDER
-            .comment("Place aim: 0 Where I look, 1 To me (feet), 2 Bridge (toggle while walking).")
-            .defineInRange("placeStyle", 0, 0, 2);
+            .comment("Place aim: 0 Where I look, 1 To me (feet), 2 Bridge, 3 Stairs (toggle while walking).")
+            .defineInRange("placeStyle", 0, 0, 3);
     public static final ModConfigSpec.IntValue PLACE_BRIDGE_OFFSET = BUILDER
-            .comment("Blocks in front of the player for Bridge mode (under-feet cell moved forward). Max 12.")
+            .comment("Blocks in front of the player for Bridge / Stairs path modes. Max 12.")
             .defineInRange("placeBridgeOffset", 3, 1, 12);
+    public static final ModConfigSpec.BooleanValue PLACE_STAIRS_UP = BUILDER
+            .comment("Stairs path: true builds a step up ahead, false builds a step down.")
+            .define("placeStairsUp", true);
     public static final ModConfigSpec.ConfigValue<String> LAST_BUILD = BUILDER
             .comment("Last blueprint that was being built.")
             .define("lastBuild", "");
@@ -674,12 +677,19 @@ public final class WrightsClientConfig {
     }
 
     public static void setPlaceStyle(int style) {
-        int next = clamp(style, 0, 2);
+        int next = clamp(style, 0, 3);
         PLACE_STYLE.set(next);
-        if (next != 2) {
+        // Bridge / Stairs share the walking-path toggle.
+        if (next != 2 && next != 3) {
             com.wrights.client.WrightsClientState.bridgeActive = false;
         }
         save();
+    }
+
+    /** Bridge or Stairs — RMB toggles continuous path placing. */
+    public static boolean placePathStyle() {
+        int style = placeStyle();
+        return style == 2 || style == 3;
     }
 
     public static int placeBridgeOffset() {
@@ -688,6 +698,15 @@ public final class WrightsClientConfig {
 
     public static void setPlaceBridgeOffset(int offset) {
         PLACE_BRIDGE_OFFSET.set(clamp(offset, 1, 12));
+        save();
+    }
+
+    public static boolean placeStairsUp() {
+        return PLACE_STAIRS_UP.get();
+    }
+
+    public static void setPlaceStairsUp(boolean up) {
+        PLACE_STAIRS_UP.set(up);
         save();
     }
 

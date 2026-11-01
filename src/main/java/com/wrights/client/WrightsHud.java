@@ -293,7 +293,7 @@ public final class WrightsHud {
         CtrlHelp kind = ctrlHelpKind();
         boolean bridgeScroll = kind == CtrlHelp.SIZE
                 && WrightsClientState.placeToolActive()
-                && WrightsClientConfig.placeStyle() == 2;
+                && WrightsClientConfig.placePathStyle();
         String titleKey = switch (kind) {
             case SIZE -> bridgeScroll ? "hud.wrights.ctrl_bridge_title" : "hud.wrights.ctrl_size_title";
             case ROTATE -> "hud.wrights.ctrl_rotate_title";
@@ -362,6 +362,7 @@ public final class WrightsHud {
         } else if (mode == WrightsClientState.Mode.BUILD) {
             if (WrightsClientState.placeToolActive()) {
                 key.append("|place|").append(WrightsClientConfig.placeStyle());
+                key.append('|').append(WrightsClientConfig.placeStairsUp());
                 key.append('|').append(WrightsClientConfig.exchangeForm().name());
                 key.append('|').append(WrightsClientState.bridgeActive);
             } else if (WrightsClientState.exchangeToolActive()) {
@@ -665,17 +666,31 @@ public final class WrightsHud {
         return Component.translatable("hud.wrights.tool_exchange_detail", name, exchangeDimText(form));
     }
 
-    /** Title line: Place form + Look / To me / Bridge status. */
+    /** Title line: Place form + Look / To me / Bridge / Stairs status. */
     private static Component placeStatusLine() {
         Shapes.ExchangeForm form = WrightsClientConfig.exchangeForm();
         Component name = Component.translatable(form.langKey());
         Component aim = Component.translatable(placeAimKey());
-        if (WrightsClientConfig.placeStyle() == 2) {
+        int style = WrightsClientConfig.placeStyle();
+        if (style == 2) {
             return Component.translatable(
                     WrightsClientState.bridgeActive
                             ? "hud.wrights.tool_place_bridge_on"
                             : "hud.wrights.tool_place_bridge_off",
                     name,
+                    WrightsClientConfig.placeBridgeOffset());
+        }
+        if (style == 3) {
+            Component dir = Component.translatable(
+                    WrightsClientConfig.placeStairsUp()
+                            ? "menu.wrights.place_stairs_up"
+                            : "menu.wrights.place_stairs_down");
+            return Component.translatable(
+                    WrightsClientState.bridgeActive
+                            ? "hud.wrights.tool_place_stairs_on"
+                            : "hud.wrights.tool_place_stairs_off",
+                    name,
+                    dir,
                     WrightsClientConfig.placeBridgeOffset());
         }
         return Component.translatable("hud.wrights.tool_place_detail", name, exchangeDimText(form), aim);
@@ -685,6 +700,7 @@ public final class WrightsHud {
         return switch (WrightsClientConfig.placeStyle()) {
             case 1 -> "menu.wrights.place_aim_me";
             case 2 -> "menu.wrights.place_aim_bridge";
+            case 3 -> "menu.wrights.place_aim_stairs";
             default -> "menu.wrights.place_aim_look";
         };
     }
@@ -695,6 +711,9 @@ public final class WrightsHud {
             case 2 -> WrightsClientState.bridgeActive
                     ? "hud.wrights.place_bridge_ready"
                     : "hud.wrights.place_bridge_explain";
+            case 3 -> WrightsClientState.bridgeActive
+                    ? "hud.wrights.place_stairs_ready"
+                    : "hud.wrights.place_stairs_explain";
             default -> "hud.wrights.place_look_explain";
         };
     }

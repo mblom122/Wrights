@@ -635,10 +635,10 @@ public final class WrightsInput {
             return;
         }
         if (control) {
-            // Place Bridge: Ctrl+scroll adjusts how far ahead the path builds (1–12).
+            // Place Bridge / Stairs: Ctrl+scroll adjusts how far ahead the path builds (1–12).
             if (WrightsClientState.placeToolActive()
                     && com.wrights.WrightsConfig.allowPlaceTool()
-                    && com.wrights.WrightsClientConfig.placeStyle() == 2) {
+                    && com.wrights.WrightsClientConfig.placePathStyle()) {
                 int step = event.getScrollDeltaY() > 0.0D ? 1 : -1;
                 com.wrights.WrightsClientConfig.setPlaceBridgeOffset(
                         com.wrights.WrightsClientConfig.placeBridgeOffset() + step);

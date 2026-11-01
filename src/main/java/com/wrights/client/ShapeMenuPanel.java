@@ -247,14 +247,15 @@ final class ShapeMenuPanel {
         if (placeMode) {
             drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.place_aim", "menu.wrights.place_aim_hint");
             y += 12;
-            y = drawTriple(graphics, mouseX, mouseY, x, y, leftW,
+            y = drawQuad(graphics, mouseX, mouseY, x, y, leftW,
                     WrightsClientConfig.placeStyle(),
                     "menu.wrights.place_aim_look",
                     "menu.wrights.place_aim_me",
                     "menu.wrights.place_aim_bridge",
+                    "menu.wrights.place_aim_stairs",
                     "place_style");
             y += 4;
-            if (WrightsClientConfig.placeStyle() == 2) {
+            if (WrightsClientConfig.placePathStyle()) {
                 drawField(graphics, mouseX, mouseY, x, y,
                         "menu.wrights.place_bridge_offset", "menu.wrights.place_bridge_offset_hint");
                 y += 12;
@@ -262,6 +263,17 @@ final class ShapeMenuPanel {
                 drawDimSlider(graphics, mouseX, mouseY, x, y, leftW,
                         WrightsClientConfig.placeBridgeOffset(), SLIDER_BRIDGE);
                 y += 18;
+            }
+            if (WrightsClientConfig.placeStyle() == 3) {
+                drawField(graphics, mouseX, mouseY, x, y,
+                        "menu.wrights.place_stairs_dir", "menu.wrights.place_stairs_dir_hint");
+                y += 12;
+                y = drawPair(graphics, mouseX, mouseY, x, y, leftW,
+                        !WrightsClientConfig.placeStairsUp(),
+                        "menu.wrights.place_stairs_up",
+                        "menu.wrights.place_stairs_down",
+                        "place_stairs_dir");
+                y += 4;
             }
         } else {
             drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_place", "menu.wrights.shape_place_hint");
@@ -691,6 +703,13 @@ final class ShapeMenuPanel {
             case "place_style" -> {
                 if (placeMode) {
                     WrightsClientConfig.setPlaceStyle(value);
+                }
+                yield true;
+            }
+            case "place_stairs_dir" -> {
+                if (placeMode) {
+                    // drawPair: 0 = left (Up), 1 = right (Down)
+                    WrightsClientConfig.setPlaceStairsUp(value == 0);
                 }
                 yield true;
             }

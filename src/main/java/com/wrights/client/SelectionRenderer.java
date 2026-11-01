@@ -174,18 +174,19 @@ public final class SelectionRenderer {
         if (formPresets) {
             WrightsClientConfig.enforceExchangeLineFootprint();
         }
-        // Bridge always previews the single path cell under/ahead of the player.
-        int size = place && WrightsClientConfig.placeStyle() == 2 ? 1 : WrightsClientConfig.SHAPE_SIZE.get();
-        int height = place && WrightsClientConfig.placeStyle() == 2 ? 1 : WrightsClientConfig.SHAPE_HEIGHT.get();
-        int thickness = place && WrightsClientConfig.placeStyle() == 2 ? 1 : WrightsClientConfig.SHAPE_THICKNESS.get();
-        if (place && WrightsClientConfig.placeStyle() == 2) {
+        // Bridge / Stairs always preview the single path cell under/ahead of the player.
+        boolean path = place && WrightsClientConfig.placePathStyle();
+        int size = path ? 1 : WrightsClientConfig.SHAPE_SIZE.get();
+        int height = path ? 1 : WrightsClientConfig.SHAPE_HEIGHT.get();
+        int thickness = path ? 1 : WrightsClientConfig.SHAPE_THICKNESS.get();
+        if (path) {
             kind = com.wrights.blueprint.Shapes.Kind.RECTANGLE;
         }
         boolean hollow = !place && WrightsClientConfig.SHAPE_HOLLOW.get() && WrightsConfig.allowShapeHollow();
         int plane = WrightsClientConfig.SHAPE_PLANE.get();
         int yaw = com.wrights.blueprint.Shapes.clampYaw(WrightsClientConfig.SHAPE_YAW.get());
         int pivot = formPresets
-                ? (place && WrightsClientConfig.placeStyle() == 2
+                ? (path
                         ? com.wrights.blueprint.Shapes.pivotId(0, 4)
                         : WrightsClientConfig.exchangePivot())
                 : WrightsClientConfig.SHAPE_PIVOT.get();
