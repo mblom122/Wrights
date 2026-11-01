@@ -51,6 +51,8 @@ final class ShapeMenuPanel {
     private int previewSizeZ = 1;
     private long previewKey = Long.MIN_VALUE;
     private float previewYaw = 35.0F;
+    private float previewPitch = 28.0F;
+    private boolean previewSpinning;
 
     ShapeMenuPanel(Font font) {
         this.font = font;
@@ -208,6 +210,10 @@ final class ShapeMenuPanel {
     }
 
     boolean mouseClicked(double mouseX, double mouseY) {
+        if (insidePreview(mouseX, mouseY)) {
+            previewSpinning = true;
+            return true;
+        }
         if (mouseX < bodyX - 4 || mouseX > bodyX + bodyW + 4 || mouseY < viewTop || mouseY > viewTop + viewH) {
             return false;
         }
@@ -230,6 +236,31 @@ final class ShapeMenuPanel {
             return apply(hit.id, hit.value);
         }
         return false;
+    }
+
+    boolean mouseDragged(double dragX, double dragY) {
+        if (!previewSpinning) {
+            return false;
+        }
+        previewYaw += (float) dragX * 0.75F;
+        previewPitch = Mth.clamp(previewPitch + (float) dragY * 0.45F, -70.0F, 70.0F);
+        return true;
+    }
+
+    boolean mouseReleased() {
+        if (!previewSpinning) {
+            return false;
+        }
+        previewSpinning = false;
+        return true;
+    }
+
+    private boolean insidePreview(double mouseX, double mouseY) {
+        return previewW > 0
+                && mouseX >= previewX
+                && mouseX < previewX + previewW
+                && mouseY >= viewTop
+                && mouseY < viewTop + viewH;
     }
 
     boolean dragSize(double mouseX) {
@@ -664,7 +695,9 @@ final class ShapeMenuPanel {
             graphics.drawCenteredString(font, Component.translatable("screen.wrights.preview_hidden"), x + width / 2, y + height / 2 - 4, WrightsUi.MUTED);
             return;
         }
-        previewYaw += 0.35F;
+        if (!previewSpinning) {
+            previewYaw += 0.35F;
+        }
         net.minecraft.core.BlockPos pin = Shapes.pivotBlock(
                 BlockPos.ZERO,
                 new BlockPos(Math.max(0, previewSizeX - 1), Math.max(0, previewSizeY - 1), Math.max(0, previewSizeZ - 1)),
@@ -680,11 +713,12 @@ final class ShapeMenuPanel {
                 previewSizeY,
                 previewSizeZ,
                 previewYaw,
-                28.0F,
+                previewPitch,
                 true,
                 pin.getX(),
                 pin.getY(),
                 pin.getZ());
+        graphics.drawCenteredString(font, Component.translatable("menu.wrights.spin"), x + width / 2, y + height - 12, WrightsUi.MUTED);
     }
 
     private void refreshShapePreview() {

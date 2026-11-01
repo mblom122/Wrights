@@ -2664,6 +2664,9 @@ public class WrightsMenuScreen extends Screen {
             applyDrag(mouseX);
             return true;
         }
+        if (shapePage && shapePanel != null && button == 0 && shapePanel.mouseDragged(dragX, dragY)) {
+            return true;
+        }
         if (spinning && button == 0) {
             yaw += (float) dragX * 0.75F;
             pitch = Mth.clamp(pitch + (float) dragY * 0.45F, -70.0F, 70.0F);
@@ -2674,6 +2677,9 @@ public class WrightsMenuScreen extends Screen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (button == 0 && shapePage && shapePanel != null && shapePanel.mouseReleased()) {
+            return true;
+        }
         if (button == 0 && shelfPress != null) {
             UUID pressed = shelfPress;
             boolean dragging = shelfDragging;
