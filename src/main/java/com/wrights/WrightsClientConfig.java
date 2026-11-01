@@ -239,6 +239,9 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.ConfigValue<String> SHAPE_SUPPLY = BUILDER
             .comment("Priority list for shape materials. 0 main, 1 offhand, 2 action bar, 3 inventory, 4 bound chest, 5 digital.")
             .define("shapeSupply", com.wrights.blueprint.ShapeSupply.DEFAULT_ORDER);
+    public static final ModConfigSpec.ConfigValue<String> SHAPE_MATERIALS = BUILDER
+            .comment("Weighted blocks used by Shape mode. Format id=weight;id=weight. At least one is required.")
+            .define("shapeMaterials", "");
 
     static final ModConfigSpec SPEC = BUILDER.build();
 
@@ -844,6 +847,31 @@ public final class WrightsClientConfig {
         int value = order.remove(index);
         order.add(next, value);
         setShapeSupplyOrder(order);
+    }
+
+    public static java.util.List<com.wrights.blueprint.ShapeMaterials.Entry> shapeMaterials() {
+        return com.wrights.blueprint.ShapeMaterials.parse(SHAPE_MATERIALS.get());
+    }
+
+    public static void setShapeMaterials(java.util.List<com.wrights.blueprint.ShapeMaterials.Entry> entries) {
+        SHAPE_MATERIALS.set(com.wrights.blueprint.ShapeMaterials.encode(entries));
+        save();
+    }
+
+    public static void shapeMaterialAdd(net.minecraft.world.item.Item item) {
+        setShapeMaterials(com.wrights.blueprint.ShapeMaterials.add(shapeMaterials(), item));
+    }
+
+    public static void shapeMaterialRemove(int index) {
+        java.util.List<com.wrights.blueprint.ShapeMaterials.Entry> entries = shapeMaterials();
+        if (entries.size() <= 1) {
+            return;
+        }
+        setShapeMaterials(com.wrights.blueprint.ShapeMaterials.remove(entries, index));
+    }
+
+    public static void shapeMaterialWeight(int index, int weight) {
+        setShapeMaterials(com.wrights.blueprint.ShapeMaterials.setWeight(shapeMaterials(), index, weight));
     }
 
     private static int clamp(int value, int min, int max) {

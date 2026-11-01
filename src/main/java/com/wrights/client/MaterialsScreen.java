@@ -105,6 +105,12 @@ public class MaterialsScreen extends Screen {
     }
 
     private void buildAnyway() {
+        if (id.equals(com.wrights.blueprint.ShapeLaunch.MATERIALS_ID)) {
+            if (WrightsClientState.tryShape(true)) {
+                onClose();
+            }
+            return;
+        }
         if (WrightsClientState.tryBuild(true)) {
             onClose();
         }

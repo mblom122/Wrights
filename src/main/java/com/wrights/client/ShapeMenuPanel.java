@@ -5,17 +5,24 @@ import java.util.List;
 
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.state.BlockState;
 
 import com.wrights.WrightsClientConfig;
 import com.wrights.WrightsConfig;
+import com.wrights.blueprint.ShapeMaterials;
 import com.wrights.blueprint.ShapeSupply;
 import com.wrights.blueprint.Shapes;
 
 /** Shape page body drawn inside the Building section of the controller menu. */
 final class ShapeMenuPanel {
+    private static final int CHIP = 20;
+
     private final Font font;
+    private Screen host;
     private int bodyX;
     private int bodyW;
     private int viewTop;
@@ -25,8 +32,10 @@ final class ShapeMenuPanel {
     private int sizeY = -1;
     private int heightY = -1;
     private int sizeW;
+    private int selectedMaterial;
     private final List<Hit> hits = new ArrayList<>();
     private Component tip;
+    private ItemStack hoveredStack = ItemStack.EMPTY;
 
     ShapeMenuPanel(Font font) {
         this.font = font;
@@ -36,9 +45,15 @@ final class ShapeMenuPanel {
         return tip;
     }
 
-    void render(GuiGraphics graphics, int mouseX, int mouseY, int x, int top, int width, int bottom) {
+    ItemStack hoveredStack() {
+        return hoveredStack;
+    }
+
+    void render(GuiGraphics graphics, int mouseX, int mouseY, int x, int top, int width, int bottom, Screen host) {
         hits.clear();
         tip = null;
+        hoveredStack = ItemStack.EMPTY;
+        this.host = host;
         bodyX = x;
         bodyW = width;
         viewTop = top;
@@ -92,17 +107,16 @@ final class ShapeMenuPanel {
         int col = (width - 6) / 2;
         int right = x + col + 6;
         y = drawToggle(graphics, mouseX, mouseY, x, y, col, WrightsClientConfig.SHAPE_HOLLOW.get(), "menu.wrights.shape_hollow", "menu.wrights.shape_hollow_hint", "hollow");
-        drawToggle(graphics, mouseX, mouseY, right, y - 16, col, WrightsClientConfig.SHAPE_RANDOMIZE.get(), "menu.wrights.shape_randomize", "menu.wrights.shape_randomize_hint", "random");
         if (WrightsConfig.allowShapeReplace()) {
-            y = drawToggle(graphics, mouseX, mouseY, x, y, col, WrightsClientConfig.SHAPE_REPLACE.get(), "menu.wrights.shape_replace", "menu.wrights.shape_replace_hint", "replace");
-            if (WrightsConfig.allowVoidBlocks()) {
-                drawToggle(graphics, mouseX, mouseY, right, y - 16, col, WrightsClientConfig.SHAPE_VOID.get(), "menu.wrights.shape_void", "menu.wrights.shape_void_hint", "void");
-            }
-        } else if (WrightsConfig.allowVoidBlocks()) {
+            drawToggle(graphics, mouseX, mouseY, right, y - 16, col, WrightsClientConfig.SHAPE_REPLACE.get(), "menu.wrights.shape_replace", "menu.wrights.shape_replace_hint", "replace");
+        }
+        if (WrightsConfig.allowVoidBlocks()) {
             y = drawToggle(graphics, mouseX, mouseY, x, y, width, WrightsClientConfig.SHAPE_VOID.get(), "menu.wrights.shape_void", "menu.wrights.shape_void_hint", "void");
         }
         y += 6;
         y = drawStatus(graphics, mouseX, mouseY, x, y, width);
+        y += 8;
+        y = drawMaterials(graphics, mouseX, mouseY, x, y, width);
         y += 8;
         drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_priority", "menu.wrights.shape_priority_hint");
         y += 12;
@@ -185,10 +199,6 @@ final class ShapeMenuPanel {
                 WrightsClientConfig.setShapeHollow(!WrightsClientConfig.SHAPE_HOLLOW.get());
                 yield true;
             }
-            case "random" -> {
-                WrightsClientConfig.setShapeRandomize(!WrightsClientConfig.SHAPE_RANDOMIZE.get());
-                yield true;
-            }
             case "replace" -> {
                 WrightsClientConfig.setShapeReplace(!WrightsClientConfig.SHAPE_REPLACE.get());
                 yield true;
@@ -223,8 +233,97 @@ final class ShapeMenuPanel {
                 WrightsClientConfig.shapeSupplyAdd(value);
                 yield true;
             }
+            case "mat_select" -> {
+                selectedMaterial = value;
+                yield true;
+            }
+            case "mat_pick" -> {
+                if (host != null) {
+                    BlockPickerScreen.openBlocks(host, this::addMaterial);
+                }
+                yield true;
+            }
+            case "mat_remove" -> {
+                WrightsClientConfig.shapeMaterialRemove(value);
+                selectedMaterial = Math.min(selectedMaterial, Math.max(0, WrightsClientConfig.shapeMaterials().size() - 1));
+                yield true;
+            }
+            case "mat_weight_up" -> {
+                List<ShapeMaterials.Entry> entries = WrightsClientConfig.shapeMaterials();
+                if (value >= 0 && value < entries.size()) {
+                    WrightsClientConfig.shapeMaterialWeight(value, entries.get(value).weight() + 1);
+                }
+                yield true;
+            }
+            case "mat_weight_down" -> {
+                List<ShapeMaterials.Entry> entries = WrightsClientConfig.shapeMaterials();
+                if (value >= 0 && value < entries.size()) {
+                    WrightsClientConfig.shapeMaterialWeight(value, entries.get(value).weight() - 1);
+                }
+                yield true;
+            }
             default -> false;
         };
+    }
+
+    private void addMaterial(BlockState state) {
+        if (state == null || state.isAir()) {
+            return;
+        }
+        WrightsClientConfig.shapeMaterialAdd(state.getBlock().asItem());
+        selectedMaterial = Math.max(0, WrightsClientConfig.shapeMaterials().size() - 1);
+    }
+
+    private int drawMaterials(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width) {
+        drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_materials", "menu.wrights.shape_materials_hint");
+        y += 12;
+        List<ShapeMaterials.Entry> entries = WrightsClientConfig.shapeMaterials();
+        if (entries.isEmpty()) {
+            graphics.drawString(font, Component.translatable("menu.wrights.shape_materials_empty"), x, y + 4, WrightsUi.MUTED, false);
+            y += 16;
+        } else {
+            selectedMaterial = Mth.clamp(selectedMaterial, 0, entries.size() - 1);
+            int gap = 4;
+            int cols = Math.max(1, (width + gap) / (CHIP + gap));
+            for (int i = 0; i < entries.size(); i++) {
+                int col = i % cols;
+                int row = i / cols;
+                int cx = x + col * (CHIP + gap);
+                int cy = y + row * (CHIP + gap);
+                boolean on = i == selectedMaterial;
+                boolean hover = mouseX >= cx && mouseX < cx + CHIP && mouseY >= cy && mouseY < cy + CHIP;
+                WrightsUi.slot(graphics, cx, cy, on || hover ? WrightsUi.COPPER : 0xFF31404E);
+                ItemStack stack = entries.get(i).item().getDefaultInstance();
+                graphics.renderItem(stack, cx + 2, cy + 2);
+                String weight = Integer.toString(entries.get(i).weight());
+                int wx = cx + CHIP - 1 - font.width(weight);
+                graphics.fill(wx - 1, cy + CHIP - 9, cx + CHIP - 1, cy + CHIP - 1, 0xAA101820);
+                graphics.drawString(font, weight, wx, cy + CHIP - 9, WrightsUi.COPPER, false);
+                hits.add(new Hit(cx, cy, CHIP, CHIP, "mat_select", i));
+                if (hover) {
+                    hoveredStack = stack;
+                }
+            }
+            int rows = (entries.size() + cols - 1) / cols;
+            y += rows * (CHIP + gap) + 2;
+            ShapeMaterials.Entry selected = entries.get(selectedMaterial);
+            String name = font.plainSubstrByWidth(selected.item().getDefaultInstance().getHoverName().getString(), Math.max(40, width - 110));
+            graphics.drawString(font, name, x, y + 4, WrightsUi.TEXT, false);
+            int controls = x + width;
+            controls = drawMini(graphics, mouseX, mouseY, controls - 16, y + 1, 16, "x", "mat_remove", selectedMaterial, entries.size() > 1) - 2;
+            controls = drawMini(graphics, mouseX, mouseY, controls - 16, y + 1, 16, "+", "mat_weight_up", selectedMaterial, true) - 2;
+            String weight = Integer.toString(selected.weight());
+            int weightW = Math.max(18, font.width(weight) + 6);
+            graphics.drawCenteredString(font, weight, controls - weightW / 2, y + 4, WrightsUi.COPPER);
+            controls -= weightW + 2;
+            drawMini(graphics, mouseX, mouseY, controls - 16, y + 1, 16, "-", "mat_weight_down", selectedMaterial, selected.weight() > 1);
+            y += 20;
+        }
+        boolean pickHover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 18;
+        WrightsUi.choice(graphics, x, y, width, 18, false, pickHover);
+        graphics.drawCenteredString(font, Component.translatable("menu.wrights.shape_materials_pick"), x + width / 2, y + 5, WrightsUi.TEXT);
+        hits.add(new Hit(x, y, width, 18, "mat_pick", 0));
+        return y + 22;
     }
 
     private int drawKinds(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width) {

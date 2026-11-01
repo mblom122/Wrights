@@ -18,18 +18,28 @@ import net.minecraft.world.level.block.state.BlockState;
 import com.wrights.WrightsConfig;
 import com.wrights.item.ControllerItem;
 import com.wrights.job.JobManager;
+import com.wrights.network.BlueprintNetwork;
 import com.wrights.network.BlueprintPayloads;
+import com.wrights.schematic.Requirements;
 import com.wrights.schematic.Schematic;
 import com.wrights.schematic.SchematicLibrary;
 import com.wrights.util.Messages;
 
 /** Builds a shape schematic and starts one wright job for it. */
 public final class ShapeLaunch {
+    /** Materials shortage screen id for shape builds. */
+    public static final UUID MATERIALS_ID = new UUID(0x57726967687473L, 0x5368617065L);
+
     private ShapeLaunch() {
     }
 
     public static void place(ServerPlayer player, BlueprintPayloads.ShapePlace payload) {
         if (!ControllerItem.isHeld(player) || payload == null || WrightsConfig.refuse(player, WrightsConfig.allowShape())) {
+            return;
+        }
+        List<ShapeMaterials.Entry> materials = ShapeMaterials.parse(payload.materials());
+        if (materials.isEmpty()) {
+            Messages.actionBar(player, "message.wrights.shape_need_materials");
             return;
         }
         Shapes.Kind kind = Shapes.Kind.byId(payload.kind());
@@ -70,12 +80,7 @@ public final class ShapeLaunch {
             return;
         }
         ServerLevel level = player.serverLevel();
-        Random random = new Random(player.getUUID().getMostSignificantBits() ^ level.getGameTime() ^ worlds.size());
-        List<BlockState> palette = ShapeSupply.palette(player, order, payload.randomizeHotbar());
-        if (palette.isEmpty()) {
-            Messages.actionBar(player, "message.wrights.shape_need_block");
-            return;
-        }
+        Random random = new Random(player.getUUID().getMostSignificantBits() ^ level.getGameTime() ^ worlds.size() ^ materials.hashCode());
         List<BlockPos> ready = new ArrayList<>(worlds.size());
         List<BlockState> states = new ArrayList<>(worlds.size());
         Map<Item, Integer> need = new HashMap<>();
@@ -87,9 +92,7 @@ public final class ShapeLaunch {
             if (!replace && !voidBlocks && !current.isAir()) {
                 continue;
             }
-            BlockState next = palette.size() == 1 || !payload.randomizeHotbar()
-                    ? palette.get(0)
-                    : palette.get(random.nextInt(palette.size()));
+            BlockState next = ShapeMaterials.pick(materials, random);
             if (next == null || next.isAir()) {
                 continue;
             }
@@ -105,12 +108,16 @@ public final class ShapeLaunch {
             Messages.actionBar(player, "message.wrights.shape_nowhere");
             return;
         }
-        if (!player.getAbilities().instabuild) {
+        BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
+        if (!payload.force() && !player.getAbilities().instabuild && !player.isSpectator()) {
+            List<Requirements.Cost> costs = new ArrayList<>(need.size());
             for (Map.Entry<Item, Integer> entry : need.entrySet()) {
-                if (!ShapeSupply.canAfford(player, entry.getKey(), entry.getValue(), order)) {
-                    Messages.actionBar(player, "message.wrights.shape_missing");
-                    return;
-                }
+                costs.add(new Requirements.Cost(Item.getId(entry.getKey()), entry.getValue()));
+            }
+            List<Requirements.Cost> listed = Requirements.ordered(player, costs, session.supplyPos(), session.supplyDimension());
+            if (Requirements.anyShort(listed)) {
+                BlueprintNetwork.materials(player, MATERIALS_ID, true, listed);
+                return;
             }
         }
         BlockPos origin = Shapes.origin(ready);
@@ -139,7 +146,8 @@ public final class ShapeLaunch {
             Messages.actionBar(player, "message.wrights.shape_too_big");
             return;
         }
-        String name = "Shape - " + kind.name().charAt(0) + kind.name().substring(1).toLowerCase();
+        String label = kind.name().charAt(0) + kind.name().substring(1).toLowerCase();
+        String name = "Shape - " + label;
         Schematic schematic = new Schematic(
                 UUID.randomUUID(),
                 name,
@@ -157,6 +165,7 @@ public final class ShapeLaunch {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         library.putSchematic(schematic);
         boolean playerFirst = playerSourcesFirst(order);
+        boolean deferSupplies = payload.force() && !player.getAbilities().instabuild && !player.isSpectator();
         boolean ok = JobManager.startBlueprintBuild(
                 player,
                 schematic.id(),
@@ -171,7 +180,7 @@ public final class ShapeLaunch {
                 false,
                 playerFirst,
                 true,
-                false,
+                deferSupplies,
                 false,
                 false,
                 false);

@@ -139,10 +139,8 @@ public final class SelectionRenderer {
         } else {
             return;
         }
-        List<BlockState> palette = com.wrights.blueprint.ShapeSupply.palette(
-                minecraft.player,
-                WrightsClientConfig.shapeSupplyOrder(),
-                WrightsClientConfig.SHAPE_RANDOMIZE.get());
+        List<com.wrights.blueprint.ShapeMaterials.Entry> materials = WrightsClientConfig.shapeMaterials();
+        List<BlockState> palette = com.wrights.blueprint.ShapeMaterials.states(materials);
         if (palette.isEmpty()) {
             return;
         }
@@ -157,6 +155,7 @@ public final class SelectionRenderer {
         BlockRenderDispatcher renderer = minecraft.getBlockRenderer();
         int budget = previewBudget();
         int drawn = 0;
+        java.util.Random previewRandom = new java.util.Random(center.asLong() ^ materials.hashCode());
         for (BlockPos world : worlds) {
             if (drawn >= budget) {
                 break;
@@ -170,8 +169,8 @@ public final class SelectionRenderer {
             if (!replace && !minecraft.level.getBlockState(world).isAir()) {
                 continue;
             }
-            BlockState state = palette.get(drawn % palette.size());
-            if (!ghostVisible(state)) {
+            BlockState state = com.wrights.blueprint.ShapeMaterials.pick(materials, previewRandom);
+            if (state == null || !ghostVisible(state)) {
                 continue;
             }
             drawGhost(pose, buffers, renderer, camera, world.getX(), world.getY(), world.getZ(), state);

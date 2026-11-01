@@ -1484,6 +1484,55 @@ public final class WrightsClientState {
         glowShapeAnchor(dimension, pos);
     }
 
+    private static BlueprintPayloads.ShapePlace pendingShape;
+
+    public static boolean tryShape(boolean force) {
+        if (pendingShape == null) {
+            return false;
+        }
+        return tryShape(force, pendingShape.pos(), Direction.from3DDataValue(pendingShape.face()));
+    }
+
+    public static boolean tryShape(boolean force, BlockPos pos, Direction face) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || !ControllerItem.isHeld(minecraft.player)) {
+            return false;
+        }
+        if (WrightsClientConfig.shapeMaterials().isEmpty()) {
+            minecraft.player.displayClientMessage(Component.translatable("message.wrights.shape_need_materials"), true);
+            return false;
+        }
+        String dimension = minecraft.level == null ? "" : minecraft.level.dimension().location().toString();
+        boolean useAnchor = WrightsClientConfig.SHAPE_USE_ANCHOR.get();
+        boolean anchorSet = WrightsClientConfig.shapePlaced(dimension);
+        if (useAnchor && !anchorSet) {
+            minecraft.player.displayClientMessage(Component.translatable("message.wrights.shape_need_anchor"), true);
+            return false;
+        }
+        if (!useAnchor && (pos == null || face == null)) {
+            minecraft.player.displayClientMessage(Component.translatable("message.wrights.shape_look"), true);
+            return false;
+        }
+        pendingShape = new BlueprintPayloads.ShapePlace(
+                pos == null ? BlockPos.ZERO : pos,
+                face == null ? 0 : face.get3DDataValue(),
+                useAnchor,
+                anchorSet,
+                anchorSet ? WrightsClientConfig.shapeAnchor() : BlockPos.ZERO,
+                WrightsClientConfig.SHAPE_KIND.get(),
+                WrightsClientConfig.SHAPE_SIZE.get(),
+                WrightsClientConfig.SHAPE_HEIGHT.get(),
+                WrightsClientConfig.SHAPE_PLANE.get(),
+                WrightsClientConfig.SHAPE_HOLLOW.get(),
+                WrightsClientConfig.SHAPE_REPLACE.get(),
+                WrightsClientConfig.SHAPE_VOID.get(),
+                force,
+                WrightsClientConfig.SHAPE_MATERIALS.get(),
+                WrightsClientConfig.SHAPE_SUPPLY.get());
+        PacketDistributor.sendToServer(pendingShape);
+        return true;
+    }
+
     public static boolean showStoredSettings() {
         return storedSettings || storedAll;
     }

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
@@ -40,6 +41,8 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
     private final int cellX;
     private final int cellY;
     private final int cellZ;
+    private final Consumer<BlockState> pick;
+    private final boolean blocksOnly;
     private final List<Choice> shown = new ArrayList<>();
     private EditBox search;
     private WrightsButton recentButton;
@@ -58,12 +61,18 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
     private int scroll;
 
     public BlockPickerScreen(Screen parent, UUID id, int cellX, int cellY, int cellZ) {
-        super(Component.translatable("screen.wrights.picker"));
+        this(parent, id, cellX, cellY, cellZ, null, false);
+    }
+
+    private BlockPickerScreen(Screen parent, UUID id, int cellX, int cellY, int cellZ, Consumer<BlockState> pick, boolean blocksOnly) {
+        super(Component.translatable(blocksOnly ? "screen.wrights.picker_blocks" : "screen.wrights.picker"));
         this.parent = parent;
         this.id = id;
         this.cellX = cellX;
         this.cellY = cellY;
         this.cellZ = cellZ;
+        this.pick = pick;
+        this.blocksOnly = blocksOnly;
     }
 
     public static void open(Screen parent, UUID id, int x, int y, int z) {
@@ -71,6 +80,14 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
             return;
         }
         net.minecraft.client.Minecraft.getInstance().setScreen(new BlockPickerScreen(parent, id, x, y, z));
+    }
+
+    /** Shape materials picker: blocks only, no fluids, callback instead of edit-cell. */
+    public static void openBlocks(Screen parent, Consumer<BlockState> onPick) {
+        if (onPick == null) {
+            return;
+        }
+        net.minecraft.client.Minecraft.getInstance().setScreen(new BlockPickerScreen(parent, null, 0, 0, 0, onPick, true));
     }
 
     /** Screen that opened this picker — library edit does not need the controller held. */
@@ -210,6 +227,9 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
         }
         shown.clear();
         for (Choice choice : source()) {
+            if (blocksOnly && choice.fluid() != null) {
+                continue;
+            }
             if (!query.isEmpty() && !choice.name().getString().toLowerCase(Locale.ROOT).contains(query)) {
                 continue;
             }
@@ -220,10 +240,10 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
     private List<Choice> source() {
         List<Choice> choices = new ArrayList<>();
         if (tab == Tab.RECENT) {
-            for (RecentBlocks.Pick pick : RecentBlocks.picks()) {
-                if (pick.fluid() != null) {
-                    addFluid(choices, pick.fluid());
-                } else if (pick.item() instanceof BlockItem blockItem && BlockFilters.canStore(blockItem.getBlock().defaultBlockState())) {
+            for (RecentBlocks.Pick recent : RecentBlocks.picks()) {
+                if (!blocksOnly && recent.fluid() != null) {
+                    addFluid(choices, recent.fluid());
+                } else if (recent.item() instanceof BlockItem blockItem && BlockFilters.canStore(blockItem.getBlock().defaultBlockState())) {
                     choices.add(Choice.ofBlock(blockItem));
                 }
             }
@@ -236,7 +256,7 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
                 var inventory = this.minecraft.player.getInventory();
                 for (int i = 0; i < inventory.getContainerSize(); i++) {
                     ItemStack stack = inventory.getItem(i);
-                    Block fluid = fluidForBucket(stack.getItem());
+                    Block fluid = blocksOnly ? null : fluidForBucket(stack.getItem());
                     if (fluid != null && seenFluids.add(fluid)) {
                         addFluid(choices, fluid);
                     } else if (stack.getItem() instanceof BlockItem blockItem
@@ -248,8 +268,10 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
             }
             return choices;
         }
-        for (Block block : sourceFluids()) {
-            addFluid(choices, block);
+        if (!blocksOnly) {
+            for (Block block : sourceFluids()) {
+                addFluid(choices, block);
+            }
         }
         for (Item item : allBlocks()) {
             if (item instanceof BlockItem blockItem) {
@@ -304,9 +326,21 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
     private void choose(Choice choice) {
         BlockState state = Block.stateById(choice.stateId());
         if (BlockFilters.isSourceFluid(state)) {
+            if (blocksOnly) {
+                return;
+            }
             RecentBlocks.rememberFluid(state.getBlock());
         } else if (state.getBlock().asItem() instanceof BlockItem blockItem) {
             RecentBlocks.remember(blockItem);
+        }
+        if (pick != null) {
+            pick.accept(state);
+            this.minecraft.setScreen(parent);
+            return;
+        }
+        if (id == null) {
+            this.minecraft.setScreen(parent);
+            return;
         }
         PacketDistributor.sendToServer(new BlueprintPayloads.EditCell(id, cellX, cellY, cellZ, choice.stateId(), false));
         this.minecraft.setScreen(parent);

@@ -752,9 +752,11 @@ public class WrightsMenuScreen extends Screen {
             int x = listX + 8;
             int w = Math.max(120, panelX + panelW - 28 - listX);
             int closeTop = closeButton != null && closeButton.visible ? closeButton.getY() - 6 : panelY + panelH - 28;
-            shapePanel.render(graphics, mouseX, mouseY, x, panelY + 40, w, closeTop);
+            shapePanel.render(graphics, mouseX, mouseY, x, panelY + 40, w, closeTop, this);
             if (shapePanel.tip() != null) {
                 graphics.renderTooltip(this.font, this.font.split(shapePanel.tip(), 240), mouseX, mouseY);
+            } else if (!shapePanel.hoveredStack().isEmpty()) {
+                graphics.renderTooltip(this.font, shapePanel.hoveredStack(), mouseX, mouseY);
             }
             return;
         }
