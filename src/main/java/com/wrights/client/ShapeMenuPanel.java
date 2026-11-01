@@ -394,8 +394,10 @@ final class ShapeMenuPanel {
         int rows = 3;
         int rowH = 26;
         int previewGap = 8;
-        // Half the row for the 9 kind buttons; the other half hosts a spinning preview.
-        int gridW = Math.max(72, (width - previewGap) / 2);
+        // Kind buttons take a bit more than half; keep the preview inside the panel edge.
+        int previewW = Math.max(40, (width - previewGap) * 2 / 5);
+        int gridW = Math.max(72, width - previewGap - previewW);
+        previewW = Math.max(40, width - previewGap - gridW);
         int cardW = Math.max(36, (gridW - gap * (cols - 1)) / cols);
         int kind = WrightsClientConfig.SHAPE_KIND.get();
         Shapes.Kind[] all = Shapes.Kind.values();
@@ -414,7 +416,7 @@ final class ShapeMenuPanel {
         }
         int gridH = rows * rowH;
         int previewX = x + gridW + previewGap;
-        int previewW = Math.max(40, x + width - previewX);
+        previewW = Math.min(previewW, Math.max(0, x + width - previewX));
         drawShapePreview(graphics, previewX, y, previewW, gridH);
         return y + gridH;
     }
@@ -433,19 +435,18 @@ final class ShapeMenuPanel {
 
     private void refreshShapePreview() {
         Shapes.Kind kind = Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
-        // Cap the menu sample so huge sizes stay cheap to bake and spin.
-        int size = Math.min(10, WrightsClientConfig.SHAPE_SIZE.get());
-        int height = Math.min(10, WrightsClientConfig.SHAPE_HEIGHT.get());
+        int size = Shapes.clampSize(WrightsClientConfig.SHAPE_SIZE.get());
+        int height = Shapes.clampHeight(WrightsClientConfig.SHAPE_HEIGHT.get());
         boolean hollow = WrightsClientConfig.SHAPE_HOLLOW.get();
         boolean flip = WrightsClientConfig.SHAPE_FLIP_VERTICAL.get();
         int plane = WrightsClientConfig.SHAPE_PLANE.get();
         BlockState fill = previewFill();
-        long key = (((long) kind.ordinal() & 0xF) << 48)
-                | (((long) size & 0x3F) << 42)
-                | (((long) height & 0x3F) << 36)
-                | (((long) plane & 0x3) << 34)
-                | ((hollow ? 1L : 0L) << 33)
-                | ((flip ? 1L : 0L) << 32)
+        long key = (((long) kind.ordinal() & 0xFF) << 56)
+                | (((long) size & 0xFF) << 48)
+                | (((long) height & 0xFF) << 40)
+                | (((long) plane & 0x3) << 38)
+                | ((hollow ? 1L : 0L) << 37)
+                | ((flip ? 1L : 0L) << 36)
                 | (Integer.toUnsignedLong(Block.getId(fill)) & 0xFFFFFFFFL);
         if (key == previewKey) {
             return;
