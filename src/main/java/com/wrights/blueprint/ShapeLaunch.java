@@ -49,7 +49,6 @@ public final class ShapeLaunch {
         int plane = Shapes.clampPlane(payload.plane());
         int yaw = Shapes.clampYaw(payload.yaw());
         boolean hollow = payload.hollow() && WrightsConfig.allowShapeHollow();
-        boolean flipVertical = payload.flipVertical() && WrightsConfig.allowShapeFlip();
         boolean replace = payload.replace() && WrightsConfig.allowShapeReplace();
         boolean voidBlocks = payload.voidBlocks() && WrightsConfig.allowShapeVoid();
         List<Integer> order = ShapeSupply.parse(payload.supplyOrder());
@@ -80,8 +79,8 @@ public final class ShapeLaunch {
         }
         // Anchor mode keeps the shape centered on the anchor. Look mode pins the bottom corner of the box.
         List<BlockPos> worlds = useAnchor
-                ? Shapes.blocks(kind, center, size, height, thickness, hollow, plane, flipVertical, yaw)
-                : Shapes.blocksFromCorner(kind, center, size, height, thickness, hollow, plane, flipVertical, yaw);
+                ? Shapes.blocks(kind, center, size, height, thickness, hollow, plane, yaw)
+                : Shapes.blocksFromCorner(kind, center, size, height, thickness, hollow, plane, yaw);
         if (worlds.isEmpty()) {
             Messages.actionBar(player, "message.wrights.shape_empty");
             return;

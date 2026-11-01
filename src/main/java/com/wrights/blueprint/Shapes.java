@@ -79,17 +79,12 @@ public final class Shapes {
     }
 
     /** World positions for one shape centered on {@code center}. */
-    public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, boolean hollow, int plane) {
-        return blocks(kind, center, size, height, 1, hollow, plane, false, 0);
+    public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, boolean hollow, int axis) {
+        return blocks(kind, center, size, height, 1, hollow, axis, 0);
     }
 
-    /** World positions for one shape centered on {@code center}. When {@code flipVertical}, mirrors on Y through the center. */
-    public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, boolean hollow, int plane, boolean flipVertical) {
-        return blocks(kind, center, size, height, 1, hollow, plane, flipVertical, 0);
-    }
-
-    public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, int thickness, boolean hollow, int plane, boolean flipVertical) {
-        return blocks(kind, center, size, height, thickness, hollow, plane, flipVertical, 0);
+    public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, int thickness, boolean hollow, int axis) {
+        return blocks(kind, center, size, height, thickness, hollow, axis, 0);
     }
 
     /**
@@ -98,7 +93,7 @@ public final class Shapes {
      * @param axis height axis: {@link #AXIS_Y}, {@link #AXIS_Z}, or {@link #AXIS_X}
      * @param rotation quarter-turns around the height axis (0–3), Ctrl+scroll in the world
      */
-    public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, int thickness, boolean hollow, int axis, boolean flipVertical, int rotation) {
+    public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, int thickness, boolean hollow, int axis, int rotation) {
         List<BlockPos> out = new ArrayList<>();
         if (center == null || kind == null) {
             return out;
@@ -124,13 +119,6 @@ public final class Shapes {
             case CYLINDER -> cylinder(out, center, r, h, hollow);
             case DOME -> dome(out, center, r, h, hollow);
             case PYRAMID -> pyramid(out, center, r, h, hollow);
-        }
-        if (flipVertical) {
-            int cy = center.getY();
-            for (int i = 0; i < out.size(); i++) {
-                BlockPos pos = out.get(i);
-                out.set(i, new BlockPos(pos.getX(), cy - (pos.getY() - cy), pos.getZ()));
-            }
         }
         orient(out, center, clampPlane(axis), clampYaw(rotation));
         return out;
@@ -186,16 +174,16 @@ public final class Shapes {
      * World positions with the shape's bounding-box min corner (lowest X/Y/Z) at {@code corner}.
      * Used by “where I look” placement so the aim cell is the bottom corner of the box, not the center.
      */
-    public static List<BlockPos> blocksFromCorner(Kind kind, BlockPos corner, int size, int height, boolean hollow, int plane, boolean flipVertical) {
-        return blocksFromCorner(kind, corner, size, height, 1, hollow, plane, flipVertical, 0);
+    public static List<BlockPos> blocksFromCorner(Kind kind, BlockPos corner, int size, int height, boolean hollow, int axis) {
+        return blocksFromCorner(kind, corner, size, height, 1, hollow, axis, 0);
     }
 
-    public static List<BlockPos> blocksFromCorner(Kind kind, BlockPos corner, int size, int height, int thickness, boolean hollow, int plane, boolean flipVertical) {
-        return blocksFromCorner(kind, corner, size, height, thickness, hollow, plane, flipVertical, 0);
+    public static List<BlockPos> blocksFromCorner(Kind kind, BlockPos corner, int size, int height, int thickness, boolean hollow, int axis) {
+        return blocksFromCorner(kind, corner, size, height, thickness, hollow, axis, 0);
     }
 
-    public static List<BlockPos> blocksFromCorner(Kind kind, BlockPos corner, int size, int height, int thickness, boolean hollow, int plane, boolean flipVertical, int yaw) {
-        List<BlockPos> local = blocks(kind, BlockPos.ZERO, size, height, thickness, hollow, plane, flipVertical, yaw);
+    public static List<BlockPos> blocksFromCorner(Kind kind, BlockPos corner, int size, int height, int thickness, boolean hollow, int axis, int rotation) {
+        List<BlockPos> local = blocks(kind, BlockPos.ZERO, size, height, thickness, hollow, axis, rotation);
         if (local.isEmpty() || corner == null) {
             return local;
         }
@@ -490,13 +478,12 @@ public final class Shapes {
             int height,
             int thickness,
             boolean hollow,
-            int plane,
-            boolean flipVertical,
-            int yaw) {
+            int axis,
+            int rotation) {
         if (feet == null) {
             return BlockPos.ZERO;
         }
-        List<BlockPos> local = blocks(kind, BlockPos.ZERO, size, height, thickness, hollow, plane, flipVertical, yaw);
+        List<BlockPos> local = blocks(kind, BlockPos.ZERO, size, height, thickness, hollow, axis, rotation);
         if (local.isEmpty()) {
             return feet.below();
         }

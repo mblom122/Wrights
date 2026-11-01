@@ -185,9 +185,6 @@ public final class WrightsConfig {
     public static final ModConfigSpec.BooleanValue ALLOW_SHAPE_HOLLOW = BUILDER
             .comment("Shape builds may use Hollow (shell only).")
             .define("shapeHollow", true);
-    public static final ModConfigSpec.BooleanValue ALLOW_SHAPE_FLIP = BUILDER
-            .comment("Shape builds may flip vertically (e.g. dome to bowl).")
-            .define("shapeFlip", true);
     public static final ModConfigSpec.BooleanValue ALLOW_SHAPE_VOID = BUILDER
             .comment("Shape builds may void mismatched blocks inside the shape first. Also needs voidBlocks.")
             .define("shapeVoid", true);
@@ -383,10 +380,6 @@ public final class WrightsConfig {
 
     public static boolean allowShapeHollow() {
         return allowShape() && read(ALLOW_SHAPE_HOLLOW, true);
-    }
-
-    public static boolean allowShapeFlip() {
-        return allowShape() && read(ALLOW_SHAPE_FLIP, true);
     }
 
     public static boolean allowShapeVoid() {

@@ -167,15 +167,8 @@ final class ShapeMenuPanel {
         }
         int col = (width - 6) / 2;
         int right = x + col + 6;
-        boolean showHollow = WrightsConfig.allowShapeHollow();
-        boolean showFlip = WrightsConfig.allowShapeFlip();
-        if (showHollow && showFlip) {
-            y = drawToggle(graphics, mouseX, mouseY, x, y, col, WrightsClientConfig.SHAPE_HOLLOW.get(), "menu.wrights.shape_hollow", "menu.wrights.shape_hollow_hint", "hollow");
-            drawToggle(graphics, mouseX, mouseY, right, y - 16, col, WrightsClientConfig.SHAPE_FLIP_VERTICAL.get(), "menu.wrights.shape_flip", "menu.wrights.shape_flip_hint", "flip");
-        } else if (showHollow) {
+        if (WrightsConfig.allowShapeHollow()) {
             y = drawToggle(graphics, mouseX, mouseY, x, y, width, WrightsClientConfig.SHAPE_HOLLOW.get(), "menu.wrights.shape_hollow", "menu.wrights.shape_hollow_hint", "hollow");
-        } else if (showFlip) {
-            y = drawToggle(graphics, mouseX, mouseY, x, y, width, WrightsClientConfig.SHAPE_FLIP_VERTICAL.get(), "menu.wrights.shape_flip", "menu.wrights.shape_flip_hint", "flip");
         }
         if (WrightsConfig.allowShapeReplace()) {
             y = drawToggle(graphics, mouseX, mouseY, x, y, col, WrightsClientConfig.SHAPE_REPLACE.get(), "menu.wrights.shape_replace", "menu.wrights.shape_replace_hint", "replace");
@@ -306,12 +299,6 @@ final class ShapeMenuPanel {
                 }
                 yield true;
             }
-            case "flip" -> {
-                if (WrightsConfig.allowShapeFlip()) {
-                    WrightsClientConfig.setShapeFlipVertical(!WrightsClientConfig.SHAPE_FLIP_VERTICAL.get());
-                }
-                yield true;
-            }
             case "replace" -> {
                 if (WrightsConfig.allowShapeReplace()) {
                     WrightsClientConfig.setShapeReplace(!WrightsClientConfig.SHAPE_REPLACE.get());
@@ -423,7 +410,6 @@ final class ShapeMenuPanel {
                 WrightsClientConfig.SHAPE_THICKNESS.get(),
                 WrightsClientConfig.SHAPE_HOLLOW.get(),
                 WrightsClientConfig.SHAPE_PLANE.get(),
-                WrightsClientConfig.SHAPE_FLIP_VERTICAL.get(),
                 WrightsClientConfig.SHAPE_YAW.get());
         WrightsClientState.setShapeAnchor(anchor);
         WrightsClientConfig.setShapeUseAnchor(true);
@@ -620,18 +606,17 @@ final class ShapeMenuPanel {
         int height = Shapes.clampHeight(WrightsClientConfig.SHAPE_HEIGHT.get());
         int thickness = Shapes.clampHeight(WrightsClientConfig.SHAPE_THICKNESS.get());
         boolean hollow = WrightsClientConfig.SHAPE_HOLLOW.get() && WrightsConfig.allowShapeHollow();
-        boolean flip = WrightsClientConfig.SHAPE_FLIP_VERTICAL.get() && WrightsConfig.allowShapeFlip();
         int plane = WrightsClientConfig.SHAPE_PLANE.get();
         int yaw = Shapes.clampYaw(WrightsClientConfig.SHAPE_YAW.get());
         List<ShapeMaterials.Entry> materials = WrightsClientConfig.shapeMaterials();
         ShapeMaterials.FillMode mode = WrightsClientConfig.shapeFillMode();
         int batch = WrightsClientConfig.SHAPE_ORDER_BATCH.get();
-        long key = previewMaterialsKey(kind, size, height, thickness, plane, yaw, hollow, flip, materials, mode, batch);
+        long key = previewMaterialsKey(kind, size, height, thickness, plane, yaw, hollow, materials, mode, batch);
         if (key == previewKey) {
             return;
         }
         previewKey = key;
-        List<BlockPos> worlds = Shapes.blocks(kind, BlockPos.ZERO, size, height, thickness, hollow, plane, flip, yaw);
+        List<BlockPos> worlds = Shapes.blocks(kind, BlockPos.ZERO, size, height, thickness, hollow, plane, yaw);
         if (worlds.isEmpty()) {
             previewGhosts = List.of();
             previewSizeX = previewSizeY = previewSizeZ = 1;
@@ -697,7 +682,6 @@ final class ShapeMenuPanel {
             int plane,
             int yaw,
             boolean hollow,
-            boolean flip,
             List<ShapeMaterials.Entry> materials,
             ShapeMaterials.FillMode mode,
             int batch) {
@@ -709,7 +693,6 @@ final class ShapeMenuPanel {
         key = key * 31L + plane;
         key = key * 31L + yaw;
         key = key * 31L + (hollow ? 1 : 0);
-        key = key * 31L + (flip ? 1 : 0);
         key = key * 31L + (mode == null ? 0 : mode.ordinal());
         key = key * 31L + batch;
         if (materials != null) {

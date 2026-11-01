@@ -154,10 +154,9 @@ public final class SelectionRenderer {
         boolean hollow = WrightsClientConfig.SHAPE_HOLLOW.get() && WrightsConfig.allowShapeHollow();
         int plane = WrightsClientConfig.SHAPE_PLANE.get();
         int yaw = WrightsClientConfig.SHAPE_YAW.get();
-        boolean flip = WrightsClientConfig.SHAPE_FLIP_VERTICAL.get() && WrightsConfig.allowShapeFlip();
         List<BlockPos> worlds = useAnchor
-                ? com.wrights.blueprint.Shapes.blocks(kind, center, size, height, thickness, hollow, plane, flip, yaw)
-                : com.wrights.blueprint.Shapes.blocksFromCorner(kind, center, size, height, thickness, hollow, plane, flip, yaw);
+                ? com.wrights.blueprint.Shapes.blocks(kind, center, size, height, thickness, hollow, plane, yaw)
+                : com.wrights.blueprint.Shapes.blocksFromCorner(kind, center, size, height, thickness, hollow, plane, yaw);
         boolean replace = WrightsClientConfig.SHAPE_REPLACE.get() && WrightsConfig.allowShapeReplace();
         List<BlockPos> ready = new java.util.ArrayList<>();
         for (BlockPos world : worlds) {

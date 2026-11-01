@@ -221,9 +221,6 @@ public final class WrightsClientConfig {
             .defineInRange("shapeYaw", 0, 0, 3);
     public static final ModConfigSpec.BooleanValue SHAPE_HOLLOW = BUILDER
             .define("shapeHollow", false);
-    public static final ModConfigSpec.BooleanValue SHAPE_FLIP_VERTICAL = BUILDER
-            .comment("When true, mirror the shape on Y through its center (e.g. dome becomes a bowl).")
-            .define("shapeFlipVertical", false);
     public static final ModConfigSpec.BooleanValue SHAPE_RANDOMIZE = BUILDER
             .comment("Legacy. Prefer shapeFillMode.")
             .define("shapeRandomize", false);
@@ -812,11 +809,6 @@ public final class WrightsClientConfig {
 
     public static void setShapeHollow(boolean hollow) {
         SHAPE_HOLLOW.set(hollow);
-        save();
-    }
-
-    public static void setShapeFlipVertical(boolean flip) {
-        SHAPE_FLIP_VERTICAL.set(flip);
         save();
     }
 
