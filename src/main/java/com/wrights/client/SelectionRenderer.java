@@ -351,7 +351,17 @@ public final class SelectionRenderer {
                 .inflate(0.015D);
         float pulse = 0.55F + 0.35F * (float) Math.sin(System.currentTimeMillis() / 280.0D);
         VertexConsumer lines = buffers.getBuffer(RenderType.lines());
-        drawBox(pose, lines, box, camera, 0.55F, 0.72F, 0.86F, 0.45F * pulse);
+        // Same yellow place outline as blueprint holograms (respects client placeEdge color).
+        int place = com.wrights.WrightsClientConfig.placeEdgeRgb();
+        drawBox(
+                pose,
+                lines,
+                box,
+                camera,
+                com.wrights.WrightsClientConfig.channel(place, 16),
+                com.wrights.WrightsClientConfig.channel(place, 8),
+                com.wrights.WrightsClientConfig.channel(place, 0),
+                0.45F * pulse);
         buffers.endBatch(RenderType.lines());
 
         if (pin != null) {
@@ -361,8 +371,8 @@ public final class SelectionRenderer {
     }
 
     /**
-     * Shared copper cross + cube used for shape pins, build anchors, and mirror anchors.
-     * Drawn through blocks so the point stays readable.
+     * Shared blue cross + cube used for shape pins, build anchors, and mirror anchors.
+     * Drawn through blocks so the point stays readable. Yellow = selection border; blue = anchor.
      */
     private static void drawAnchorMarker(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, BlockPos block) {
         drawAnchorMarker(pose, buffers, camera, block, 10.0D);
@@ -377,12 +387,15 @@ public final class SelectionRenderer {
         double cz = block.getZ() + 0.5D;
         double arm = Math.max(0.45D, Math.min(2.8D, span * 0.08D));
         double marker = Math.max(0.2D, Math.min(1.1D, span * 0.035D));
+        float ar = WrightsUi.anchorR();
+        float ag = WrightsUi.anchorG();
+        float ab = WrightsUi.anchorB();
         com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
         VertexConsumer pivot = buffers.getBuffer(RenderType.lines());
-        drawLine(pose, pivot, camera, new Vec3(cx - arm, cy, cz), new Vec3(cx + arm, cy, cz), 0.91F, 0.55F, 0.23F, 1.0F);
-        drawLine(pose, pivot, camera, new Vec3(cx, cy - arm, cz), new Vec3(cx, cy + arm, cz), 0.91F, 0.55F, 0.23F, 1.0F);
-        drawLine(pose, pivot, camera, new Vec3(cx, cy, cz - arm), new Vec3(cx, cy, cz + arm), 0.91F, 0.55F, 0.23F, 1.0F);
-        drawBox(pose, pivot, new AABB(cx - marker, cy - marker, cz - marker, cx + marker, cy + marker, cz + marker), camera, 0.98F, 0.78F, 0.35F, 1.0F);
+        drawLine(pose, pivot, camera, new Vec3(cx - arm, cy, cz), new Vec3(cx + arm, cy, cz), ar, ag, ab, 1.0F);
+        drawLine(pose, pivot, camera, new Vec3(cx, cy - arm, cz), new Vec3(cx, cy + arm, cz), ar, ag, ab, 1.0F);
+        drawLine(pose, pivot, camera, new Vec3(cx, cy, cz - arm), new Vec3(cx, cy, cz + arm), ar, ag, ab, 1.0F);
+        drawBox(pose, pivot, new AABB(cx - marker, cy - marker, cz - marker, cx + marker, cy + marker, cz + marker), camera, ar, ag, ab, 1.0F);
         buffers.endBatch(RenderType.lines());
         com.mojang.blaze3d.systems.RenderSystem.enableDepthTest();
     }
@@ -1298,7 +1311,16 @@ public final class SelectionRenderer {
         }
         drawAnchorMarker(pose, buffers, camera, pos, 14.0D);
         VertexConsumer lines = buffers.getBuffer(RenderType.lines());
-        drawGuide(pose, lines, camera, minecraft.player.getBoundingBox(), new AABB(pos), 0.91F, 0.55F, 0.23F, 1.0F);
+        drawGuide(
+                pose,
+                lines,
+                camera,
+                minecraft.player.getBoundingBox(),
+                new AABB(pos),
+                WrightsUi.anchorR(),
+                WrightsUi.anchorG(),
+                WrightsUi.anchorB(),
+                1.0F);
         buffers.endBatch(RenderType.lines());
     }
 
@@ -1315,7 +1337,16 @@ public final class SelectionRenderer {
         }
         drawAnchorMarker(pose, buffers, camera, pos, 14.0D);
         VertexConsumer lines = buffers.getBuffer(RenderType.lines());
-        drawGuide(pose, lines, camera, minecraft.player.getBoundingBox(), new AABB(pos), 0.91F, 0.55F, 0.23F, 1.0F);
+        drawGuide(
+                pose,
+                lines,
+                camera,
+                minecraft.player.getBoundingBox(),
+                new AABB(pos),
+                WrightsUi.anchorR(),
+                WrightsUi.anchorG(),
+                WrightsUi.anchorB(),
+                1.0F);
         buffers.endBatch(RenderType.lines());
     }
 

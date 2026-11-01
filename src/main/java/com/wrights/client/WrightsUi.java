@@ -17,6 +17,21 @@ public final class WrightsUi {
     /** Box / volume size text (e.g. {@code 64 x 129 x 129}). Always use this for dimension triples. */
     public static final int SIZE = BLUE;
     public static final int GOLD = 0xFFE0B060;
+    public static final int GREEN = 0xFF6FCF97;
+    public static final int RED = 0xFFE07A7A;
+    /** A job that stopped on its own and will continue when the cause clears. */
+    public static final int TEAL = 0xFF5ED0C4;
+    public static final int TEXT = 0xFFE7EEF4;
+    public static final int MUTED = 0xFF93A1AD;
+    public static final int PANEL = 0xF0101822;
+    public static final int INSET = 0xFF0C141C;
+    public static final int CARD = 0xFF1C2A37;
+    public static final int CARD_HOVER = 0xFF223445;
+    public static final int CARD_ON = 0xFF24384A;
+    public static final int SHADE = 0xFF101820;
+
+    private WrightsUi() {
+    }
 
     /** 0–1 channel from an ARGB/RGB int (same bit layout as {@code WrightsClientConfig#channel}). */
     public static float channel(int rgb, int shift) {
@@ -45,21 +60,6 @@ public final class WrightsUi {
 
     public static float borderB() {
         return channel(YELLOW, 0);
-    }
-    public static final int GREEN = 0xFF6FCF97;
-    public static final int RED = 0xFFE07A7A;
-    /** A job that stopped on its own and will continue when the cause clears. */
-    public static final int TEAL = 0xFF5ED0C4;
-    public static final int TEXT = 0xFFE7EEF4;
-    public static final int MUTED = 0xFF93A1AD;
-    public static final int PANEL = 0xF0101822;
-    public static final int INSET = 0xFF0C141C;
-    public static final int CARD = 0xFF1C2A37;
-    public static final int CARD_HOVER = 0xFF223445;
-    public static final int CARD_ON = 0xFF24384A;
-    public static final int SHADE = 0xFF101820;
-
-    private WrightsUi() {
     }
 
     /**

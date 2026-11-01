@@ -167,16 +167,16 @@ public final class StructureGrid {
         boolean selectedHere = selectedX >= 0 && LayerAxis.of(selectedX, selectedY, selectedZ, this.axis) == layer;
         boolean same = selectedHere && selectedX == anchorX && selectedY == anchorY && selectedZ == anchorZ;
         if (selectedHere && !same) {
-            markCell(graphics, filled, LayerAxis.horizontal(this.axis, selectedX, selectedY, selectedZ), LayerAxis.vertical(this.axis, selectedX, selectedY, selectedZ), 0xFFF2D48A, 0x66F0C420);
+            markCell(graphics, filled, LayerAxis.horizontal(this.axis, selectedX, selectedY, selectedZ), LayerAxis.vertical(this.axis, selectedX, selectedY, selectedZ), WrightsUi.SELECT, 0x66F0C420);
         } else if (same && inside(anchorH, anchorV, planeH, planeV)) {
             int cellX = originX + (anchorH - fromX) * cell;
             int cellY = originY + localV(anchorV) * cell;
             int inset = cell <= 6 ? 1 : Math.max(1, blockSize() / 5);
             int inner = Math.max(1, blockSize() - inset * 2);
             if (cell <= 6) {
-                markCorners(graphics, cellX + inset, cellY + inset, inner, 0xFFF2D48A);
+                markCorners(graphics, cellX + inset, cellY + inset, inner, WrightsUi.SELECT);
             } else {
-                WrightsUi.border(graphics, cellX + inset, cellY + inset, inner, inner, 0xFFF2D48A);
+                WrightsUi.border(graphics, cellX + inset, cellY + inset, inner, inner, WrightsUi.SELECT);
             }
         }
         var font = Minecraft.getInstance().font;

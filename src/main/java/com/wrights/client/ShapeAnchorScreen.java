@@ -291,12 +291,13 @@ public class ShapeAnchorScreen extends Screen {
                         if (!anchor) {
                             continue;
                         }
-                        state = Blocks.GOLD_BLOCK.defaultBlockState();
+                        // Blue stand-in so an empty anchor cell still matches world/menu markers.
+                        state = Blocks.LIGHT_BLUE_CONCRETE.defaultBlockState();
                     } else if (anchor) {
-                        // Keep the real block, but tint the ghost so the center reads clearly.
+                        // Keep the real block, but tint blue so the center matches the anchor marker.
                         ghosts.add(new WrightsClientState.Ghost(
                                 dx + RADIUS, dy + RADIUS, dz + RADIUS,
-                                1.0F, 0.85F, 0.25F,
+                                WrightsUi.anchorR(), WrightsUi.anchorG(), WrightsUi.anchorB(),
                                 Block.getId(state)));
                         continue;
                     }

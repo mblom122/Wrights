@@ -299,7 +299,7 @@ public final class LayerColumn {
         int legendWidth = selectedW + legendGap + font.width(anchor);
         int pairX = modelX + Math.max(2, (modelSize - legendWidth) / 2);
         int legendY = gridY + 3;
-        graphics.drawString(font, selected, modelX + 2, legendY, 0xFFF2D48A, true);
+        graphics.drawString(font, selected, modelX + 2, legendY, WrightsUi.SELECT, true);
         graphics.drawString(font, anchor, pairX + selectedW + legendGap, legendY, WrightsUi.BLUE, true);
         graphics.drawString(font, Component.translatable("screen.wrights.layers"), modelX, layersY - 12, WrightsUi.TEXT, false);
         if (promptOpen) {

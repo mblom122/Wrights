@@ -132,8 +132,13 @@ public final class BlueprintModelView {
         mesh.draw(modelView, projection);
         if (showFrame) {
             // Half the old shader-line look: thin solid edge beams in local block space.
+            // Yellow border + blue anchor — same language as world holograms / layer grids.
             float frameThick = Math.max(0.012F, span * 0.004F);
-            drawFrameBeams(modelView, projection, x0, y0, z0, x1, y1, z1, frameThick, 0.55F, 0.72F, 0.86F, 0.85F);
+            int place = com.wrights.WrightsClientConfig.placeEdgeRgb();
+            float br = com.wrights.WrightsClientConfig.channel(place, 16);
+            float bg = com.wrights.WrightsClientConfig.channel(place, 8);
+            float bb = com.wrights.WrightsClientConfig.channel(place, 0);
+            drawFrameBeams(modelView, projection, x0, y0, z0, x1, y1, z1, frameThick, br, bg, bb, 0.85F);
             int px = Math.max(minX, Math.min(maxX, pivotX));
             int py = Math.max(minY, Math.min(maxY, pivotY));
             int pz = Math.max(minZ, Math.min(maxZ, pivotZ));
@@ -143,11 +148,14 @@ public final class BlueprintModelView {
             float arm = Math.max(0.35F, Math.min(2.0F, span * 0.06F));
             float pin = Math.max(0.12F, Math.min(0.7F, span * 0.025F));
             float pinThick = Math.max(frameThick, span * 0.006F);
+            float ar = WrightsUi.anchorR();
+            float ag = WrightsUi.anchorG();
+            float ab = WrightsUi.anchorB();
             RenderSystem.disableDepthTest();
-            drawFrameBeams(modelView, projection, mx - arm, my, mz, mx + arm, my, mz, pinThick, 0.91F, 0.55F, 0.23F, 1.0F);
-            drawFrameBeams(modelView, projection, mx, my - arm, mz, mx, my + arm, mz, pinThick, 0.91F, 0.55F, 0.23F, 1.0F);
-            drawFrameBeams(modelView, projection, mx, my, mz - arm, mx, my, mz + arm, pinThick, 0.91F, 0.55F, 0.23F, 1.0F);
-            drawSolidBox(modelView, projection, mx - pin, my - pin, mz - pin, mx + pin, my + pin, mz + pin, 0.98F, 0.78F, 0.35F, 1.0F);
+            drawFrameBeams(modelView, projection, mx - arm, my, mz, mx + arm, my, mz, pinThick, ar, ag, ab, 1.0F);
+            drawFrameBeams(modelView, projection, mx, my - arm, mz, mx, my + arm, mz, pinThick, ar, ag, ab, 1.0F);
+            drawFrameBeams(modelView, projection, mx, my, mz - arm, mx, my, mz + arm, pinThick, ar, ag, ab, 1.0F);
+            drawSolidBox(modelView, projection, mx - pin, my - pin, mz - pin, mx + pin, my + pin, mz + pin, ar, ag, ab, 1.0F);
             RenderSystem.enableDepthTest();
         }
         RenderSystem.disableDepthTest();
