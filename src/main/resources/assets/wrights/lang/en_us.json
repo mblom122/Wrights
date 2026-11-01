@@ -903,6 +903,8 @@
   "menu.wrights.shape_size_hint": "Radius or half-width of the shape, in blocks from the center.",
   "menu.wrights.shape_height": "Height",
   "menu.wrights.shape_height_hint": "How tall cylinders and pyramids grow upward from the center.",
+  "menu.wrights.shape_thickness": "Thickness",
+  "menu.wrights.shape_thickness_hint": "How many blocks wide the ring band is, from the outer edge inward.",
   "menu.wrights.shape_plane": "Plane",
   "menu.wrights.shape_plane_hint": "Which flat plane a 2D shape sits on.",
   "menu.wrights.shape_plane_xz": "Floor (XZ)",

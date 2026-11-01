@@ -77,7 +77,9 @@ final class ShapeMenuPanel {
         y += 14;
         y = drawKinds(graphics, mouseX, mouseY, x, y, width);
         y += 4;
-        boolean volume = Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get()).volume();
+        Shapes.Kind kind = Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
+        boolean volume = kind.volume();
+        boolean ring = kind == Shapes.Kind.RING;
         drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_size", "menu.wrights.shape_size_hint");
         y += 12;
         sizeY = y;
@@ -88,13 +90,17 @@ final class ShapeMenuPanel {
         graphics.drawString(font, Integer.toString(size), x + sizeW + 8, y, WrightsUi.TEXT, false);
         y += 18;
         heightY = -1;
-        if (volume) {
-            drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_height", "menu.wrights.shape_height_hint");
+        if (volume || ring) {
+            drawSection(graphics, mouseX, mouseY, x, y,
+                    ring ? "menu.wrights.shape_thickness" : "menu.wrights.shape_height",
+                    ring ? "menu.wrights.shape_thickness_hint" : "menu.wrights.shape_height_hint");
             y += 12;
             heightY = y;
             int height = WrightsClientConfig.SHAPE_HEIGHT.get();
-            drawSlider(graphics, x, y, sizeW, height - 1, Math.max(1, max - 1));
-            graphics.drawString(font, Integer.toString(height), x + sizeW + 8, y, WrightsUi.TEXT, false);
+            int heightMax = ring ? Math.max(1, size) : max;
+            int heightValue = ring ? Math.min(height, heightMax) : height;
+            drawSlider(graphics, x, y, sizeW, heightValue - 1, Math.max(1, heightMax - 1));
+            graphics.drawString(font, Integer.toString(heightValue), x + sizeW + 8, y, WrightsUi.TEXT, false);
             y += 18;
         }
         if (!volume) {
@@ -164,7 +170,7 @@ final class ShapeMenuPanel {
             return true;
         }
         if (heightY >= 0 && mouseY >= heightY && mouseY < heightY + 12 && mouseX >= bodyX && mouseX < bodyX + sizeW) {
-            int max = Math.max(1, Math.min(64, WrightsConfig.MAX_AXIS.getAsInt()));
+            int max = heightSliderMax();
             int value = 1 + (int) Math.round((mouseX - bodyX) * (max - 1) / Math.max(1, sizeW));
             WrightsClientConfig.setShapeHeight(value);
             return true;
@@ -192,10 +198,18 @@ final class ShapeMenuPanel {
         if (heightY < 0) {
             return false;
         }
-        int max = Math.max(1, Math.min(64, WrightsConfig.MAX_AXIS.getAsInt()));
+        int max = heightSliderMax();
         int value = 1 + (int) Math.round((mouseX - bodyX) * (max - 1) / Math.max(1, sizeW));
         WrightsClientConfig.setShapeHeight(value);
         return true;
+    }
+
+    private int heightSliderMax() {
+        int cap = Math.max(1, Math.min(64, WrightsConfig.MAX_AXIS.getAsInt()));
+        if (Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get()) == Shapes.Kind.RING) {
+            return Math.max(1, Math.min(cap, WrightsClientConfig.SHAPE_SIZE.get()));
+        }
+        return cap;
     }
 
     private boolean apply(String id, int value) {

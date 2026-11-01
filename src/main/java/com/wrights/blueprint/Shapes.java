@@ -77,7 +77,7 @@ public final class Shapes {
         int flat = clampPlane(plane);
         switch (kind) {
             case CIRCLE -> disk(out, center, r, hollow, flat, false);
-            case RING -> disk(out, center, r, true, flat, false);
+            case RING -> ring(out, center, r, h, flat);
             case SQUARE -> square(out, center, r, hollow, flat);
             case LINE -> line(out, center, r, flat);
             case SPHERE -> sphere(out, center, r, hollow);
@@ -123,6 +123,23 @@ public final class Shapes {
                     continue;
                 }
                 if (hollow && !filledOnly && d2 < inner2) {
+                    continue;
+                }
+                out.add(flat(center, a, b, plane));
+            }
+        }
+    }
+
+    /** Annulus: outer radius {@code radius}, band width {@code thickness} (1 = one-block rim). */
+    private static void ring(List<BlockPos> out, BlockPos center, int radius, int thickness, int plane) {
+        int band = Mth.clamp(thickness, 1, radius);
+        int inner = Math.max(0, radius - band);
+        int r2 = radius * radius;
+        int inner2 = inner * inner;
+        for (int a = -radius; a <= radius; a++) {
+            for (int b = -radius; b <= radius; b++) {
+                int d2 = a * a + b * b;
+                if (d2 > r2 || d2 < inner2) {
                     continue;
                 }
                 out.add(flat(center, a, b, plane));
