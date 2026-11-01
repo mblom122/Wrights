@@ -49,7 +49,6 @@ public final class ShapeLaunch {
         int plane = Shapes.clampPlane(payload.plane());
         int yaw = Shapes.clampYaw(payload.yaw());
         boolean hollow = payload.hollow() && WrightsConfig.allowShapeHollow();
-        boolean replace = payload.replace() && WrightsConfig.allowShapeReplace();
         boolean voidBlocks = payload.voidBlocks() && WrightsConfig.allowShapeVoid();
         List<Integer> order = ShapeSupply.parse(payload.supplyOrder());
         BlockPos center;
@@ -95,7 +94,7 @@ public final class ShapeLaunch {
                 continue;
             }
             BlockState current = level.getBlockState(world);
-            if (!replace && !voidBlocks && !current.isAir()) {
+            if (!voidBlocks && !current.isAir()) {
                 continue;
             }
             ready.add(world.immutable());

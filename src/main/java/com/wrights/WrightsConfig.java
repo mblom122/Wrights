@@ -179,14 +179,11 @@ public final class WrightsConfig {
     public static final ModConfigSpec.BooleanValue ALLOW_SHAPE = BUILDER
             .comment("Shape building. Off hides the shape page and refuses shape jobs.")
             .define("shape", true);
-    public static final ModConfigSpec.BooleanValue ALLOW_SHAPE_REPLACE = BUILDER
-            .comment("Shape builds may replace a block that is already there.")
-            .define("shapeReplace", true);
     public static final ModConfigSpec.BooleanValue ALLOW_SHAPE_HOLLOW = BUILDER
             .comment("Shape builds may use Hollow (shell only).")
             .define("shapeHollow", true);
     public static final ModConfigSpec.BooleanValue ALLOW_SHAPE_VOID = BUILDER
-            .comment("Shape builds may void mismatched blocks inside the shape first. Also needs voidBlocks.")
+            .comment("Shape builds may void existing blocks at placement cells before placing. Also needs voidBlocks.")
             .define("shapeVoid", true);
     public static final ModConfigSpec.BooleanValue ALLOW_SHAPE_ANCHOR = BUILDER
             .comment("Shape builds may use On anchor / Set under me. Off forces Where I look.")
@@ -372,10 +369,6 @@ public final class WrightsConfig {
 
     public static boolean allowShape() {
         return allowBuilding() && read(ALLOW_SHAPE, true);
-    }
-
-    public static boolean allowShapeReplace() {
-        return allowShape() && read(ALLOW_SHAPE_REPLACE, true);
     }
 
     public static boolean allowShapeHollow() {

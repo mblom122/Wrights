@@ -157,10 +157,10 @@ public final class SelectionRenderer {
         List<BlockPos> worlds = useAnchor
                 ? com.wrights.blueprint.Shapes.blocks(kind, center, size, height, thickness, hollow, plane, yaw)
                 : com.wrights.blueprint.Shapes.blocksFromCorner(kind, center, size, height, thickness, hollow, plane, yaw);
-        boolean replace = WrightsClientConfig.SHAPE_REPLACE.get() && WrightsConfig.allowShapeReplace();
+        boolean voidBlocks = WrightsClientConfig.SHAPE_VOID.get() && WrightsConfig.allowShapeVoid();
         List<BlockPos> ready = new java.util.ArrayList<>();
         for (BlockPos world : worlds) {
-            if (!replace && !minecraft.level.getBlockState(world).isAir()) {
+            if (!voidBlocks && !minecraft.level.getBlockState(world).isAir()) {
                 continue;
             }
             ready.add(world);

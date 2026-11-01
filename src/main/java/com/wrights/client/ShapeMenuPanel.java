@@ -165,17 +165,10 @@ final class ShapeMenuPanel {
                 y += 22;
             }
         }
-        int col = (width - 6) / 2;
-        int right = x + col + 6;
         if (WrightsConfig.allowShapeHollow()) {
             y = drawToggle(graphics, mouseX, mouseY, x, y, width, WrightsClientConfig.SHAPE_HOLLOW.get(), "menu.wrights.shape_hollow", "menu.wrights.shape_hollow_hint", "hollow");
         }
-        if (WrightsConfig.allowShapeReplace()) {
-            y = drawToggle(graphics, mouseX, mouseY, x, y, col, WrightsClientConfig.SHAPE_REPLACE.get(), "menu.wrights.shape_replace", "menu.wrights.shape_replace_hint", "replace");
-            if (WrightsConfig.allowShapeVoid()) {
-                drawToggle(graphics, mouseX, mouseY, right, y - 16, col, WrightsClientConfig.SHAPE_VOID.get(), "menu.wrights.shape_void", "menu.wrights.shape_void_hint", "void");
-            }
-        } else if (WrightsConfig.allowShapeVoid()) {
+        if (WrightsConfig.allowShapeVoid()) {
             y = drawToggle(graphics, mouseX, mouseY, x, y, width, WrightsClientConfig.SHAPE_VOID.get(), "menu.wrights.shape_void", "menu.wrights.shape_void_hint", "void");
         }
         y += 6;
@@ -296,12 +289,6 @@ final class ShapeMenuPanel {
             case "hollow" -> {
                 if (WrightsConfig.allowShapeHollow()) {
                     WrightsClientConfig.setShapeHollow(!WrightsClientConfig.SHAPE_HOLLOW.get());
-                }
-                yield true;
-            }
-            case "replace" -> {
-                if (WrightsConfig.allowShapeReplace()) {
-                    WrightsClientConfig.setShapeReplace(!WrightsClientConfig.SHAPE_REPLACE.get());
                 }
                 yield true;
             }

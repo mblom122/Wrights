@@ -233,10 +233,8 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.BooleanValue SHAPE_USE_ANCHOR = BUILDER
             .comment("When true, builds on the shape anchor. When false, builds where you look.")
             .define("shapeUseAnchor", false);
-    public static final ModConfigSpec.BooleanValue SHAPE_REPLACE = BUILDER
-            .define("shapeReplace", false);
     public static final ModConfigSpec.BooleanValue SHAPE_VOID = BUILDER
-            .comment("When true, clears mismatched blocks inside the shape before placing.")
+            .comment("When true, Wrights void the existing block at each placement cell before placing, like blueprints.")
             .define("shapeVoid", false);
     public static final ModConfigSpec.BooleanValue SHAPE_SET = BUILDER
             .define("shapeSet", false);
@@ -833,11 +831,6 @@ public final class WrightsClientConfig {
 
     public static void setShapeUseAnchor(boolean useAnchor) {
         SHAPE_USE_ANCHOR.set(useAnchor);
-        save();
-    }
-
-    public static void setShapeReplace(boolean replace) {
-        SHAPE_REPLACE.set(replace);
         save();
     }
 
