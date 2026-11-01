@@ -18,6 +18,7 @@ public final class Shapes {
         RING(false, true),
         /** Legacy flat square — kept for saved configs; use {@link #CUBE} with height 1. */
         SQUARE(false, false),
+        /** Legacy line — kept for saved configs; use {@link #CYLINDER} with width 1. */
         LINE(false, false),
         SPHERE(true, false),
         CUBE(true, true),
@@ -42,9 +43,9 @@ public final class Shapes {
             return usesHeight;
         }
 
-        /** False for legacy kinds hidden from the picker (Square is Box with height 1). */
+        /** False for legacy kinds hidden from the picker. */
         public boolean selectable() {
-            return this != SQUARE;
+            return this != SQUARE && this != LINE;
         }
 
         public static Kind byId(int id) {
@@ -94,7 +95,8 @@ public final class Shapes {
     }
 
     /**
-     * @param height box / cylinder / pyramid / dome height (box height 1 = flat square); for rings, tube diameter (1 = flat)
+     * @param height box / cylinder / pyramid / dome height (box height 1 = flat square); for rings, tube diameter (1 = flat).
+     *               Cylinder width 1 uses height as the line length.
      * @param thickness ring / torus tube width in the ring plane; ignored by other kinds
      * @param yaw quarter-turns around Y through {@code center} (0–3)
      */
@@ -111,7 +113,7 @@ public final class Shapes {
             case CIRCLE -> disk(out, center, r, hollow, flat, false);
             case RING -> ring(out, center, r, band, h, flat, hollow);
             case SQUARE -> square(out, center, r, hollow, flat);
-            case LINE -> line(out, center, r, flat);
+            case LINE -> lineSegment(out, center, Math.max(h, 2 * r + 1), flat);
             case SPHERE -> sphere(out, center, r, hollow);
             case CUBE -> {
                 // Height 1 is the old Square (plane chooses floor/wall). Taller is a rectangular box.
@@ -121,7 +123,15 @@ public final class Shapes {
                     box(out, center, r, h, hollow);
                 }
             }
-            case CYLINDER -> cylinder(out, center, r, h, hollow);
+            case CYLINDER -> {
+                // Width 1 = single-block line (old Line). Width 2 = radius 1, and so on.
+                int rad = Math.max(0, r - 1);
+                if (rad == 0) {
+                    lineSegment(out, center, h, flat);
+                } else {
+                    cylinder(out, center, rad, h, hollow);
+                }
+            }
             case DOME -> dome(out, center, r, h, hollow);
             case PYRAMID -> pyramid(out, center, r, h, hollow);
         }
@@ -292,6 +302,14 @@ public final class Shapes {
     private static void line(List<BlockPos> out, BlockPos center, int radius, int plane) {
         for (int i = -radius; i <= radius; i++) {
             out.add(flat(center, i, 0, plane));
+        }
+    }
+
+    /** One-block-thick run of {@code length} blocks along the plane’s main axis, from the origin outward. */
+    private static void lineSegment(List<BlockPos> out, BlockPos origin, int length, int plane) {
+        int top = Math.max(0, length - 1);
+        for (int i = 0; i <= top; i++) {
+            out.add(flat(origin, i, 0, plane));
         }
     }
 

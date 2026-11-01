@@ -78,18 +78,27 @@ final class ShapeMenuPanel {
         y += 14;
         y = drawKinds(graphics, mouseX, mouseY, x, y, width);
         y += 4;
-        // Square was folded into Box (Cube) with height 1 — migrate old configs once.
+        // Legacy Square/Line folded into Box/Cylinder — migrate old configs once.
         if (WrightsClientConfig.SHAPE_KIND.get() == Shapes.Kind.SQUARE.ordinal()) {
             WrightsClientConfig.setShapeKind(Shapes.Kind.CUBE.ordinal());
             WrightsClientConfig.setShapeHeight(1);
+        } else if (WrightsClientConfig.SHAPE_KIND.get() == Shapes.Kind.LINE.ordinal()) {
+            int old = WrightsClientConfig.SHAPE_SIZE.get();
+            WrightsClientConfig.setShapeKind(Shapes.Kind.CYLINDER.ordinal());
+            WrightsClientConfig.setShapeSize(1);
+            WrightsClientConfig.setShapeHeight(Math.max(1, 2 * old + 1));
         }
         Shapes.Kind kind = Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
         boolean volume = kind.volume();
         boolean ring = kind == Shapes.Kind.RING;
         boolean box = kind == Shapes.Kind.CUBE;
+        boolean cylinder = kind == Shapes.Kind.CYLINDER;
+        boolean widthShape = box || cylinder;
         drawSection(graphics, mouseX, mouseY, x, y,
-                box ? "menu.wrights.shape_width" : "menu.wrights.shape_size",
-                box ? "menu.wrights.shape_width_hint" : "menu.wrights.shape_size_hint");
+                widthShape ? "menu.wrights.shape_width" : "menu.wrights.shape_size",
+                cylinder ? "menu.wrights.shape_cylinder_width_hint"
+                        : box ? "menu.wrights.shape_width_hint"
+                        : "menu.wrights.shape_size_hint");
         y += 12;
         sizeY = y;
         sizeW = Math.max(40, width - 40);
@@ -113,6 +122,7 @@ final class ShapeMenuPanel {
         if (kind.usesHeight()) {
             String heightHint = ring ? "menu.wrights.shape_ring_height_hint"
                     : box ? "menu.wrights.shape_box_height_hint"
+                    : cylinder ? "menu.wrights.shape_cylinder_height_hint"
                     : "menu.wrights.shape_height_hint";
             drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_height", heightHint);
             y += 12;
@@ -122,8 +132,10 @@ final class ShapeMenuPanel {
             graphics.drawString(font, Integer.toString(height), x + sizeW + 8, y, WrightsUi.TEXT, false);
             y += 18;
         }
-        // Flat shapes, and Box at height 1 (the old Square), can tip onto a wall plane.
-        boolean showPlane = !volume || (box && WrightsClientConfig.SHAPE_HEIGHT.get() <= 1);
+        // Flat shapes, Box at height 1, and Cylinder at width 1 (the old Line) can tip with Plane.
+        boolean showPlane = !volume
+                || (box && WrightsClientConfig.SHAPE_HEIGHT.get() <= 1)
+                || (cylinder && size <= 1);
         if (showPlane) {
             drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_plane", "menu.wrights.shape_plane_hint");
             y += 12;
@@ -480,6 +492,8 @@ final class ShapeMenuPanel {
         int kind = WrightsClientConfig.SHAPE_KIND.get();
         if (kind == Shapes.Kind.SQUARE.ordinal()) {
             kind = Shapes.Kind.CUBE.ordinal();
+        } else if (kind == Shapes.Kind.LINE.ordinal()) {
+            kind = Shapes.Kind.CYLINDER.ordinal();
         }
         java.util.List<Shapes.Kind> shown = new java.util.ArrayList<>();
         for (Shapes.Kind entry : Shapes.Kind.values()) {

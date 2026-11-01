@@ -526,7 +526,9 @@ public final class WrightsInput {
                         com.wrights.blueprint.Shapes.Kind.byId(com.wrights.WrightsClientConfig.SHAPE_KIND.get());
                 boolean flatBox = kind == com.wrights.blueprint.Shapes.Kind.CUBE
                         && com.wrights.WrightsClientConfig.SHAPE_HEIGHT.get() <= 1;
-                if (!kind.volume() || flatBox) {
+                boolean thinCylinder = kind == com.wrights.blueprint.Shapes.Kind.CYLINDER
+                        && com.wrights.WrightsClientConfig.SHAPE_SIZE.get() <= 1;
+                if (!kind.volume() || flatBox || thinCylinder) {
                     int plane = com.wrights.WrightsClientConfig.SHAPE_PLANE.get();
                     int next = event.getScrollDeltaY() > 0.0D
                             ? (plane + 1) % 3
