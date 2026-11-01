@@ -106,6 +106,18 @@ public final class ShapeSupply {
         };
     }
 
+    /** Compact names for the shape menu summary line. */
+    public static String shortLabelKey(int id) {
+        return switch (clamp(id)) {
+            case OFFHAND -> "menu.wrights.shape_src_offhand_short";
+            case ACTION_BAR -> "menu.wrights.shape_src_actionbar_short";
+            case INVENTORY -> "menu.wrights.shape_src_inventory_short";
+            case BOUND_CHEST -> "menu.wrights.shape_src_chest_short";
+            case DIGITAL -> "menu.wrights.shape_src_digital_short";
+            default -> "menu.wrights.shape_src_main_short";
+        };
+    }
+
     /** Block states that Shape mode may place, following the priority list. */
     public static List<BlockState> palette(Player player, List<Integer> order, boolean randomizeHotbar) {
         List<BlockState> out = new ArrayList<>();

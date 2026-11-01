@@ -236,20 +236,10 @@ final class ShapeMenuPanel {
                 }
                 yield true;
             }
-            case "up" -> {
-                WrightsClientConfig.shapeSupplyMove(value, -1);
-                yield true;
-            }
-            case "down" -> {
-                WrightsClientConfig.shapeSupplyMove(value, 1);
-                yield true;
-            }
-            case "remove" -> {
-                WrightsClientConfig.shapeSupplyRemove(value);
-                yield true;
-            }
-            case "add" -> {
-                WrightsClientConfig.shapeSupplyAdd(value);
+            case "priority" -> {
+                if (host != null) {
+                    net.minecraft.client.Minecraft.getInstance().setScreen(new ShapePriorityScreen(host));
+                }
                 yield true;
             }
             case "mat_select" -> {
@@ -519,30 +509,21 @@ final class ShapeMenuPanel {
 
     private int drawPriority(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width) {
         List<Integer> order = WrightsClientConfig.shapeSupplyOrder();
+        StringBuilder summary = new StringBuilder();
         for (int i = 0; i < order.size(); i++) {
-            int source = order.get(i);
-            WrightsUi.choice(graphics, x, y, width, 18, false, mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 18);
-            graphics.drawString(font, (i + 1) + ". " + Component.translatable(ShapeSupply.labelKey(source)).getString(), x + 6, y + 5, WrightsUi.TEXT, false);
-            int btn = 16;
-            int right = x + width - 4;
-            right = drawMini(graphics, mouseX, mouseY, right - btn, y + 1, btn, "↑", "up", i, i > 0);
-            right = drawMini(graphics, mouseX, mouseY, right - btn - 2, y + 1, btn, "↓", "down", i, i < order.size() - 1);
-            drawMini(graphics, mouseX, mouseY, right - btn - 2, y + 1, btn, "x", "remove", i, order.size() > 1);
-            y += 20;
-        }
-        List<Integer> missing = ShapeSupply.missing(order);
-        if (!missing.isEmpty()) {
-            graphics.drawString(font, Component.translatable("menu.wrights.shape_priority_add"), x, y, WrightsUi.MUTED, false);
-            y += 12;
-            for (int source : missing) {
-                boolean hover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 16;
-                WrightsUi.choice(graphics, x, y, width, 16, false, hover);
-                graphics.drawString(font, "+ " + Component.translatable(ShapeSupply.labelKey(source)).getString(), x + 6, y + 4, WrightsUi.COPPER, false);
-                hits.add(new Hit(x, y, width, 16, "add", source));
-                y += 18;
+            if (i > 0) {
+                summary.append(" › ");
             }
+            summary.append(Component.translatable(ShapeSupply.shortLabelKey(order.get(i))).getString());
         }
-        return y;
+        String line = font.plainSubstrByWidth(summary.toString(), Math.max(8, width));
+        graphics.drawString(font, line, x, y, WrightsUi.MUTED, false);
+        y += 12;
+        boolean hover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 18;
+        WrightsUi.choice(graphics, x, y, width, 18, false, hover);
+        graphics.drawCenteredString(font, Component.translatable("menu.wrights.shape_priority_edit"), x + width / 2, y + 5, WrightsUi.TEXT);
+        hits.add(new Hit(x, y, width, 18, "priority", 0));
+        return y + 22;
     }
 
     private int drawMini(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int w, String text, String id, int value, boolean on) {
