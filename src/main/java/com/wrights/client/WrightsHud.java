@@ -199,7 +199,7 @@ public final class WrightsHud {
             int rows = 1 + (sub == null ? 0 : 1) + (note == null || hideNote ? 0 : 1) + (offset == null ? 0 : 1);
             detailHeight = 6 + rows * 12;
         }
-        // Mode title + timed help use Options → Move messages (default: Bottom = above hotbar).
+        // Mode title + timed help use Options → Move messages (default: Bottom = above hotbar / hearts).
         int taskH = 14;
         int stackWidth = Math.max(taskWidth, Math.max(detailWidth, 1));
         int stackHeight = taskH + (detailHeight == 0 ? 0 : 4 + detailHeight);

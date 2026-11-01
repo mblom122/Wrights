@@ -12,7 +12,10 @@ public final class HudAnchor {
     public static final int RIGHT = 3;
     public static final int CENTER = 4;
     public static final int CUSTOM = 5;
-    /** Leaves the vanilla action-bar text and the hotbar clear. */
+    /**
+     * Room from the bottom of the screen so Bottom placement clears the hotbar, XP bar,
+     * and survival health / hunger (and armor / air) rows.
+     */
     public static final int HOTBAR_CLEARANCE = 70;
     /** Vanilla hotbar width; used to park Ctrl/Shift menus beside it. */
     public static final int HOTBAR_WIDTH = 182;
@@ -37,9 +40,9 @@ public final class HudAnchor {
         return screen - 22;
     }
 
-    /** Y so {@code size} sits flush above the hotbar with a small gap. */
+    /** Y so {@code size} sits above hotbar + health / hunger / XP. */
     public static int aboveHotbarY(int screen, int size) {
-        return Mth.clamp(hotbarTop(screen) - HOTBAR_GAP - size, 2, Math.max(2, screen - size - 2));
+        return Mth.clamp(screen - HOTBAR_CLEARANCE - size, 2, Math.max(2, screen - size - 2));
     }
 
     /** Horizontal center over the hotbar. */
@@ -68,8 +71,8 @@ public final class HudAnchor {
     public static int y(int spot, int custom, int screen, int size) {
         int raw = switch (spot) {
             case TOP -> 6;
-            // Flush above the hotbar (mode title default). HOTBAR_CLEARANCE kept for callers that need action-bar room.
-            case BOTTOM -> hotbarTop(screen) - HOTBAR_GAP - size;
+            // Above hotbar + hearts / hunger / XP (mode title + help default).
+            case BOTTOM -> screen - HOTBAR_CLEARANCE - size;
             case CUSTOM -> custom * screen / 1000 - size / 2;
             default -> (screen - size) / 2;
         };
