@@ -2,6 +2,7 @@ package com.wrights.client;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -11,7 +12,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -445,14 +445,10 @@ final class ShapeMenuPanel {
         boolean hollow = WrightsClientConfig.SHAPE_HOLLOW.get();
         boolean flip = WrightsClientConfig.SHAPE_FLIP_VERTICAL.get();
         int plane = WrightsClientConfig.SHAPE_PLANE.get();
-        BlockState fill = previewFill();
-        long key = (((long) kind.ordinal() & 0xFF) << 56)
-                | (((long) size & 0xFF) << 48)
-                | (((long) height & 0xFF) << 40)
-                | (((long) plane & 0x3) << 38)
-                | ((hollow ? 1L : 0L) << 37)
-                | ((flip ? 1L : 0L) << 36)
-                | (Integer.toUnsignedLong(Block.getId(fill)) & 0xFFFFFFFFL);
+        List<ShapeMaterials.Entry> materials = WrightsClientConfig.shapeMaterials();
+        ShapeMaterials.FillMode mode = WrightsClientConfig.shapeFillMode();
+        int batch = WrightsClientConfig.SHAPE_ORDER_BATCH.get();
+        long key = previewMaterialsKey(kind, size, height, plane, hollow, flip, materials, mode, batch);
         if (key == previewKey) {
             return;
         }
@@ -463,54 +459,88 @@ final class ShapeMenuPanel {
             previewSizeX = previewSizeY = previewSizeZ = 1;
             return;
         }
-        if (worlds.size() > WrightsConfig.maxPreviewBlocks()) {
-            previewGhosts = List.of();
-            BlockPos origin = Shapes.origin(worlds);
-            int maxX = 0;
-            int maxY = 0;
-            int maxZ = 0;
-            for (BlockPos pos : worlds) {
-                maxX = Math.max(maxX, pos.getX() - origin.getX());
-                maxY = Math.max(maxY, pos.getY() - origin.getY());
-                maxZ = Math.max(maxZ, pos.getZ() - origin.getZ());
-            }
-            previewSizeX = maxX + 1;
-            previewSizeY = maxY + 1;
-            previewSizeZ = maxZ + 1;
-            return;
-        }
         BlockPos origin = Shapes.origin(worlds);
         int maxX = 0;
         int maxY = 0;
         int maxZ = 0;
-        int stateId = Block.getId(fill);
-        List<WrightsClientState.Ghost> ghosts = new ArrayList<>(worlds.size());
         for (BlockPos pos : worlds) {
-            int lx = pos.getX() - origin.getX();
-            int ly = pos.getY() - origin.getY();
-            int lz = pos.getZ() - origin.getZ();
-            maxX = Math.max(maxX, lx);
-            maxY = Math.max(maxY, ly);
-            maxZ = Math.max(maxZ, lz);
-            ghosts.add(new WrightsClientState.Ghost(lx, ly, lz, 1.0F, 1.0F, 1.0F, stateId));
+            maxX = Math.max(maxX, pos.getX() - origin.getX());
+            maxY = Math.max(maxY, pos.getY() - origin.getY());
+            maxZ = Math.max(maxZ, pos.getZ() - origin.getZ());
         }
-        previewGhosts = List.copyOf(ghosts);
         previewSizeX = maxX + 1;
         previewSizeY = maxY + 1;
         previewSizeZ = maxZ + 1;
+        if (worlds.size() > WrightsConfig.maxPreviewBlocks()) {
+            previewGhosts = List.of();
+            return;
+        }
+        List<BlockState> planned = ShapeMaterials.assign(
+                materials,
+                worlds.size(),
+                mode,
+                batch,
+                new Random(key),
+                true,
+                item -> Long.MAX_VALUE / 4L,
+                true);
+        if (planned.isEmpty()) {
+            BlockState fallback = Blocks.STONE.defaultBlockState();
+            planned = new ArrayList<>(worlds.size());
+            for (int i = 0; i < worlds.size(); i++) {
+                planned.add(fallback);
+            }
+        }
+        List<WrightsClientState.Ghost> ghosts = new ArrayList<>(worlds.size());
+        for (int i = 0; i < worlds.size(); i++) {
+            BlockPos pos = worlds.get(i);
+            BlockState state = i < planned.size() ? planned.get(i) : planned.get(planned.size() - 1);
+            if (state == null || state.isAir()) {
+                state = Blocks.STONE.defaultBlockState();
+            }
+            ghosts.add(new WrightsClientState.Ghost(
+                    pos.getX() - origin.getX(),
+                    pos.getY() - origin.getY(),
+                    pos.getZ() - origin.getZ(),
+                    1.0F,
+                    1.0F,
+                    1.0F,
+                    Block.getId(state)));
+        }
+        previewGhosts = List.copyOf(ghosts);
     }
 
-    private BlockState previewFill() {
-        List<ShapeMaterials.Entry> materials = WrightsClientConfig.shapeMaterials();
-        Item item;
-        if (materials.isEmpty()) {
-            item = Items.STONE;
-        } else {
-            int index = Mth.clamp(selectedMaterial, 0, materials.size() - 1);
-            item = materials.get(index).item();
+    /** Fingerprint so the sample rebuilds when materials, weights, or fill mode change. */
+    private static long previewMaterialsKey(
+            Shapes.Kind kind,
+            int size,
+            int height,
+            int plane,
+            boolean hollow,
+            boolean flip,
+            List<ShapeMaterials.Entry> materials,
+            ShapeMaterials.FillMode mode,
+            int batch) {
+        long key = 0x9E3779B97F4A7C15L;
+        key = key * 31L + kind.ordinal();
+        key = key * 31L + size;
+        key = key * 31L + height;
+        key = key * 31L + plane;
+        key = key * 31L + (hollow ? 1 : 0);
+        key = key * 31L + (flip ? 1 : 0);
+        key = key * 31L + (mode == null ? 0 : mode.ordinal());
+        key = key * 31L + batch;
+        if (materials != null) {
+            for (ShapeMaterials.Entry entry : materials) {
+                if (entry == null) {
+                    continue;
+                }
+                Item item = entry.item();
+                key = key * 31L + (item == null ? 0 : Item.getId(item));
+                key = key * 31L + entry.weight();
+            }
         }
-        BlockState state = Block.byItem(item).defaultBlockState();
-        return state.isAir() ? Blocks.STONE.defaultBlockState() : state;
+        return key;
     }
 
     private int drawPriority(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width) {
