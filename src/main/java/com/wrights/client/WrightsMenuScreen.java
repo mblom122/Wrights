@@ -5278,5 +5278,15 @@ public class WrightsMenuScreen extends Screen {
         public int areaH() {
             return Math.max(120, manageY() + manageH() - areaY() - 4);
         }
+
+        @Override
+        public boolean toolHeld() {
+            return WrightsMenuScreen.this.toolHeld();
+        }
+
+        @Override
+        public boolean requireTool() {
+            return WrightsMenuScreen.this.requireTool();
+        }
     }
 }

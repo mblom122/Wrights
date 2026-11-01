@@ -47,4 +47,10 @@ interface ManageHost {
     int areaW();
 
     int areaH();
+
+    /** True when swarm edits are allowed (controller held, or this UI does not require one). */
+    boolean toolHeld();
+
+    /** Like {@link #toolHeld()}, but may flash a “need controller” hint when false. */
+    boolean requireTool();
 }

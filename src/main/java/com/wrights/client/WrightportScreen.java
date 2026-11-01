@@ -236,6 +236,17 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
     }
 
     @Override
+    public boolean toolHeld() {
+        // Block UI is opened from the wrightport itself — no controller gate.
+        return true;
+    }
+
+    @Override
+    public boolean requireTool() {
+        return true;
+    }
+
+    @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
     }
 
