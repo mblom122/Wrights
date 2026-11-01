@@ -787,6 +787,12 @@ public final class WrightsClientConfig {
 
     public static void setShapeSize(int size) {
         SHAPE_SIZE.set(com.wrights.blueprint.Shapes.clampSize(size));
+        // Ring band cannot be wider than the outer radius — keep thickness in range without
+        // rescaling the slider track when size changes.
+        if (com.wrights.blueprint.Shapes.Kind.byId(SHAPE_KIND.get()) == com.wrights.blueprint.Shapes.Kind.RING
+                && SHAPE_THICKNESS.get() > SHAPE_SIZE.get()) {
+            SHAPE_THICKNESS.set(SHAPE_SIZE.get());
+        }
         save();
     }
 
@@ -796,7 +802,11 @@ public final class WrightsClientConfig {
     }
 
     public static void setShapeThickness(int thickness) {
-        SHAPE_THICKNESS.set(com.wrights.blueprint.Shapes.clampHeight(thickness));
+        int value = com.wrights.blueprint.Shapes.clampHeight(thickness);
+        if (com.wrights.blueprint.Shapes.Kind.byId(SHAPE_KIND.get()) == com.wrights.blueprint.Shapes.Kind.RING) {
+            value = Math.min(value, SHAPE_SIZE.get());
+        }
+        SHAPE_THICKNESS.set(Math.max(1, value));
         save();
     }
 

@@ -17,7 +17,7 @@ public final class Shapes {
         CIRCLE(false, false),
         RING(false, true),
         SQUARE(false, false),
-        LINE(false, false),
+        LINE(false, true),
         SPHERE(true, false),
         CUBE(true, true),
         CYLINDER(true, true),
@@ -105,7 +105,7 @@ public final class Shapes {
             case CIRCLE -> disk(out, center, r, hollow, flat, false);
             case RING -> ring(out, center, r, band, h, flat, hollow);
             case SQUARE -> square(out, center, r, hollow, flat);
-            case LINE -> squareLine(out, center, r, band, hollow, flat);
+            case LINE -> squareLine(out, center, r, band, h, hollow, flat);
             case SPHERE -> sphere(out, center, r, hollow);
             case CUBE -> {
                 // Height 1 is the old Square (plane chooses floor/wall). Taller is a rectangular box.
@@ -290,19 +290,23 @@ public final class Shapes {
     }
 
     /**
-     * Squared beam: {@code length} is half-length along the plane’s main axis (same as old Size),
-     * {@code thickness} is the square cross-section in blocks (1 = a single-block line).
+     * Rectangular beam: {@code length} is half-length along the plane’s main axis,
+     * {@code thickness} is width in the plane, {@code height} is the other cross-section size
+     * (on XZ, thickness is Z and height is Y).
      */
-    private static void squareLine(List<BlockPos> out, BlockPos center, int length, int thickness, boolean hollow, int plane) {
+    private static void squareLine(List<BlockPos> out, BlockPos center, int length, int thickness, int height, boolean hollow, int plane) {
         int half = Math.max(1, length);
-        int side = Math.max(1, thickness);
-        int t0 = -(side - 1) / 2;
-        int t1 = t0 + side - 1;
+        int wide = Math.max(1, thickness);
+        int tall = Math.max(1, height);
+        int v0 = -(wide - 1) / 2;
+        int v1 = v0 + wide - 1;
+        int u0 = -(tall - 1) / 2;
+        int u1 = u0 + tall - 1;
         for (int i = -half; i <= half; i++) {
-            for (int u = t0; u <= t1; u++) {
-                for (int v = t0; v <= t1; v++) {
-                    if (hollow && side > 2) {
-                        boolean shell = u == t0 || u == t1 || v == t0 || v == t1;
+            for (int u = u0; u <= u1; u++) {
+                for (int v = v0; v <= v1; v++) {
+                    if (hollow && (wide > 2 || tall > 2)) {
+                        boolean shell = u == u0 || u == u1 || v == v0 || v == v1;
                         if (!shell) {
                             continue;
                         }
@@ -313,7 +317,7 @@ public final class Shapes {
         }
     }
 
-    /** Beam along the plane’s main axis; {@code u}/{@code v} are the square cross-section. */
+    /** Beam along the plane’s main axis; {@code u}/{@code v} are the rectangular cross-section. */
     private static BlockPos beamCell(BlockPos origin, int along, int u, int v, int plane) {
         return switch (plane) {
             case PLANE_XY -> origin.offset(along, u, v);

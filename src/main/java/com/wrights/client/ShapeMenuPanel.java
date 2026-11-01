@@ -95,7 +95,7 @@ final class ShapeMenuPanel {
         sizeY = y;
         sizeW = Math.max(40, width - 40);
         int size = WrightsClientConfig.SHAPE_SIZE.get();
-        int max = Math.max(1, Math.min(64, WrightsConfig.MAX_AXIS.getAsInt()));
+        int max = axisMax();
         drawSlider(graphics, x, y, sizeW, size - 1, Math.max(1, max - 1));
         graphics.drawString(font, Integer.toString(size), x + sizeW + 8, y, WrightsUi.TEXT, false);
         y += 18;
@@ -106,14 +106,15 @@ final class ShapeMenuPanel {
                     line ? "menu.wrights.shape_line_thickness_hint" : "menu.wrights.shape_thickness_hint");
             y += 12;
             thicknessY = y;
-            int thicknessMax = line ? max : Math.max(1, size);
-            int thickness = Math.min(WrightsClientConfig.SHAPE_THICKNESS.get(), thicknessMax);
-            drawSlider(graphics, x, y, sizeW, thickness - 1, Math.max(1, thicknessMax - 1));
+            // Same track scale as Size (axis max) so changing size does not slide the thickness thumb.
+            int thickness = Mth.clamp(WrightsClientConfig.SHAPE_THICKNESS.get(), 1, thicknessCap(size, ring, line, max));
+            drawSlider(graphics, x, y, sizeW, thickness - 1, Math.max(1, max - 1));
             graphics.drawString(font, Integer.toString(thickness), x + sizeW + 8, y, WrightsUi.TEXT, false);
             y += 18;
         }
         if (kind.usesHeight()) {
             String heightHint = ring ? "menu.wrights.shape_ring_height_hint"
+                    : line ? "menu.wrights.shape_line_height_hint"
                     : box ? "menu.wrights.shape_box_height_hint"
                     : cylinder ? "menu.wrights.shape_cylinder_height_hint"
                     : "menu.wrights.shape_height_hint";
@@ -188,21 +189,21 @@ final class ShapeMenuPanel {
             return false;
         }
         if (sizeY >= 0 && mouseY >= sizeY && mouseY < sizeY + 12 && mouseX >= bodyX && mouseX < bodyX + sizeW) {
-            int max = Math.max(1, Math.min(64, WrightsConfig.MAX_AXIS.getAsInt()));
-            int value = 1 + (int) Math.round((mouseX - bodyX) * (max - 1) / Math.max(1, sizeW));
-            WrightsClientConfig.setShapeSize(value);
+            WrightsClientConfig.setShapeSize(sliderAt(mouseX, axisMax()));
             return true;
         }
         if (thicknessY >= 0 && mouseY >= thicknessY && mouseY < thicknessY + 12 && mouseX >= bodyX && mouseX < bodyX + sizeW) {
-            int max = Math.max(1, Math.min(WrightsClientConfig.SHAPE_SIZE.get(), Math.min(64, WrightsConfig.MAX_AXIS.getAsInt())));
-            int value = 1 + (int) Math.round((mouseX - bodyX) * (max - 1) / Math.max(1, sizeW));
+            Shapes.Kind kind = Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
+            int max = axisMax();
+            int value = sliderAt(mouseX, max);
+            if (kind == Shapes.Kind.RING) {
+                value = Math.min(value, Math.max(1, WrightsClientConfig.SHAPE_SIZE.get()));
+            }
             WrightsClientConfig.setShapeThickness(value);
             return true;
         }
         if (heightY >= 0 && mouseY >= heightY && mouseY < heightY + 12 && mouseX >= bodyX && mouseX < bodyX + sizeW) {
-            int max = Math.max(1, Math.min(64, WrightsConfig.MAX_AXIS.getAsInt()));
-            int value = 1 + (int) Math.round((mouseX - bodyX) * (max - 1) / Math.max(1, sizeW));
-            WrightsClientConfig.setShapeHeight(value);
+            WrightsClientConfig.setShapeHeight(sliderAt(mouseX, axisMax()));
             return true;
         }
         for (Hit hit : hits) {
@@ -218,9 +219,7 @@ final class ShapeMenuPanel {
         if (sizeY < 0) {
             return false;
         }
-        int max = Math.max(1, Math.min(64, WrightsConfig.MAX_AXIS.getAsInt()));
-        int value = 1 + (int) Math.round((mouseX - bodyX) * (max - 1) / Math.max(1, sizeW));
-        WrightsClientConfig.setShapeSize(value);
+        WrightsClientConfig.setShapeSize(sliderAt(mouseX, axisMax()));
         return true;
     }
 
@@ -228,9 +227,7 @@ final class ShapeMenuPanel {
         if (heightY < 0) {
             return false;
         }
-        int max = Math.max(1, Math.min(64, WrightsConfig.MAX_AXIS.getAsInt()));
-        int value = 1 + (int) Math.round((mouseX - bodyX) * (max - 1) / Math.max(1, sizeW));
-        WrightsClientConfig.setShapeHeight(value);
+        WrightsClientConfig.setShapeHeight(sliderAt(mouseX, axisMax()));
         return true;
     }
 
@@ -238,10 +235,32 @@ final class ShapeMenuPanel {
         if (thicknessY < 0) {
             return false;
         }
-        int max = Math.max(1, Math.min(WrightsClientConfig.SHAPE_SIZE.get(), Math.min(64, WrightsConfig.MAX_AXIS.getAsInt())));
-        int value = 1 + (int) Math.round((mouseX - bodyX) * (max - 1) / Math.max(1, sizeW));
+        Shapes.Kind kind = Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
+        int value = sliderAt(mouseX, axisMax());
+        if (kind == Shapes.Kind.RING) {
+            value = Math.min(value, Math.max(1, WrightsClientConfig.SHAPE_SIZE.get()));
+        }
         WrightsClientConfig.setShapeThickness(value);
         return true;
+    }
+
+    private static int axisMax() {
+        return Math.max(1, Math.min(64, WrightsConfig.MAX_AXIS.getAsInt()));
+    }
+
+    /** Cap for the thickness value (ring band ≤ size; line width ≤ axis). */
+    private static int thicknessCap(int size, boolean ring, boolean line, int max) {
+        if (ring) {
+            return Math.max(1, size);
+        }
+        return max;
+    }
+
+    /** Map a click on the shared slider track to 1..maxInclusive. */
+    private int sliderAt(double mouseX, int maxInclusive) {
+        int span = Math.max(1, maxInclusive - 1);
+        int value = 1 + (int) Math.round((mouseX - bodyX) * (double) span / Math.max(1, sizeW));
+        return Mth.clamp(value, 1, maxInclusive);
     }
 
     private boolean apply(String id, int value) {
