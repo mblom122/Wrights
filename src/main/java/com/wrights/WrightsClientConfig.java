@@ -127,6 +127,9 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.IntValue LAST_STYLE = BUILDER
             .comment("Last new-blueprint tool. 0 corners, 1 box, 2 move.")
             .defineInRange("lastStyle", 1, 0, 2);
+    public static final ModConfigSpec.IntValue LAST_BUILD_TOOL = BUILDER
+            .comment("Last build sub-tool. 0 use template, 1 mirror, 2 shape, 3 bind inventory.")
+            .defineInRange("lastBuildTool", 0, 0, 3);
     public static final ModConfigSpec.ConfigValue<String> LAST_BUILD = BUILDER
             .comment("Last blueprint that was being built.")
             .define("lastBuild", "");
@@ -607,8 +610,13 @@ public final class WrightsClientConfig {
     }
 
     public static void setLastMode(int mode, int style, String buildId) {
+        setLastMode(mode, style, LAST_BUILD_TOOL.get(), buildId);
+    }
+
+    public static void setLastMode(int mode, int style, int buildTool, String buildId) {
         LAST_MODE.set(clamp(mode, 0, 6));
         LAST_STYLE.set(clamp(style, 0, 2));
+        LAST_BUILD_TOOL.set(clamp(buildTool, 0, 3));
         LAST_BUILD.set(buildId == null ? "" : buildId);
         save();
     }

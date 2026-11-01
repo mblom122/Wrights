@@ -188,6 +188,10 @@ public final class BlueprintActions {
         }
         if (mode == 2) {
             beginBuild(player, buildId);
+            // Missing/deleted blueprint still restores Build (Shape/Mirror need the mode).
+            if (BlueprintSessions.get(player).mode() != BlueprintSessions.Mode.BUILD) {
+                beginBuild(player, Util.NIL_UUID);
+            }
             return;
         }
         if (mode == 1) {

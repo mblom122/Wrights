@@ -579,7 +579,21 @@ public final class WrightsClientState {
 
     private static int rememberedMode = -1;
     private static int rememberedStyle = -1;
+    private static int rememberedTool = -1;
     private static String rememberedBuild = "";
+
+    private static int currentBuildTool() {
+        if (mirrorAim) {
+            return 1;
+        }
+        if (shapeAim) {
+            return 2;
+        }
+        if (bindSupply) {
+            return 3;
+        }
+        return 0;
+    }
 
     private static void rememberMode() {
         int modeId = switch (mode) {
@@ -602,13 +616,35 @@ public final class WrightsClientState {
             id = stored == null ? "" : stored;
         }
         int style = captureStyle.ordinal();
-        if (modeId == rememberedMode && style == rememberedStyle && id.equals(rememberedBuild)) {
+        int tool = modeId == 2 ? currentBuildTool() : rememberedTool >= 0
+                ? rememberedTool
+                : com.wrights.WrightsClientConfig.LAST_BUILD_TOOL.get();
+        if (modeId == rememberedMode && style == rememberedStyle && tool == rememberedTool && id.equals(rememberedBuild)) {
             return;
         }
         rememberedMode = modeId;
         rememberedStyle = style;
+        rememberedTool = tool;
         rememberedBuild = id;
-        com.wrights.WrightsClientConfig.setLastMode(modeId, style, id);
+        com.wrights.WrightsClientConfig.setLastMode(modeId, style, tool, id);
+    }
+
+    /** Restore Mirror / Shape / Bind inventory after Build mode comes back. */
+    public static void applyLastBuildTool() {
+        mirrorAim = false;
+        shapeAim = false;
+        bindSupply = false;
+        bindFromMenu = false;
+        int tool = com.wrights.WrightsClientConfig.LAST_BUILD_TOOL.get();
+        if (tool == 1 && WrightsConfig.allowMirror()) {
+            mirrorAim = true;
+            WrightsClientConfig.setMirrorBlocks(true);
+        } else if (tool == 2 && WrightsConfig.allowShape()) {
+            shapeAim = true;
+        } else if (tool == 3) {
+            bindSupply = true;
+        }
+        rememberedTool = currentBuildTool();
     }
 
     public static void prepareJoin() {
@@ -623,11 +659,20 @@ public final class WrightsClientState {
         moveGrabbed = false;
         generation = -1;
         seq = -1;
+        mirrorAim = false;
+        shapeAim = false;
+        bindSupply = false;
+        bindFromMenu = false;
         int style = com.wrights.WrightsClientConfig.LAST_STYLE.get();
         CaptureStyle[] styles = CaptureStyle.values();
         captureStyle = styles[Math.max(0, Math.min(styles.length - 1, style))];
+        rememberedMode = -1;
+        rememberedStyle = -1;
+        rememberedTool = -1;
+        rememberedBuild = "";
         resumeSent = false;
         bindPort = null;
+        clearShapeLookSnap();
         updateFlags();
     }
 
@@ -652,8 +697,9 @@ public final class WrightsClientState {
     private static boolean resumeSent;
 
     public static void forgetMode() {
-        WrightsClientConfig.setLastMode(0, captureStyle.ordinal(), "");
+        WrightsClientConfig.setLastMode(0, captureStyle.ordinal(), currentBuildTool(), "");
         rememberedMode = 0;
+        rememberedTool = currentBuildTool();
         rememberedBuild = "";
     }
 
@@ -702,6 +748,10 @@ public final class WrightsClientState {
             } catch (IllegalArgumentException ignored) {
                 id = net.minecraft.Util.NIL_UUID;
             }
+        }
+        // Drop a missing blueprint id so Build (and Shape/Mirror) still resumes.
+        if (last == 2 && !id.equals(net.minecraft.Util.NIL_UUID) && libraryKnown && summary(id) == null) {
+            id = net.minecraft.Util.NIL_UUID;
         }
         net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.wrights.network.BlueprintPayloads.Resume(last, id));
     }
@@ -872,7 +922,8 @@ public final class WrightsClientState {
         int next = modes[Math.floorMod(at + delta, modes.length)];
         if (next == 0) {
             enterBuildFromLast();
-            bindSupply = false;
+            applyLastBuildTool();
+            rememberMode();
         } else if (next == 1) {
             enterJobs();
         } else if (next == 2) {
@@ -1103,6 +1154,13 @@ public final class WrightsClientState {
                 ghosts = List.of();
                 concealed = false;
                 follow = false;
+                if (incoming == Mode.CAPTURE || incoming == Mode.SAVING) {
+                    mirrorAim = false;
+                    shapeAim = false;
+                    bindSupply = false;
+                }
+            } else if (previous != Mode.BUILD) {
+                applyLastBuildTool();
             }
             if ((incoming != Mode.CAPTURE && incoming != Mode.SAVING) || cornerA == null || cornerB == null) {
                 clearCapturePreview();
@@ -1172,13 +1230,13 @@ public final class WrightsClientState {
         editPivotY = clamp(payload.anchorY(), editY);
         editPivotZ = clamp(payload.anchorZ(), editZ);
         if (payload.forBuild()) {
-            boolean same = mode == Mode.BUILD && payload.id().equals(buildId);
+            boolean wasBuild = mode == Mode.BUILD;
+            boolean same = wasBuild && payload.id().equals(buildId);
             boolean sizeChanged = fullX != editX || fullY != editY || fullZ != editZ;
             // Saving a new template and choosing Build arrives here while still capturing.
             // Keep an in-progress Bind inventory selection, which is already in build mode.
-            if (mode != Mode.BUILD) {
-                bindSupply = false;
-                bindFromMenu = false;
+            if (!wasBuild) {
+                applyLastBuildTool();
             }
             mode = Mode.BUILD;
             buildId = payload.id();
@@ -1761,6 +1819,7 @@ public final class WrightsClientState {
         }
         styleHudTicks = STYLE_HUD_TICKS;
         styleAnnounce = true;
+        rememberMode();
     }
 
     private static int styleSteps() {
@@ -1815,12 +1874,14 @@ public final class WrightsClientState {
         mirrorAim = true;
         shapeAim = false;
         WrightsClientConfig.setMirrorBlocks(true);
+        rememberMode();
     }
 
     public static void selectShapeTool() {
         selectBuildTool(false);
         shapeAim = true;
         mirrorAim = false;
+        rememberMode();
     }
 
     private static void selectBuildTool(boolean bind) {
@@ -1841,6 +1902,7 @@ public final class WrightsClientState {
         if (bind) {
             bindFromMenu = false;
         }
+        rememberMode();
     }
 
     private static void selectNewStyle(CaptureStyle style) {

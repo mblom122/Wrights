@@ -640,8 +640,8 @@ public final class SelectionRenderer {
                 markCells(pose, null, lines, camera, job, pulse, false);
                 continue;
             }
-            drawBox(pose, lines, markedBox(job), camera, 0.98F, 0.86F, 0.32F, pulse);
-        }
+                drawBox(pose, lines, markedBox(job), camera, 0.98F, 0.86F, 0.32F, pulse);
+            }
         buffers.endBatch(RenderType.lines());
     }
 
@@ -718,7 +718,7 @@ public final class SelectionRenderer {
             drawBox(pose, lines, block, camera, 0.55F, 1.0F, 0.62F, 1.0F);
             drawBox(pose, lines, block.inflate(0.08D), camera, 0.85F, 1.0F, 0.55F, pulse);
             drawGuide(pose, lines, camera, body, new AABB(port.pos()), 0.45F, 1.0F, 0.55F, pulse);
-            any = true;
+                any = true;
         }
         if (any) {
             buffers.endBatch(RenderType.lines());
@@ -766,7 +766,7 @@ public final class SelectionRenderer {
             any = true;
         }
         if (any) {
-            buffers.endBatch(RenderType.lines());
+        buffers.endBatch(RenderType.lines());
         }
     }
 
@@ -1255,7 +1255,7 @@ public final class SelectionRenderer {
         if (state.getBlock() instanceof LiquidBlock) {
             BlueprintModelView.renderFluid(pose, output, state);
         } else {
-            renderer.renderSingleBlock(state, pose, output, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
+        renderer.renderSingleBlock(state, pose, output, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
         }
         pose.popPose();
     }
