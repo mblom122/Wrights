@@ -91,7 +91,7 @@ public final class Shapes {
      * @param height box / cylinder / pyramid / dome height (box height 1 = flat square); for rings, tube diameter (1 = flat)
      * @param thickness ring band width; for lines, beam width in the cross-section
      * @param axis height axis: {@link #AXIS_Y}, {@link #AXIS_Z}, or {@link #AXIS_X}
-     * @param rotation quarter-turns around the height axis (0–3), Ctrl+scroll in the world
+     * @param rotation quarter-turns around world Y after axis remap (0–3), Ctrl+scroll in the world
      */
     public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, int thickness, boolean hollow, int axis, int rotation) {
         List<BlockPos> out = new ArrayList<>();
@@ -125,8 +125,9 @@ public final class Shapes {
     }
 
     /**
-     * Rotate around local Y, then map local Y (height) onto the chosen world axis.
-     * Axis ids match the old plane control: Y={@link #AXIS_Y}, Z={@link #AXIS_Z}, X={@link #AXIS_X}.
+     * Map local Y (height) onto the chosen world axis, then yaw around world Y.
+     * That way a tipped pyramid’s tip swings N/E/S/W instead of rolling around the tip.
+     * Axis ids: Y={@link #AXIS_Y}, Z={@link #AXIS_Z}, X={@link #AXIS_X}.
      */
     private static void orient(List<BlockPos> out, BlockPos center, int axis, int rotation) {
         if (out.isEmpty() || (axis == AXIS_Y && rotation == 0)) {
@@ -140,12 +141,6 @@ public final class Shapes {
             int x = pos.getX() - cx;
             int y = pos.getY() - cy;
             int z = pos.getZ() - cz;
-            for (int t = 0; t < rotation; t++) {
-                int nextX = z;
-                int nextZ = -x;
-                x = nextX;
-                z = nextZ;
-            }
             int wx;
             int wy;
             int wz;
@@ -165,6 +160,13 @@ public final class Shapes {
                     wy = y;
                     wz = z;
                 }
+            }
+            // Yaw around world up so sideways tips turn through the cardinals.
+            for (int t = 0; t < rotation; t++) {
+                int nextX = wz;
+                int nextZ = -wx;
+                wx = nextX;
+                wz = nextZ;
             }
             out.set(i, new BlockPos(cx + wx, cy + wy, cz + wz));
         }

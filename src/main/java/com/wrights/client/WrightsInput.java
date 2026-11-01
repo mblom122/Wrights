@@ -520,7 +520,7 @@ public final class WrightsInput {
             return;
         }
         if (control) {
-            // Shape tool: Ctrl+scroll turns the shape 90° around its height axis.
+            // Shape tool: Ctrl+scroll yaws the shape 90° around world up.
             if (WrightsClientState.shapeToolActive() && com.wrights.WrightsConfig.allowShape()) {
                 int yaw = com.wrights.WrightsClientConfig.SHAPE_YAW.get();
                 int nextYaw = event.getScrollDeltaY() > 0.0D

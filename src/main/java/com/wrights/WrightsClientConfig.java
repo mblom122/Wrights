@@ -217,7 +217,7 @@ public final class WrightsClientConfig {
             .comment("Shape height axis. 0 = Y upright, 1 = Z, 2 = X.")
             .defineInRange("shapePlane", 0, 0, 2);
     public static final ModConfigSpec.IntValue SHAPE_YAW = BUILDER
-            .comment("Quarter-turns around the height axis (0–3). Ctrl+scroll in the world.")
+            .comment("Quarter-turns around world Y after axis remap (0–3). Ctrl+scroll in the world.")
             .defineInRange("shapeYaw", 0, 0, 3);
     public static final ModConfigSpec.BooleanValue SHAPE_HOLLOW = BUILDER
             .define("shapeHollow", false);
