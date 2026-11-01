@@ -22,7 +22,6 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
     private int panelH;
     private int controlsX;
     private int controlsW;
-    private int modelX;
     private int detailY;
     private int rotateY;
     private int flipY;
@@ -51,8 +50,7 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
         int pad = 12;
         int side = 12;
         int openW = this.font.width(Component.translatable("screen.wrights.open_map")) + 12;
-        // Size + anchor sit under selection (~40px), same pocket Placement uses for location/size.
-        int leftChrome = 148 + (map ? 18 : 0) + 40;
+        int leftChrome = 148 + (map ? 18 : 0);
         int modelSize = Math.min(140, Math.max(map ? openW : 88, this.height - leftChrome - 36));
         int leftW = modelSize;
         if (pad + leftW + gap + controlsW + pad > this.width - 8) {
@@ -62,20 +60,19 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
         panelW = pad + leftW + gap + controlsW + pad;
         int extraRows = (WrightsClientState.showStoredSettings() ? 1 : 0) + (WrightsClientState.showStoredAll() ? 1 : 0);
         int pasteRows = 2 + extraRows;
-        int leftNeed = 28 + modelSize + 16 + 18 + 32 + (map ? 18 : 0) + 52 + 40 + 40 + 8;
-        int rightNeed = 28 + 36 + 48 + 12 + pasteRows * 18 + 14 + 16 + 18 + 12;
+        int leftNeed = 28 + modelSize + 16 + 18 + 32 + (map ? 18 : 0) + 52 + 40 + 8;
+        // Size/anchor row, then rotate, flip, paste, materials, save.
+        int rightNeed = 28 + 32 + 36 + 48 + 12 + pasteRows * 18 + 14 + 16 + 18 + 12;
         panelH = Math.min(this.height - 8, Math.max(leftNeed, rightNeed));
         panelX = JeiPreview.left(this.width, panelW);
         panelY = Math.max(4, (this.height - panelH) / 2);
-        modelX = panelX + pad;
+        int modelX = panelX + pad;
         int modelY = panelY + 28;
         controlsX = modelX + leftW + gap;
         column.place(this, this.font, modelX, modelY, modelSize, widget -> addRenderableWidget(widget), this::setFocused);
-        detailY = column.belowSelection();
-        column.shiftPromptTo(detailY + 40);
 
-        int top = panelY + 28;
-        rotateY = top + 12;
+        detailY = panelY + 28;
+        rotateY = detailY + 32;
         flipY = rotateY + 36;
         pasteY = flipY + 48;
         int inner = controlsW - side;
@@ -105,7 +102,7 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
         addRenderableWidget(saveButton);
         addRenderableWidget(cancelButton);
 
-        int contentBottom = Math.max(detailY + 40, footY + 40);
+        int contentBottom = Math.max(column.belowSelection(), footY + 40);
         panelH = Math.min(this.height - 8, Math.max(panelH, contentBottom - panelY + 8));
         column.refresh();
         refreshOptions();
@@ -165,7 +162,7 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
             saveButton.setY(footY + 18);
             cancelButton.setY(footY + 18);
         }
-        int contentBottom = Math.max(detailY + 40, footY + 40);
+        int contentBottom = Math.max(column.belowSelection(), footY + 40);
         panelH = Math.min(this.height - 8, Math.max(panelH, contentBottom - panelY + 8));
     }
 
@@ -182,10 +179,15 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
                 : WrightsClientState.editName;
         graphics.drawString(this.font, this.font.plainSubstrByWidth(title, panelW - 24), panelX + 14, panelY + 8, WrightsUi.COPPER, false);
         column.render(graphics);
-        graphics.drawString(this.font, Component.translatable("screen.wrights.size_label"), modelX, detailY, WrightsUi.BLUE, false);
-        graphics.drawString(this.font, Component.literal(WrightsClientState.editX + " × " + WrightsClientState.editY + " × " + WrightsClientState.editZ), modelX, detailY + 14, WrightsUi.TEXT, false);
-        graphics.drawString(this.font, Component.translatable("screen.wrights.anchor_section"), modelX, detailY + 32, WrightsUi.BLUE, false);
-        graphics.drawString(this.font, Component.translatable("screen.wrights.anchor", WrightsClientState.editPivotX, WrightsClientState.editPivotY, WrightsClientState.editPivotZ), modelX, detailY + 46, WrightsUi.TEXT, false);
+        int side = 12;
+        int half = (controlsW - side) / 2;
+        int sizeX = controlsX + side;
+        int anchorX = controlsX + side + half;
+        graphics.drawString(this.font, Component.translatable("screen.wrights.size_label"), sizeX, detailY, WrightsUi.BLUE, false);
+        graphics.drawString(this.font, Component.literal(WrightsClientState.editX + " × " + WrightsClientState.editY + " × " + WrightsClientState.editZ), sizeX, detailY + 12, WrightsUi.TEXT, false);
+        graphics.drawString(this.font, Component.translatable("screen.wrights.anchor_section"), anchorX, detailY, WrightsUi.BLUE, false);
+        String pivot = WrightsClientState.editPivotX + ", " + WrightsClientState.editPivotY + ", " + WrightsClientState.editPivotZ;
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(pivot, Math.max(40, controlsW - side - half)), anchorX, detailY + 12, WrightsUi.TEXT, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.rotate"), controlsX + 12, rotateY - 12, WrightsUi.BLUE, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.flip"), controlsX + 12, flipY - 12, WrightsUi.BLUE, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.paste_options"), controlsX + 12, pasteY - 12, WrightsUi.BLUE, false);
