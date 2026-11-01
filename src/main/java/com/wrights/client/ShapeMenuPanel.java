@@ -711,15 +711,13 @@ final class ShapeMenuPanel {
 
     private void drawShapePreview(GuiGraphics graphics, int x, int y, int width, int height) {
         refreshShapePreview();
-        // Compact size + block count above the spinning preview.
-        int infoH = 14;
-        String info = Component.translatable(
-                "menu.wrights.shape_preview_info",
-                previewSizeX,
-                previewSizeY,
-                previewSizeZ,
-                previewBlocks).getString();
-        graphics.drawCenteredString(font, font.plainSubstrByWidth(info, width), x + width / 2, y + 2, WrightsUi.MUTED);
+        // Preview header, size (blue), then block count — same language as Jobs rows.
+        int infoH = 34;
+        WrightsUi.section(graphics, font, x, y, "menu.wrights.job_preview", x + width);
+        Component size = Component.translatable("menu.wrights.size", previewSizeX, previewSizeY, previewSizeZ);
+        graphics.drawString(font, font.plainSubstrByWidth(size.getString(), width), x, y + 12, WrightsUi.SIZE, false);
+        Component blocks = Component.translatable("menu.wrights.job_preview_blocks", previewBlocks);
+        graphics.drawString(font, font.plainSubstrByWidth(blocks.getString(), width), x, y + 22, WrightsUi.MUTED, false);
         previewBoxY = y + infoH;
         previewBoxH = Math.max(24, height - infoH);
         graphics.fill(x, previewBoxY, x + width, previewBoxY + previewBoxH, 0xFF101820);

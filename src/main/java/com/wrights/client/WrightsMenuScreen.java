@@ -2212,7 +2212,8 @@ public class WrightsMenuScreen extends Screen {
             String name = this.font.plainSubstrByWidth(entry.name(), Math.max(8, nameRoom - extraW));
             graphics.drawString(this.font, name, x, y + 5, entry.folder() ? WrightsUi.COPPER : WrightsUi.TEXT, false);
             if (!extra.isEmpty()) {
-                graphics.drawString(this.font, extra, listX + listW - 8 - this.font.width(extra), y + 5, WrightsUi.MUTED, false);
+                graphics.drawString(this.font, extra, listX + listW - 8 - this.font.width(extra), y + 5,
+                        entry.folder() ? WrightsUi.MUTED : WrightsUi.SIZE, false);
             }
             shown++;
         }
@@ -2384,7 +2385,7 @@ public class WrightsMenuScreen extends Screen {
         graphics.fill(detailX + 4, detailSplit, detailX + detailW - 4 - bar, detailSplit + 1, 0xFF31404E);
         int info = detailSplit + 4;
         graphics.drawString(this.font, this.font.plainSubstrByWidth(summary.name(), modelW), detailX + 4, info, WrightsUi.TEXT, false);
-        graphics.drawString(this.font, Component.translatable("menu.wrights.size", summary.sizeX(), summary.sizeY(), summary.sizeZ()), detailX + 4, info + 10, WrightsUi.BLUE, false);
+        graphics.drawString(this.font, Component.translatable("menu.wrights.size", summary.sizeX(), summary.sizeY(), summary.sizeZ()), detailX + 4, info + 10, WrightsUi.SIZE, false);
         long box = (long) summary.sizeX() * summary.sizeY() * summary.sizeZ();
         graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("menu.wrights.blocks", box, summary.blocks()).getString(), modelW), detailX + 4, info + 20, WrightsUi.MUTED, false);
         if (!summary.source().isEmpty()) {
@@ -3297,7 +3298,7 @@ public class WrightsMenuScreen extends Screen {
         Component statusText = jobStatusText(job);
         graphics.drawString(this.font, statusText, x + width - 8 - this.font.width(statusText), y + 4, jobColor(job), false);
         WrightsUi.section(graphics, this.font, x + 6, y + 15, "menu.wrights.job_preview", x + width - 8);
-        graphics.drawString(this.font, Component.translatable("menu.wrights.size", job.sizeX(), job.sizeY(), job.sizeZ()), x + 6, y + 25, WrightsUi.BLUE, false);
+        graphics.drawString(this.font, Component.translatable("menu.wrights.size", job.sizeX(), job.sizeY(), job.sizeZ()), x + 6, y + 25, WrightsUi.SIZE, false);
         graphics.drawString(this.font, Component.translatable("menu.wrights.job_preview_blocks", job.total()), x + 6, y + 35, WrightsUi.MUTED, false);
         Component source = jobSource(job);
         if (!source.getString().isEmpty()) {

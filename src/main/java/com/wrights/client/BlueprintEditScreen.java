@@ -204,7 +204,7 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
         int sizeX = controlsX + side;
         int anchorX = controlsX + side + half;
         graphics.drawString(this.font, Component.translatable("screen.wrights.size_label"), sizeX, detailY, WrightsUi.BLUE, false);
-        graphics.drawString(this.font, Component.literal(WrightsClientState.editX + " × " + WrightsClientState.editY + " × " + WrightsClientState.editZ), sizeX, detailY + 12, WrightsUi.TEXT, false);
+        graphics.drawString(this.font, Component.literal(WrightsClientState.editX + " × " + WrightsClientState.editY + " × " + WrightsClientState.editZ), sizeX, detailY + 12, WrightsUi.SIZE, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.anchor_section"), anchorX, detailY, WrightsUi.BLUE, false);
         String pivot = WrightsClientState.editPivotX + ", " + WrightsClientState.editPivotY + ", " + WrightsClientState.editPivotZ;
         graphics.drawString(this.font, this.font.plainSubstrByWidth(pivot, Math.max(40, controlsW - side - half)), anchorX, detailY + 12, WrightsUi.TEXT, false);
