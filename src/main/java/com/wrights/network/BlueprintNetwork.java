@@ -154,8 +154,9 @@ public final class BlueprintNetwork {
         for (Requirements.Cost cost : costs) {
             lines.add(new BlueprintPayloads.MaterialLine(cost.itemId(), cost.count(), cost.player(), cost.supply(), cost.digital()));
         }
+        boolean supply = com.wrights.blueprint.BlueprintSessions.get(player).supplyPos() != null;
         boolean digital = com.wrights.storage.ItemSource.linkOf(player).bound();
-        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.Materials(id, shortage, digital, lines));
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.Materials(id, shortage, supply, digital, lines));
     }
 
     public static void finished(ServerPlayer player, UUID id, boolean saved, boolean stay) {

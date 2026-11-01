@@ -28,6 +28,7 @@ public class MaterialsScreen extends Screen {
     private final Screen parent;
     private final List<BlueprintPayloads.MaterialLine> lines = new ArrayList<>();
     private boolean shortage;
+    private boolean supplyBound;
     private boolean digitalBound;
     private boolean loaded;
     private int panelX;
@@ -73,6 +74,7 @@ public class MaterialsScreen extends Screen {
         lines.clear();
         lines.addAll(payload.lines());
         shortage = payload.shortage();
+        supplyBound = payload.supply();
         digitalBound = payload.digital();
         loaded = true;
         scroll = 0;
@@ -83,7 +85,7 @@ public class MaterialsScreen extends Screen {
 
     @Override
     protected void init() {
-        panelW = WrightsUi.fitW(digitalBound ? 700 : 580, this.width);
+        panelW = WrightsUi.fitW(700, this.width);
         panelH = WrightsUi.fitH(240, this.height);
         panelX = WrightsUi.centerX(panelW, this.width);
         panelY = WrightsUi.centerY(panelH, this.height);
@@ -130,7 +132,7 @@ public class MaterialsScreen extends Screen {
         graphics.drawString(this.font, title, panelX + 14, panelY + 8, WrightsUi.COPPER, false);
         boolean creative = this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild && !this.minecraft.player.isSpectator();
         boolean queue = WrightsClientConfig.QUEUE_JOBS.get();
-        String hintKey = creative ? "menu.wrights.materials_creative" : shortage ? (queue ? "menu.wrights.need_hint_queue" : "menu.wrights.need_hint") : digitalBound ? "menu.wrights.materials_hint_digital" : "menu.wrights.materials_hint";
+        String hintKey = creative ? "menu.wrights.materials_creative" : shortage ? (queue ? "menu.wrights.need_hint_queue" : "menu.wrights.need_hint") : "menu.wrights.materials_hint";
         Component hint = Component.translatable(hintKey);
         graphics.drawString(this.font, this.font.plainSubstrByWidth(hint.getString(), panelW - 28), panelX + 14, panelY + 20, WrightsUi.MUTED, false);
         if (!loaded) {
@@ -143,18 +145,20 @@ public class MaterialsScreen extends Screen {
         }
         int right = panelX + panelW - 18;
         int inventoryW = Math.max(COUNT_W, this.font.width(Component.translatable("menu.wrights.column_inventory").getString()));
-        int digitalW = COUNT_W;
-        if (digitalBound) {
-            digitalW = Math.max(digitalW, this.font.width(Component.translatable("menu.wrights.column_digital").getString()));
-            for (BlueprintPayloads.MaterialLine line : lines) {
-                digitalW = Math.max(digitalW, this.font.width(Integer.toString(line.digital())));
-            }
-        }
+        int digitalW = Math.max(COUNT_W, this.font.width(Component.translatable("menu.wrights.column_digital").getString()));
         int missingW = Math.max(COUNT_W, this.font.width(Component.translatable("menu.wrights.column_missing").getString()));
         int totalW = Math.max(COUNT_W, this.font.width(Component.translatable("menu.wrights.column_total").getString()));
         for (BlueprintPayloads.MaterialLine line : lines) {
-            long sum = (long) line.player() + line.supply() + line.digital();
+            long supply = supplyBound ? line.supply() : 0L;
+            long digital = digitalBound ? line.digital() : 0L;
+            long sum = line.player() + supply + digital;
             long shortfall = Math.max(0L, line.count() - sum);
+            if (supplyBound) {
+                inventoryW = Math.max(inventoryW, this.font.width(Integer.toString(line.supply())));
+            }
+            if (digitalBound) {
+                digitalW = Math.max(digitalW, this.font.width(Integer.toString(line.digital())));
+            }
             totalW = Math.max(totalW, this.font.width(Long.toString(sum)));
             missingW = Math.max(missingW, this.font.width(Long.toString(shortfall)));
         }
@@ -162,7 +166,7 @@ public class MaterialsScreen extends Screen {
         int totalX = needX - 8 - totalW;
         int missingX = totalX - 8 - missingW;
         int digitalX = missingX - 8 - digitalW;
-        int inventoryX = (digitalBound ? digitalX : missingX) - 8 - inventoryW;
+        int inventoryX = digitalX - 8 - inventoryW;
         int playerX = inventoryX - 8 - COUNT_W;
         int iconX = panelX + 16;
         int nameX = iconX + 22;
@@ -170,9 +174,7 @@ public class MaterialsScreen extends Screen {
         drawColumn(graphics, Component.translatable("menu.wrights.column_material"), iconX, listY + 2, COUNT_W, false);
         drawColumn(graphics, Component.translatable("menu.wrights.column_player"), playerX, listY + 2, COUNT_W, true);
         drawColumn(graphics, Component.translatable("menu.wrights.column_inventory"), inventoryX, listY + 2, inventoryW, true);
-        if (digitalBound) {
-            drawColumn(graphics, Component.translatable("menu.wrights.column_digital"), digitalX, listY + 2, digitalW, true);
-        }
+        drawColumn(graphics, Component.translatable("menu.wrights.column_digital"), digitalX, listY + 2, digitalW, true);
         drawColumn(graphics, Component.translatable("menu.wrights.column_missing"), missingX, listY + 2, missingW, true);
         drawColumn(graphics, Component.translatable("menu.wrights.column_total"), totalX, listY + 2, totalW, true);
         drawColumn(graphics, Component.translatable("menu.wrights.column_need"), needX, listY + 2, COUNT_W, true);
@@ -190,17 +192,19 @@ public class MaterialsScreen extends Screen {
             int y = bodyY + (i - scroll) * ROW;
             ItemStack stack = new ItemStack(item);
             int need = line.count();
-            long total = (long) line.player() + line.supply() + line.digital();
+            long supply = supplyBound ? line.supply() : 0L;
+            long digital = digitalBound ? line.digital() : 0L;
+            long total = line.player() + supply + digital;
             long missing = Math.max(0L, need - total);
             WrightsUi.slot(graphics, iconX, y, 0xFF31404E);
             graphics.renderItem(stack, iconX + 1, y + 1);
             String name = this.font.plainSubstrByWidth(stack.getHoverName().getString(), nameW);
             graphics.drawString(this.font, name, nameX, y + 5, WrightsUi.TEXT, false);
             drawCount(graphics, Integer.toString(line.player()), playerX, y + 5, COUNT_W, stockColor(creative, line.player(), need));
-            drawCount(graphics, Integer.toString(line.supply()), inventoryX, y + 5, inventoryW, stockColor(creative, line.supply(), need));
-            if (digitalBound) {
-                drawCount(graphics, Integer.toString(line.digital()), digitalX, y + 5, digitalW, stockColor(creative, line.digital(), need));
-            }
+            drawCount(graphics, supplyBound ? Integer.toString(line.supply()) : "-", inventoryX, y + 5, inventoryW,
+                    supplyBound ? stockColor(creative, line.supply(), need) : WrightsUi.MUTED);
+            drawCount(graphics, digitalBound ? Integer.toString(line.digital()) : "-", digitalX, y + 5, digitalW,
+                    digitalBound ? stockColor(creative, line.digital(), need) : WrightsUi.MUTED);
             drawCount(graphics, Long.toString(missing), missingX, y + 5, missingW, missingColor(creative, missing));
             drawCount(graphics, Long.toString(total), totalX, y + 5, totalW, stockColor(creative, total, need));
             drawCount(graphics, Integer.toString(need), needX, y + 5, COUNT_W, WrightsUi.TEXT);
