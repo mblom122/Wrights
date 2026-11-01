@@ -49,9 +49,16 @@ public final class WrightsConfig {
     public static final ModConfigSpec.IntValue MAX_BLOCKS = BUILDER
             .comment(
                     "Largest volume, in blocks, for blueprints and Shape builds. Separate from maxShapeAxis (slider length).",
-                    "Default 512³ (134217728) matches RFTools Builder’s max box. Huge solids use a lot of memory and can lag.",
-                    "Hollow shapes stay much cheaper. Lower this if the server struggles.")
+                    "Default 512³ (134217728) matches RFTools Builder’s max box size.",
+                    "Shape mode still will not allocate more than maxShapeCells at once (RFTools streams; Wrights materializes).")
             .defineInRange("maxBlocks", 512 * 512 * 512, 1, 512 * 512 * 512);
+
+    public static final ModConfigSpec.IntValue MAX_SHAPE_CELLS = BUILDER
+            .comment(
+                    "Most BlockPos cells Shape mode may allocate for one build. Above this, the shape is refused.",
+                    "RFTools Builder streams cells; Wrights builds a list, so this protects against OutOfMemoryError.",
+                    "Raise carefully — each cell is a Java object. Prefer Hollow for huge shapes.")
+            .defineInRange("maxShapeCells", 2_000_000, 1, 512 * 512 * 512);
 
     public static final ModConfigSpec.IntValue BLOCKS_PER_TICK = BUILDER
             .comment(
@@ -407,6 +414,13 @@ public final class WrightsConfig {
         int shape = Math.max(1, read(MAX_SHAPE_AXIS, 512));
         int axis = Math.max(1, read(MAX_AXIS, 512));
         return Math.min(shape, axis);
+    }
+
+    /** Hard cap on Shape BlockPos list size — keeps large maxBlocks from OOMing the JVM. */
+    public static int maxShapeCells() {
+        int cells = Math.max(1, read(MAX_SHAPE_CELLS, 2_000_000));
+        int blocks = Math.max(1, read(MAX_BLOCKS, 512 * 512 * 512));
+        return Math.min(cells, blocks);
     }
 
     /**

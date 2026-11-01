@@ -79,19 +79,20 @@ public final class ShapeLaunch {
                     ? clicked.immutable()
                     : Shapes.lookCorner(clicked, Direction.from3DDataValue(Mth.clamp(payload.face(), 0, 5)));
         }
-        // Cap materialization like RFTools: never allocate a multi-million BlockPos list.
-        // maxBlocks is the hard volume budget; +1 detects overflow without a second full pass.
-        int maxBlocks = Math.max(1, WrightsConfig.MAX_BLOCKS.getAsInt());
-        long scan = Shapes.scanVolume(kind, size, height, thickness);
-        if (scan > maxBlocks * 8L) {
-            // AABB walk would thrash even with early exit (e.g. solid 256³). Refuse up front.
-            Messages.actionBar(player, "message.wrights.shape_too_many", maxBlocks);
+        // RFTools streams cells; Wrights materializes a list. Cap allocation so 512³ config
+        // cannot OutOfMemoryError the JVM (see maxShapeCells).
+        int budget = Math.max(1, WrightsConfig.maxShapeCells());
+        List<BlockPos> worlds;
+        try {
+            worlds = Shapes.blocksPinned(
+                    kind, target, size, height, thickness, hollow, plane, yaw, pivot, budget + 1);
+        } catch (OutOfMemoryError error) {
+            System.gc();
+            Messages.actionBar(player, "message.wrights.shape_too_many", budget);
             return;
         }
-        List<BlockPos> worlds = Shapes.blocksPinned(
-                kind, target, size, height, thickness, hollow, plane, yaw, pivot, maxBlocks + 1);
-        if (worlds.size() > maxBlocks) {
-            Messages.actionBar(player, "message.wrights.shape_too_many", maxBlocks);
+        if (worlds.size() > budget) {
+            Messages.actionBar(player, "message.wrights.shape_too_many", budget);
             return;
         }
         if (worlds.isEmpty()) {
@@ -102,8 +103,10 @@ public final class ShapeLaunch {
         ShapeMaterials.FillMode fillMode = ShapeMaterials.FillMode.byId(payload.fillMode());
         int orderBatch = ShapeMaterials.clampBatch(payload.orderBatch());
         Random random = new Random(player.getUUID().getMostSignificantBits() ^ level.getGameTime() ^ worlds.size() ^ materials.hashCode() ^ fillMode.ordinal());
-        List<BlockPos> ready = new ArrayList<>(worlds.size());
-        for (BlockPos world : worlds) {
+        // Filter in place to avoid a second multi-million list.
+        int write = 0;
+        for (int i = 0; i < worlds.size(); i++) {
+            BlockPos world = worlds.get(i);
             if (!level.isLoaded(world) || !BoxEdits.inWorld(world) || !level.mayInteract(player, world)) {
                 continue;
             }
@@ -111,8 +114,12 @@ public final class ShapeLaunch {
             if (!voidBlocks && !current.isAir()) {
                 continue;
             }
-            ready.add(world.immutable());
+            worlds.set(write++, world);
         }
+        if (write < worlds.size()) {
+            worlds.subList(write, worlds.size()).clear();
+        }
+        List<BlockPos> ready = worlds;
         if (ready.isEmpty()) {
             Messages.actionBar(player, "message.wrights.shape_nowhere");
             return;

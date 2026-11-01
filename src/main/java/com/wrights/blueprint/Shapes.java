@@ -519,11 +519,11 @@ public final class Shapes {
         if (local.isEmpty() || (dx == 0 && dy == 0 && dz == 0)) {
             return local;
         }
-        List<BlockPos> out = new ArrayList<>(local.size());
-        for (BlockPos pos : local) {
-            out.add(pos.offset(dx, dy, dz));
+        // Offset in place — a second ArrayList of millions of BlockPos OOMs the heap.
+        for (int i = 0; i < local.size(); i++) {
+            local.set(i, local.get(i).offset(dx, dy, dz));
         }
-        return out;
+        return local;
     }
 
     /** @deprecated prefer {@link #blocksPinned} with a pivot */
