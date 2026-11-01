@@ -634,6 +634,7 @@ public final class JobManager {
                 schematic.id(),
                 schematic.blockCount());
         job.setAnchor(origin.pos().offset(schematic.anchorX(), schematic.anchorY(), schematic.anchorZ()));
+        job.setBlueprintName(blueprintJobTitle(schematic.name()));
         if (!instant(player) && !assignCrew(player, job, schematic)) {
             return;
         }
@@ -664,7 +665,7 @@ public final class JobManager {
                 Math.max(cornerA.getY(), cornerB.getY()),
                 Math.max(cornerA.getZ(), cornerB.getZ()));
         BuildJob job = BuildJob.copy(player.getUUID(), player.getUUID(), dimension, min, max);
-        job.setBlueprintName(name);
+        job.setBlueprintName(blueprintJobTitle(name == null || name.isBlank() ? "Saving" : name));
         job.setCopyFluids(copyFluids);
         job.setCopyNbt(copyNbtBlocks, copyNbtSettings, copyNbtAll);
         job.setCopyTurns(turns);
@@ -975,7 +976,7 @@ public final class JobManager {
         job.setPasteOptions(false, voidBlocks, voidBlocks, false, false, false, false);
         job.setClip(job.boxSizeX(), job.boxSizeY(), job.boxSizeZ());
         job.setAnchor(min);
-        job.setBlueprintName(exchange ? "Exchange" : "Shape");
+        job.setBlueprintName(shapeJobTitle(exchange, kind, size, height, thickness, axis));
         com.wrights.blueprint.BlueprintSessions.BlueprintSession session = com.wrights.blueprint.BlueprintSessions.get(player);
         job.setSupply(session.supplyPos(), session.supplyDimension());
         job.setSupplyOrder(supplyOrder);
@@ -2141,12 +2142,23 @@ public final class JobManager {
 
     private static String subjectName(BuildJob job, Schematic schematic) {
         String name = job.blueprintName();
+        if (name != null) {
+            for (String prefix : new String[] {"Shape - ", "Exchange - ", "Blueprint - "}) {
+                if (name.startsWith(prefix)) {
+                    name = name.substring(prefix.length()).trim();
+                    break;
+                }
+            }
+        }
         if (name != null && (name.equals("Mirror - Mine") || name.equals("Build") || name.equals("Saving")
                 || name.equals("Blueprint") || name.equals("Exchange") || name.equals("Shape"))) {
             name = null;
         }
         if ((name == null || name.isBlank()) && schematic != null) {
             name = schematic.name();
+            if (name != null && name.startsWith("Blueprint - ")) {
+                name = name.substring("Blueprint - ".length()).trim();
+            }
         }
         if (name == null || name.isBlank()) {
             return "";
@@ -2156,6 +2168,108 @@ public final class JobManager {
             return "";
         }
         return name;
+    }
+
+    /** Jobs card / stored title: {@code Shape - Ring}, {@code Exchange - Wall}, {@code Blueprint - Dock}. */
+    public static String jobCardTitle(BuildJob job, SchematicLibrary library) {
+        if (job == null) {
+            return "Build";
+        }
+        if (job.kind() == BuildJob.Kind.SHAPE) {
+            String current = job.blueprintName();
+            if (current != null && (current.startsWith("Shape - ") || current.startsWith("Exchange - "))) {
+                return clipJobTitle(current);
+            }
+            return clipJobTitle(shapeJobTitle(
+                    job.exchangeJob(),
+                    job.shapeKind(),
+                    job.shapeSize(),
+                    job.shapeHeight(),
+                    job.shapeThickness(),
+                    job.shapeAxis()));
+        }
+        if (job.kind() == BuildJob.Kind.COPY) {
+            String current = job.blueprintName();
+            if (current != null && current.startsWith("Blueprint - ")) {
+                return clipJobTitle(current);
+            }
+            String bare = current == null || current.isBlank() ? "Saving" : current;
+            return clipJobTitle(blueprintJobTitle(bare));
+        }
+        // PASTE — blueprints and mirror copies.
+        String current = job.blueprintName();
+        if (current != null && !current.isBlank()) {
+            if (current.startsWith("Blueprint - ") || current.startsWith("Mirror")) {
+                return clipJobTitle(current);
+            }
+            if (current.equals("Build") || current.equals("Saving") || current.equals("Blueprint")) {
+                current = null;
+            }
+        }
+        if ((current == null || current.isBlank()) && job.schematicId() != null && library != null) {
+            current = library.schematic(job.schematicId()).map(Schematic::name).orElse(null);
+        }
+        if (current == null || current.isBlank()) {
+            return "Blueprint - Build";
+        }
+        if (current.startsWith("Mirror")) {
+            return clipJobTitle(current);
+        }
+        return clipJobTitle(blueprintJobTitle(current));
+    }
+
+    public static String shapeJobTitle(boolean exchange, int kindId, int size, int height, int thickness, int axis) {
+        String mode = exchange ? "Exchange" : "Shape";
+        String detail = exchange
+                ? exchangeFormLabel(kindId, size, height, thickness, axis)
+                : shapeKindLabel(com.wrights.blueprint.Shapes.Kind.byId(kindId));
+        return mode + " - " + detail;
+    }
+
+    public static String blueprintJobTitle(String blueprintName) {
+        String bare = blueprintName == null ? "" : blueprintName.trim();
+        if (bare.startsWith("Blueprint - ")) {
+            return bare;
+        }
+        if (bare.isEmpty()) {
+            bare = "Build";
+        }
+        return "Blueprint - " + bare;
+    }
+
+    private static String exchangeFormLabel(int kindId, int size, int height, int thickness, int axis) {
+        com.wrights.blueprint.Shapes.Kind kind = com.wrights.blueprint.Shapes.Kind.byId(kindId);
+        return switch (kind) {
+            case CIRCLE -> "Circle";
+            case BOX -> {
+                if (Math.max(1, size) <= 1 && Math.max(1, thickness) <= 1) {
+                    yield "Pillar";
+                }
+                if (Math.max(1, height) <= 1) {
+                    yield "Beam";
+                }
+                yield "Box";
+            }
+            case SQUARE, RECTANGLE -> com.wrights.blueprint.Shapes.clampPlane(axis) == com.wrights.blueprint.Shapes.AXIS_Y
+                    ? "Floor"
+                    : "Wall";
+            default -> shapeKindLabel(kind);
+        };
+    }
+
+    private static String shapeKindLabel(com.wrights.blueprint.Shapes.Kind kind) {
+        if (kind == null) {
+            return "Shape";
+        }
+        String raw = kind.name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
+        return Character.toUpperCase(raw.charAt(0)) + raw.substring(1);
+    }
+
+    private static String clipJobTitle(String title) {
+        if (title == null || title.isBlank()) {
+            return "Build";
+        }
+        return title.length() > 48 ? title.substring(0, 48) : title;
     }
 
     private static String stripMirrorSuffix(String name) {

@@ -786,16 +786,7 @@ public final class BlueprintNetwork {
         jobs.sort(java.util.Comparator.comparing(BuildJob::finished).thenComparing(java.util.Comparator.comparingInt(BuildJob::historyOrder).reversed()));
         java.util.List<BlueprintPayloads.JobLine> lines = new java.util.ArrayList<>();
         for (BuildJob job : jobs) {
-            String name = job.blueprintName();
-            if (name == null || name.isBlank()) {
-                name = job.kind() == BuildJob.Kind.COPY ? "Saving" : "Build";
-                if (job.schematicId() != null) {
-                    name = library.schematic(job.schematicId()).map(Schematic::name).orElse(name);
-                }
-            }
-            if (name.length() > 48) {
-                name = name.substring(0, 48);
-            }
+            String name = JobManager.jobCardTitle(job, library);
             int done = job.progressDone();
             int total = job.undoing() ? Math.max(1, job.undoTotal()) : job.total();
             lines.add(new BlueprintPayloads.JobLine(
