@@ -45,6 +45,8 @@ final class ShapeMenuPanel {
     private int sizeY = -1;
     private int heightY = -1;
     private int thicknessY = -1;
+    /** Left edge of the slider track (between − and +). */
+    private int sizeTrackX;
     private int sizeW;
     private int sizeValueX;
     private int sizeValueW;
@@ -120,11 +122,7 @@ final class ShapeMenuPanel {
         drawField(graphics, mouseX, mouseY, x, y, sizeLabel(kind, axis), sizeHint(kind, axis));
         y += 12;
         sizeY = y;
-        sizeW = Math.max(40, leftW - 40);
-        int size = WrightsClientConfig.SHAPE_SIZE.get();
-        int max = axisMax();
-        drawSlider(graphics, x, y, sizeW, size - 1, Math.max(1, max - 1));
-        drawSliderValue(graphics, mouseX, mouseY, x + sizeW + 8, y, size, SLIDER_SIZE);
+        drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_SIZE.get(), SLIDER_SIZE);
         y += 18;
         heightY = -1;
         thicknessY = -1;
@@ -137,18 +135,15 @@ final class ShapeMenuPanel {
                     box ? "menu.wrights.shape_depth_hint" : "menu.wrights.shape_thickness_hint");
             y += 12;
             thicknessY = y;
-            int thickness = Mth.clamp(WrightsClientConfig.SHAPE_THICKNESS.get(), 1, max);
-            drawSlider(graphics, x, y, sizeW, thickness - 1, Math.max(1, max - 1));
-            drawSliderValue(graphics, mouseX, mouseY, x + sizeW + 8, y, thickness, SLIDER_THICKNESS);
+            int thickness = Mth.clamp(WrightsClientConfig.SHAPE_THICKNESS.get(), 1, axisMax());
+            drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, thickness, SLIDER_THICKNESS);
             y += 18;
         }
         if (kind.usesHeight()) {
             drawField(graphics, mouseX, mouseY, x, y, alongLabel(kind, axis), alongHint(kind, axis));
             y += 12;
             heightY = y;
-            int height = WrightsClientConfig.SHAPE_HEIGHT.get();
-            drawSlider(graphics, x, y, sizeW, height - 1, Math.max(1, max - 1));
-            drawSliderValue(graphics, mouseX, mouseY, x + sizeW + 8, y, height, SLIDER_HEIGHT);
+            drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_HEIGHT.get(), SLIDER_HEIGHT);
             y += 18;
         }
         // Axis = height direction; Rotation = world yaw around the pin (also Ctrl+scroll).
@@ -271,17 +266,17 @@ final class ShapeMenuPanel {
             beginEdit(SLIDER_HEIGHT);
             return true;
         }
-        if (sizeY >= 0 && mouseY >= sizeY && mouseY < sizeY + 12 && mouseX >= bodyX && mouseX < bodyX + sizeW) {
+        if (sizeY >= 0 && mouseY >= sizeY && mouseY < sizeY + 12 && mouseX >= sizeTrackX && mouseX < sizeTrackX + sizeW) {
             draggingSlider = SLIDER_SIZE;
             WrightsClientConfig.setShapeSize(sliderAt(mouseX, axisMax()));
             return true;
         }
-        if (thicknessY >= 0 && mouseY >= thicknessY && mouseY < thicknessY + 12 && mouseX >= bodyX && mouseX < bodyX + sizeW) {
+        if (thicknessY >= 0 && mouseY >= thicknessY && mouseY < thicknessY + 12 && mouseX >= sizeTrackX && mouseX < sizeTrackX + sizeW) {
             draggingSlider = SLIDER_THICKNESS;
             WrightsClientConfig.setShapeThickness(sliderAt(mouseX, axisMax()));
             return true;
         }
-        if (heightY >= 0 && mouseY >= heightY && mouseY < heightY + 12 && mouseX >= bodyX && mouseX < bodyX + sizeW) {
+        if (heightY >= 0 && mouseY >= heightY && mouseY < heightY + 12 && mouseX >= sizeTrackX && mouseX < sizeTrackX + sizeW) {
             draggingSlider = SLIDER_HEIGHT;
             WrightsClientConfig.setShapeHeight(sliderAt(mouseX, axisMax()));
             return true;
@@ -520,7 +515,7 @@ final class ShapeMenuPanel {
     /** Map a click on the shared slider track to 1..maxInclusive. */
     private int sliderAt(double mouseX, int maxInclusive) {
         int span = Math.max(1, maxInclusive - 1);
-        int value = 1 + (int) Math.round((mouseX - bodyX) * (double) span / Math.max(1, sizeW));
+        int value = 1 + (int) Math.round((mouseX - sizeTrackX) * (double) span / Math.max(1, sizeW));
         return Mth.clamp(value, 1, maxInclusive);
     }
 
@@ -664,8 +659,42 @@ final class ShapeMenuPanel {
                 WrightsClientConfig.setShapeOrderBatch(WrightsClientConfig.SHAPE_ORDER_BATCH.get() - step);
                 yield true;
             }
+            case "size_up" -> {
+                nudgeDim(SLIDER_SIZE, 1);
+                yield true;
+            }
+            case "size_down" -> {
+                nudgeDim(SLIDER_SIZE, -1);
+                yield true;
+            }
+            case "height_up" -> {
+                nudgeDim(SLIDER_HEIGHT, 1);
+                yield true;
+            }
+            case "height_down" -> {
+                nudgeDim(SLIDER_HEIGHT, -1);
+                yield true;
+            }
+            case "thickness_up" -> {
+                nudgeDim(SLIDER_THICKNESS, 1);
+                yield true;
+            }
+            case "thickness_down" -> {
+                nudgeDim(SLIDER_THICKNESS, -1);
+                yield true;
+            }
             default -> false;
         };
+    }
+
+    /** ± with the shared Wrights modifiers: 1 · Ctrl 5 · Shift 10 · Alt 50 · Ctrl+Shift 100. */
+    private void nudgeDim(int slider, int sign) {
+        int step = WrightsUi.nudgeStep() * (sign < 0 ? -1 : 1);
+        switch (slider) {
+            case SLIDER_HEIGHT -> WrightsClientConfig.setShapeHeight(WrightsClientConfig.SHAPE_HEIGHT.get() + step);
+            case SLIDER_THICKNESS -> WrightsClientConfig.setShapeThickness(WrightsClientConfig.SHAPE_THICKNESS.get() + step);
+            default -> WrightsClientConfig.setShapeSize(WrightsClientConfig.SHAPE_SIZE.get() + step);
+        }
     }
 
     /** Anchor so the player will stand on the center of the finished shape’s top. */
@@ -1209,6 +1238,34 @@ final class ShapeMenuPanel {
         int thumb = max <= 0 ? 0 : width * Mth.clamp(value, 0, max) / max;
         graphics.fill(x, y + 4, x + Math.max(2, thumb), y + 8, WrightsUi.COPPER);
         graphics.fill(x + Math.max(0, thumb - 2), y + 1, x + Math.max(4, thumb + 2), y + 11, WrightsUi.COPPER);
+    }
+
+    /**
+     * Dimension row: {@code −} track {@code +} value.
+     * Buttons use {@link WrightsUi#nudgeStep()} (Ctrl/Shift/Alt).
+     */
+    private void drawDimSlider(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int leftW, int value, int slider) {
+        int stepW = 14;
+        int gap = 2;
+        int valueReserve = 36;
+        sizeW = Math.max(28, leftW - stepW * 2 - gap * 2 - valueReserve);
+        sizeTrackX = x + stepW + gap;
+        int max = axisMax();
+        int clamped = Mth.clamp(value, 1, max);
+        String downId = switch (slider) {
+            case SLIDER_HEIGHT -> "height_down";
+            case SLIDER_THICKNESS -> "thickness_down";
+            default -> "size_down";
+        };
+        String upId = switch (slider) {
+            case SLIDER_HEIGHT -> "height_up";
+            case SLIDER_THICKNESS -> "thickness_up";
+            default -> "size_up";
+        };
+        drawMini(graphics, mouseX, mouseY, x, y - 1, stepW, "-", downId, 0, clamped > 1);
+        drawSlider(graphics, sizeTrackX, y, sizeW, clamped - 1, Math.max(1, max - 1));
+        drawMini(graphics, mouseX, mouseY, sizeTrackX + sizeW + gap, y - 1, stepW, "+", upId, 0, clamped < max);
+        drawSliderValue(graphics, mouseX, mouseY, sizeTrackX + sizeW + gap + stepW + 4, y, clamped, slider);
     }
 
     /** Number to the right of a slider — click to type; copper outline while editing. */
