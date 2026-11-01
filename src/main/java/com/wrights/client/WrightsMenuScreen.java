@@ -3543,7 +3543,7 @@ public class WrightsMenuScreen extends Screen {
 
     private void openImport() {
         BlueprintList.Row row = selectedRow();
-        this.minecraft.setScreen(new ImportExportScreen(this, row == null ? null : row.id(), row != null && row.folder()));
+        this.minecraft.setScreen(new ImportExportScreen(this, row));
     }
 
     private void newBlueprint() {

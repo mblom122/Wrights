@@ -18,6 +18,7 @@ public class ImportExportScreen extends Screen {
     private final Screen parent;
     private final UUID selectedId;
     private final boolean selectedFolder;
+    private final Component selectionLine;
     private BlueprintPayloads.ClipboardStatus status = BlueprintPayloads.ClipboardStatus.EMPTY;
     private String copiedName = "";
     /** True only after the player asks to paste from the clipboard. */
@@ -40,11 +41,29 @@ public class ImportExportScreen extends Screen {
     private WrightsButton useNameButton;
     private WrightsButton saveButton;
 
-    public ImportExportScreen(Screen parent, UUID selectedId, boolean selectedFolder) {
+    public ImportExportScreen(Screen parent, BlueprintList.Row row) {
         super(Component.translatable("screen.wrights.transfer_title"));
         this.parent = parent;
-        this.selectedId = selectedId;
-        this.selectedFolder = selectedFolder;
+        if (row == null) {
+            this.selectedId = null;
+            this.selectedFolder = false;
+            this.selectionLine = Component.translatable("screen.wrights.transfer_selected_none");
+        } else if (row.folder()) {
+            this.selectedId = row.id();
+            this.selectedFolder = true;
+            this.selectionLine = Component.translatable("screen.wrights.transfer_selected_folder", row.name(), BlueprintList.childCount(row.id()));
+        } else {
+            this.selectedId = row.id();
+            this.selectedFolder = false;
+            BlueprintPayloads.Summary summary = row.summary();
+            this.selectionLine = Component.translatable(
+                    "screen.wrights.transfer_selected_blueprint",
+                    row.name(),
+                    summary.sizeX(),
+                    summary.sizeY(),
+                    summary.sizeZ(),
+                    summary.blocks());
+        }
     }
 
     /** Server finished a copy-to-clipboard. Do not treat that as an import preview. */
@@ -73,7 +92,7 @@ public class ImportExportScreen extends Screen {
         leftX = panelX + 14;
         columnW = (panelW - 36) / 2;
         rightX = leftX + columnW + 8;
-        bodyY = panelY + 58;
+        bodyY = panelY + 70;
         int buttonY = panelY + panelH - 78;
         copyButton = addRenderableWidget(new WrightsButton(leftX, buttonY, columnW, 18, Component.translatable("screen.wrights.transfer_copy"), button -> copy()));
         pasteButton = addRenderableWidget(new WrightsButton(leftX, buttonY + 22, columnW, 18, Component.translatable("screen.wrights.transfer_paste"), button -> pasteClicked()));
@@ -226,6 +245,7 @@ public class ImportExportScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, this.title, panelX + 14, panelY + 12, WrightsUi.COPPER, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.transfer_sub"), panelX + 14, panelY + 26, WrightsUi.MUTED, false);
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(selectionLine.getString(), panelW - 28), panelX + 14, panelY + 40, selectedId == null ? WrightsUi.MUTED : WrightsUi.TEXT, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.transfer_clip"), leftX, bodyY - 12, WrightsUi.COPPER, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.transfer_items"), rightX, bodyY - 12, WrightsUi.COPPER, false);
         int y = bodyY + 4;
