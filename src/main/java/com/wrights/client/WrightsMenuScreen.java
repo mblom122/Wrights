@@ -3260,8 +3260,8 @@ public class WrightsMenuScreen extends Screen {
 
     private static final int JOB_HEADER = 20;
     private static final int JOB_GROUP_MIN = 46;
-    /** Name, Preview/size/blocks, source, anchor, and progress. */
-    private static final int JOB_BODY = 78;
+    /** Name (section style), size/blocks, source, anchor, and progress. */
+    private static final int JOB_BODY = 68;
     private static final int JOB_CREW = 18;
     private static final int JOB_BUTTON = 18;
     private static final int ACT_MANAGE = -1;
@@ -3650,20 +3650,23 @@ public class WrightsMenuScreen extends Screen {
         if (hover) {
             graphics.fill(x, y, x + 2, y + rowH, jobColor(job));
         }
-        String name = this.font.plainSubstrByWidth(job.name(), Math.max(40, width / 2));
-        graphics.drawString(this.font, name, x + 6, y + 4, WrightsUi.TEXT, false);
         Component statusText = jobStatusText(job);
-        graphics.drawString(this.font, statusText, x + width - 8 - this.font.width(statusText), y + 4, jobColor(job), false);
-        WrightsUi.section(graphics, this.font, x + 6, y + 15, "menu.wrights.job_preview", x + width - 8);
-        graphics.drawString(this.font, Component.translatable("menu.wrights.size", job.sizeX(), job.sizeY(), job.sizeZ()), x + 6, y + 25, WrightsUi.SIZE, false);
-        graphics.drawString(this.font, Component.translatable("menu.wrights.job_preview_blocks", WrightsUi.count(job.total())), x + 6, y + 35, WrightsUi.MUTED, false);
+        int statusW = this.font.width(statusText);
+        int statusX = x + width - 8 - statusW;
+        // Section hairline runs to ~3 spaces before the status (Completed / Working / …).
+        int lineEnd = Math.max(x + 6, statusX - this.font.width("   "));
+        String name = this.font.plainSubstrByWidth(job.name(), Math.max(24, lineEnd - (x + 6) - 8));
+        WrightsUi.section(graphics, this.font, x + 6, y + 4, Component.literal(name), lineEnd);
+        graphics.drawString(this.font, statusText, statusX, y + 4, jobColor(job), false);
+        graphics.drawString(this.font, Component.translatable("menu.wrights.size", job.sizeX(), job.sizeY(), job.sizeZ()), x + 6, y + 15, WrightsUi.SIZE, false);
+        graphics.drawString(this.font, Component.translatable("menu.wrights.job_preview_blocks", WrightsUi.count(job.total())), x + 6, y + 25, WrightsUi.MUTED, false);
         Component source = jobSource(job);
         if (!source.getString().isEmpty()) {
-            graphics.drawString(this.font, this.font.plainSubstrByWidth(source.getString(), Math.max(40, width - 12)), x + 6, y + 46, WrightsUi.MUTED, false);
+            graphics.drawString(this.font, this.font.plainSubstrByWidth(source.getString(), Math.max(40, width - 12)), x + 6, y + 36, WrightsUi.MUTED, false);
         }
         BlockPos anchor = job.anchor();
-        graphics.drawString(this.font, Component.translatable("menu.wrights.job_anchor", anchor.getX(), anchor.getY(), anchor.getZ()), x + 6, y + 57, WrightsUi.MUTED, false);
-        drawProgress(graphics, x + 6, y + 68, Math.max(40, width - 12), job);
+        graphics.drawString(this.font, Component.translatable("menu.wrights.job_anchor", anchor.getX(), anchor.getY(), anchor.getZ()), x + 6, y + 47, WrightsUi.MUTED, false);
+        drawProgress(graphics, x + 6, y + 58, Math.max(40, width - 12), job);
         if (!job.finished() && !job.saving()) {
             graphics.drawString(this.font, crewCountText(job), x + 6, y + JOB_BODY + 4, WrightsUi.MUTED, false);
         }
