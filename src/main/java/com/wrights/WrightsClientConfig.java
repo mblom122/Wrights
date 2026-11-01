@@ -288,10 +288,10 @@ public final class WrightsClientConfig {
             .defineInRange("exchangeForm", 0, 0, 6);
     public static final ModConfigSpec.BooleanValue EXCHANGE_FLOOR_EQUAL = BUILDER
             .comment("When true, Floor uses one Size for both sides. When false, Width and Height are separate.")
-            .define("exchangeFloorEqual", false);
+            .define("exchangeFloorEqual", true);
     public static final ModConfigSpec.BooleanValue EXCHANGE_WALL_EQUAL = BUILDER
             .comment("When true, Wall uses one Size for both sides. When false, Width and Height are separate.")
-            .define("exchangeWallEqual", false);
+            .define("exchangeWallEqual", true);
 
     static final ModConfigSpec SPEC = BUILDER.build();
 
