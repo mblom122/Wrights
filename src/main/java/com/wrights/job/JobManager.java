@@ -2791,7 +2791,11 @@ public final class JobManager {
             refreshHeldHint(level, schematic, job);
         }
         // Large jobs skip per-block ghost packets; refresh the stepped hologram on a throttle instead.
-        if (job.total() > 8000 && level.getGameTime() % 40L == 0L) {
+        // Skip while Waiting — the ghost is unchanged and rebuilding 65k-entry holograms freezes Stop/Pause.
+        if (job.total() > 8000 && level.getGameTime() % 40L == 0L
+                && job.waitKind() != BuildJob.WAIT_ITEMS
+                && job.waitKind() != BuildJob.WAIT_FLOOR
+                && job.waitKind() != BuildJob.WAIT_CHUNK) {
             BlueprintNetwork.showJobHologram(player, job, schematic);
         }
         int reason = BuildJob.WAIT_NONE;
