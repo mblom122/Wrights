@@ -1740,6 +1740,7 @@ public class WrightsMenuScreen extends Screen {
     private int mirrorClearX;
     private int mirrorClearW;
     private int mirrorClearY;
+    private int mirrorPriorityY = -1;
     private int mirrorBodyX;
     private int mirrorBodyW;
     private final List<HelpSpot> mirrorHelps = new ArrayList<>();
@@ -1747,6 +1748,7 @@ public class WrightsMenuScreen extends Screen {
     private void renderMirror(GuiGraphics graphics, int mouseX, int mouseY) {
         mirrorHelps.clear();
         mirrorTip = null;
+        mirrorPriorityY = -1;
         int x = listX + 8;
         int w = Math.max(120, panelX + panelW - 28 - listX);
         mirrorBodyX = x;
@@ -1910,6 +1912,15 @@ public class WrightsMenuScreen extends Screen {
         graphics.drawString(this.font, clear, mirrorClearX + 8, y + 5, clearOn ? WrightsUi.RED : WrightsUi.MUTED, false);
         drawHelpBox(graphics, mouseX, mouseY, mirrorClearX + clearW - 16, y + 3, "menu.wrights.mirror_clear_hint");
         mirrorClearY = y;
+        y += 26;
+        y = beginMirrorSection(graphics, mouseX, mouseY, x, y, lineEnd, "menu.wrights.shape_priority", "menu.wrights.shape_priority_hint", false);
+        String orderLine = this.font.plainSubstrByWidth(WrightsClientConfig.supplyOrderSummary(), Math.max(8, w));
+        graphics.drawString(this.font, orderLine, x, y, WrightsUi.MUTED, false);
+        y += 12;
+        mirrorPriorityY = y;
+        boolean priorityHover = mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + 18 && !overMirrorHelp(mouseX, mouseY);
+        WrightsUi.choice(graphics, x, y, w, 18, false, priorityHover);
+        graphics.drawCenteredString(this.font, Component.translatable("menu.wrights.shape_priority_edit"), x + w / 2, y + 5, WrightsUi.TEXT);
         mirrorContentH = y + 18 - (mirrorViewTop - mirrorScroll);
         graphics.disableScissor();
         int maxScroll = Math.max(0, mirrorContentH - mirrorViewH);
@@ -2161,6 +2172,10 @@ public class WrightsMenuScreen extends Screen {
         }
         if (WrightsClientConfig.MIRROR_SET.get() && mouseX >= mirrorClearX && mouseX < mirrorClearX + mirrorClearW && mouseY >= mirrorClearY && mouseY < mirrorClearY + 18) {
             WrightsClientConfig.clearMirror();
+            return true;
+        }
+        if (mirrorPriorityY >= 0 && mouseX >= x && mouseX < x + mirrorBodyW && mouseY >= mirrorPriorityY && mouseY < mirrorPriorityY + 18) {
+            this.minecraft.setScreen(new ShapePriorityScreen(this));
             return true;
         }
         return false;
