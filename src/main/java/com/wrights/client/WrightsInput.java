@@ -101,10 +101,12 @@ public final class WrightsInput {
         wasHeld = held;
         if (!held) {
             WrightsClientState.noteUnequipped();
-            // World placement/capture UIs need the tool; the main menu and library do not.
+            // World placement/capture UIs need the tool; the main menu and library edit do not.
             if (minecraft.screen instanceof BlueprintAdjustScreen
-                    || minecraft.screen instanceof PlacementScreen
-                    || minecraft.screen instanceof BlockPickerScreen) {
+                    || minecraft.screen instanceof PlacementScreen) {
+                minecraft.setScreen(null);
+            } else if (minecraft.screen instanceof BlockPickerScreen picker
+                    && (picker.parent() instanceof PlacementScreen || picker.parent() instanceof BlueprintAdjustScreen)) {
                 minecraft.setScreen(null);
             }
         }
@@ -122,11 +124,14 @@ public final class WrightsInput {
                 minecraft.setScreen(new WrightsMenuScreen());
                 net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                         new com.wrights.network.BlueprintPayloads.LibraryRequest(WrightsClientState.libraryGlobal));
+            } else if (minecraft.screen instanceof BlockPickerScreen
+                    || minecraft.screen instanceof BlueprintMapScreen
+                    || minecraft.screen instanceof BlueprintEditScreen) {
+                // Return to the parent edit screen, or discard the edit cleanly.
+                minecraft.screen.onClose();
             } else if (minecraft.screen instanceof WrightsMenuScreen
                     || minecraft.screen instanceof BlueprintAdjustScreen
                     || minecraft.screen instanceof PlacementScreen
-                    || minecraft.screen instanceof BlueprintEditScreen
-                    || minecraft.screen instanceof BlockPickerScreen
                     || minecraft.screen instanceof JobActionScreen
                     || minecraft.screen instanceof JobDroneScreen
                     || minecraft.screen instanceof DroneRosterScreen) {

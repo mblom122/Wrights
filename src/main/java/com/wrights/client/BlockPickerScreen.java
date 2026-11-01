@@ -73,6 +73,11 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
         net.minecraft.client.Minecraft.getInstance().setScreen(new BlockPickerScreen(parent, id, x, y, z));
     }
 
+    /** Screen that opened this picker — library edit does not need the controller held. */
+    public Screen parent() {
+        return parent;
+    }
+
     @Override
     protected void init() {
         panelW = Math.min(220, this.width - 16);
