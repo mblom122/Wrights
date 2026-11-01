@@ -440,7 +440,7 @@ public final class WrightsClientState {
     }
 
     public static String timeLeft(BlueprintPayloads.JobLine job) {
-        if (job.finished() || job.paused()) {
+        if (job.finished()) {
             return "";
         }
         Pace pace = paces.get(job.id());
@@ -448,13 +448,26 @@ public final class WrightsClientState {
             return "";
         }
         double seconds = pace.shownSeconds;
-        if (job.waitKind() != com.wrights.job.BuildJob.WAIT_ITEMS) {
+        // Paused / stalled jobs keep the last ETA frozen instead of counting down or clearing.
+        if (!etaFrozen(job)) {
             seconds -= (System.currentTimeMillis() - pace.shownAt) / 1000.0D;
         }
         if (seconds < 1) {
             return "1s";
         }
         return formatSeconds((long) Math.ceil(seconds));
+    }
+
+    /** True when the job is not placing (paused, waiting, or held) so ETA should not drain. */
+    private static boolean etaFrozen(BlueprintPayloads.JobLine job) {
+        if (job.paused()) {
+            return true;
+        }
+        if (job.waitKind() != com.wrights.job.BuildJob.WAIT_NONE) {
+            return true;
+        }
+        int hold = job.hold();
+        return hold != com.wrights.job.BuildJob.HOLD_NONE && hold != com.wrights.job.BuildJob.HOLD_MANUAL;
     }
 
     private static String formatSeconds(long seconds) {
@@ -483,7 +496,11 @@ public final class WrightsClientState {
             pace.shownAt = now;
             return;
         }
-        if (job.paused() || job.waitKind() == com.wrights.job.BuildJob.WAIT_ITEMS) {
+        if (etaFrozen(job)) {
+            // Bake the countdown into shownSeconds once, then hold it until work resumes.
+            if (pace.shownSeconds >= 0) {
+                pace.shownSeconds = Math.max(0, pace.shownSeconds - (now - pace.shownAt) / 1000.0D);
+            }
             pace.samples.clear();
             pace.shownAt = now;
             pace.done = job.done();
