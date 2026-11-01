@@ -326,7 +326,7 @@
   "menu.wrights.supply_order": "Take blocks from",
   "menu.wrights.supply_player_first": "Player, then chest",
   "menu.wrights.supply_chest_first": "Chest, then player",
-  "menu.wrights.supply_order_hint": "Shared for blueprints and Shape. Blocks are taken from these sources in order. Open Set priority to reorder, remove, or add sources.",
+  "menu.wrights.supply_order_hint": "Shared for blueprints, Shape, and Mirror. Main hand is only the held slot; Hotbar is the other hotbar slots. Open Set priority to reorder, remove, or add sources.",
   "menu.wrights.supply_order_player_hint": "Your inventory is used first. A bound chest fills in what you do not have.",
   "menu.wrights.supply_order_chest_hint": "A bound chest is used first. Your inventory fills in what the chest does not have.",
   "menu.wrights.supply_priority_hint": "Builds and shapes take blocks from these sources in order. Main hand is only the held slot; Hotbar is the other hotbar slots. Remove a source to skip it. Add it back below. This list is shared everywhere.",
