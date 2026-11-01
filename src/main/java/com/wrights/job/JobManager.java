@@ -971,8 +971,8 @@ public final class JobManager {
         }
         BuildJob job = BuildJob.shape(player.getUUID(), player.getUUID(), player.level().dimension(), min, max);
         job.setShapeStream(kind, size, height, thickness, axis, yaw, pivot, hollow, center, materials, fillMode, orderBatch, seed, exchange, exchangeFrom, exchangeSilk);
-        // Exchange always replaces matching cells; voidBlocks still gates wiping non-matching when false.
-        job.setPasteOptions(false, exchange || voidBlocks, exchange || voidBlocks, false, false, false, false);
+        // Exchange uses the same Void toggle: off skips occupied cells, on clears them (silk or destroy) before placing.
+        job.setPasteOptions(false, voidBlocks, voidBlocks, false, false, false, false);
         job.setClip(job.boxSizeX(), job.boxSizeY(), job.boxSizeZ());
         job.setAnchor(min);
         job.setBlueprintName(exchange ? "Exchange" : "Shape");

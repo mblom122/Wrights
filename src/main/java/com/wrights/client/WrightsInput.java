@@ -745,7 +745,7 @@ public final class WrightsInput {
             return;
         }
         if (player.isShiftKeyDown()) {
-            pickExchangeFrom(player, pos);
+            pickExchangeTo(player, pos);
             return;
         }
         boolean lookMode = !com.wrights.WrightsClientConfig.SHAPE_USE_ANCHOR.get()
@@ -780,28 +780,30 @@ public final class WrightsInput {
         WrightsClientState.tryExchange(false, pos, face);
     }
 
-    /** Clears the From list and sets it to the aimed block only. */
-    private static void pickExchangeFrom(net.minecraft.world.entity.player.Player player, BlockPos clicked) {
+    /** Shift+right-click: set Replace with to the aimed block (and clear any old From filter). */
+    private static void pickExchangeTo(net.minecraft.world.entity.player.Player player, BlockPos clicked) {
         Minecraft minecraft = Minecraft.getInstance();
         BlockHitResult aim = WrightsClientState.lookHit();
         BlockPos at = aim != null ? aim.getBlockPos() : clicked;
         if (at == null || minecraft.level == null) {
-            player.displayClientMessage(Component.translatable("message.wrights.exchange_from_look"), true);
+            player.displayClientMessage(Component.translatable("message.wrights.exchange_to_look"), true);
             return;
         }
         net.minecraft.world.level.block.state.BlockState state = minecraft.level.getBlockState(at);
-        if (!com.wrights.util.BlockFilters.canExchange(minecraft.level, at, state)) {
-            player.displayClientMessage(Component.translatable("message.wrights.exchange_from_blocked"), true);
+        if (!com.wrights.util.BlockFilters.canShapeMaterial(state)) {
+            player.displayClientMessage(Component.translatable("message.wrights.exchange_to_blocked"), true);
             return;
         }
         net.minecraft.world.item.Item item = state.getBlock().asItem();
         if (!(item instanceof net.minecraft.world.item.BlockItem)) {
-            player.displayClientMessage(Component.translatable("message.wrights.exchange_from_blocked"), true);
+            player.displayClientMessage(Component.translatable("message.wrights.exchange_to_blocked"), true);
             return;
         }
-        com.wrights.WrightsClientConfig.setExchangeFrom(java.util.List.of(new com.wrights.blueprint.ShapeMaterials.Entry(item, 1)));
+        com.wrights.WrightsClientConfig.setShapeMaterials(
+                java.util.List.of(new com.wrights.blueprint.ShapeMaterials.Entry(item, 1)));
+        com.wrights.WrightsClientConfig.setExchangeFrom(java.util.List.of());
         player.displayClientMessage(
-                Component.translatable("message.wrights.exchange_from_set", state.getBlock().getName()),
+                Component.translatable("message.wrights.exchange_to_set", state.getBlock().getName()),
                 true);
     }
 

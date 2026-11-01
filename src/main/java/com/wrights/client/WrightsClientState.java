@@ -1802,7 +1802,7 @@ public final class WrightsClientState {
                 WrightsClientConfig.SHAPE_MATERIALS.get(),
                 WrightsClientConfig.SHAPE_SUPPLY.get(),
                 true,
-                WrightsClientConfig.EXCHANGE_FROM.get(),
+                "",
                 WrightsClientConfig.exchangeSilk());
         PacketDistributor.sendToServer(pendingShape);
         if (lookPinned) {
