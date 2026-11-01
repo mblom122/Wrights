@@ -42,6 +42,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.ticks.LevelChunkTicks;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -3250,9 +3251,15 @@ public final class JobManager {
         return Falling.SKIP;
     }
 
+    /**
+     * Sand/gravel can be hung in mid-air the same way worldgen does: place them, then cancel the
+     * fall tick so they sit until a later neighbor update. Prefer waiting for a still-coming
+     * support block so towers build bottom-up when possible; if that support will never land,
+     * place suspended instead of holding forever or skipping.
+     */
     private static Falling fallingAt(ServerLevel level, Schematic schematic, BuildJob job, Schematic.Entry entry, Set<Long> seen) {
         if (!seen.add(BlockPos.asLong(entry.x(), entry.y(), entry.z()))) {
-            return Falling.SKIP;
+            return Falling.READY;
         }
         BlockPos below = job.min().offset(entry.x(), entry.y(), entry.z()).below();
         if (level.isOutsideBuildHeight(below) || !level.isLoaded(below)) {
@@ -3270,10 +3277,6 @@ public final class JobManager {
                     return Falling.WAIT;
                 }
             }
-            return Falling.SKIP;
-        }
-        if (FallingBlock.isFree(under)) {
-            return Falling.SKIP;
         }
         return Falling.READY;
     }
@@ -4227,11 +4230,15 @@ public final class JobManager {
                 return PlaceResult.WAIT;
             }
         }
+        // Hang gravity blocks when nothing solid is under them (worldgen-style), instead of
+        // waiting forever or refusing the cell.
+        boolean suspendFall = false;
         if (BlockFilters.falls(state)) {
             BlockPos below = pos.below();
-            if (level.isOutsideBuildHeight(below) || !level.isLoaded(below) || FallingBlock.isFree(level.getBlockState(below))) {
+            if (level.isOutsideBuildHeight(below) || !level.isLoaded(below)) {
                 return PlaceResult.WAIT;
             }
+            suspendFall = FallingBlock.isFree(level.getBlockState(below));
         }
         if (clearFirst) {
             voidCell(level, pos);
@@ -4239,7 +4246,7 @@ public final class JobManager {
         }
 
         BlockSnapshot snapshot = BlockSnapshot.create(level.dimension(), level, pos);
-        level.setBlock(pos, state, Block.UPDATE_ALL);
+        writePlaced(level, pos, state, suspendFall);
         BlockState after = level.getBlockState(pos);
         if (after.getBlock() != state.getBlock()) {
             if (!after.equals(existing)) {
@@ -4270,6 +4277,29 @@ public final class JobManager {
             job.placedOne();
         }
         return PlaceResult.DONE;
+    }
+
+    /**
+     * Writes a block into the world. Gravity blocks with nothing under them are placed like
+     * worldgen: clients are notified, neighbour/shape updates are skipped, and the fall tick
+     * from {@link FallingBlock#onPlace} is cancelled so the block hangs until something else
+     * updates it (breaking a neighbour, placing beside it with full updates, etc.).
+     */
+    private static void writePlaced(ServerLevel level, BlockPos pos, BlockState state, boolean suspendFall) {
+        if (!suspendFall) {
+            level.setBlock(pos, state, Block.UPDATE_ALL);
+            return;
+        }
+        level.setBlock(pos, state, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+        cancelFallTick(level, pos, state.getBlock());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void cancelFallTick(ServerLevel level, BlockPos pos, Block block) {
+        if (!(level.getChunkAt(pos).getBlockTicks() instanceof LevelChunkTicks<?> ticks)) {
+            return;
+        }
+        ((LevelChunkTicks<Block>) ticks).removeIf(tick -> tick.pos().equals(pos) && tick.type() == block);
     }
 
     /**
