@@ -158,7 +158,8 @@ public final class BlueprintModelView {
             drawFrameBeams(modelView, projection, mx - arm, my, mz, mx + arm, my, mz, pinThick, ar, ag, ab, 1.0F);
             drawFrameBeams(modelView, projection, mx, my - arm, mz, mx, my + arm, mz, pinThick, ar, ag, ab, 1.0F);
             drawFrameBeams(modelView, projection, mx, my, mz - arm, mx, my, mz + arm, pinThick, ar, ag, ab, 1.0F);
-            drawSolidBox(modelView, projection, mx - pin, my - pin, mz - pin, mx + pin, my + pin, mz + pin, ar, ag, ab, 1.0F);
+            // Wire cube only in the menu — solid fill is reserved for the world look/anchor tweak glow.
+            drawFrameBeams(modelView, projection, mx - pin, my - pin, mz - pin, mx + pin, my + pin, mz + pin, pinThick, ar, ag, ab, 1.0F);
             RenderSystem.enableDepthTest();
         }
         RenderSystem.disableDepthTest();
@@ -201,25 +202,6 @@ public final class BlueprintModelView {
         } else {
             beam(buffer, x0, y0, z0, x1, y1, z1, thick, red, green, blue, alpha);
         }
-        drawBuilt(buffer, bytes, modelView, projection, RenderType.debugQuads());
-    }
-
-    private static void drawSolidBox(
-            Matrix4f modelView,
-            Matrix4f projection,
-            float x0,
-            float y0,
-            float z0,
-            float x1,
-            float y1,
-            float z1,
-            float red,
-            float green,
-            float blue,
-            float alpha) {
-        ByteBufferBuilder bytes = new ByteBufferBuilder(1024);
-        BufferBuilder buffer = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
-        filledBox(buffer, x0, y0, z0, x1, y1, z1, red, green, blue, alpha);
         drawBuilt(buffer, bytes, modelView, projection, RenderType.debugQuads());
     }
 
@@ -333,26 +315,6 @@ public final class BlueprintModelView {
         coloredQuad(buffer, x10, y10, z10, x11, y11, z11, X11, Y11, Z11, X10, Y10, Z10, red, green, blue, alpha);
         coloredQuad(buffer, x00, y00, z00, x01, y01, z01, x11, y11, z11, x10, y10, z10, red, green, blue, alpha);
         coloredQuad(buffer, X00, Y00, Z00, X10, Y10, Z10, X11, Y11, Z11, X01, Y01, Z01, red, green, blue, alpha);
-    }
-
-    private static void filledBox(
-            BufferBuilder buffer,
-            float x0,
-            float y0,
-            float z0,
-            float x1,
-            float y1,
-            float z1,
-            float red,
-            float green,
-            float blue,
-            float alpha) {
-        coloredQuad(buffer, x0, y0, z0, x1, y0, z0, x1, y0, z1, x0, y0, z1, red, green, blue, alpha);
-        coloredQuad(buffer, x0, y1, z0, x0, y1, z1, x1, y1, z1, x1, y1, z0, red, green, blue, alpha);
-        coloredQuad(buffer, x0, y0, z0, x0, y1, z0, x1, y1, z0, x1, y0, z0, red, green, blue, alpha);
-        coloredQuad(buffer, x0, y0, z1, x1, y0, z1, x1, y1, z1, x0, y1, z1, red, green, blue, alpha);
-        coloredQuad(buffer, x0, y0, z0, x0, y0, z1, x0, y1, z1, x0, y1, z0, red, green, blue, alpha);
-        coloredQuad(buffer, x1, y0, z0, x1, y1, z0, x1, y1, z1, x1, y0, z1, red, green, blue, alpha);
     }
 
     private static void coloredQuad(

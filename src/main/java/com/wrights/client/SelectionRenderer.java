@@ -1366,7 +1366,7 @@ public final class SelectionRenderer {
         if (pos == null) {
             return;
         }
-        drawAnchorMarker(pose, buffers, camera, pos, 14.0D);
+        drawWorldAnchorSolid(pose, buffers, camera, pos);
         VertexConsumer lines = buffers.getBuffer(RenderType.lines());
         drawGuide(
                 pose,
@@ -1392,7 +1392,7 @@ public final class SelectionRenderer {
         if (pos == null) {
             return;
         }
-        drawAnchorMarker(pose, buffers, camera, pos, 14.0D);
+        drawWorldAnchorSolid(pose, buffers, camera, pos);
         VertexConsumer lines = buffers.getBuffer(RenderType.lines());
         drawGuide(
                 pose,
@@ -1405,6 +1405,26 @@ public final class SelectionRenderer {
                 WrightsUi.anchorB(),
                 1.0F);
         buffers.endBatch(RenderType.lines());
+    }
+
+    /** Solid fill + wire cross for the look/anchor tweak glow in the world (menu preview stays wire-only). */
+    private static void drawWorldAnchorSolid(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, BlockPos block) {
+        if (block == null) {
+            return;
+        }
+        float ar = WrightsUi.anchorR();
+        float ag = WrightsUi.anchorG();
+        float ab = WrightsUi.anchorB();
+        AABB cell = new AABB(block).inflate(0.02D);
+        AABB local = cell.move(-camera.x, -camera.y, -camera.z);
+        com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
+        VertexConsumer fill = buffers.getBuffer(RenderType.debugFilledBox());
+        LevelRenderer.addChainedFilledBoxVertices(
+                pose, fill, local.minX, local.minY, local.minZ, local.maxX, local.maxY, local.maxZ,
+                ar, ag, ab, 0.55F);
+        buffers.endBatch(RenderType.debugFilledBox());
+        drawAnchorMarker(pose, buffers, camera, block);
+        com.mojang.blaze3d.systems.RenderSystem.enableDepthTest();
     }
 
     /** A solid guide from the face it leaves to the face it arrives on. */
