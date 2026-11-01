@@ -1242,10 +1242,62 @@ final class ShapeMenuPanel {
         return key;
     }
 
-    /** Exchange 3×3 pin (footprint on Floor/Beam; wall face on Wall). Slot 4 is the default. */
+    /**
+     * Exchange pin control: 3×3 for Floor/Wall/Circle; three points along the length for Pillar/Beam.
+     */
     private int drawExchangePivot(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width) {
         int selected = WrightsClientConfig.exchangePivotSlot();
         int gap = 4;
+        if (WrightsClientConfig.exchangeForm().line()) {
+            boolean pillar = WrightsClientConfig.exchangeForm() == Shapes.ExchangeForm.PILLAR;
+            int cell = Math.min(32, Math.max(20, pillar ? Math.min(width, 72) : (width - gap * 2) / 3));
+            // Pillar: top → mid → bottom. Beam: min end → mid → max end.
+            int[] order = pillar ? new int[] {2, 1, 0} : new int[] {0, 1, 2};
+            String[] keys = pillar
+                    ? new String[] {
+                            "menu.wrights.exchange_pivot_bottom",
+                            "menu.wrights.exchange_pivot_middle",
+                            "menu.wrights.exchange_pivot_top"
+                    }
+                    : new String[] {
+                            "menu.wrights.exchange_pivot_end_a",
+                            "menu.wrights.exchange_pivot_middle",
+                            "menu.wrights.exchange_pivot_end_b"
+                    };
+            if (pillar) {
+                int gridX = x + Math.max(0, (width - cell) / 2);
+                for (int i = 0; i < 3; i++) {
+                    int line = order[i];
+                    int cy = y + i * (cell + gap);
+                    boolean on = line == selected;
+                    boolean hover = mouseX >= gridX && mouseX < gridX + cell && mouseY >= cy && mouseY < cy + cell;
+                    WrightsUi.choice(graphics, gridX, cy, cell, cell, on, hover);
+                    String mark = line == 1 ? "●" : "·";
+                    graphics.drawCenteredString(font, mark, gridX + cell / 2, cy + cell / 2 - 4, on ? WrightsUi.TEXT : WrightsUi.MUTED);
+                    hits.add(new Hit(gridX, cy, cell, cell, "exchange_pivot", line));
+                    if (hover) {
+                        tip = Component.translatable(keys[line]);
+                    }
+                }
+                return y + cell * 3 + gap * 2 + 8;
+            }
+            int gridW = cell * 3 + gap * 2;
+            int gridX = x + Math.max(0, (width - gridW) / 2);
+            for (int i = 0; i < 3; i++) {
+                int line = order[i];
+                int cx = gridX + i * (cell + gap);
+                boolean on = line == selected;
+                boolean hover = mouseX >= cx && mouseX < cx + cell && mouseY >= y && mouseY < y + cell;
+                WrightsUi.choice(graphics, cx, y, cell, cell, on, hover);
+                String mark = line == 1 ? "●" : "─";
+                graphics.drawCenteredString(font, mark, cx + cell / 2, y + cell / 2 - 4, on ? WrightsUi.TEXT : WrightsUi.MUTED);
+                hits.add(new Hit(cx, y, cell, cell, "exchange_pivot", line));
+                if (hover) {
+                    tip = Component.translatable(keys[line]);
+                }
+            }
+            return y + cell + 8;
+        }
         int cell = Math.min(28, Math.max(18, (width - gap * 2) / 3));
         int gridW = cell * 3 + gap * 2;
         int gridX = x + Math.max(0, (width - gridW) / 2);

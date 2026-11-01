@@ -483,25 +483,64 @@ public final class Shapes {
     }
 
     /**
-     * Map Exchange’s 3×3 slot onto the form’s pin face.
-     * Floor / Beam / Circle use the bottom footprint; Wall uses the broad vertical face
-     * (UI top row = top of the wall); Pillar stays bottom-center.
+     * Collapse a stored 3×3 slot to a line index 0/1/2 (negative end, middle, positive end).
+     * Line forms only have three distinct pin cells.
      */
-    public static int exchangePivotId(ExchangeForm form, int plane, int slot) {
+    public static int exchangeLineIndex(int slot) {
+        int s = Mth.clamp(slot, 0, 8);
+        if (s <= 2) {
+            return s;
+        }
+        if (s == 4) {
+            return 1;
+        }
+        if (s == 3 || s == 6) {
+            return 0;
+        }
+        if (s == 5 || s == 7 || s == 8) {
+            return 2;
+        }
+        return 1;
+    }
+
+    /**
+     * Map Exchange’s pivot control onto the form’s pin cell.
+     * Floor / Circle: full bottom 3×3. Wall: broad vertical face (UI top = wall top).
+     * Pillar / Beam: three points along the length (bottom/mid/top or min/mid/max).
+     */
+    public static int exchangePivotId(ExchangeForm form, int plane, int slot, int size, int thickness) {
         int s = Mth.clamp(slot, 0, 8);
         ExchangeForm kind = form == null ? ExchangeForm.FLOOR : form;
         return switch (kind) {
             case WALL -> {
-                // Broad face of the vertical plate after axis remap.
                 int face = clampPlane(plane) == AXIS_X ? 5 /* EAST */ : 2 /* NORTH */;
                 int col = s % 3;
                 int row = s / 3;
-                // Flip rows so the menu’s top row is the top of the wall (max Y).
                 yield pivotId(face, (2 - row) * 3 + col);
             }
-            case PILLAR -> pivotId(0, 4);
-            default -> pivotId(0, s); // FLOOR, BEAM, CIRCLE — bottom footprint
+            case PILLAR -> switch (exchangeLineIndex(s)) {
+                case 0 -> pivotId(0, 4); // bottom
+                case 2 -> pivotId(1, 4); // top
+                default -> PIVOT_CENTER; // middle
+            };
+            case BEAM -> {
+                int i = exchangeLineIndex(s);
+                // Length sits on X or Z after {@code applyExchangeForm}; thin axis stays 1.
+                boolean lengthOnX = clampSize(size) >= clampHeight(thickness);
+                yield switch (i) {
+                    case 0 -> pivotId(0, lengthOnX ? 3 : 1); // W or N end
+                    case 2 -> pivotId(0, lengthOnX ? 5 : 7); // E or S end
+                    default -> pivotId(0, 4); // center
+                };
+            }
+            default -> pivotId(0, s); // FLOOR, CIRCLE — bottom footprint
         };
+    }
+
+    /** @deprecated prefer {@link #exchangePivotId(ExchangeForm, int, int, int, int)} */
+    @Deprecated
+    public static int exchangePivotId(ExchangeForm form, int plane, int slot) {
+        return exchangePivotId(form, plane, slot, 1, 1);
     }
 
     public static int pivotId(int face, int slot) {

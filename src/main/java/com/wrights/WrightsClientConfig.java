@@ -908,26 +908,43 @@ public final class WrightsClientConfig {
         save();
     }
 
-    /** Logical 3×3 slot (0–8) chosen in the Exchange menu. */
+    /**
+     * Logical pivot control value for the Exchange menu.
+     * Plates use a 3×3 slot (0–8); Pillar/Beam use a line index (0–2).
+     */
     public static int exchangePivotSlot() {
         int slot = com.wrights.blueprint.Shapes.pivotSlot(EXCHANGE_PIVOT.get());
-        return slot < 0 ? 4 : slot;
+        if (slot < 0) {
+            slot = 4;
+        }
+        if (exchangeForm().line()) {
+            return com.wrights.blueprint.Shapes.exchangeLineIndex(slot);
+        }
+        return slot;
     }
 
     /**
      * Resolved AABB pivot for the active Exchange form.
-     * Floor/Beam use the bottom footprint; Wall maps the same 3×3 onto the vertical plate face.
+     * Floor/Circle: bottom 3×3. Wall: vertical plate face. Pillar/Beam: three points along the length.
      */
     public static int exchangePivot() {
-        return com.wrights.blueprint.Shapes.exchangePivotId(exchangeForm(), SHAPE_PLANE.get(), exchangePivotSlot());
+        return com.wrights.blueprint.Shapes.exchangePivotId(
+                exchangeForm(),
+                SHAPE_PLANE.get(),
+                com.wrights.blueprint.Shapes.pivotSlot(EXCHANGE_PIVOT.get()),
+                SHAPE_SIZE.get(),
+                SHAPE_THICKNESS.get());
     }
 
     public static void setExchangePivot(int pivot) {
         int slot = com.wrights.blueprint.Shapes.pivotSlot(pivot);
         if (slot < 0) {
-            slot = 4;
+            slot = exchangeForm().line() ? 1 : 4;
         }
-        // Store the logical slot only; {@link #exchangePivot()} maps it to the form’s face.
+        if (exchangeForm().line()) {
+            slot = com.wrights.blueprint.Shapes.exchangeLineIndex(slot);
+        }
+        // Store the logical control value; {@link #exchangePivot()} maps it to the form’s cell.
         EXCHANGE_PIVOT.set(com.wrights.blueprint.Shapes.pivotId(0, slot));
         save();
     }
