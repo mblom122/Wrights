@@ -170,8 +170,8 @@ public final class BlueprintModelView {
             int maxZ) {
         MultiBufferSource.BufferSource buffers = Minecraft.getInstance().renderBuffers().bufferSource();
         float pad = 0.015F;
-        // Soft steel frame — thin line width so the border stays light.
-        RenderSystem.lineWidth(1.0F);
+        // Soft steel frame — half the usual line width so the AABB stays light in the menu.
+        RenderSystem.lineWidth(0.5F);
         VertexConsumer frame = buffers.getBuffer(RenderType.lines());
         boxEdges(pose, frame, x0 - pad, y0 - pad, z0 - pad, x1 + pad, y1 + pad, z1 + pad, 0.55F, 0.72F, 0.86F, 0.55F);
         buffers.endBatch(RenderType.lines());
