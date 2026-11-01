@@ -1755,7 +1755,9 @@ public final class WrightsClientState {
             }
             int style = WrightsClientConfig.placeStyle();
             if (style == 1) {
-                return minecraft.player.blockPosition().below();
+                // Preview pin: aimed block (line runs on that axis toward the player's matching coord).
+                BlockHitResult aim = shapeLookHit();
+                return aim == null ? null : aim.getBlockPos();
             }
             if (WrightsClientConfig.placePathStyle()) {
                 return placePathCell(minecraft.player);
@@ -1939,7 +1941,8 @@ public final class WrightsClientState {
 
     /**
      * Place tool: same footprint as Exchange, but builds instead of swaps.
-     * Look → aim; To me → under feet; Bridge / Stairs → toggle continuous path.
+     * Look → aim form; To me → fill along the aim-face axis to the player's matching coord;
+     * Bridge / Stairs → toggle continuous path.
      */
     public static boolean tryPlace(boolean force, BlockPos pos, Direction face) {
         Minecraft minecraft = Minecraft.getInstance();
@@ -1992,22 +1995,40 @@ public final class WrightsClientState {
         WrightsClientConfig.enforceExchangeLineFootprint();
         if (WrightsClientConfig.placePathStyle()) {
             // Force-place fills every empty cell from the player out to the offset.
-            face = Direction.UP;
             int placed = 0;
             for (BlockPos at : placePathCells(minecraft.player)) {
                 BlockState state = minecraft.level.getBlockState(at);
                 if (!state.isAir() && !state.canBeReplaced()) {
                     continue;
                 }
-                PacketDistributor.sendToServer(pathCellPlace(at));
+                PacketDistributor.sendToServer(pathCellPlace(at, false));
                 placed++;
             }
             return placed > 0;
         }
         if (style == 1) {
-            pos = minecraft.player.blockPosition().below();
-            face = Direction.UP;
-        } else if (pos == null || face == null) {
+            BlockHitResult aim = shapeLookHit();
+            if (aim == null) {
+                minecraft.player.displayClientMessage(Component.translatable("message.wrights.shape_look"), true);
+                return false;
+            }
+            boolean voidBlocks = WrightsClientConfig.SHAPE_VOID.get() && WrightsConfig.allowShapeVoid();
+            int placed = 0;
+            for (BlockPos at : placeToMeCells(minecraft.player, aim.getBlockPos(), aim.getDirection())) {
+                BlockState state = minecraft.level.getBlockState(at);
+                if (!voidBlocks && !state.isAir() && !state.canBeReplaced()) {
+                    continue;
+                }
+                PacketDistributor.sendToServer(pathCellPlace(at, voidBlocks));
+                placed++;
+            }
+            if (placed == 0) {
+                minecraft.player.displayClientMessage(Component.translatable("message.wrights.shape_nowhere"), true);
+                return false;
+            }
+            return true;
+        }
+        if (pos == null || face == null) {
             BlockHitResult aim = shapeLookHit();
             if (aim == null) {
                 minecraft.player.displayClientMessage(Component.translatable("message.wrights.shape_look"), true);
@@ -2032,7 +2053,7 @@ public final class WrightsClientState {
                 false,
                 WrightsClientConfig.SHAPE_VOID.get(),
                 force,
-                style != 0,
+                false,
                 WrightsClientConfig.SHAPE_FILL_MODE.get(),
                 WrightsClientConfig.SHAPE_ORDER_BATCH.get(),
                 WrightsClientConfig.SHAPE_MATERIALS.get(),
@@ -2077,7 +2098,29 @@ public final class WrightsClientState {
         return cells;
     }
 
-    private static BlueprintPayloads.ShapePlace pathCellPlace(BlockPos at) {
+    /**
+     * To me: from the aimed block, along the face axis, to the player's matching axis value.
+     * Other two coordinates stay on the aimed block — the line need not pass through the player.
+     */
+    public static java.util.List<BlockPos> placeToMeCells(Player player, BlockPos aim, Direction face) {
+        Direction.Axis axis = face.getAxis();
+        int from = aim.get(axis);
+        int to = player.blockPosition().get(axis);
+        int step = Integer.compare(to, from);
+        int max = WrightsConfig.maxShapeAxis();
+        java.util.ArrayList<BlockPos> cells = new java.util.ArrayList<>();
+        if (step == 0) {
+            cells.add(aim.immutable());
+            return cells;
+        }
+        int span = Math.abs(to - from);
+        for (int i = 0; i <= span && i < max; i++) {
+            cells.add(aim.relative(axis, i * step));
+        }
+        return cells;
+    }
+
+    private static BlueprintPayloads.ShapePlace pathCellPlace(BlockPos at, boolean voidBlocks) {
         return new BlueprintPayloads.ShapePlace(
                 at,
                 Direction.UP.get3DDataValue(),
@@ -2092,7 +2135,7 @@ public final class WrightsClientState {
                 0,
                 Shapes.pivotId(0, 4),
                 false,
-                false,
+                voidBlocks,
                 false,
                 true,
                 WrightsClientConfig.SHAPE_FILL_MODE.get(),
@@ -2127,7 +2170,7 @@ public final class WrightsClientState {
             if (!state.isAir() && !state.canBeReplaced()) {
                 continue;
             }
-            PacketDistributor.sendToServer(pathCellPlace(at));
+            PacketDistributor.sendToServer(pathCellPlace(at, false));
             placed++;
         }
         bridgeCooldown = placed > 0 ? 3 : 2;

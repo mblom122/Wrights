@@ -174,10 +174,13 @@ public final class SelectionRenderer {
         if (formPresets) {
             WrightsClientConfig.enforceExchangeLineFootprint();
         }
-        // Bridge / Stairs preview every cell from the player out to the path offset.
-        boolean path = place && WrightsClientConfig.placePathStyle();
-        if (path) {
+        // Bridge / Stairs / To me: multi-cell path ghosts instead of a form footprint.
+        if (place && WrightsClientConfig.placePathStyle()) {
             drawPlacePathGhosts(pose, buffers, camera, minecraft, materials);
+            return;
+        }
+        if (place && WrightsClientConfig.placeStyle() == 1) {
+            drawPlaceToMeGhosts(pose, buffers, camera, minecraft, materials);
             return;
         }
         int size = WrightsClientConfig.SHAPE_SIZE.get();
@@ -426,11 +429,46 @@ public final class SelectionRenderer {
             Vec3 camera,
             Minecraft minecraft,
             List<com.wrights.blueprint.ShapeMaterials.Entry> materials) {
-        if (minecraft.player == null || minecraft.level == null) {
+        if (minecraft.player == null) {
             return;
         }
-        List<BlockPos> cells = WrightsClientState.placePathCells(minecraft.player);
-        if (cells.isEmpty()) {
+        drawPlaceCellGhosts(pose, buffers, camera, minecraft, materials, WrightsClientState.placePathCells(minecraft.player), false);
+    }
+
+    /** Ghost the To me axis line from the aimed block to the player's matching axis value. */
+    private static void drawPlaceToMeGhosts(
+            PoseStack pose,
+            MultiBufferSource.BufferSource buffers,
+            Vec3 camera,
+            Minecraft minecraft,
+            List<com.wrights.blueprint.ShapeMaterials.Entry> materials) {
+        if (minecraft.player == null) {
+            return;
+        }
+        BlockHitResult aim = WrightsClientState.shapeLookHit();
+        if (aim == null) {
+            return;
+        }
+        boolean voidBlocks = WrightsClientConfig.SHAPE_VOID.get() && WrightsConfig.allowShapeVoid();
+        drawPlaceCellGhosts(
+                pose,
+                buffers,
+                camera,
+                minecraft,
+                materials,
+                WrightsClientState.placeToMeCells(minecraft.player, aim.getBlockPos(), aim.getDirection()),
+                voidBlocks);
+    }
+
+    private static void drawPlaceCellGhosts(
+            PoseStack pose,
+            MultiBufferSource.BufferSource buffers,
+            Vec3 camera,
+            Minecraft minecraft,
+            List<com.wrights.blueprint.ShapeMaterials.Entry> materials,
+            List<BlockPos> cells,
+            boolean voidBlocks) {
+        if (minecraft.level == null || cells.isEmpty()) {
             return;
         }
         BlockPos min = cells.get(0);
@@ -453,7 +491,7 @@ public final class SelectionRenderer {
         java.util.ArrayList<BlockPos> open = new java.util.ArrayList<>(cells.size());
         for (BlockPos cell : cells) {
             BlockState world = minecraft.level.getBlockState(cell);
-            if (!world.isAir() && !world.canBeReplaced()) {
+            if (!voidBlocks && !world.isAir() && !world.canBeReplaced()) {
                 continue;
             }
             open.add(cell);
