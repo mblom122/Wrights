@@ -379,9 +379,9 @@ public final class WrightsInput {
     /**
      * Shared controller chords:
      * Ctrl+right-click = set / clear that mode’s anchor,
-     * Shift+right-click = mode special action (second corner, …),
+     * Shift+right-click = mode special action (second corner, Shape look/anchor tweak, …),
      * Middle-click = pick the aimed block as Shape / Exchange material (like creative pick),
-     * Ctrl+Shift+right-click = that mode’s special menu (or the controller page for it),
+     * Ctrl+Shift+right-click = that mode’s options page (Shape / Exchange / Mirror / …),
      * Alt+right-click = undo last finished build.
      */
 
@@ -693,14 +693,19 @@ public final class WrightsInput {
             player.displayClientMessage(Component.translatable("message.wrights.feature_off"), true);
             return;
         }
-        // Ctrl+Shift = look-snap / world-anchor editor.
+        // Ctrl+Shift = Shape options page (same chord as Exchange / Mirror).
         if (menuChord(player)) {
-            openShapeSpecialMenu(player);
+            openToolMenu();
             return;
         }
         // Ctrl = set world anchor (and switch Look → On anchor). Air clears.
         if (controlHeld()) {
             setShapeWorldAnchor(player, pos);
+            return;
+        }
+        // Shift = look-snap / world-anchor tweak menu.
+        if (player.isShiftKeyDown()) {
+            openShapeSpecialMenu(player);
             return;
         }
         boolean lookMode = !com.wrights.WrightsClientConfig.SHAPE_USE_ANCHOR.get()

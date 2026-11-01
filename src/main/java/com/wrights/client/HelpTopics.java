@@ -99,7 +99,7 @@ public final class HelpTopics {
                     line("P", "help.wrights.shape.p_mats"),
                     line("P", "help.wrights.shape.p_aim"),
                     line("P", "help.wrights.shape.p_void"),
-                    line("K", "Right-click|Ctrl+Right-click|Ctrl+Shift+Right-click|Ctrl+Scroll"),
+                    line("K", "Right-click|Shift+Right-click|Ctrl+Right-click|Ctrl+Shift+Right-click|Middle-click|Ctrl+Scroll"),
                     line("T", "help.wrights.shape.tip")
             };
             case "exchange" -> new Line[] {
@@ -107,7 +107,7 @@ public final class HelpTopics {
                     line("P", "help.wrights.exchange.p1"),
                     line("H", "help.wrights.exchange.h2"),
                     line("P", "help.wrights.exchange.p2"),
-                    line("K", "Right-click|Shift+Right-click|Ctrl+Right-click|Ctrl+Shift+Right-click"),
+                    line("K", "Right-click|Middle-click|Ctrl+Right-click|Ctrl+Shift+Right-click|Ctrl+Scroll"),
                     line("T", "help.wrights.exchange.tip")
             };
             case "bind" -> new Line[] {
