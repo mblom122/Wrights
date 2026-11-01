@@ -29,11 +29,6 @@ import net.minecraft.core.Direction;
 
 @EventBusSubscriber(modid = WrightsMod.MOD_ID, value = Dist.CLIENT)
 public final class WrightsHud {
-    /** Short help under the mode title — only for the first seconds after a mode/submode change. */
-    private static final long MODE_HELP_MS = 5000L;
-    private static String modeHelpKey = "";
-    private static long modeHelpUntilMs;
-
     private WrightsHud() {
     }
 
@@ -54,7 +49,8 @@ public final class WrightsHud {
         Component offset = mirrorOffset(minecraft);
         List<Component> look = List.of();
         Component task = taskLine();
-        boolean showHelp = refreshModeHelp();
+        // Under-mode how-to tips removed — the timed Shift/Ctrl mode window already covers that.
+        boolean showHelp = false;
         if (WrightsClientState.bindPort != null) {
             line = Component.translatable("hud.wrights.port_chest");
             sub = Component.translatable("hud.wrights.port_chest_sub");
@@ -160,14 +156,21 @@ public final class WrightsHud {
         } else if (WrightsClientState.mode == WrightsClientState.Mode.NONE) {
             line = Component.translatable("hud.wrights.task_ready_sub");
         }
-        // Helper tips (sub/note + explain lines) only for 5s after mode/submode change — all modes.
-        // Live status lines (shape size, job progress, Info look) stay after the tip fades.
+        // Drop how-to tips; keep live status (shape size, job progress, Info look, …).
         if (!showHelp) {
-            sub = null;
-            note = null;
             if (!liveStatusDetail(line, look)) {
                 line = null;
+                sub = null;
+                note = null;
                 offset = null;
+            } else {
+                // Explain footers are tips; status-only lines (job wait, missing materials) stay.
+                if (WrightsClientState.placeToolActive()
+                        || WrightsClientState.exchangeToolActive()
+                        || WrightsClientState.shapeToolActive()
+                        || WrightsClientState.mirrorToolActive()) {
+                    sub = null;
+                }
             }
         }
         GuiGraphics graphics = event.getGuiGraphics();
@@ -338,59 +341,8 @@ public final class WrightsHud {
     }
 
     /**
-     * Restart the 5s help window when mode or submode changes.
-     * @return true while the under-mode help tooltip should still show
-     */
-    private static boolean refreshModeHelp() {
-        String key = modeHelpFingerprint();
-        long now = System.currentTimeMillis();
-        if (!key.equals(modeHelpKey)) {
-            modeHelpKey = key;
-            modeHelpUntilMs = now + MODE_HELP_MS;
-        }
-        return now < modeHelpUntilMs;
-    }
-
-    private static String modeHelpFingerprint() {
-        WrightsClientState.Mode mode = WrightsClientState.mode;
-        StringBuilder key = new StringBuilder(mode.name());
-        if (mode == WrightsClientState.Mode.CAPTURE || mode == WrightsClientState.Mode.SAVING) {
-            key.append('|').append(WrightsClientState.captureStyle.name());
-            // Re-show tips when capture step changes (first corner → second → box ready).
-            int step = WrightsClientState.cornerA == null ? 0 : WrightsClientState.cornerB == null ? 1 : 2;
-            key.append('|').append(step);
-            key.append('|').append(WrightsClientState.boxDragging).append('|').append(WrightsClientState.moveGrabbed);
-        } else if (mode == WrightsClientState.Mode.BUILD) {
-            if (WrightsClientState.placeToolActive()) {
-                key.append("|place|").append(WrightsClientConfig.placeStyle());
-                key.append('|').append(WrightsClientConfig.placeStairsUp());
-                key.append('|').append(WrightsClientConfig.exchangeForm().name());
-                key.append('|').append(WrightsClientState.bridgeActive);
-            } else if (WrightsClientState.exchangeToolActive()) {
-                key.append("|exchange|").append(WrightsClientConfig.exchangeForm().name());
-            } else if (WrightsClientState.shapeToolActive()) {
-                key.append("|shape|").append(WrightsClientConfig.SHAPE_KIND.get());
-                key.append('|').append(WrightsClientConfig.SHAPE_USE_ANCHOR.get());
-                key.append('|').append(WrightsClientConfig.SHAPE_LOOK_LOCK.get());
-                key.append('|').append(WrightsClientState.shapeLookSnapActive());
-            } else if (WrightsClientState.mirrorToolActive()) {
-                key.append("|mirror|").append(WrightsClientConfig.mirrorBlocks());
-                String dim = Minecraft.getInstance().level == null
-                        ? ""
-                        : Minecraft.getInstance().level.dimension().location().toString();
-                key.append('|').append(WrightsClientConfig.mirrorPlaced(dim));
-            } else if (WrightsClientState.bindSupply || WrightsClientState.bindPort != null) {
-                key.append("|bind");
-            } else {
-                key.append("|blueprint|").append(WrightsClientState.buildId == null ? "" : WrightsClientState.buildId.toString());
-            }
-        }
-        return key.toString();
-    }
-
-    /**
-     * True when {@code line} / Info look is live status that should remain after the 5s tip fades.
-     * Pure explain tips (capture how-to, manage/info/link blurbs, pick-blueprint) are not live.
+     * True when {@code line} / Info look is live status (shape size, job progress, …).
+     * Pure explain tips are not shown — the timed mode window covers those.
      */
     private static boolean liveStatusDetail(Component line, List<Component> look) {
         if (!look.isEmpty()) {
@@ -410,7 +362,7 @@ public final class WrightsHud {
                 return line != null;
             }
             if (WrightsClientState.bindSupply || WrightsClientState.bindPort != null) {
-                return false;
+                return line != null;
             }
             // Armed blueprint name line is status; "pick a blueprint" is a tip.
             return WrightsClientState.buildId != null && line != null;
