@@ -199,6 +199,7 @@ public class WrightsMenuScreen extends Screen {
     private final List<JobHit> jobHits = new ArrayList<>();
     /** Until this millis, draw the controller banner brighter after a blocked click. */
     private long needControllerFlashUntil;
+    private boolean lastToolHeld;
     private int drag;
     private int wallSliderX;
     private int wallSliderY;
@@ -406,6 +407,7 @@ public class WrightsMenuScreen extends Screen {
         unbindDigital = add(new WrightsButton(panelX + 140, panelY + panelH - 48, 120, 18,
                 Component.translatable("menu.wrights.digital_unbind"), button -> clearDigitalLink()));
         manage.addWidgets(manageHost);
+        lastToolHeld = toolHeld();
         refresh();
         if (infoPage) {
             requestDigitalInfo();
@@ -3107,11 +3109,12 @@ public class WrightsMenuScreen extends Screen {
         int reserved = manageAllWidth + 8 + (clearJobs ? clearJobWidth + 4 : 0);
         String drones = this.font.plainSubstrByWidth(Component.translatable("menu.wrights.wrights_available", pool[0], pool[1]).getString(), Math.max(40, jobW - reserved));
         graphics.drawString(this.font, drones, jobX, manageAllY + 4, WrightsUi.TEXT, false);
+        boolean tool = toolHeld();
         trackJobButton(manageAllRight, manageAllY, manageAllWidth, null, ACT_MANAGE_ALL);
-        drawJobButton(graphics, manageAllRight, manageAllY, "menu.wrights.manage_all", mouseX, mouseY, manageAllWidth);
+        drawJobButton(graphics, manageAllRight, manageAllY, "menu.wrights.manage_all", mouseX, mouseY, manageAllWidth, 0, tool);
         if (clearJobs) {
             trackJobButton(clearJobRight, manageAllY, clearJobWidth, null, ACT_CLEAR_MARKS);
-            drawJobButton(graphics, clearJobRight, manageAllY, "menu.wrights.clear_highlights", mouseX, mouseY, clearJobWidth, 0xFFF2D48A);
+            drawJobButton(graphics, clearJobRight, manageAllY, "menu.wrights.clear_highlights", mouseX, mouseY, clearJobWidth, 0xFFF2D48A, true);
         }
         int rowX = jobX + 4;
         int workGutter = workingJobs.size() > workRows ? 16 : 0;
@@ -3129,10 +3132,10 @@ public class WrightsMenuScreen extends Screen {
         drawJobGroup(graphics, jobX, workGroupY, jobsPanelW, workGroupH, workTitle, workingJobs.isEmpty() ? Component.translatable("menu.wrights.jobs_working_empty") : null, workingJobs.isEmpty() ? 0 : workPauseWidth + workRemoveWidth + 18);
         if (!workingJobs.isEmpty()) {
             trackJobButton(workRemoveRight, workHeaderY, workRemoveWidth, null, BlueprintPayloads.JobControl.REMOVE_ACTIVE);
-            drawJobButton(graphics, workRemoveRight, workHeaderY, "menu.wrights.remove_all", mouseX, mouseY, workRemoveWidth);
+            drawJobButton(graphics, workRemoveRight, workHeaderY, "menu.wrights.remove_all", mouseX, mouseY, workRemoveWidth, 0, tool);
             trackJobButton(workPauseRight, workHeaderY, workPauseWidth, null,
                     workAllPaused ? BlueprintPayloads.JobControl.RESUME_ALL : BlueprintPayloads.JobControl.PAUSE_ALL);
-            drawJobButton(graphics, workPauseRight, workHeaderY, workAllPaused ? "menu.wrights.resume_all" : "menu.wrights.pause_all", mouseX, mouseY, workPauseWidth);
+            drawJobButton(graphics, workPauseRight, workHeaderY, workAllPaused ? "menu.wrights.resume_all" : "menu.wrights.pause_all", mouseX, mouseY, workPauseWidth, 0, tool);
             int workClipTop = Math.max(workListY, jobsViewTop);
             int workClipBottom = Math.min(workGroupY + workGroupH - 2, jobsViewTop + jobsViewH);
             if (workClipBottom > workClipTop) {
@@ -3151,7 +3154,7 @@ public class WrightsMenuScreen extends Screen {
         drawJobGroup(graphics, jobX, doneGroupY, jobsPanelW, doneGroupH, doneTitle, finishedJobs.isEmpty() ? Component.translatable("menu.wrights.jobs_finished_empty") : null, finishedJobs.isEmpty() ? 0 : doneRemoveWidth + 14);
         if (!finishedJobs.isEmpty()) {
             trackJobButton(doneRemoveRight, doneHeaderY, doneRemoveWidth, null, BlueprintPayloads.JobControl.REMOVE_DONE);
-            drawJobButton(graphics, doneRemoveRight, doneHeaderY, "menu.wrights.remove_all", mouseX, mouseY, doneRemoveWidth);
+            drawJobButton(graphics, doneRemoveRight, doneHeaderY, "menu.wrights.remove_all", mouseX, mouseY, doneRemoveWidth, 0, tool);
             int doneClipTop = Math.max(doneListY, jobsViewTop);
             int doneClipBottom = Math.min(doneGroupY + doneGroupH - 2, jobsViewTop + jobsViewH);
             if (doneClipBottom > doneClipTop) {
@@ -3300,10 +3303,17 @@ public class WrightsMenuScreen extends Screen {
         if (!job.finished() && !job.saving()) {
             graphics.drawString(this.font, crewCountText(job), x + 6, y + JOB_BODY + 4, WrightsUi.MUTED, false);
         }
+        boolean tool = toolHeld();
         for (RowButton button : rowButtons(job, x, y, width)) {
             jobHits.add(new JobHit(button.x(), button.y(), button.width(), 16, job.id(), button.action()));
-            drawJobButton(graphics, button.x() + button.width(), button.y(), button.key(), mouseX, mouseY, button.width(), button.border());
+            drawJobButton(graphics, button.x() + button.width(), button.y(), button.key(), mouseX, mouseY, button.width(), button.border(),
+                    !needsController(button.action()) || tool);
         }
+    }
+
+    /** Highlight / clear-highlights are local; everything else talks to the server with the controller. */
+    private static boolean needsController(int action) {
+        return action != ACT_MARK && action != ACT_CLEAR_MARKS;
     }
 
     private void trackJobButton(int right, int y, int width, UUID jobId, int action) {
@@ -3568,19 +3578,23 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private int drawJobButton(GuiGraphics graphics, int right, int y, String key, int mouseX, int mouseY, int width) {
-        return drawJobButton(graphics, right, y, key, mouseX, mouseY, width, 0);
+        return drawJobButton(graphics, right, y, key, mouseX, mouseY, width, 0, true);
     }
 
     private int drawJobButton(GuiGraphics graphics, int right, int y, String key, int mouseX, int mouseY, int width, int border) {
+        return drawJobButton(graphics, right, y, key, mouseX, mouseY, width, border, true);
+    }
+
+    private int drawJobButton(GuiGraphics graphics, int right, int y, String key, int mouseX, int mouseY, int width, int border, boolean enabled) {
         int left = right - width;
-        boolean hover = mouseX >= left && mouseX < right && mouseY >= y && mouseY < y + 16;
-        WrightsUi.choice(graphics, left, y, width, 16, false, hover);
-        if (border != 0) {
+        boolean hover = enabled && mouseX >= left && mouseX < right && mouseY >= y && mouseY < y + 16;
+        WrightsUi.choice(graphics, left, y, width, 16, false, hover, enabled);
+        if (border != 0 && enabled) {
             graphics.fill(left, y, right, y + 2, border);
         }
         Component label = Component.translatable(key);
         String text = this.font.plainSubstrByWidth(label.getString(), width - 4);
-        graphics.drawString(this.font, text, left + (width - this.font.width(text)) / 2, y + 4, WrightsUi.TEXT, false);
+        graphics.drawString(this.font, text, left + (width - this.font.width(text)) / 2, y + 4, enabled ? WrightsUi.TEXT : 0xFF6E7A86, false);
         return left - 4;
     }
 
@@ -3686,7 +3700,7 @@ public class WrightsMenuScreen extends Screen {
             }
             return true;
         }
-        if (!requireTool()) {
+        if (needsController(hit.action()) && !requireTool()) {
             return true;
         }
         if (hit.action() == ACT_MANAGE_ALL) {
@@ -3812,6 +3826,11 @@ public class WrightsMenuScreen extends Screen {
     @Override
     public void tick() {
         super.tick();
+        boolean tool = toolHeld();
+        if (tool != lastToolHeld) {
+            lastToolHeld = tool;
+            refresh();
+        }
         if (jobsPage && portStockTick++ % 20 == 0) {
             PacketDistributor.sendToServer(new BlueprintPayloads.PlacedPortsAsk());
         }
@@ -4803,8 +4822,9 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private int drawPlacedButtons(GuiGraphics graphics, BlueprintPayloads.PlacedPort port, int right, int y, int mouseX, int mouseY) {
+        boolean tool = toolHeld();
         if (creativeVisit()) {
-            right = drawJobButton(graphics, right, y, "menu.wrights.visit", mouseX, mouseY, jobButtonWidth("menu.wrights.visit"));
+            right = drawJobButton(graphics, right, y, "menu.wrights.visit", mouseX, mouseY, jobButtonWidth("menu.wrights.visit"), 0, tool);
         }
         right = drawJobButton(graphics, right, y, "menu.wrights.rename", mouseX, mouseY, jobButtonWidth("menu.wrights.rename"));
         boolean marked = WrightsClientState.portMarked(port.dimension(), port.pos());
@@ -4983,8 +5003,10 @@ public class WrightsMenuScreen extends Screen {
         if (creativeVisit()) {
             int goW = jobButtonWidth("menu.wrights.visit");
             if (hitWide(mouseX, mouseY, right, buttonY, goW)) {
-                pickPlaced(port);
-                PacketDistributor.sendToServer(new BlueprintPayloads.PlacedVisit(port.dimension(), port.pos()));
+                if (requireTool()) {
+                    pickPlaced(port);
+                    PacketDistributor.sendToServer(new BlueprintPayloads.PlacedVisit(port.dimension(), port.pos()));
+                }
                 return true;
             }
             right -= goW + 4;

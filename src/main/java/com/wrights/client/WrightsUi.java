@@ -69,6 +69,15 @@ public final class WrightsUi {
 
     /** A selectable card with a thin top accent, the same language as the mirror page. */
     public static void choice(GuiGraphics graphics, int x, int y, int width, int height, boolean on, boolean hover) {
+        choice(graphics, x, y, width, height, on, hover, true);
+    }
+
+    public static void choice(GuiGraphics graphics, int x, int y, int width, int height, boolean on, boolean hover, boolean enabled) {
+        if (!enabled) {
+            graphics.fill(x, y, x + width, y + height, 0xFF141A22);
+            graphics.fill(x, y, x + width, y + Math.min(2, height), 0xFF2A3440);
+            return;
+        }
         graphics.fill(x, y, x + width, y + height, on ? CARD_ON : (hover ? CARD_HOVER : CARD));
         int accent = on ? TEAL : (hover ? COPPER : COPPER_DIM);
         graphics.fill(x, y, x + width, y + Math.min(2, height), accent);
