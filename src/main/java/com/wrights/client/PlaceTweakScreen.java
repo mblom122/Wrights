@@ -76,6 +76,7 @@ public class PlaceTweakScreen extends Screen {
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_stairs_width")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_to_me_height")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_stairs_dir")));
+        labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.shape_rotation")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.shape_materials")));
         int rowInner = labelW + 4 + stepW + 2 + fieldW + 2 + stepW;
         Component done = Component.translatable("screen.wrights.done");
@@ -93,6 +94,7 @@ public class PlaceTweakScreen extends Screen {
         boolean line = look && !stairsForm && WrightsClientConfig.exchangeForm().line();
         boolean showFormDims = look && !stairsForm;
         boolean pathDims = bridge || stairsForm;
+        boolean yawRotate = WrightsClientConfig.placeFormYawRotatable();
         int rows = 1 // title
                 + 1 // build mode label
                 + 1 // build mode choices (Look / To me / Bridge)
@@ -101,6 +103,7 @@ public class PlaceTweakScreen extends Screen {
                 + (pathDims ? 2 : 0) // offset + width
                 + (toMe ? 2 : 0) // width + height
                 + (stairsForm ? 1 : 0) // up/down
+                + (yawRotate ? 1 : 0) // rotate left/right
                 + 1 // materials label
                 + 1 // icons
                 + 1; // done
@@ -115,7 +118,7 @@ public class PlaceTweakScreen extends Screen {
         int plusX = valueX + fieldW + 2;
         int y = panelY + PAD + 12 + GAP;
 
-        sizeY = alongY = styleLabelY = styleChoicesY = offsetY = widthY = toMeHeightY = stairsDirY = matsLabelY = matsRowY = -1;
+        sizeY = alongY = styleLabelY = styleChoicesY = offsetY = widthY = toMeHeightY = stairsDirY = rotateY = matsLabelY = matsRowY = -1;
 
         styleLabelY = y;
         y += ROW + GAP;
@@ -156,6 +159,29 @@ public class PlaceTweakScreen extends Screen {
         }
         if (stairsForm) {
             stairsDirY = y;
+            y += ROW + GAP;
+        }
+        if (yawRotate) {
+            rotateY = y;
+            int gap = GAP;
+            int choiceW = (panelW - PAD * 2 - gap) / 2;
+            int leftX = panelX + PAD;
+            int rightX = leftX + choiceW + gap;
+            int rightW = panelW - PAD * 2 - choiceW - gap;
+            addRenderableWidget(new WrightsButton(
+                    leftX,
+                    rotateY,
+                    choiceW,
+                    ROW,
+                    Component.translatable("screen.wrights.rotate_left"),
+                    button -> WrightsClientConfig.nudgeShapeYaw(1)));
+            addRenderableWidget(new WrightsButton(
+                    rightX,
+                    rotateY,
+                    rightW,
+                    ROW,
+                    Component.translatable("screen.wrights.rotate_right"),
+                    button -> WrightsClientConfig.nudgeShapeYaw(-1)));
             y += ROW + GAP;
         }
         matsLabelY = y;

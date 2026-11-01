@@ -701,6 +701,13 @@ final class ShapeMenuPanel {
                 }
                 yield true;
             }
+            case "place_yaw" -> {
+                // Action pair: 0 = Left (CCW), 1 = Right (CW) — Floor / Wall / Beam only.
+                if (placeMode && WrightsClientConfig.placeFormYawRotatable()) {
+                    WrightsClientConfig.nudgeShapeYaw(value == 0 ? 1 : -1);
+                }
+                yield true;
+            }
             case "plane" -> {
                 WrightsClientConfig.setShapePlane(value);
                 yield true;
@@ -1127,6 +1134,16 @@ final class ShapeMenuPanel {
                 int axis = WrightsClientConfig.SHAPE_PLANE.get();
                 y = drawFormDimensions(graphics, mouseX, mouseY, x, y, leftW, kind, form, exchangeLine, exchangePlate,
                         kind == Shapes.Kind.RING, kind == Shapes.Kind.BOX, axis);
+                if (WrightsClientConfig.placeFormYawRotatable()) {
+                    drawField(graphics, mouseX, mouseY, x, y,
+                            "menu.wrights.shape_rotation", "menu.wrights.place_form_rotation_hint");
+                    y += 12;
+                    y = drawActionPair(graphics, mouseX, mouseY, x, y, leftW,
+                            "screen.wrights.rotate_left",
+                            "screen.wrights.rotate_right",
+                            "place_yaw");
+                    y += 4;
+                }
             }
             y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
                     "menu.wrights.shape_materials", "menu.wrights.shape_materials_hint", false);
@@ -1775,6 +1792,15 @@ final class ShapeMenuPanel {
         int half = (width - gap) / 2;
         drawChoice(graphics, mouseX, mouseY, x, y, half, 24, !second, left, id, 0);
         drawChoice(graphics, mouseX, mouseY, x + half + gap, y, width - half - gap, 24, second, right, id, 1);
+        return y + 28;
+    }
+
+    /** Two side-by-side action buttons (neither stays selected). */
+    private int drawActionPair(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width, String left, String right, String id) {
+        int gap = 6;
+        int half = (width - gap) / 2;
+        drawChoice(graphics, mouseX, mouseY, x, y, half, 24, false, left, id, 0);
+        drawChoice(graphics, mouseX, mouseY, x + half + gap, y, width - half - gap, 24, false, right, id, 1);
         return y + 28;
     }
 

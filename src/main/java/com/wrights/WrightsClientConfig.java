@@ -696,7 +696,7 @@ public final class WrightsClientConfig {
     public static int placeStyle() {
         int raw = PLACE_STYLE.get();
         if (raw == 3) {
-            return 0; // legacy Stairs aim → Look (pick Stairs form for the path)
+            return 0; // legacy Stairs aim → Look (pick Stairs form)
         }
         return clamp(raw, 0, 2);
     }
@@ -723,6 +723,22 @@ public final class WrightsClientConfig {
     /** Bridge mode, or Look + Stairs form — RMB toggles continuous path placing. */
     public static boolean placePathStyle() {
         return placeBridgeStyle() || placeStairsStyle();
+    }
+
+    /** Place Look Floor / Wall / Beam — Left/Right yaw around the look pin. */
+    public static boolean placeFormYawRotatable() {
+        if (placeStyle() != 0) {
+            return false;
+        }
+        com.wrights.blueprint.Shapes.ExchangeForm form = exchangeForm();
+        return form == com.wrights.blueprint.Shapes.ExchangeForm.FLOOR
+                || form == com.wrights.blueprint.Shapes.ExchangeForm.WALL
+                || form == com.wrights.blueprint.Shapes.ExchangeForm.BEAM;
+    }
+
+    /** Nudge shape yaw by quarter-turns (positive = left / CCW). */
+    public static void nudgeShapeYaw(int delta) {
+        setShapeYaw(SHAPE_YAW.get() + delta);
     }
 
     public static int placeBridgeOffset() {
@@ -1333,7 +1349,7 @@ public final class WrightsClientConfig {
             }
             case CIRCLE -> setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
             case STAIRS -> {
-                // Path form; Place Look uses stairs toggle instead of this footprint.
+                // Manual Place form — same footprint controls as Floor / Wall.
                 setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
                 if (SHAPE_SIZE.get() <= 1) {
                     setShapeSize(3);
