@@ -48,7 +48,7 @@ public final class ShapeLaunch {
             Messages.actionBar(player, "message.wrights.shape_need_materials");
             return;
         }
-        Shapes.Kind kind = Shapes.Kind.byId(payload.kind());
+        Shapes.Kind kind = exchange ? Shapes.exchangeKind(payload.kind()) : Shapes.Kind.byId(payload.kind());
         int size = Shapes.clampSize(payload.size());
         int height = Shapes.clampHeight(payload.height());
         int thickness = Shapes.clampHeight(payload.thickness());
@@ -57,6 +57,7 @@ public final class ShapeLaunch {
         int pivot = Shapes.clampPivot(payload.pivot());
         boolean hollow = payload.hollow() && WrightsConfig.allowShapeHollow();
         boolean voidBlocks = payload.voidBlocks() && WrightsConfig.allowShapeVoid();
+        boolean silk = exchange && payload.silk();
         List<Integer> order = ShapeSupply.parse(payload.supplyOrder());
         BlockPos target;
         boolean useAnchor = payload.useAnchor() && WrightsConfig.allowShapeAnchor();
@@ -136,7 +137,8 @@ public final class ShapeLaunch {
                 ShapeSupply.encode(order),
                 deferSupplies,
                 exchange,
-                exchange ? (payload.fromMaterials() == null ? "" : payload.fromMaterials()) : "");
+                exchange ? (payload.fromMaterials() == null ? "" : payload.fromMaterials()) : "",
+                silk);
         if (!ok) {
             Messages.actionBar(player, exchange ? "message.wrights.exchange_failed" : "message.wrights.shape_failed");
             return;

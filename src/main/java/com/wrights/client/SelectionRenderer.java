@@ -154,7 +154,9 @@ public final class SelectionRenderer {
         if (com.wrights.blueprint.ShapeMaterials.states(materials).isEmpty()) {
             return;
         }
-        com.wrights.blueprint.Shapes.Kind kind = com.wrights.blueprint.Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
+        com.wrights.blueprint.Shapes.Kind kind = WrightsClientState.exchangeToolActive()
+                ? com.wrights.blueprint.Shapes.exchangeKind(WrightsClientConfig.SHAPE_KIND.get())
+                : com.wrights.blueprint.Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
         int size = WrightsClientConfig.SHAPE_SIZE.get();
         int height = WrightsClientConfig.SHAPE_HEIGHT.get();
         int thickness = WrightsClientConfig.SHAPE_THICKNESS.get();

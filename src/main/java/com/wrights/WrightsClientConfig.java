@@ -274,6 +274,9 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.ConfigValue<String> EXCHANGE_FROM = BUILDER
             .comment("Blocks Exchange replaces. Empty = any non-air block in the volume. Format id=weight;… (weights ignored).")
             .define("exchangeFrom", "");
+    public static final ModConfigSpec.BooleanValue EXCHANGE_SILK = BUILDER
+            .comment("When true, Exchange breaks replaced blocks with silk touch and returns the drops.")
+            .define("exchangeSilk", false);
 
     static final ModConfigSpec SPEC = BUILDER.build();
 
@@ -998,6 +1001,15 @@ public final class WrightsClientConfig {
             return;
         }
         setExchangeFrom(com.wrights.blueprint.ShapeMaterials.remove(entries, index));
+    }
+
+    public static boolean exchangeSilk() {
+        return EXCHANGE_SILK.get();
+    }
+
+    public static void setExchangeSilk(boolean silk) {
+        EXCHANGE_SILK.set(silk);
+        save();
     }
 
     private static int clamp(int value, int min, int max) {

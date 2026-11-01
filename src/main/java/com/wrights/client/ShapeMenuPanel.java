@@ -124,7 +124,9 @@ final class ShapeMenuPanel {
         }
         y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd, "menu.wrights.shape_kind", "menu.wrights.shape_kind_hint", !exchangeMode);
         y = drawKinds(graphics, mouseX, mouseY, x, y, leftW);
-        Shapes.Kind kind = Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
+        Shapes.Kind kind = exchangeMode
+                ? Shapes.exchangeKind(WrightsClientConfig.SHAPE_KIND.get())
+                : Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
         int axis = WrightsClientConfig.SHAPE_PLANE.get();
         boolean ring = kind == Shapes.Kind.RING;
         boolean box = kind == Shapes.Kind.BOX;
@@ -220,7 +222,10 @@ final class ShapeMenuPanel {
         if (WrightsConfig.allowShapeHollow()) {
             y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_HOLLOW.get(), "menu.wrights.shape_hollow", "menu.wrights.shape_hollow_hint", "hollow");
         }
-        if (WrightsConfig.allowShapeVoid()) {
+        if (exchangeMode) {
+            y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.exchangeSilk(),
+                    "menu.wrights.exchange_silk", "menu.wrights.exchange_silk_hint", "exchange_silk");
+        } else if (WrightsConfig.allowShapeVoid()) {
             y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_VOID.get(), "menu.wrights.shape_void", "menu.wrights.shape_void_hint", "void");
         }
         if (WrightsConfig.allowShapeAnchor()) {
@@ -535,8 +540,10 @@ final class ShapeMenuPanel {
     private boolean apply(String id, int value) {
         return switch (id) {
             case "kind" -> {
-                WrightsClientConfig.setShapeKind(value);
-                yield true;
+                if (exchangeMode && Shapes.Kind.byId(value).volume()) {
+                    yield true;
+                }
+                WrightsClientConfig.setShapeKind(value);                yield true;
             }
             case "plane" -> {
                 WrightsClientConfig.setShapePlane(value);
@@ -583,8 +590,14 @@ final class ShapeMenuPanel {
                 yield true;
             }
             case "void" -> {
-                if (WrightsConfig.allowShapeVoid()) {
+                if (!exchangeMode && WrightsConfig.allowShapeVoid()) {
                     WrightsClientConfig.setShapeVoid(!WrightsClientConfig.SHAPE_VOID.get());
+                }
+                yield true;
+            }
+            case "exchange_silk" -> {
+                if (exchangeMode) {
+                    WrightsClientConfig.setExchangeSilk(!WrightsClientConfig.exchangeSilk());
                 }
                 yield true;
             }
@@ -761,7 +774,7 @@ final class ShapeMenuPanel {
         java.util.Set<net.minecraft.world.item.Item> seen = new java.util.HashSet<>();
         if (states != null) {
             for (BlockState state : states) {
-                if (state == null || state.isAir()) {
+                if (state == null || !com.wrights.util.BlockFilters.canExchange(null, null, state)) {
                     continue;
                 }
                 net.minecraft.world.item.Item item = state.getBlock().asItem();
@@ -937,17 +950,23 @@ final class ShapeMenuPanel {
                 flat.add(entry);
             }
         }
+        // Exchange is flat-only — keep a leftover 3D kind from switching into a 2D pick.
+        if (exchangeMode && Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get()).volume()) {
+            WrightsClientConfig.setShapeKind(Shapes.Kind.CIRCLE.ordinal());
+        }
         int flatRows = Math.max(1, (flat.size() + cols - 1) / cols);
-        int volumeRows = Math.max(1, (volume.size() + cols - 1) / cols);
-        int gridH = labelH + flatRows * rowH + sectionGap + labelH + volumeRows * rowH;
+        int volumeRows = exchangeMode ? 0 : Math.max(1, (volume.size() + cols - 1) / cols);
+        int gridH = labelH + flatRows * rowH + (exchangeMode ? 0 : sectionGap + labelH + volumeRows * rowH);
         int cursor = y;
         graphics.drawString(font, Component.translatable("menu.wrights.shape_kind_2d"), x, cursor, WrightsUi.MUTED, false);
         cursor += labelH;
         cursor = drawKindGrid(graphics, mouseX, mouseY, x, cursor, width, cardW, gap, cols, rowH, flat);
-        cursor += sectionGap;
-        graphics.drawString(font, Component.translatable("menu.wrights.shape_kind_3d"), x, cursor, WrightsUi.MUTED, false);
-        cursor += labelH;
-        drawKindGrid(graphics, mouseX, mouseY, x, cursor, width, cardW, gap, cols, rowH, volume);
+        if (!exchangeMode) {
+            cursor += sectionGap;
+            graphics.drawString(font, Component.translatable("menu.wrights.shape_kind_3d"), x, cursor, WrightsUi.MUTED, false);
+            cursor += labelH;
+            drawKindGrid(graphics, mouseX, mouseY, x, cursor, width, cardW, gap, cols, rowH, volume);
+        }
         return y + gridH;
     }
 
@@ -1019,7 +1038,9 @@ final class ShapeMenuPanel {
     }
 
     private void refreshShapePreview() {
-        Shapes.Kind kind = Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
+        Shapes.Kind kind = exchangeMode
+                ? Shapes.exchangeKind(WrightsClientConfig.SHAPE_KIND.get())
+                : Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
         int size = Shapes.clampSize(WrightsClientConfig.SHAPE_SIZE.get());
         int height = Shapes.clampHeight(WrightsClientConfig.SHAPE_HEIGHT.get());
         int thickness = Shapes.clampHeight(WrightsClientConfig.SHAPE_THICKNESS.get());

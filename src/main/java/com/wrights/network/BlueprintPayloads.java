@@ -2036,7 +2036,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record ShapePlace(BlockPos pos, int face, boolean useAnchor, boolean anchorSet, BlockPos anchor, int kind, int size, int height, int thickness, int plane, int yaw, int pivot, boolean hollow, boolean voidBlocks, boolean force, boolean lookPinned, int fillMode, int orderBatch, String materials, String supplyOrder, boolean exchange, String fromMaterials) implements CustomPacketPayload {
+    public record ShapePlace(BlockPos pos, int face, boolean useAnchor, boolean anchorSet, BlockPos anchor, int kind, int size, int height, int thickness, int plane, int yaw, int pivot, boolean hollow, boolean voidBlocks, boolean force, boolean lookPinned, int fillMode, int orderBatch, String materials, String supplyOrder, boolean exchange, String fromMaterials, boolean silk) implements CustomPacketPayload {
         public static final Type<ShapePlace> TYPE = payloadType("shape_place");
         public static final StreamCodec<RegistryFriendlyByteBuf, ShapePlace> STREAM_CODEC = StreamCodec.of((buf, value) -> value.write(buf), ShapePlace::read);
 
@@ -2063,6 +2063,7 @@ public final class BlueprintPayloads {
             buf.writeUtf(supplyOrder == null ? "" : supplyOrder, 64);
             buf.writeBoolean(exchange);
             buf.writeUtf(fromMaterials == null ? "" : fromMaterials, 512);
+            buf.writeBoolean(silk);
         }
 
         public static ShapePlace read(RegistryFriendlyByteBuf buf) {
@@ -2088,7 +2089,8 @@ public final class BlueprintPayloads {
                     buf.readUtf(512),
                     buf.readUtf(64),
                     buf.readBoolean(),
-                    buf.readUtf(512));
+                    buf.readUtf(512),
+                    buf.readBoolean());
         }
 
         @Override

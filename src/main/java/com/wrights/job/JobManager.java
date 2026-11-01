@@ -910,7 +910,7 @@ public final class JobManager {
             long seed,
             String supplyOrder,
             boolean deferSupplies) {
-        return startShapeBuild(player, min, max, center, kind, size, height, thickness, axis, yaw, pivot, hollow, voidBlocks, materials, fillMode, orderBatch, seed, supplyOrder, deferSupplies, false, "");
+        return startShapeBuild(player, min, max, center, kind, size, height, thickness, axis, yaw, pivot, hollow, voidBlocks, materials, fillMode, orderBatch, seed, supplyOrder, deferSupplies, false, "", false);
     }
 
     public static boolean startShapeBuild(
@@ -935,6 +935,32 @@ public final class JobManager {
             boolean deferSupplies,
             boolean exchange,
             String exchangeFrom) {
+        return startShapeBuild(player, min, max, center, kind, size, height, thickness, axis, yaw, pivot, hollow, voidBlocks, materials, fillMode, orderBatch, seed, supplyOrder, deferSupplies, exchange, exchangeFrom, false);
+    }
+
+    public static boolean startShapeBuild(
+            ServerPlayer player,
+            BlockPos min,
+            BlockPos max,
+            BlockPos center,
+            int kind,
+            int size,
+            int height,
+            int thickness,
+            int axis,
+            int yaw,
+            int pivot,
+            boolean hollow,
+            boolean voidBlocks,
+            String materials,
+            int fillMode,
+            int orderBatch,
+            long seed,
+            String supplyOrder,
+            boolean deferSupplies,
+            boolean exchange,
+            String exchangeFrom,
+            boolean exchangeSilk) {
         if (player == null || min == null || max == null) {
             return false;
         }
@@ -944,7 +970,7 @@ public final class JobManager {
             return false;
         }
         BuildJob job = BuildJob.shape(player.getUUID(), player.getUUID(), player.level().dimension(), min, max);
-        job.setShapeStream(kind, size, height, thickness, axis, yaw, pivot, hollow, center, materials, fillMode, orderBatch, seed, exchange, exchangeFrom);
+        job.setShapeStream(kind, size, height, thickness, axis, yaw, pivot, hollow, center, materials, fillMode, orderBatch, seed, exchange, exchangeFrom, exchangeSilk);
         // Exchange always replaces matching cells; voidBlocks still gates wiping non-matching when false.
         job.setPasteOptions(false, exchange || voidBlocks, exchange || voidBlocks, false, false, false, false);
         job.setClip(job.boxSizeX(), job.boxSizeY(), job.boxSizeZ());
@@ -1093,7 +1119,7 @@ public final class JobManager {
             }
             BlockState current = level.getBlockState(pos);
             if (job.exchangeJob()) {
-                if (!exchangeMatches(current, job.exchangeFrom())) {
+                if (!exchangeMatches(level, pos, current, job.exchangeFrom())) {
                     job.advance();
                     job.skippedOne();
                     scanned++;
@@ -1184,15 +1210,15 @@ public final class JobManager {
         };
     }
 
-    /** Empty from-list = any non-air; otherwise match block item against the filter. */
-    private static boolean exchangeMatches(BlockState current, String fromRaw) {
-        if (current == null || current.isAir()) {
+    /** Empty from-list = any exchangeable solid; otherwise match block item against the filter. */
+    private static boolean exchangeMatches(ServerLevel level, BlockPos pos, BlockState current, String fromRaw) {
+        if (!BlockFilters.canExchange(level, pos, current)) {
             return false;
         }
         java.util.List<com.wrights.blueprint.ShapeMaterials.Entry> from =
                 com.wrights.blueprint.ShapeMaterials.parse(fromRaw);
         if (from.isEmpty()) {
-            return !current.canBeReplaced();
+            return true;
         }
         net.minecraft.world.item.Item item = current.getBlock().asItem();
         if (!(item instanceof net.minecraft.world.item.BlockItem)) {
@@ -1985,6 +2011,19 @@ public final class JobManager {
         }
         var silk = server.registryAccess().lookupOrThrow(Registries.ENCHANTMENT).get(Enchantments.SILK_TOUCH);
         return silk.isPresent() && tool.getEnchantments().getLevel(silk.get()) > 0;
+    }
+
+    /** Temporary silk-touch pick used when Exchange returns the replaced blocks. */
+    private static ItemStack silkTouchPick(MinecraftServer server) {
+        ItemStack pick = new ItemStack(Items.DIAMOND_PICKAXE);
+        if (server == null) {
+            return pick;
+        }
+        var silk = server.registryAccess().lookupOrThrow(Registries.ENCHANTMENT).get(Enchantments.SILK_TOUCH);
+        if (silk.isPresent()) {
+            pick.enchant(silk.get(), 1);
+        }
+        return pick;
     }
 
     private static void noteChunk(ServerPlayer player, SchematicLibrary library, BuildJob job) {
@@ -4989,7 +5028,12 @@ public final class JobManager {
             suspendFall = FallingBlock.isFree(level.getBlockState(below));
         }
         if (clearFirst) {
-            voidCell(level, pos);
+            if (job.exchangeJob() && job.exchangeSilk()) {
+                ItemStack silk = silkTouchPick(level.getServer());
+                com.wrights.blueprint.MirrorLaunch.harvest(player, level, pos, silk, false);
+            } else {
+                voidCell(level, pos);
+            }
             existing = level.getBlockState(pos);
         }
 

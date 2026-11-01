@@ -12,7 +12,9 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.EmptyBlockGetter;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.BushBlock;
 import net.minecraft.world.level.block.CactusBlock;
 import net.minecraft.world.level.block.DoorBlock;
@@ -24,6 +26,7 @@ import net.minecraft.world.level.block.EndPortalBlock;
 import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.NetherPortalBlock;
 import net.minecraft.world.level.block.RedStoneWireBlock;
+import net.minecraft.world.level.block.SpawnerBlock;
 import net.minecraft.world.level.block.SugarCaneBlock;
 import net.minecraft.world.level.block.TorchBlock;
 import net.minecraft.world.level.block.piston.MovingPistonBlock;
@@ -195,6 +198,47 @@ public final class BlockFilters {
      */
     public static boolean isNbtBlock(BlockState state) {
         return state != null && (state.hasBlockEntity() || state.getBlock() instanceof EntityBlock);
+    }
+
+    /**
+     * Blocks Exchange may replace. Refuses air, unbreakables, portals, spawners / other NBT
+     * blocks, budding amethyst, and modded budding / flawless crystal hosts (e.g. AE2 certus).
+     */
+    public static boolean canExchange(BlockGetter level, BlockPos pos, BlockState state) {
+        if (state == null || state.isAir() || state.canBeReplaced()) {
+            return false;
+        }
+        if (isNbtBlock(state) || state.getBlock() instanceof SpawnerBlock) {
+            return false;
+        }
+        if (state.getDestroySpeed(level == null ? EmptyBlockGetter.INSTANCE : level, pos == null ? BlockPos.ZERO : pos) < 0.0F) {
+            return false;
+        }
+        Block block = state.getBlock();
+        if (block instanceof NetherPortalBlock
+                || block instanceof EndPortalBlock
+                || block instanceof EndGatewayBlock
+                || block instanceof PistonHeadBlock
+                || block instanceof MovingPistonBlock
+                || block instanceof LiquidBlock) {
+            return false;
+        }
+        if (block == Blocks.BUDDING_AMETHYST || block == Blocks.REINFORCED_DEEPSLATE || block == Blocks.TRIAL_SPAWNER
+                || block == Blocks.VAULT || block == Blocks.BEDROCK || block == Blocks.BARRIER
+                || block == Blocks.COMMAND_BLOCK || block == Blocks.CHAIN_COMMAND_BLOCK
+                || block == Blocks.REPEATING_COMMAND_BLOCK || block == Blocks.STRUCTURE_BLOCK
+                || block == Blocks.STRUCTURE_VOID || block == Blocks.JIGSAW || block == Blocks.LIGHT) {
+            return false;
+        }
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
+        if (id != null) {
+            String path = id.getPath();
+            if (path.contains("budding") || path.contains("flawless") || path.contains("spawner")
+                    || path.contains("trial_spawner") || path.contains("vault")) {
+                return false;
+            }
+        }
+        return block.asItem() != Items.AIR;
     }
 
     /**

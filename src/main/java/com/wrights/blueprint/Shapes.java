@@ -52,6 +52,12 @@ public final class Shapes {
         }
     }
 
+    /** Exchange only uses flat shapes — volume kinds fall back to Circle. */
+    public static Kind exchangeKind(int id) {
+        Kind kind = Kind.byId(id);
+        return kind.volume() ? Kind.CIRCLE : kind;
+    }
+
     /**
      * Height / extrusion axis (cross-section is the other two).
      * 0 = Y upright (XZ), 1 = Z (XY), 2 = X (YZ). Same ids as the old plane control.

@@ -797,6 +797,8 @@ public final class BuildJob {
     private boolean exchange;
     /** Blocks to replace when {@link #exchange}; blank = any non-air. */
     private String exchangeFrom = "";
+    /** When true, Exchange silk-touches replaced blocks instead of voiding them. */
+    private boolean exchangeSilk;
     private int shapeFillMode;
     private int shapeOrderBatch = 1;
     private long shapeSeed;
@@ -816,7 +818,7 @@ public final class BuildJob {
             int fillMode,
             int orderBatch,
             long seed) {
-        setShapeStream(kind, size, height, thickness, axis, yaw, pivot, hollow, center, materials, fillMode, orderBatch, seed, false, "");
+        setShapeStream(kind, size, height, thickness, axis, yaw, pivot, hollow, center, materials, fillMode, orderBatch, seed, false, "", false);
     }
 
     public void setShapeStream(
@@ -835,6 +837,26 @@ public final class BuildJob {
             long seed,
             boolean exchange,
             String exchangeFrom) {
+        setShapeStream(kind, size, height, thickness, axis, yaw, pivot, hollow, center, materials, fillMode, orderBatch, seed, exchange, exchangeFrom, false);
+    }
+
+    public void setShapeStream(
+            int kind,
+            int size,
+            int height,
+            int thickness,
+            int axis,
+            int yaw,
+            int pivot,
+            boolean hollow,
+            BlockPos center,
+            String materials,
+            int fillMode,
+            int orderBatch,
+            long seed,
+            boolean exchange,
+            String exchangeFrom,
+            boolean exchangeSilk) {
         this.shapeKind = kind;
         this.shapeSize = Math.max(1, size);
         this.shapeHeight = Math.max(1, height);
@@ -847,6 +869,7 @@ public final class BuildJob {
         this.shapeMaterials = materials == null ? "" : materials;
         this.exchange = exchange;
         this.exchangeFrom = exchangeFrom == null ? "" : exchangeFrom;
+        this.exchangeSilk = exchange && exchangeSilk;
         this.shapeFillMode = fillMode;
         this.shapeOrderBatch = Math.max(1, orderBatch);
         this.shapeSeed = seed;
@@ -859,6 +882,10 @@ public final class BuildJob {
 
     public String exchangeFrom() {
         return exchangeFrom;
+    }
+
+    public boolean exchangeSilk() {
+        return exchangeSilk;
     }
 
     public int shapeKind() {
@@ -1191,6 +1218,7 @@ public final class BuildJob {
             tag.putString("shapeMaterials", shapeMaterials == null ? "" : shapeMaterials);
             tag.putBoolean("exchange", exchange);
             tag.putString("exchangeFrom", exchangeFrom == null ? "" : exchangeFrom);
+            tag.putBoolean("exchangeSilk", exchangeSilk);
             tag.putInt("shapeFillMode", shapeFillMode);
             tag.putInt("shapeOrderBatch", shapeOrderBatch);
             tag.putLong("shapeSeed", shapeSeed);
@@ -1375,6 +1403,7 @@ public final class BuildJob {
             job.shapeMaterials = tag.getString("shapeMaterials");
             job.exchange = tag.getBoolean("exchange");
             job.exchangeFrom = tag.contains("exchangeFrom") ? tag.getString("exchangeFrom") : "";
+            job.exchangeSilk = job.exchange && tag.getBoolean("exchangeSilk");
             job.shapeFillMode = tag.getInt("shapeFillMode");
             job.shapeOrderBatch = Math.max(1, tag.contains("shapeOrderBatch") ? tag.getInt("shapeOrderBatch") : 1);
             job.shapeSeed = tag.getLong("shapeSeed");

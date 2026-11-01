@@ -1732,7 +1732,8 @@ public final class WrightsClientState {
                 WrightsClientConfig.SHAPE_MATERIALS.get(),
                 WrightsClientConfig.SHAPE_SUPPLY.get(),
                 false,
-                "");
+                "",
+                false);
         PacketDistributor.sendToServer(pendingShape);
         if (lookPinned) {
             clearShapeLookSnap();
@@ -1785,7 +1786,7 @@ public final class WrightsClientState {
                 useAnchor,
                 anchorSet,
                 anchorSet ? WrightsClientConfig.shapeAnchor() : BlockPos.ZERO,
-                WrightsClientConfig.SHAPE_KIND.get(),
+                com.wrights.blueprint.Shapes.exchangeKind(WrightsClientConfig.SHAPE_KIND.get()).ordinal(),
                 WrightsClientConfig.SHAPE_SIZE.get(),
                 WrightsClientConfig.SHAPE_HEIGHT.get(),
                 WrightsClientConfig.SHAPE_THICKNESS.get(),
@@ -1801,7 +1802,8 @@ public final class WrightsClientState {
                 WrightsClientConfig.SHAPE_MATERIALS.get(),
                 WrightsClientConfig.SHAPE_SUPPLY.get(),
                 true,
-                WrightsClientConfig.EXCHANGE_FROM.get());
+                WrightsClientConfig.EXCHANGE_FROM.get(),
+                WrightsClientConfig.exchangeSilk());
         PacketDistributor.sendToServer(pendingShape);
         if (lookPinned) {
             clearShapeLookSnap();
@@ -2080,6 +2082,10 @@ public final class WrightsClientState {
     public static void selectExchangeTool() {
         selectBuildTool(false);
         exchangeAim = true;
+        // Exchange is 2D-only — drop a leftover volume kind from Shape mode.
+        if (com.wrights.blueprint.Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get()).volume()) {
+            WrightsClientConfig.setShapeKind(com.wrights.blueprint.Shapes.Kind.CIRCLE.ordinal());
+        }
         rememberMode();
     }
 

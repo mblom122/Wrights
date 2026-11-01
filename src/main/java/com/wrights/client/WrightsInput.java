@@ -636,27 +636,19 @@ public final class WrightsInput {
         WrightsClientState.tryShape(false, pos, face);
     }
 
-    /** Same look/anchor flow as Shape, but starts an Exchange job. */
+    /** Same look/anchor flow as Shape, but starts an Exchange job. Shift picks the From block. */
     private static void useExchangeClick(net.minecraft.world.entity.player.Player player, BlockPos pos, Direction face) {
         if (!com.wrights.WrightsConfig.allowExchange()) {
             player.displayClientMessage(Component.translatable("message.wrights.feature_off"), true);
             return;
         }
+        if (player.isShiftKeyDown()) {
+            pickExchangeFrom(player, pos);
+            return;
+        }
         boolean lookMode = !com.wrights.WrightsClientConfig.SHAPE_USE_ANCHOR.get()
                 || !com.wrights.WrightsConfig.allowShapeAnchor();
         if (lookMode) {
-            if (player.isShiftKeyDown()) {
-                if (!WrightsClientState.shapeLookSnapActive()) {
-                    BlockHitResult aim = WrightsClientState.shapeLookHit();
-                    if (aim == null) {
-                        player.displayClientMessage(Component.translatable("message.wrights.shape_look"), true);
-                        return;
-                    }
-                    WrightsClientState.lockShapeLookSnap(aim.getBlockPos(), aim.getDirection());
-                }
-                Minecraft.getInstance().setScreen(new ShapeLookSnapScreen());
-                return;
-            }
             boolean lockFirst = com.wrights.WrightsClientConfig.SHAPE_LOOK_LOCK.get();
             if (lockFirst && !WrightsClientState.shapeLookSnapActive()) {
                 BlockHitResult aim = WrightsClientState.shapeLookHit();
@@ -683,19 +675,32 @@ public final class WrightsInput {
             }
             return;
         }
-        if (player.isShiftKeyDown()) {
-            BlockHitResult aim = WrightsClientState.lookHit();
-            BlockPos at = aim != null ? aim.getBlockPos() : pos;
-            if (at != null) {
-                WrightsClientState.setShapeAnchor(at);
-                player.displayClientMessage(Component.translatable("message.wrights.shape_set", at.getX(), at.getY(), at.getZ()), true);
-            } else {
-                com.wrights.WrightsClientConfig.clearShapeAnchor();
-                player.displayClientMessage(Component.translatable("message.wrights.shape_cleared"), true);
-            }
+        WrightsClientState.tryExchange(false, pos, face);
+    }
+
+    /** Clears the From list and sets it to the aimed block only. */
+    private static void pickExchangeFrom(net.minecraft.world.entity.player.Player player, BlockPos clicked) {
+        Minecraft minecraft = Minecraft.getInstance();
+        BlockHitResult aim = WrightsClientState.lookHit();
+        BlockPos at = aim != null ? aim.getBlockPos() : clicked;
+        if (at == null || minecraft.level == null) {
+            player.displayClientMessage(Component.translatable("message.wrights.exchange_from_look"), true);
             return;
         }
-        WrightsClientState.tryExchange(false, pos, face);
+        net.minecraft.world.level.block.state.BlockState state = minecraft.level.getBlockState(at);
+        if (!com.wrights.util.BlockFilters.canExchange(minecraft.level, at, state)) {
+            player.displayClientMessage(Component.translatable("message.wrights.exchange_from_blocked"), true);
+            return;
+        }
+        net.minecraft.world.item.Item item = state.getBlock().asItem();
+        if (!(item instanceof net.minecraft.world.item.BlockItem)) {
+            player.displayClientMessage(Component.translatable("message.wrights.exchange_from_blocked"), true);
+            return;
+        }
+        com.wrights.WrightsClientConfig.setExchangeFrom(java.util.List.of(new com.wrights.blueprint.ShapeMaterials.Entry(item, 1)));
+        player.displayClientMessage(
+                Component.translatable("message.wrights.exchange_from_set", state.getBlock().getName()),
+                true);
     }
 
     private static String mirrorAxisKey(Direction.Axis axis) {
