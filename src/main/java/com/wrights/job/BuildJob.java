@@ -47,6 +47,11 @@ public final class BuildJob {
     private final List<Refund> refunds = new ArrayList<>();
     /** Local cells whose ghost is done. Placed cells also live in {@link #refunds}. */
     private final Set<Long> settledGhosts = new HashSet<>();
+    /**
+     * World positions where a falling block was hung without support this paste.
+     * Not saved — used only to scrub fall ticks at job end. Packed with {@link BlockPos#asLong()}.
+     */
+    private final Set<Long> hungFalls = new HashSet<>();
 
     private UUID schematicId;
     private UUID resultSchematicId;
@@ -745,6 +750,15 @@ public final class BuildJob {
     public void recordPlaced(short x, short y, short z, BlockState state, boolean paid) {
         refunds.add(new Refund(x, y, z, state, paid));
         settleGhost(x, y, z);
+    }
+
+    /** Remember a gravity block that was intentionally left floating during this paste. */
+    public void noteHungFall(BlockPos worldPos) {
+        hungFalls.add(worldPos.asLong());
+    }
+
+    public Set<Long> hungFalls() {
+        return hungFalls;
     }
 
     /** The real block has this cell, so its ghost should not come back if the block is broken. */

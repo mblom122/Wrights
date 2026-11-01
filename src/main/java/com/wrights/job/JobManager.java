@@ -1409,6 +1409,11 @@ public final class JobManager {
     }
 
     private static void finishPaste(MinecraftServer server, SchematicLibrary library, ServerPlayer player, BuildJob job) {
+        ServerLevel finishLevel = server.getLevel(job.dimension());
+        if (finishLevel != null && !job.mining()) {
+            // Drop any fall ticks neighbour places scheduled during the paste so hung sand stays.
+            scrubHangRegion(finishLevel, job);
+        }
         sendHome(server, player, job);
         int placed = job.placed();
         int skipped = job.skipped();
@@ -2747,6 +2752,10 @@ public final class JobManager {
                 noteProgress(schematic, job, hand, entry, at);
             }
             publishHandStatus(level, player, schematic, job, hand, handStatus);
+        }
+        // Neighbour places can re-schedule fall ticks on hung sand a tick or two later — keep clearing them.
+        if (!job.hungFalls().isEmpty()) {
+            scrubHangRegion(level, job);
         }
         shareWithIdle(level, job, schematic);
         // Only send spare wrights home when the job has nothing left to place or hold.
@@ -4446,6 +4455,9 @@ public final class JobManager {
             level.setBlock(pos, existing, Block.UPDATE_ALL);
             return skipCell(player, job, entry);
         }
+        if (suspendFall) {
+            job.noteHungFall(pos.immutable());
+        }
         boolean paid = !entry.secondary() && !freePlace(player) && payment != null;
         if (paid) {
             consumeItem(player, level, job, hand, payment);
@@ -4466,18 +4478,62 @@ public final class JobManager {
     }
 
     /**
-     * Writes a block into the world. Gravity blocks with nothing under them are placed like
-     * worldgen: clients are notified, neighbour/shape updates are skipped, and the fall tick
-     * from {@link FallingBlock#onPlace} is cancelled so the block hangs until something else
-     * updates it (breaking a neighbour, placing beside it with full updates, etc.).
+     * Writes a block into the world. Gravity blocks with nothing under them are hung like
+     * worldgen: {@link FallingBlock#onPlace} is skipped (NeoForge snapshot capture), clients
+     * are notified without neighbour updates, and any fall ticks from later neighbour places
+     * during this paste are scrubbed so the sand stays until something updates it after the job.
      */
     private static void writePlaced(ServerLevel level, BlockPos pos, BlockState state, boolean suspendFall) {
         if (!suspendFall) {
             level.setBlock(pos, state, Block.UPDATE_ALL);
+            // A normal place can schedule fall ticks on already-hung sand beside it — drop those.
+            scrubHangAround(level, pos);
             return;
         }
-        level.setBlock(pos, state, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
-        cancelFallTick(level, pos, state.getBlock());
+        BlockState old = level.getBlockState(pos);
+        boolean capturing = level.captureBlockSnapshots;
+        level.captureBlockSnapshots = true;
+        try {
+            level.setBlock(pos, state, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+        } finally {
+            level.captureBlockSnapshots = capturing;
+            if (!level.capturedBlockSnapshots.isEmpty()) {
+                level.capturedBlockSnapshots.remove(level.capturedBlockSnapshots.size() - 1);
+            }
+        }
+        // Capture skips markAndNotify — push the new block to clients ourselves.
+        level.sendBlockUpdated(pos, old, state, Block.UPDATE_CLIENTS);
+        cancelHangAt(level, pos);
+        scrubHangAround(level, pos);
+    }
+
+    private static void scrubHangAround(ServerLevel level, BlockPos center) {
+        cancelHangAt(level, center);
+        for (Direction direction : Direction.values()) {
+            cancelHangAt(level, center.relative(direction));
+        }
+    }
+
+    private static void scrubHangRegion(ServerLevel level, BuildJob job) {
+        for (long packed : job.hungFalls()) {
+            cancelHangAt(level, BlockPos.of(packed));
+        }
+    }
+
+    private static void cancelHangAt(ServerLevel level, BlockPos pos) {
+        if (!level.isLoaded(pos)) {
+            return;
+        }
+        BlockState state = level.getBlockState(pos);
+        Block block = state.getBlock();
+        if (!(block instanceof FallingBlock)) {
+            return;
+        }
+        BlockPos below = pos.below();
+        if (level.isOutsideBuildHeight(below) || !level.isLoaded(below) || !FallingBlock.isFree(level.getBlockState(below))) {
+            return;
+        }
+        cancelFallTick(level, pos, block);
     }
 
     @SuppressWarnings("unchecked")
