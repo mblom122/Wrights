@@ -1794,7 +1794,7 @@ public final class WrightsClientState {
                 useAnchor,
                 anchorSet,
                 anchorSet ? WrightsClientConfig.shapeAnchor() : BlockPos.ZERO,
-                com.wrights.blueprint.Shapes.exchangeKind(WrightsClientConfig.SHAPE_KIND.get()).ordinal(),
+                WrightsClientConfig.exchangeForm().kind().ordinal(),
                 WrightsClientConfig.SHAPE_SIZE.get(),
                 WrightsClientConfig.SHAPE_HEIGHT.get(),
                 WrightsClientConfig.SHAPE_THICKNESS.get(),
@@ -2090,10 +2090,8 @@ public final class WrightsClientState {
     public static void selectExchangeTool() {
         selectBuildTool(false);
         exchangeAim = true;
-        // Exchange is 2D-only — drop a leftover volume kind from Shape mode.
-        if (com.wrights.blueprint.Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get()).volume()) {
-            WrightsClientConfig.setShapeKind(com.wrights.blueprint.Shapes.Kind.CIRCLE.ordinal());
-        }
+        // Re-apply the saved Exchange preset so Kind/Axis match Floor/Wall/Column.
+        WrightsClientConfig.applyExchangeForm(WrightsClientConfig.EXCHANGE_FORM.get(), Minecraft.getInstance().player);
         // Default Void on so look-aim swaps solids instead of skipping every occupied cell.
         if (WrightsConfig.allowShapeVoid() && !WrightsClientConfig.SHAPE_VOID.get()) {
             WrightsClientConfig.setShapeVoid(true);

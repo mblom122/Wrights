@@ -592,10 +592,17 @@ public final class WrightsInput {
             return;
         }
         if (control) {
+            // Exchange: Ctrl+scroll grows/shrinks Size for quicker Floor/Wall/Column tweaks.
+            if (WrightsClientState.exchangeToolActive() && com.wrights.WrightsConfig.allowExchange()) {
+                int step = event.getScrollDeltaY() > 0.0D ? 1 : -1;
+                com.wrights.WrightsClientConfig.setShapeSize(
+                        com.wrights.WrightsClientConfig.SHAPE_SIZE.get() + step);
+                event.setCanceled(true);
+                return;
+            }
             // Shape tool: Ctrl+scroll yaws the whole footprint around the look/anchor pin.
             // Scroll up = clockwise so the AABB orbits that cell (needs a corner/edge pivot).
-            if ((WrightsClientState.shapeToolActive() && com.wrights.WrightsConfig.allowShape())
-                    || (WrightsClientState.exchangeToolActive() && com.wrights.WrightsConfig.allowExchange())) {
+            if (WrightsClientState.shapeToolActive() && com.wrights.WrightsConfig.allowShape()) {
                 // Center pivot spins a cube in place — move to the bottom min corner so scroll orbits the box.
                 if (com.wrights.WrightsClientConfig.SHAPE_PIVOT.get() == com.wrights.blueprint.Shapes.PIVOT_CENTER) {
                     com.wrights.WrightsClientConfig.setShapePivot(com.wrights.blueprint.Shapes.pivotId(0, 0));

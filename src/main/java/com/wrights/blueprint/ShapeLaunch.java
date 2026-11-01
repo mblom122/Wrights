@@ -60,7 +60,8 @@ public final class ShapeLaunch {
             Messages.actionBar(player, "message.wrights.shape_need_materials");
             return;
         }
-        Shapes.Kind kind = exchange ? Shapes.exchangeKind(payload.kind()) : Shapes.Kind.byId(payload.kind());
+        // Client already resolved ExchangeForm → Kind into payload.kind.
+        Shapes.Kind kind = Shapes.Kind.byId(payload.kind());
         int size = Shapes.clampSize(payload.size());
         int height = Shapes.clampHeight(payload.height());
         int thickness = Shapes.clampHeight(payload.thickness());

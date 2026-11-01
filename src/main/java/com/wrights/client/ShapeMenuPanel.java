@@ -117,10 +117,13 @@ final class ShapeMenuPanel {
         int lineEnd = x + leftW;
         graphics.drawString(font, Component.translatable(exchangeMode ? "menu.wrights.exchange_title" : "menu.wrights.shape_title"), x, y, WrightsUi.COPPER, false);
         y += 14;
-        y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd, "menu.wrights.shape_kind", "menu.wrights.shape_kind_hint", !exchangeMode);
+        y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
+                exchangeMode ? "menu.wrights.exchange_form" : "menu.wrights.shape_kind",
+                exchangeMode ? "menu.wrights.exchange_form_hint" : "menu.wrights.shape_kind_hint",
+                !exchangeMode);
         y = drawKinds(graphics, mouseX, mouseY, x, y, leftW);
         Shapes.Kind kind = exchangeMode
-                ? Shapes.exchangeKind(WrightsClientConfig.SHAPE_KIND.get())
+                ? WrightsClientConfig.exchangeForm().kind()
                 : Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
         int axis = WrightsClientConfig.SHAPE_PLANE.get();
         boolean ring = kind == Shapes.Kind.RING;
@@ -546,10 +549,14 @@ final class ShapeMenuPanel {
     private boolean apply(String id, int value) {
         return switch (id) {
             case "kind" -> {
-                if (exchangeMode && Shapes.Kind.byId(value).volume()) {
-                    yield true;
+                WrightsClientConfig.setShapeKind(value);
+                yield true;
+            }
+            case "exchange_form" -> {
+                if (exchangeMode) {
+                    WrightsClientConfig.applyExchangeForm(value, net.minecraft.client.Minecraft.getInstance().player);
                 }
-                WrightsClientConfig.setShapeKind(value);                yield true;
+                yield true;
             }
             case "plane" -> {
                 WrightsClientConfig.setShapePlane(value);
@@ -867,6 +874,15 @@ final class ShapeMenuPanel {
         int labelH = 12;
         int sectionGap = 6;
         int cardW = Math.max(36, (width - gap * (cols - 1)) / cols);
+        if (exchangeMode) {
+            java.util.List<Shapes.ExchangeForm> forms = java.util.List.of(Shapes.ExchangeForm.values());
+            int rows = Math.max(1, (forms.size() + cols - 1) / cols);
+            int cursor = y;
+            graphics.drawString(font, Component.translatable("menu.wrights.exchange_form_presets"), x, cursor, WrightsUi.MUTED, false);
+            cursor += labelH;
+            drawExchangeFormGrid(graphics, mouseX, mouseY, x, cursor, width, cardW, gap, cols, rowH, forms);
+            return y + labelH + rows * rowH;
+        }
         java.util.List<Shapes.Kind> flat = new java.util.ArrayList<>();
         java.util.List<Shapes.Kind> volume = new java.util.ArrayList<>();
         for (Shapes.Kind entry : Shapes.Kind.values()) {
@@ -876,24 +892,49 @@ final class ShapeMenuPanel {
                 flat.add(entry);
             }
         }
-        // Exchange is flat-only — keep a leftover 3D kind from switching into a 2D pick.
-        if (exchangeMode && Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get()).volume()) {
-            WrightsClientConfig.setShapeKind(Shapes.Kind.CIRCLE.ordinal());
-        }
         int flatRows = Math.max(1, (flat.size() + cols - 1) / cols);
-        int volumeRows = exchangeMode ? 0 : Math.max(1, (volume.size() + cols - 1) / cols);
-        int gridH = labelH + flatRows * rowH + (exchangeMode ? 0 : sectionGap + labelH + volumeRows * rowH);
+        int volumeRows = Math.max(1, (volume.size() + cols - 1) / cols);
+        int gridH = labelH + flatRows * rowH + sectionGap + labelH + volumeRows * rowH;
         int cursor = y;
         graphics.drawString(font, Component.translatable("menu.wrights.shape_kind_2d"), x, cursor, WrightsUi.MUTED, false);
         cursor += labelH;
         cursor = drawKindGrid(graphics, mouseX, mouseY, x, cursor, width, cardW, gap, cols, rowH, flat);
-        if (!exchangeMode) {
-            cursor += sectionGap;
-            graphics.drawString(font, Component.translatable("menu.wrights.shape_kind_3d"), x, cursor, WrightsUi.MUTED, false);
-            cursor += labelH;
-            drawKindGrid(graphics, mouseX, mouseY, x, cursor, width, cardW, gap, cols, rowH, volume);
-        }
+        cursor += sectionGap;
+        graphics.drawString(font, Component.translatable("menu.wrights.shape_kind_3d"), x, cursor, WrightsUi.MUTED, false);
+        cursor += labelH;
+        drawKindGrid(graphics, mouseX, mouseY, x, cursor, width, cardW, gap, cols, rowH, volume);
         return y + gridH;
+    }
+
+    private void drawExchangeFormGrid(
+            GuiGraphics graphics,
+            int mouseX,
+            int mouseY,
+            int x,
+            int y,
+            int gridW,
+            int cardW,
+            int gap,
+            int cols,
+            int rowH,
+            java.util.List<Shapes.ExchangeForm> forms) {
+        int selected = WrightsClientConfig.EXCHANGE_FORM.get();
+        for (int i = 0; i < forms.size(); i++) {
+            Shapes.ExchangeForm entry = forms.get(i);
+            int col = i % cols;
+            int row = i / cols;
+            int cx = x + col * (cardW + gap);
+            int cy = y + row * rowH;
+            int cw = col == cols - 1 ? x + gridW - cx : cardW;
+            boolean on = selected == entry.ordinal();
+            boolean hover = mouseX >= cx && mouseX < cx + cw && mouseY >= cy && mouseY < cy + 22;
+            WrightsUi.choice(graphics, cx, cy, cw, 22, on, hover);
+            String label = font.plainSubstrByWidth(
+                    Component.translatable(entry.langKey()).getString(),
+                    Math.max(8, cw - 10));
+            graphics.drawString(font, label, cx + 5, cy + 7, on ? WrightsUi.TEXT : WrightsUi.MUTED, false);
+            hits.add(new Hit(cx, cy, cw, 22, "exchange_form", entry.ordinal()));
+        }
     }
 
     private int drawKindGrid(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int gridW, int cardW, int gap, int cols, int rowH, java.util.List<Shapes.Kind> kinds) {
@@ -965,7 +1006,7 @@ final class ShapeMenuPanel {
 
     private void refreshShapePreview() {
         Shapes.Kind kind = exchangeMode
-                ? Shapes.exchangeKind(WrightsClientConfig.SHAPE_KIND.get())
+                ? WrightsClientConfig.exchangeForm().kind()
                 : Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
         int size = Shapes.clampSize(WrightsClientConfig.SHAPE_SIZE.get());
         int height = Shapes.clampHeight(WrightsClientConfig.SHAPE_HEIGHT.get());

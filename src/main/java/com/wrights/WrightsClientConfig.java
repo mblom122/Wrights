@@ -277,6 +277,9 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.BooleanValue EXCHANGE_SILK = BUILDER
             .comment("When true, Exchange breaks replaced blocks with silk touch and returns the drops.")
             .define("exchangeSilk", false);
+    public static final ModConfigSpec.IntValue EXCHANGE_FORM = BUILDER
+            .comment("Exchange preset: 0 floor, 1 wall, 2 column, 3 circle, 4 ring, 5 rectangle, 6 box, 7 cylinder.")
+            .defineInRange("exchangeForm", 0, 0, 7);
 
     static final ModConfigSpec SPEC = BUILDER.build();
 
@@ -1010,6 +1013,70 @@ public final class WrightsClientConfig {
     public static void setExchangeSilk(boolean silk) {
         EXCHANGE_SILK.set(silk);
         save();
+    }
+
+    public static com.wrights.blueprint.Shapes.ExchangeForm exchangeForm() {
+        return com.wrights.blueprint.Shapes.ExchangeForm.byId(EXCHANGE_FORM.get());
+    }
+
+    public static void setExchangeForm(int form) {
+        EXCHANGE_FORM.set(com.wrights.blueprint.Shapes.ExchangeForm.byId(form).ordinal());
+        save();
+    }
+
+    /**
+     * Pick an Exchange preset and snap Kind / Axis / light defaults so Wall is vertical,
+     * Floor is flat, Column stands upright — no Orientation panel needed.
+     */
+    public static void applyExchangeForm(int formId, net.minecraft.world.entity.player.Player player) {
+        com.wrights.blueprint.Shapes.ExchangeForm form = com.wrights.blueprint.Shapes.ExchangeForm.byId(formId);
+        setExchangeForm(form.ordinal());
+        setShapeKind(form.kind().ordinal());
+        setShapeYaw(0);
+        setShapeHollow(false);
+        switch (form) {
+            case FLOOR -> {
+                setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
+                if (SHAPE_HEIGHT.get() < 1) {
+                    setShapeHeight(1);
+                }
+            }
+            case WALL -> {
+                net.minecraft.core.Direction facing = player == null
+                        ? net.minecraft.core.Direction.NORTH
+                        : player.getDirection();
+                // Wall faces the player: plate stands in the plane across their look.
+                setShapePlane(facing.getAxis() == net.minecraft.core.Direction.Axis.X
+                        ? com.wrights.blueprint.Shapes.AXIS_X
+                        : com.wrights.blueprint.Shapes.AXIS_Z);
+                if (SHAPE_HEIGHT.get() < 2) {
+                    setShapeHeight(3);
+                }
+            }
+            case COLUMN -> {
+                setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
+                if (SHAPE_SIZE.get() > 5) {
+                    setShapeSize(3);
+                }
+                if (SHAPE_HEIGHT.get() < 3) {
+                    setShapeHeight(5);
+                }
+            }
+            case CIRCLE, RECTANGLE -> setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
+            case RING -> {
+                setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
+                if (SHAPE_HEIGHT.get() < 1) {
+                    setShapeHeight(1);
+                }
+            }
+            case BOX -> setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
+            case CYLINDER -> {
+                setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
+                if (SHAPE_HEIGHT.get() < 2) {
+                    setShapeHeight(4);
+                }
+            }
+        }
     }
 
     private static int clamp(int value, int min, int max) {

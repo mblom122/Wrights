@@ -155,7 +155,7 @@ public final class SelectionRenderer {
             return;
         }
         com.wrights.blueprint.Shapes.Kind kind = WrightsClientState.exchangeToolActive()
-                ? com.wrights.blueprint.Shapes.exchangeKind(WrightsClientConfig.SHAPE_KIND.get())
+                ? WrightsClientConfig.exchangeForm().kind()
                 : com.wrights.blueprint.Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
         int size = WrightsClientConfig.SHAPE_SIZE.get();
         int height = WrightsClientConfig.SHAPE_HEIGHT.get();

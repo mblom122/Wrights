@@ -52,9 +52,50 @@ public final class Shapes {
         }
     }
 
-    /** Exchange only uses flat shapes — volume kinds fall back to Circle. */
-    public static Kind exchangeKind(int id) {
-        Kind kind = Kind.byId(id);
+    /**
+     * Exchange presets: each picks a Kind and sets Axis (and light defaults) so Wall/Floor/Column
+     * are oriented correctly without opening the Shape orientation controls.
+     */
+    public enum ExchangeForm {
+        FLOOR,
+        WALL,
+        COLUMN,
+        CIRCLE,
+        RING,
+        RECTANGLE,
+        BOX,
+        CYLINDER;
+
+        public Kind kind() {
+            return switch (this) {
+                case FLOOR, WALL -> Kind.SQUARE;
+                case COLUMN, CYLINDER -> Kind.CYLINDER;
+                case CIRCLE -> Kind.CIRCLE;
+                case RING -> Kind.RING;
+                case RECTANGLE -> Kind.RECTANGLE;
+                case BOX -> Kind.BOX;
+            };
+        }
+
+        public static ExchangeForm byId(int id) {
+            ExchangeForm[] all = values();
+            return all[Mth.clamp(id, 0, all.length - 1)];
+        }
+
+        public String langKey() {
+            return "menu.wrights.exchange_form_" + name().toLowerCase();
+        }
+    }
+
+    /** Resolve Exchange's configured form to a Kind (allows volume forms like Column/Box). */
+    public static Kind exchangeKind(int formId) {
+        return ExchangeForm.byId(formId).kind();
+    }
+
+    /** @deprecated prefer {@link #exchangeKind(int)} with an ExchangeForm id */
+    @Deprecated
+    public static Kind exchangeKindFromShape(int shapeKindId) {
+        Kind kind = Kind.byId(shapeKindId);
         return kind.volume() ? Kind.CIRCLE : kind;
     }
 

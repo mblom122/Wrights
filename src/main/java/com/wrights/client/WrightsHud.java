@@ -407,7 +407,7 @@ public final class WrightsHud {
         Component exchange = Component.translatable("hud.wrights.tool_exchange");
         Component mirrorMark = Component.translatable(WrightsClientConfig.mirrorBlocks() ? "menu.wrights.mirror_blocks" : "menu.wrights.mirror_blueprints");
         Component shapeMark = Component.translatable("menu.wrights.shape_kind_" + com.wrights.blueprint.Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get()).name().toLowerCase());
-        Component exchangeMark = Component.translatable("menu.wrights.exchange_mark");
+        Component exchangeMark = Component.translatable(WrightsClientConfig.exchangeForm().langKey());
         Component selected = Component.translatable("hud.wrights.mode_selected");
         Component corners = Component.translatable("hud.wrights.mode_corners");
         Component box = Component.translatable("hud.wrights.mode_box");
