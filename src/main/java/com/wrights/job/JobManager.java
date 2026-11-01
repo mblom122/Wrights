@@ -1689,23 +1689,28 @@ public final class JobManager {
             return;
         }
         Vec3 hover = Vec3.atCenterOf(nextPos).add(0.0D, 0.9D, 0.0D);
+        ItemStack soloTarget = stackFor(schematic, at);
         if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
             double step = drone.distanceToSqr(hover) > 64.0D ? 0.85D : 0.4D;
             drone.moveToward(hover, step);
             job.setLastDronePos(drone.blockPosition());
             job.setWaitKind(BuildJob.WAIT_NONE);
+            drone.setWorkStatus(soloTarget, ItemStack.EMPTY, DroneEntity.WAIT_NONE);
             library.setDirty();
             return;
         }
+        drone.setWorkStatus(soloTarget, ItemStack.EMPTY, DroneEntity.WAIT_NONE);
         int budget = WrightsConfig.BLOCKS_PER_TICK.getAsInt();
         for (int i = 0; i < budget; i++) {
             int index = i == 0 ? at : nextSolo(level, player, schematic, job);
             if (index == SUPPORT_WAIT) {
                 job.setWaitKind(BuildJob.WAIT_FLOOR);
+                drone.setWorkStatus(soloTarget, ItemStack.EMPTY, DroneEntity.WAIT_FLOOR);
                 break;
             }
             if (index == NEED_ITEMS) {
                 job.setWaitKind(BuildJob.WAIT_ITEMS);
+                drone.setWorkStatus(soloTarget, ItemStack.EMPTY, DroneEntity.WAIT_ITEMS);
                 parkSolo(level, player, job);
                 releaseStalledHome(player, library, job);
                 break;
@@ -1715,6 +1720,11 @@ public final class JobManager {
             }
             Schematic.Entry entry = schematic.entry(index);
             BlockPos pos = job.min().offset(entry.x(), entry.y(), entry.z());
+            ItemStack aiming = BlockFilters.icon(entry.state());
+            if (!aiming.isEmpty()) {
+                soloTarget = aiming;
+            }
+            drone.setWorkStatus(soloTarget, ItemStack.EMPTY, DroneEntity.WAIT_NONE);
             if (drone.distanceToSqr(Vec3.atCenterOf(pos)) > 9.0D) {
                 break;
             }
@@ -1730,6 +1740,7 @@ public final class JobManager {
             PlaceResult placed = actOne(level, player, job, pos, entry, false, null);
             if (placed == PlaceResult.PAUSE) {
                 job.setWaitKind(BuildJob.WAIT_CHUNK);
+                drone.setWorkStatus(soloTarget, ItemStack.EMPTY, DroneEntity.WAIT_CHUNK);
                 if (job.tickMessage()) {
                     noteChunk(player, library, job);
                 }
@@ -1738,6 +1749,7 @@ public final class JobManager {
             }
             if (placed == PlaceResult.WAIT) {
                 job.setWaitKind(BuildJob.WAIT_ITEMS);
+                drone.setWorkStatus(soloTarget, ItemStack.EMPTY, DroneEntity.WAIT_ITEMS);
                 break;
             }
             markSolo(job, index);
@@ -4315,7 +4327,7 @@ public final class JobManager {
             drone.setWorkStatus(ItemStack.EMPTY, ItemStack.EMPTY, reason);
             return;
         }
-        // Hover text does not need per-tick updates; skip the schematic scan most ticks.
+        // Refresh every few ticks so the hanging place/mine block tracks the job without a full scan each tick.
         if (reason == drone.waitReason() && (level.getGameTime() + Math.max(0, hand.lane)) % 5L != 0L) {
             return;
         }

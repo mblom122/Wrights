@@ -217,6 +217,21 @@ public class DroneEntity extends Entity {
         this.entityData.set(CARRIED, stack == null || stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1));
     }
 
+    /**
+     * Block rendered under the wright: the place/mine target while working, or the
+     * harvested drop while flying home.
+     */
+    public ItemStack displayCargo() {
+        if (returning()) {
+            return carried();
+        }
+        ItemStack placing = currentBlock();
+        if (!placing.isEmpty()) {
+            return placing;
+        }
+        return carried();
+    }
+
     /** Block this wright is placing or waiting on right now. */
     public ItemStack currentBlock() {
         return this.entityData.get(CURRENT_BLOCK);

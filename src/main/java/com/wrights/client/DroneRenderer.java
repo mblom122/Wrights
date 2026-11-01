@@ -44,13 +44,14 @@ public class DroneRenderer extends EntityRenderer<DroneEntity> {
         this.model.renderToBuffer(pose, consumer, light, OverlayTexture.NO_OVERLAY, color);
         this.model.renderLens(pose, consumer, light, OverlayTexture.NO_OVERLAY);
         pose.popPose();
-        ItemStack carried = entity.carried();
-        if (!carried.isEmpty()) {
+        // Same hanging cargo as a return trip — place/mine target while working, harvested drop while homebound.
+        ItemStack cargo = entity.displayCargo();
+        if (!cargo.isEmpty()) {
             pose.pushPose();
             pose.translate(0.0D, -0.35D, 0.0D);
             pose.mulPose(Axis.YP.rotationDegrees((entity.tickCount + partialTick) * 3.0F));
             pose.scale(0.55F, 0.55F, 0.55F);
-            this.items.renderStatic(carried, ItemDisplayContext.GROUND, light, OverlayTexture.NO_OVERLAY, pose, buffers, entity.level(), entity.getId());
+            this.items.renderStatic(cargo, ItemDisplayContext.GROUND, light, OverlayTexture.NO_OVERLAY, pose, buffers, entity.level(), entity.getId());
             pose.popPose();
         }
         super.render(entity, yaw, partialTick, pose, buffers, light);
