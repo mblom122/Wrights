@@ -136,6 +136,9 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.IntValue PLACE_BRIDGE_OFFSET = BUILDER
             .comment("Blocks in front of the player for Bridge / Stairs path modes. Max 12.")
             .defineInRange("placeBridgeOffset", 3, 1, 12);
+    public static final ModConfigSpec.IntValue PLACE_BRIDGE_WIDTH = BUILDER
+            .comment("How wide Bridge / Stairs paths are (left–right across facing). Max 12.")
+            .defineInRange("placeBridgeWidth", 1, 1, 12);
     public static final ModConfigSpec.BooleanValue PLACE_STAIRS_UP = BUILDER
             .comment("Stairs path: true builds a step up ahead, false builds a step down.")
             .define("placeStairsUp", true);
@@ -698,6 +701,15 @@ public final class WrightsClientConfig {
 
     public static void setPlaceBridgeOffset(int offset) {
         PLACE_BRIDGE_OFFSET.set(clamp(offset, 1, 12));
+        save();
+    }
+
+    public static int placeBridgeWidth() {
+        return PLACE_BRIDGE_WIDTH.get();
+    }
+
+    public static void setPlaceBridgeWidth(int width) {
+        PLACE_BRIDGE_WIDTH.set(clamp(width, 1, 12));
         save();
     }
 

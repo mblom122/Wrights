@@ -2082,17 +2082,21 @@ public final class WrightsClientState {
      */
     public static java.util.List<BlockPos> placePathCells(Player player) {
         Direction forward = player.getDirection();
+        Direction side = forward.getClockWise();
         int offset = Math.max(1, WrightsClientConfig.placeBridgeOffset());
+        int width = Math.max(1, WrightsClientConfig.placeBridgeWidth());
+        int sideStart = -(width - 1) / 2;
         BlockPos feet = player.blockPosition();
         boolean stairs = WrightsClientConfig.placeStyle() == 3;
         boolean up = WrightsClientConfig.placeStairsUp();
-        java.util.ArrayList<BlockPos> cells = new java.util.ArrayList<>(offset);
+        java.util.ArrayList<BlockPos> cells = new java.util.ArrayList<>(offset * width);
         for (int d = 1; d <= offset; d++) {
             BlockPos ahead = feet.relative(forward, d);
-            if (stairs) {
-                cells.add(up ? ahead.above(d - 1) : ahead.below(d + 1));
-            } else {
-                cells.add(ahead.below());
+            BlockPos center = stairs
+                    ? (up ? ahead.above(d - 1) : ahead.below(d + 1))
+                    : ahead.below();
+            for (int s = 0; s < width; s++) {
+                cells.add(center.relative(side, sideStart + s));
             }
         }
         return cells;

@@ -626,12 +626,14 @@ public final class WrightsHud {
         Component aim = Component.translatable(placeAimKey());
         int style = WrightsClientConfig.placeStyle();
         int offset = WrightsClientConfig.placeBridgeOffset();
+        int width = WrightsClientConfig.placeBridgeWidth();
         if (style == 2) {
             return Component.translatable(
                     "hud.wrights.tool_place_bridge_status",
                     name,
                     pathStateLabel(true, WrightsClientState.bridgeActive),
-                    offset);
+                    offset,
+                    width);
         }
         if (style == 3) {
             Component dir = Component.translatable(
@@ -643,7 +645,8 @@ public final class WrightsHud {
                     name,
                     dir,
                     pathStateLabel(false, WrightsClientState.bridgeActive),
-                    offset);
+                    offset,
+                    width);
         }
         return Component.translatable("hud.wrights.tool_place_detail", name, exchangeDimText(form), aim);
     }
