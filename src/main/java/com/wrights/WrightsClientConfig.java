@@ -1205,7 +1205,8 @@ public final class WrightsClientConfig {
                 setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
                 setShapeSize(1);
                 setShapeThickness(1);
-                if (SHAPE_HEIGHT.get() < 3) {
+                // Default post height is 5 (plates use Size 3).
+                if (SHAPE_HEIGHT.get() < 5) {
                     setShapeHeight(5);
                 }
             }
@@ -1213,7 +1214,11 @@ public final class WrightsClientConfig {
                 // Horizontal 1-thick line across the player's look (perpendicular to facing).
                 setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
                 setShapeHeight(1);
-                int length = Math.max(3, Math.max(SHAPE_SIZE.get(), SHAPE_THICKNESS.get()));
+                // Default run length is 5 when coming from a smaller plate Size.
+                int length = Math.max(SHAPE_SIZE.get(), SHAPE_THICKNESS.get());
+                if (length < 5) {
+                    length = 5;
+                }
                 if (facing.getAxis() == net.minecraft.core.Direction.Axis.X) {
                     setShapeSize(1);
                     setShapeThickness(length);
