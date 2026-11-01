@@ -19,7 +19,10 @@ public class ImportExportScreen extends Screen {
     private final UUID selectedId;
     private final boolean selectedFolder;
     private BlueprintPayloads.ClipboardStatus status = BlueprintPayloads.ClipboardStatus.EMPTY;
-    private boolean asked;
+    private String copiedName = "";
+    /** True only after the player asks to paste from the clipboard. */
+    private boolean reviewing;
+    private boolean waitingPreview;
     private int panelX;
     private int panelY;
     private int panelW;
@@ -44,9 +47,20 @@ public class ImportExportScreen extends Screen {
         this.selectedFolder = selectedFolder;
     }
 
+    /** Server finished a copy-to-clipboard. Do not treat that as an import preview. */
+    public void copied(BlueprintPayloads.ClipboardStatus status) {
+        this.status = status == null ? BlueprintPayloads.ClipboardStatus.EMPTY : status;
+        this.copiedName = this.status.present() ? this.status.name() : "";
+        reviewing = false;
+        waitingPreview = false;
+        showActions();
+    }
+
+    /** Server answered a paste-from-clipboard preview. */
     public void apply(BlueprintPayloads.ClipboardStatus status) {
         this.status = status == null ? BlueprintPayloads.ClipboardStatus.EMPTY : status;
-        asked = true;
+        reviewing = true;
+        waitingPreview = false;
         showActions();
     }
 
@@ -62,17 +76,17 @@ public class ImportExportScreen extends Screen {
         bodyY = panelY + 58;
         int buttonY = panelY + panelH - 78;
         copyButton = addRenderableWidget(new WrightsButton(leftX, buttonY, columnW, 18, Component.translatable("screen.wrights.transfer_copy"), button -> copy()));
-        pasteButton = addRenderableWidget(new WrightsButton(leftX, buttonY + 22, columnW, 18, Component.translatable("screen.wrights.transfer_paste"), button -> paste(BlueprintSlips.LOAD)));
+        pasteButton = addRenderableWidget(new WrightsButton(leftX, buttonY + 22, columnW, 18, Component.translatable("screen.wrights.transfer_paste"), button -> pasteClicked()));
         int half = Math.max(36, (columnW - 4) / 2);
-        replaceButton = addRenderableWidget(new WrightsButton(leftX, buttonY, half, 18, Component.translatable("screen.wrights.slip_replace"), button -> paste(BlueprintSlips.REPLACE), true));
-        anotherButton = addRenderableWidget(new WrightsButton(leftX + half + 4, buttonY, columnW - half - 4, 18, Component.translatable("screen.wrights.folder_another"), button -> paste(BlueprintSlips.LOAD)));
-        nextButton = addRenderableWidget(new WrightsButton(leftX, buttonY + 22, columnW, 18, Component.translatable("screen.wrights.slip_as", ""), button -> paste(BlueprintSlips.NEXT_NUMBER)));
+        replaceButton = addRenderableWidget(new WrightsButton(leftX, buttonY, half, 18, Component.translatable("screen.wrights.slip_replace"), button -> importClip(BlueprintSlips.REPLACE), true));
+        anotherButton = addRenderableWidget(new WrightsButton(leftX + half + 4, buttonY, columnW - half - 4, 18, Component.translatable("screen.wrights.folder_another"), button -> importClip(BlueprintSlips.LOAD)));
+        nextButton = addRenderableWidget(new WrightsButton(leftX, buttonY + 22, columnW, 18, Component.translatable("screen.wrights.slip_as", ""), button -> importClip(BlueprintSlips.NEXT_NUMBER)));
         nameBox = new EditBox(this.font, leftX, buttonY + 44, Math.max(40, columnW - 78), 18, Component.translatable("screen.wrights.slip_name_hint"));
         nameBox.setMaxLength(48);
         nameBox.setHint(Component.translatable("screen.wrights.slip_name_hint"));
         nameBox.setResponder(value -> refreshName());
         addRenderableWidget(nameBox);
-        useNameButton = addRenderableWidget(new WrightsButton(leftX + columnW - 74, buttonY + 44, 74, 18, Component.translatable("screen.wrights.slip_use_name"), button -> paste(BlueprintSlips.NAMED)));
+        useNameButton = addRenderableWidget(new WrightsButton(leftX + columnW - 74, buttonY + 44, 74, 18, Component.translatable("screen.wrights.slip_use_name"), button -> importClip(BlueprintSlips.NAMED)));
         saveButton = addRenderableWidget(new WrightsButton(rightX, bodyY + 28, columnW, 18, Component.translatable("screen.wrights.transfer_save_blueprint"), button -> saveItem()));
         addRenderableWidget(new WrightsButton(rightX, bodyY + 52, columnW, 18, Component.translatable("screen.wrights.transfer_load_blueprints"), button -> {
             this.minecraft.setScreen(new BlueprintLoadScreen(this));
@@ -86,12 +100,9 @@ public class ImportExportScreen extends Screen {
         copyButton.active = selectedId != null;
         saveButton.active = selectedId != null;
         saveButton.setMessage(Component.translatable(selectedFolder ? "screen.wrights.transfer_save_folder" : "screen.wrights.transfer_save_blueprint"));
-        BlueprintClipboard.load();
-        if (BlueprintClipboard.has()) {
-            PacketDistributor.sendToServer(new BlueprintPayloads.ClipboardPreview(BlueprintClipboard.data()));
-        } else {
-            asked = true;
-        }
+        reviewing = false;
+        waitingPreview = false;
+        status = BlueprintPayloads.ClipboardStatus.EMPTY;
         showActions();
     }
 
@@ -99,11 +110,14 @@ public class ImportExportScreen extends Screen {
         if (pasteButton == null) {
             return;
         }
-        boolean ready = asked && status.present() && BlueprintClipboard.has();
+        boolean ready = reviewing && !waitingPreview && status.present() && BlueprintClipboard.has();
         boolean conflict = ready && status.kind() != BlueprintSlips.NEW;
         boolean different = ready && status.kind() == BlueprintSlips.DIFFERENT;
+        boolean canImport = ready && status.kind() == BlueprintSlips.NEW;
+        copyButton.visible = !conflict;
         pasteButton.visible = !conflict;
-        pasteButton.active = ready && status.kind() == BlueprintSlips.NEW;
+        pasteButton.active = !waitingPreview && (!reviewing || canImport);
+        pasteButton.setMessage(Component.translatable(canImport ? "screen.wrights.transfer_paste_confirm" : "screen.wrights.transfer_paste"));
         replaceButton.visible = different;
         anotherButton.visible = different && status.folder();
         if (different && !status.folder()) {
@@ -151,7 +165,31 @@ public class ImportExportScreen extends Screen {
         PacketDistributor.sendToServer(new BlueprintPayloads.CopyClipboard(selectedId, selectedFolder));
     }
 
-    private void paste(int mode) {
+    private void pasteClicked() {
+        if (reviewing && status.present() && status.kind() == BlueprintSlips.NEW && BlueprintClipboard.has()) {
+            importClip(BlueprintSlips.LOAD);
+            return;
+        }
+        readClipboard();
+    }
+
+    private void readClipboard() {
+        BlueprintClipboard.load();
+        copiedName = "";
+        if (!BlueprintClipboard.has()) {
+            status = BlueprintPayloads.ClipboardStatus.EMPTY;
+            reviewing = true;
+            waitingPreview = false;
+            showActions();
+            return;
+        }
+        reviewing = true;
+        waitingPreview = true;
+        showActions();
+        PacketDistributor.sendToServer(new BlueprintPayloads.ClipboardPreview(BlueprintClipboard.data()));
+    }
+
+    private void importClip(int mode) {
         if (!BlueprintClipboard.has()) {
             return;
         }
@@ -191,7 +229,7 @@ public class ImportExportScreen extends Screen {
         graphics.drawString(this.font, Component.translatable("screen.wrights.transfer_clip"), leftX, bodyY - 12, WrightsUi.COPPER, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.transfer_items"), rightX, bodyY - 12, WrightsUi.COPPER, false);
         int y = bodyY + 4;
-        if (asked && status.present() && !status.folder() && BlueprintClipboard.has()) {
+        if (reviewing && status.present() && !status.folder() && BlueprintClipboard.has()) {
             SchematicViews.Shot shot = SchematicViews.fromClipboard();
             int buttonTop = panelY + panelH - 82;
             int modelH = Math.min(96, buttonTop - y - 28);
@@ -200,13 +238,21 @@ public class ImportExportScreen extends Screen {
                 y += modelH + 6;
             }
         }
-        if (!BlueprintClipboard.has()) {
-            for (var line : this.font.split(Component.translatable("screen.wrights.transfer_empty"), columnW - 8)) {
+        if (!reviewing) {
+            Component tip = copiedName.isEmpty()
+                    ? Component.translatable("screen.wrights.transfer_idle")
+                    : Component.translatable("screen.wrights.transfer_copied", copiedName);
+            for (var line : this.font.split(tip, columnW - 8)) {
                 graphics.drawString(this.font, line, leftX, y, WrightsUi.MUTED, false);
                 y += 10;
             }
-        } else if (!asked || !status.present()) {
-            graphics.drawString(this.font, Component.translatable(asked ? "screen.wrights.transfer_bad" : "screen.wrights.slip_loading"), leftX, y, WrightsUi.MUTED, false);
+        } else if (waitingPreview) {
+            graphics.drawString(this.font, Component.translatable("screen.wrights.slip_loading"), leftX, y, WrightsUi.MUTED, false);
+        } else if (!BlueprintClipboard.has() || !status.present()) {
+            for (var line : this.font.split(Component.translatable(BlueprintClipboard.has() ? "screen.wrights.transfer_bad" : "screen.wrights.transfer_empty"), columnW - 8)) {
+                graphics.drawString(this.font, line, leftX, y, WrightsUi.MUTED, false);
+                y += 10;
+            }
         } else {
             graphics.drawString(this.font, this.font.plainSubstrByWidth(status.name(), columnW - 8), leftX, y, WrightsUi.TEXT, false);
             y += 12;

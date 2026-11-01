@@ -710,7 +710,8 @@ public final class BlueprintNetwork {
         context.enqueueWork(() -> {
             com.wrights.client.BlueprintClipboard.store(payload.data());
             if (net.minecraft.client.Minecraft.getInstance().screen instanceof com.wrights.client.ImportExportScreen screen) {
-                screen.apply(payload.status());
+                // Copy only writes the clipboard — import preview waits for Paste from clipboard.
+                screen.copied(payload.status());
             }
         });
     }
