@@ -147,9 +147,10 @@ public final class BlueprintModelView {
             float mx = px + 0.5F;
             float my = py + 0.5F;
             float mz = pz + 0.5F;
-            float arm = Math.max(0.35F, Math.min(2.0F, span * 0.06F));
-            float pin = Math.max(0.12F, Math.min(0.7F, span * 0.025F));
-            float pinThick = Math.max(frameThick, span * 0.006F);
+            float arm = Math.max(0.55F, Math.min(1.6F, span * 0.05F));
+            // Same as the world anchor: one cell, slightly outside the faces.
+            float pin = 0.55F;
+            float pinThick = Math.max(frameThick, 0.02F);
             float ar = WrightsUi.anchorR();
             float ag = WrightsUi.anchorG();
             float ab = WrightsUi.anchorB();
