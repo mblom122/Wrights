@@ -136,12 +136,10 @@ public final class SelectionRenderer {
             }
             center = WrightsClientConfig.shapeAnchor();
         } else {
-            // Same long-range aim as build holograms (not vanilla ~4.5 block reach).
-            BlockHitResult hit = WrightsClientState.shapeLookHit();
-            if (hit == null) {
+            center = WrightsClientState.shapeLookTarget();
+            if (center == null) {
                 return;
             }
-            center = com.wrights.blueprint.Shapes.lookCorner(hit.getBlockPos(), hit.getDirection());
         }
         List<com.wrights.blueprint.ShapeMaterials.Entry> materials = WrightsClientConfig.shapeMaterials();
         if (com.wrights.blueprint.ShapeMaterials.states(materials).isEmpty()) {
@@ -157,6 +155,9 @@ public final class SelectionRenderer {
         int pivot = WrightsClientConfig.SHAPE_PIVOT.get();
         List<BlockPos> worlds = com.wrights.blueprint.Shapes.blocksPinned(
                 kind, center, size, height, thickness, hollow, plane, yaw, pivot);
+        if (worlds.isEmpty()) {
+            return;
+        }
         boolean voidBlocks = WrightsClientConfig.SHAPE_VOID.get() && WrightsConfig.allowShapeVoid();
         List<BlockPos> ready = new java.util.ArrayList<>();
         for (BlockPos world : worlds) {
@@ -165,38 +166,73 @@ public final class SelectionRenderer {
             }
             ready.add(world);
         }
-        if (ready.isEmpty()) {
+        if (!ready.isEmpty()) {
+            java.util.Random previewRandom = new java.util.Random(center.asLong() ^ materials.hashCode());
+            List<BlockState> planned = com.wrights.blueprint.ShapeMaterials.assign(
+                    materials,
+                    ready.size(),
+                    WrightsClientConfig.shapeFillMode(),
+                    WrightsClientConfig.SHAPE_ORDER_BATCH.get(),
+                    previewRandom,
+                    true,
+                    item -> Long.MAX_VALUE / 4L,
+                    true);
+            BlockRenderDispatcher renderer = minecraft.getBlockRenderer();
+            int budget = previewBudget();
+            int drawn = 0;
+            for (int i = 0; i < ready.size() && drawn < budget; i++) {
+                BlockPos world = ready.get(i);
+                double dx = world.getX() + 0.5D - camera.x;
+                double dy = world.getY() + 0.5D - camera.y;
+                double dz = world.getZ() + 0.5D - camera.z;
+                if (dx * dx + dy * dy + dz * dz > rangeSqr()) {
+                    continue;
+                }
+                BlockState state = i < planned.size() ? planned.get(i) : null;
+                if (state == null || !ghostVisible(state)) {
+                    continue;
+                }
+                drawGhost(pose, buffers, renderer, camera, world.getX(), world.getY(), world.getZ(), state);
+                drawn++;
+            }
+            buffers.endBatch();
+        }
+        drawShapeBounds(pose, buffers, camera, worlds, center);
+    }
+
+    /** Wire AABB around the full shape plus a see-through pivot marker at the pin cell. */
+    private static void drawShapeBounds(
+            PoseStack pose,
+            MultiBufferSource.BufferSource buffers,
+            Vec3 camera,
+            List<BlockPos> worlds,
+            BlockPos pin) {
+        BlockPos min = com.wrights.blueprint.Shapes.origin(worlds);
+        BlockPos max = com.wrights.blueprint.Shapes.extent(worlds);
+        AABB box = new AABB(min.getX(), min.getY(), min.getZ(), max.getX() + 1.0D, max.getY() + 1.0D, max.getZ() + 1.0D)
+                .inflate(0.015D);
+        float pulse = 0.55F + 0.35F * (float) Math.sin(System.currentTimeMillis() / 280.0D);
+        VertexConsumer lines = buffers.getBuffer(RenderType.lines());
+        drawBox(pose, lines, box, camera, 0.55F, 0.72F, 0.86F, 0.45F * pulse);
+        buffers.endBatch(RenderType.lines());
+
+        if (pin == null) {
             return;
         }
-        java.util.Random previewRandom = new java.util.Random(center.asLong() ^ materials.hashCode());
-        List<BlockState> planned = com.wrights.blueprint.ShapeMaterials.assign(
-                materials,
-                ready.size(),
-                WrightsClientConfig.shapeFillMode(),
-                WrightsClientConfig.SHAPE_ORDER_BATCH.get(),
-                previewRandom,
-                true,
-                item -> Long.MAX_VALUE / 4L,
-                true);
-        BlockRenderDispatcher renderer = minecraft.getBlockRenderer();
-        int budget = previewBudget();
-        int drawn = 0;
-        for (int i = 0; i < ready.size() && drawn < budget; i++) {
-            BlockPos world = ready.get(i);
-            double dx = world.getX() + 0.5D - camera.x;
-            double dy = world.getY() + 0.5D - camera.y;
-            double dz = world.getZ() + 0.5D - camera.z;
-            if (dx * dx + dy * dy + dz * dz > rangeSqr()) {
-                continue;
-            }
-            BlockState state = i < planned.size() ? planned.get(i) : null;
-            if (state == null || !ghostVisible(state)) {
-                continue;
-            }
-            drawGhost(pose, buffers, renderer, camera, world.getX(), world.getY(), world.getZ(), state);
-            drawn++;
-        }
-        buffers.endBatch();
+        double cx = pin.getX() + 0.5D;
+        double cy = pin.getY() + 0.5D;
+        double cz = pin.getZ() + 0.5D;
+        int span = Math.max(1, Math.max(max.getX() - min.getX(), Math.max(max.getY() - min.getY(), max.getZ() - min.getZ())) + 1);
+        double arm = Math.max(0.45D, Math.min(2.8D, span * 0.08D));
+        double marker = Math.max(0.2D, Math.min(1.1D, span * 0.035D));
+        com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
+        VertexConsumer pivot = buffers.getBuffer(RenderType.lines());
+        drawLine(pose, pivot, camera, new Vec3(cx - arm, cy, cz), new Vec3(cx + arm, cy, cz), 0.91F, 0.55F, 0.23F, 1.0F);
+        drawLine(pose, pivot, camera, new Vec3(cx, cy - arm, cz), new Vec3(cx, cy + arm, cz), 0.91F, 0.55F, 0.23F, 1.0F);
+        drawLine(pose, pivot, camera, new Vec3(cx, cy, cz - arm), new Vec3(cx, cy, cz + arm), 0.91F, 0.55F, 0.23F, 1.0F);
+        drawBox(pose, pivot, new AABB(cx - marker, cy - marker, cz - marker, cx + marker, cy + marker, cz + marker), camera, 0.98F, 0.78F, 0.35F, 1.0F);
+        buffers.endBatch(RenderType.lines());
+        com.mojang.blaze3d.systems.RenderSystem.enableDepthTest();
     }
 
     private static void drawMirrorBlockGhosts(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {

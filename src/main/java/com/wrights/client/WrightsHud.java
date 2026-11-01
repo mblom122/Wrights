@@ -501,7 +501,9 @@ public final class WrightsHud {
             boolean placed = minecraft.level != null && WrightsClientConfig.shapePlaced(minecraft.level.dimension().location().toString());
             return placed ? "hud.wrights.shape_anchor_ready" : "hud.wrights.shape_anchor_explain";
         }
-        return "hud.wrights.shape_look_explain";
+        return WrightsClientState.shapeLookSnapActive()
+                ? "hud.wrights.shape_look_locked"
+                : "hud.wrights.shape_look_explain";
     }
 
     private static void drawToolRow(GuiGraphics graphics, Minecraft minecraft, int x, int y, int width, boolean on, Component label, Component selected) {

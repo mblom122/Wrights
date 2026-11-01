@@ -65,7 +65,6 @@ public final class ShapeLaunch {
                 return;
             }
         } else {
-            Direction face = Direction.from3DDataValue(Mth.clamp(payload.face(), 0, 5));
             BlockPos clicked = payload.pos();
             if (clicked == null) {
                 Messages.actionBar(player, "message.wrights.shape_look");
@@ -75,7 +74,10 @@ public final class ShapeLaunch {
                 Messages.actionBar(player, "message.wrights.place_out_of_range");
                 return;
             }
-            target = Shapes.lookCorner(clicked, face);
+            // lookPinned: client already resolved the pin cell (locked look snap).
+            target = payload.lookPinned()
+                    ? clicked.immutable()
+                    : Shapes.lookCorner(clicked, Direction.from3DDataValue(Mth.clamp(payload.face(), 0, 5)));
         }
         // Both modes pin the chosen shape AABB pivot to the world target.
         List<BlockPos> worlds = Shapes.blocksPinned(kind, target, size, height, thickness, hollow, plane, yaw, pivot);

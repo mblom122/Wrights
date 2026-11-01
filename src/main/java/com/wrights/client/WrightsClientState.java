@@ -100,6 +100,14 @@ public final class WrightsClientState {
     public static boolean shapeToolActive() {
         return mode == Mode.BUILD && shapeAim;
     }
+
+    /**
+     * Look-mode snap lock: when set, the shape preview pins here instead of following the crosshair.
+     * Right-click locks; right-click again builds; clear unlocks.
+     */
+    public static boolean shapeLookSnapLocked;
+    public static BlockPos shapeLookSnapPos;
+    public static Direction shapeLookSnapFace = Direction.UP;
     /** Placed wrightport waiting for a chest click. Null when not binding. */
     public static BlockPos bindPort;
     public static boolean supplyBound;
@@ -1484,6 +1492,47 @@ public final class WrightsClientState {
         glowShapeAnchor(dimension, pos);
     }
 
+    public static boolean shapeLookSnapActive() {
+        return shapeLookSnapLocked && shapeLookSnapPos != null;
+    }
+
+    /** Pin look-mode preview to the look-corner of this clicked block/face. */
+    public static void lockShapeLookSnap(BlockPos clicked, Direction face) {
+        if (clicked == null) {
+            return;
+        }
+        Direction side = face == null ? Direction.UP : face;
+        setShapeLookSnapTarget(com.wrights.blueprint.Shapes.lookCorner(clicked, side));
+        shapeLookSnapFace = side;
+    }
+
+    /** Pin look-mode preview to an absolute world cell (the shape pivot lands here). */
+    public static void setShapeLookSnapTarget(BlockPos target) {
+        if (target == null) {
+            return;
+        }
+        shapeLookSnapPos = target.immutable();
+        shapeLookSnapLocked = true;
+    }
+
+    public static void clearShapeLookSnap() {
+        shapeLookSnapLocked = false;
+        shapeLookSnapPos = null;
+        shapeLookSnapFace = Direction.UP;
+    }
+
+    /** World cell the look-mode shape pivot pins to (locked snap or current aim). */
+    public static BlockPos shapeLookTarget() {
+        if (shapeLookSnapActive()) {
+            return shapeLookSnapPos;
+        }
+        BlockHitResult hit = shapeLookHit();
+        if (hit == null) {
+            return null;
+        }
+        return com.wrights.blueprint.Shapes.lookCorner(hit.getBlockPos(), hit.getDirection());
+    }
+
     private static BlueprintPayloads.ShapePlace pendingShape;
 
     public static boolean tryShape(boolean force) {
@@ -1509,14 +1558,22 @@ public final class WrightsClientState {
             minecraft.player.displayClientMessage(Component.translatable("message.wrights.shape_need_anchor"), true);
             return false;
         }
-        if (!useAnchor && (pos == null || face == null)) {
-            BlockHitResult aim = shapeLookHit();
-            if (aim == null) {
-                minecraft.player.displayClientMessage(Component.translatable("message.wrights.shape_look"), true);
-                return false;
+        boolean lookPinned = false;
+        if (!useAnchor) {
+            if (shapeLookSnapActive()) {
+                // Snap already stores the pin cell — server must not lookCorner again.
+                pos = shapeLookSnapPos;
+                face = Direction.UP;
+                lookPinned = true;
+            } else if (pos == null || face == null) {
+                BlockHitResult aim = shapeLookHit();
+                if (aim == null) {
+                    minecraft.player.displayClientMessage(Component.translatable("message.wrights.shape_look"), true);
+                    return false;
+                }
+                pos = aim.getBlockPos();
+                face = aim.getDirection();
             }
-            pos = aim.getBlockPos();
-            face = aim.getDirection();
         }
         pendingShape = new BlueprintPayloads.ShapePlace(
                 pos == null ? BlockPos.ZERO : pos,
@@ -1534,11 +1591,15 @@ public final class WrightsClientState {
                 WrightsClientConfig.SHAPE_HOLLOW.get(),
                 WrightsClientConfig.SHAPE_VOID.get(),
                 force,
+                lookPinned,
                 WrightsClientConfig.SHAPE_FILL_MODE.get(),
                 WrightsClientConfig.SHAPE_ORDER_BATCH.get(),
                 WrightsClientConfig.SHAPE_MATERIALS.get(),
                 WrightsClientConfig.SHAPE_SUPPLY.get());
         PacketDistributor.sendToServer(pendingShape);
+        if (lookPinned) {
+            clearShapeLookSnap();
+        }
         return true;
     }
 

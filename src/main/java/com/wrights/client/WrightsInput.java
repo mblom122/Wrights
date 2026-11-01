@@ -563,8 +563,41 @@ public final class WrightsInput {
             player.displayClientMessage(Component.translatable("message.wrights.feature_off"), true);
             return;
         }
+        boolean lookMode = !com.wrights.WrightsClientConfig.SHAPE_USE_ANCHOR.get()
+                || !com.wrights.WrightsConfig.allowShapeAnchor();
+        if (lookMode) {
+            if (player.isShiftKeyDown()) {
+                // Shift opens the look-snap editor (locks at current aim first if needed).
+                if (!WrightsClientState.shapeLookSnapActive()) {
+                    BlockHitResult aim = WrightsClientState.shapeLookHit();
+                    if (aim == null) {
+                        player.displayClientMessage(Component.translatable("message.wrights.shape_look"), true);
+                        return;
+                    }
+                    WrightsClientState.lockShapeLookSnap(aim.getBlockPos(), aim.getDirection());
+                }
+                Minecraft.getInstance().setScreen(new ShapeLookSnapScreen());
+                return;
+            }
+            if (!WrightsClientState.shapeLookSnapActive()) {
+                BlockHitResult aim = WrightsClientState.shapeLookHit();
+                if (aim == null) {
+                    player.displayClientMessage(Component.translatable("message.wrights.shape_look"), true);
+                    return;
+                }
+                WrightsClientState.lockShapeLookSnap(aim.getBlockPos(), aim.getDirection());
+                BlockPos pin = WrightsClientState.shapeLookSnapPos;
+                player.displayClientMessage(
+                        Component.translatable("message.wrights.shape_look_locked", pin.getX(), pin.getY(), pin.getZ()),
+                        true);
+                return;
+            }
+            // Second right-click with a locked snap builds.
+            WrightsClientState.tryShape(false, WrightsClientState.shapeLookSnapPos, Direction.UP);
+            return;
+        }
         if (player.isShiftKeyDown()) {
-            // Prefer long-range look so the anchor can be set as far as holograms aim.
+            // On-anchor mode: shift sets or clears the world shape anchor.
             BlockHitResult aim = WrightsClientState.lookHit();
             BlockPos at = aim != null ? aim.getBlockPos() : pos;
             if (at != null) {
@@ -575,13 +608,6 @@ public final class WrightsInput {
                 player.displayClientMessage(Component.translatable("message.wrights.shape_cleared"), true);
             }
             return;
-        }
-        if (!com.wrights.WrightsClientConfig.SHAPE_USE_ANCHOR.get()) {
-            BlockHitResult aim = WrightsClientState.shapeLookHit();
-            if (aim != null) {
-                pos = aim.getBlockPos();
-                face = aim.getDirection();
-            }
         }
         WrightsClientState.tryShape(false, pos, face);
     }
