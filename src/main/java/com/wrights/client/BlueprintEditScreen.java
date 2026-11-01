@@ -4,8 +4,10 @@ import java.util.List;
 import java.util.UUID;
 
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.network.PacketDistributor;
 
@@ -27,6 +29,12 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
     private int flipY;
     private int pasteY;
     private int footY;
+    private int bodyScroll;
+    private int bodyTop;
+    private int bodyViewH;
+    private int contentH;
+    private int rowH;
+    private int btnH;
     private WrightsButton placeFluidsButton;
     private WrightsButton placeNbtButton;
     private WrightsButton placeSettingsButton;
@@ -45,65 +53,74 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
         boolean map = !WrightsClientState.previewConcealed && (StructureGrid.oversized(WrightsClientState.editX, WrightsClientState.editZ)
                 || StructureGrid.oversized(WrightsClientState.editX, WrightsClientState.editY)
                 || StructureGrid.oversized(WrightsClientState.editZ, WrightsClientState.editY));
-        controlsW = 240;
-        int gap = 14;
+        float density = Mth.clamp(this.height / 380.0F, 0.62F, 1.0F);
+        rowH = density < 0.85F ? 14 : 16;
+        btnH = density < 0.85F ? 14 : 16;
+        int section = density < 0.85F ? 10 : 12;
+        controlsW = density < 0.85F ? 210 : 240;
+        int gap = density < 0.85F ? 10 : 14;
         int pad = 12;
         int side = 12;
         int openW = this.font.width(Component.translatable("screen.wrights.open_map")) + 12;
-        int leftChrome = 148 + (map ? 18 : 0);
-        int modelSize = Math.min(140, Math.max(map ? openW : 88, this.height - leftChrome - 36));
+        int modelCap = Math.max(72, Math.round(140 * density));
+        int modelSize = Math.min(modelCap, Math.max(map ? openW : 72, Math.round(88 * density)));
         int leftW = modelSize;
         if (pad + leftW + gap + controlsW + pad > this.width - 8) {
-            modelSize = Math.max(map ? openW : 88, this.width - 8 - pad * 2 - gap - controlsW);
+            modelSize = Math.max(map ? openW : 72, this.width - 8 - pad * 2 - gap - controlsW);
             leftW = modelSize;
         }
         panelW = pad + leftW + gap + controlsW + pad;
         int extraRows = (WrightsClientState.showStoredSettings() ? 1 : 0) + (WrightsClientState.showStoredAll() ? 1 : 0);
         int pasteRows = 2 + extraRows;
         int leftNeed = 28 + modelSize + 16 + 18 + 32 + (map ? 18 : 0) + 52 + 40 + 8;
-        // Size/anchor row, then rotate, flip, paste, materials, save.
-        int rightNeed = 28 + 32 + 36 + 48 + 12 + pasteRows * 18 + 14 + 16 + 18 + 12;
-        panelH = Math.min(this.height - 8, Math.max(leftNeed, rightNeed));
+        int rightNeed = 28 + 32 + 36 + 48 + 12 + pasteRows * rowH + 14 + 16 + 18 + 12;
+        panelH = WrightsUi.fitH(Math.max(leftNeed, rightNeed), this.height);
         panelX = JeiPreview.left(this.width, panelW);
-        panelY = Math.max(4, (this.height - panelH) / 2);
+        panelY = WrightsUi.centerY(panelH, this.height);
+        bodyTop = panelY + 22;
+        bodyViewH = Math.max(40, panelH - 28);
+        bodyScroll = Mth.clamp(bodyScroll, 0, Math.max(0, contentH - bodyViewH));
+        int origin = bodyTop - bodyScroll;
         int modelX = panelX + pad;
-        int modelY = panelY + 28;
+        int modelY = origin;
         controlsX = modelX + leftW + gap;
         column.place(this, this.font, modelX, modelY, modelSize, widget -> addRenderableWidget(widget), this::setFocused);
 
-        detailY = panelY + 28;
-        rotateY = detailY + 32;
-        flipY = rotateY + 36;
-        pasteY = flipY + 48;
+        detailY = origin;
+        rotateY = detailY + 28 + section;
+        flipY = rotateY + rowH + section + 8;
+        pasteY = flipY + rowH * 2 + section + 8;
         int inner = controlsW - side;
         int row = (inner - 4) / 2;
-        addRenderableWidget(new WrightsButton(controlsX + side, rotateY, row, 16, Component.translatable("screen.wrights.rotate_left"), button -> transform(BlueprintTransforms.Op.ROTATE_CCW)));
-        addRenderableWidget(new WrightsButton(controlsX + side + row + 4, rotateY, row, 16, Component.translatable("screen.wrights.rotate_right"), button -> transform(BlueprintTransforms.Op.ROTATE)));
-        addRenderableWidget(new WrightsButton(controlsX + side, flipY, row, 16, Component.translatable("screen.wrights.flip_horizontal"), button -> transform(BlueprintTransforms.Op.FLIP_X)));
-        addRenderableWidget(new WrightsButton(controlsX + side + row + 4, flipY, row, 16, Component.translatable("screen.wrights.flip_vertical"), button -> transform(BlueprintTransforms.Op.FLIP_Y)));
-        addRenderableWidget(new WrightsButton(controlsX + side, flipY + 18, row, 16, Component.translatable("screen.wrights.center_short"), button -> transform(BlueprintTransforms.Op.CENTER)));
-        addRenderableWidget(new WrightsButton(controlsX + side + row + 4, flipY + 18, row, 16, Component.translatable("screen.wrights.ground"), button -> transform(BlueprintTransforms.Op.GROUND)));
-        placeFluidsButton = new WrightsButton(controlsX + side, pasteY, inner, 16, Component.translatable("screen.wrights.place_fluids"), button -> togglePlaceFluids());
-        placeNbtButton = new WrightsButton(controlsX + side, pasteY + 18, inner, 16, Component.translatable("screen.wrights.place_nbt_blocks"), button -> togglePlaceNbt());
-        placeSettingsButton = new WrightsButton(controlsX + side, pasteY + 36, inner, 16, Component.translatable("screen.wrights.place_nbt_settings"), button -> togglePlaceSettings());
-        placeAllButton = new WrightsButton(controlsX + side, pasteY + 54, inner, 16, Component.translatable("screen.wrights.place_nbt_all"), button -> togglePlaceAll());
+        addRenderableWidget(new WrightsButton(controlsX + side, rotateY, row, btnH, Component.translatable("screen.wrights.rotate_left"), button -> transform(BlueprintTransforms.Op.ROTATE_CCW)));
+        addRenderableWidget(new WrightsButton(controlsX + side + row + 4, rotateY, row, btnH, Component.translatable("screen.wrights.rotate_right"), button -> transform(BlueprintTransforms.Op.ROTATE)));
+        addRenderableWidget(new WrightsButton(controlsX + side, flipY, row, btnH, Component.translatable("screen.wrights.flip_horizontal"), button -> transform(BlueprintTransforms.Op.FLIP_X)));
+        addRenderableWidget(new WrightsButton(controlsX + side + row + 4, flipY, row, btnH, Component.translatable("screen.wrights.flip_vertical"), button -> transform(BlueprintTransforms.Op.FLIP_Y)));
+        addRenderableWidget(new WrightsButton(controlsX + side, flipY + rowH, row, btnH, Component.translatable("screen.wrights.center_short"), button -> transform(BlueprintTransforms.Op.CENTER)));
+        addRenderableWidget(new WrightsButton(controlsX + side + row + 4, flipY + rowH, row, btnH, Component.translatable("screen.wrights.ground"), button -> transform(BlueprintTransforms.Op.GROUND)));
+        placeFluidsButton = new WrightsButton(controlsX + side, pasteY, inner, btnH, Component.translatable("screen.wrights.place_fluids"), button -> togglePlaceFluids());
+        placeNbtButton = new WrightsButton(controlsX + side, pasteY + rowH, inner, btnH, Component.translatable("screen.wrights.place_nbt_blocks"), button -> togglePlaceNbt());
+        placeSettingsButton = new WrightsButton(controlsX + side, pasteY + rowH * 2, inner, btnH, Component.translatable("screen.wrights.place_nbt_settings"), button -> togglePlaceSettings());
+        placeAllButton = new WrightsButton(controlsX + side, pasteY + rowH * 3, inner, btnH, Component.translatable("screen.wrights.place_nbt_all"), button -> togglePlaceAll());
         addRenderableWidget(placeFluidsButton);
         addRenderableWidget(placeNbtButton);
         addRenderableWidget(placeSettingsButton);
         addRenderableWidget(placeAllButton);
 
-        footY = pasteY + 36 + extraRows * 18 + 14;
-        materialsButton = new WrightsButton(controlsX + side, footY, inner, 16, Component.translatable("menu.wrights.materials"), button -> MaterialsScreen.request(WrightsClientState.editId, 0, 0, 0, this));
+        footY = pasteY + rowH * 2 + extraRows * rowH + 12;
+        materialsButton = new WrightsButton(controlsX + side, footY, inner, btnH, Component.translatable("menu.wrights.materials"), button -> MaterialsScreen.request(WrightsClientState.editId, 0, 0, 0, this));
         int backW = 68;
         int backX = controlsW - backW;
-        saveButton = new WrightsButton(controlsX + side, footY + 18, backX - side - 4, 18, Component.translatable("screen.wrights.save"), button -> finish(true));
-        cancelButton = new WrightsButton(controlsX + backX, footY + 18, backW, 18, Component.translatable("screen.wrights.cancel"), button -> onClose());
+        int footBtn = Math.max(16, btnH + 2);
+        saveButton = new WrightsButton(controlsX + side, footY + rowH + 2, backX - side - 4, footBtn, Component.translatable("screen.wrights.save"), button -> finish(true));
+        cancelButton = new WrightsButton(controlsX + backX, footY + rowH + 2, backW, footBtn, Component.translatable("screen.wrights.cancel"), button -> onClose());
         addRenderableWidget(materialsButton);
         addRenderableWidget(saveButton);
         addRenderableWidget(cancelButton);
 
-        int contentBottom = Math.max(column.belowSelection(), footY + 40);
-        panelH = Math.min(this.height - 8, Math.max(panelH, contentBottom - panelY + 8));
+        int contentBottom = Math.max(column.belowSelection(), footY + rowH + 2 + footBtn + 8);
+        contentH = contentBottom - (bodyTop - bodyScroll);
+        bodyScroll = Mth.clamp(bodyScroll, 0, Math.max(0, contentH - bodyViewH));
         column.refresh();
         refreshOptions();
     }
@@ -147,23 +164,26 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
         placeSettingsButton.setPicked(showSettings && WrightsClientState.placeSettingsChosen());
         placeAllButton.setShown(showAll);
         placeAllButton.setPicked(showAll && WrightsClientState.placeAllChosen());
-        int y = pasteY + 36;
+        int pitch = Math.max(14, rowH);
+        int y = pasteY + pitch * 2;
         if (showSettings) {
             placeSettingsButton.setY(y);
-            y += 18;
+            y += pitch;
         }
         if (showAll) {
             placeAllButton.setY(y);
-            y += 18;
+            y += pitch;
         }
-        footY = y + 14;
+        footY = y + 12;
+        int footBtn = Math.max(16, btnH + 2);
         if (materialsButton != null) {
             materialsButton.setY(footY);
-            saveButton.setY(footY + 18);
-            cancelButton.setY(footY + 18);
+            saveButton.setY(footY + pitch + 2);
+            cancelButton.setY(footY + pitch + 2);
         }
-        int contentBottom = Math.max(column.belowSelection(), footY + 40);
-        panelH = Math.min(this.height - 8, Math.max(panelH, contentBottom - panelY + 8));
+        int contentBottom = Math.max(column.belowSelection(), footY + pitch + 2 + footBtn + 8);
+        contentH = contentBottom - (bodyTop - bodyScroll);
+        bodyScroll = Mth.clamp(bodyScroll, 0, Math.max(0, contentH - bodyViewH));
     }
 
     @Override
@@ -173,11 +193,11 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
-        String title = WrightsClientState.editName == null || WrightsClientState.editName.isEmpty()
-                ? Component.translatable("screen.wrights.adjust_edit").getString()
-                : WrightsClientState.editName;
-        graphics.drawString(this.font, this.font.plainSubstrByWidth(title, panelW - 24), panelX + 14, panelY + 8, WrightsUi.COPPER, false);
+        renderBackground(graphics, mouseX, mouseY, partialTick);
+        graphics.enableScissor(panelX + 1, bodyTop, panelX + panelW - 1, bodyTop + bodyViewH);
+        for (Renderable renderable : this.renderables) {
+            renderable.render(graphics, mouseX, mouseY, partialTick);
+        }
         column.render(graphics);
         int side = 12;
         int half = (controlsW - side) / 2;
@@ -191,6 +211,16 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
         graphics.drawString(this.font, Component.translatable("screen.wrights.rotate"), controlsX + 12, rotateY - 12, WrightsUi.BLUE, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.flip"), controlsX + 12, flipY - 12, WrightsUi.BLUE, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.paste_options"), controlsX + 12, pasteY - 12, WrightsUi.BLUE, false);
+        graphics.disableScissor();
+        String title = WrightsClientState.editName == null || WrightsClientState.editName.isEmpty()
+                ? Component.translatable("screen.wrights.adjust_edit").getString()
+                : WrightsClientState.editName;
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(title, panelW - 24), panelX + 14, panelY + 8, WrightsUi.COPPER, false);
+        WrightsUi.scrollBar(graphics, panelX + panelW - 5, bodyTop, bodyViewH, bodyScroll, contentH);
+    }
+
+    private boolean insideBody(double mouseX, double mouseY) {
+        return mouseX >= panelX && mouseX < panelX + panelW && mouseY >= bodyTop && mouseY < bodyTop + bodyViewH;
     }
 
     @Override
@@ -203,16 +233,31 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (column.mouseClicked(mouseX, mouseY, button)) {
+        if (!insideBody(mouseX, mouseY) && mouseY >= bodyTop) {
+            return false;
+        }
+        if (insideBody(mouseX, mouseY) && column.mouseClicked(mouseX, mouseY, button)) {
             return true;
+        }
+        if (!insideBody(mouseX, mouseY)) {
+            return false;
         }
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        if (column.mouseScrolled(mouseX, mouseY, scrollY)) {
+        if (insideBody(mouseX, mouseY) && column.mouseScrolled(mouseX, mouseY, scrollY)) {
             return true;
+        }
+        if (insideBody(mouseX, mouseY)) {
+            int max = Math.max(0, contentH - bodyViewH);
+            int next = Mth.clamp(bodyScroll - (int) Math.signum(scrollY) * 18, 0, max);
+            if (next != bodyScroll) {
+                bodyScroll = next;
+                this.rebuildWidgets();
+                return true;
+            }
         }
         return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }

@@ -41,6 +41,20 @@ public final class WrightsUi {
         return Math.max(4, (screenH - panelH) / 2);
     }
 
+    /** Thumb for a vertical body scroller. Returns false when everything already fits. */
+    public static boolean scrollBar(GuiGraphics graphics, int x, int viewTop, int viewH, int scroll, int contentH) {
+        int max = Math.max(0, contentH - viewH);
+        if (max <= 0 || viewH <= 8) {
+            return false;
+        }
+        int track = viewH - 4;
+        int thumb = Math.max(16, track * viewH / Math.max(viewH, contentH));
+        int thumbY = viewTop + 2 + (track - thumb) * scroll / max;
+        graphics.fill(x, viewTop + 2, x + 2, viewTop + viewH - 2, 0xFF1A2836);
+        graphics.fill(x, thumbY, x + 2, thumbY + thumb, COPPER_DIM);
+        return true;
+    }
+
     public static void scrim(GuiGraphics graphics, int width, int height) {
         graphics.fill(0, 0, width, height, 0xC0060C14);
     }

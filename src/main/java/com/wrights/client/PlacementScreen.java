@@ -5,9 +5,11 @@ import java.util.UUID;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.network.PacketDistributor;
 
@@ -39,6 +41,12 @@ public class PlacementScreen extends Screen implements JeiPreview {
     private int modelX;
     private int locationY;
     private int sizeLeft;
+    private int bodyScroll;
+    private int bodyTop;
+    private int bodyViewH;
+    private int contentH;
+    private int rowH;
+    private int btnH;
     private EditBox xBox;
     private EditBox yBox;
     private EditBox zBox;
@@ -65,17 +73,21 @@ public class PlacementScreen extends Screen implements JeiPreview {
         boolean map = !WrightsClientState.concealed && (StructureGrid.oversized(WrightsClientState.fullX, WrightsClientState.fullZ)
                 || StructureGrid.oversized(WrightsClientState.fullX, WrightsClientState.fullY)
                 || StructureGrid.oversized(WrightsClientState.fullZ, WrightsClientState.fullY));
-        controlsW = 240;
-        int gap = 14;
+        // Shrink controls when Auto/high GUI scale leaves few pixels.
+        float density = Mth.clamp(this.height / 380.0F, 0.62F, 1.0F);
+        rowH = density < 0.85F ? 14 : 16;
+        btnH = density < 0.85F ? 14 : 16;
+        int section = density < 0.85F ? 10 : 12;
+        controlsW = density < 0.85F ? 210 : 240;
+        int gap = density < 0.85F ? 10 : 14;
         int pad = 12;
         int openW = this.font.width(Component.translatable("screen.wrights.open_map")) + 12;
-        // Location + size sit side by side under selection (~60px).
-        int leftChrome = 148 + (map ? 18 : 0) + 60;
-        int modelSize = Math.min(140, Math.max(map ? openW : 88, this.height - leftChrome - 36));
-        int stepW = 16;
+        int modelCap = Math.max(72, Math.round(140 * density));
+        int modelSize = Math.min(modelCap, Math.max(map ? openW : 72, Math.round(88 * density)));
+        int stepW = density < 0.85F ? 14 : 16;
         int axisRoom = 8;
         int pairGap = 6;
-        int boxW = 44;
+        int boxW = density < 0.85F ? 36 : 44;
         int colW = stepW + 2 + boxW + 2 + stepW + axisRoom;
         int detailW = colW * 2 + pairGap;
         int leftW = Math.max(modelSize, detailW);
@@ -86,7 +98,7 @@ public class PlacementScreen extends Screen implements JeiPreview {
             leftW = Math.max(modelSize, detailW);
         }
         if (pad + leftW + gap + controlsW + pad > this.width - 8) {
-            modelSize = Math.max(map ? openW : 88, this.width - 8 - pad * 2 - gap - controlsW);
+            modelSize = Math.max(map ? openW : 72, this.width - 8 - pad * 2 - gap - controlsW);
             leftW = Math.max(modelSize, detailW);
             if (pad + leftW + gap + controlsW + pad > this.width - 8) {
                 leftW = Math.max(modelSize, this.width - 8 - pad * 2 - gap - controlsW);
@@ -96,14 +108,18 @@ public class PlacementScreen extends Screen implements JeiPreview {
         boolean voiding = WrightsClientConfig.VOID_BLOCKS.get() || WrightsClientConfig.VOID_FLUIDS.get();
         int extraRows = (WrightsClientState.showStoredSettings() ? 1 : 0) + (WrightsClientState.showStoredAll() ? 1 : 0) + (voiding ? 1 : 0);
         int pasteRows = 3 + extraRows;
-        int leftNeed = 28 + modelSize + 16 + 18 + 32 + (map ? 18 : 0) + 52 + 40 + 60 + 8;
-        int rightNeed = 28 + 46 + 36 + 48 + pasteRows * 18 + 14 + 18 + 14 + 18 + 20 + 16 + 18 + 18 + 12;
-        panelH = Math.min(this.height - 8, Math.max(leftNeed, rightNeed));
+        int fieldPitch = btnH + 2;
+        int leftNeed = 28 + modelSize + 16 + 18 + 32 + (map ? 18 : 0) + 52 + 40 + fieldPitch * 3 + 8;
+        int rightNeed = 28 + 46 + 36 + 48 + pasteRows * rowH + 14 + rowH + 14 + rowH + 20 + 16 + 18 + 18 + 12;
+        panelH = WrightsUi.fitH(Math.max(leftNeed, rightNeed), this.height);
         panelX = JeiPreview.left(this.width, panelW);
-        panelY = Math.max(4, (this.height - panelH) / 2);
+        panelY = WrightsUi.centerY(panelH, this.height);
+        bodyTop = panelY + 22;
+        bodyViewH = Math.max(40, panelH - 28);
+        bodyScroll = Mth.clamp(bodyScroll, 0, Math.max(0, contentH - bodyViewH));
+        int origin = bodyTop - bodyScroll;
         modelX = panelX + pad;
-        int modelY = panelY + 28;
-        // Same inset on both sides: content runs to panelX+pad … panelX+panelW-pad.
+        int modelY = origin;
         int side = 12;
         controlsX = modelX + leftW + gap;
         column.place(this, this.font, modelX, modelY, modelSize, widget -> addRenderableWidget(widget), this::setFocused);
@@ -112,52 +128,54 @@ public class PlacementScreen extends Screen implements JeiPreview {
         }
         locationY = column.belowSelection();
         sizeLeft = modelX + colW + pairGap;
-        // Move-layer prompt sits under Location/Size only when it is open.
-        column.shiftPromptTo(locationY + 60);
+        column.shiftPromptTo(locationY + fieldPitch * 3 + 12);
         int locPlus = modelX + stepW + 2 + boxW + 2;
         int sizePlus = sizeLeft + stepW + 2 + boxW + 2;
-        xBox = number(modelX + stepW + 2, locationY + 12, boxW);
-        yBox = number(modelX + stepW + 2, locationY + 28, boxW);
-        zBox = number(modelX + stepW + 2, locationY + 44, boxW);
-        sxBox = number(sizeLeft + stepW + 2, locationY + 12, boxW);
-        syBox = number(sizeLeft + stepW + 2, locationY + 28, boxW);
-        szBox = number(sizeLeft + stepW + 2, locationY + 44, boxW);
-        step(modelX, locationY + 12, "-", () -> move(-1, 0, 0));
-        step(locPlus, locationY + 12, "+", () -> move(1, 0, 0));
-        step(modelX, locationY + 28, "-", () -> move(0, -1, 0));
-        step(locPlus, locationY + 28, "+", () -> move(0, 1, 0));
-        step(modelX, locationY + 44, "-", () -> move(0, 0, -1));
-        step(locPlus, locationY + 44, "+", () -> move(0, 0, 1));
-        step(sizeLeft, locationY + 12, "-", () -> resize(0, -1));
-        step(sizePlus, locationY + 12, "+", () -> resize(0, 1));
-        step(sizeLeft, locationY + 28, "-", () -> resize(1, -1));
-        step(sizePlus, locationY + 28, "+", () -> resize(1, 1));
-        step(sizeLeft, locationY + 44, "-", () -> resize(2, -1));
-        step(sizePlus, locationY + 44, "+", () -> resize(2, 1));
-        int top = panelY + 28;
-        rotateY = top + 46;
-        flipY = rotateY + 36;
-        pasteY = flipY + 48;
+        int r0 = locationY + section;
+        int r1 = r0 + fieldPitch;
+        int r2 = r1 + fieldPitch;
+        xBox = number(modelX + stepW + 2, r0, boxW);
+        yBox = number(modelX + stepW + 2, r1, boxW);
+        zBox = number(modelX + stepW + 2, r2, boxW);
+        sxBox = number(sizeLeft + stepW + 2, r0, boxW);
+        syBox = number(sizeLeft + stepW + 2, r1, boxW);
+        szBox = number(sizeLeft + stepW + 2, r2, boxW);
+        step(modelX, r0, "-", () -> move(-1, 0, 0));
+        step(locPlus, r0, "+", () -> move(1, 0, 0));
+        step(modelX, r1, "-", () -> move(0, -1, 0));
+        step(locPlus, r1, "+", () -> move(0, 1, 0));
+        step(modelX, r2, "-", () -> move(0, 0, -1));
+        step(locPlus, r2, "+", () -> move(0, 0, 1));
+        step(sizeLeft, r0, "-", () -> resize(0, -1));
+        step(sizePlus, r0, "+", () -> resize(0, 1));
+        step(sizeLeft, r1, "-", () -> resize(1, -1));
+        step(sizePlus, r1, "+", () -> resize(1, 1));
+        step(sizeLeft, r2, "-", () -> resize(2, -1));
+        step(sizePlus, r2, "+", () -> resize(2, 1));
+        int top = origin;
+        rotateY = top + 32 + section;
+        flipY = rotateY + rowH + section + 8;
+        pasteY = flipY + rowH * 2 + section + 8;
         int inner = controlsW - side;
         int row = (inner - 4) / 2;
-        lockButton = new WrightsButton(controlsX + side, top + 14, row, 16, Component.translatable("screen.wrights.lock"), button -> setAim(false));
-        followButton = new WrightsButton(controlsX + side + row + 4, top + 14, row, 16, Component.translatable("screen.wrights.follow"), button -> setAim(true));
+        lockButton = new WrightsButton(controlsX + side, top + 12, row, btnH, Component.translatable("screen.wrights.lock"), button -> setAim(false));
+        followButton = new WrightsButton(controlsX + side + row + 4, top + 12, row, btnH, Component.translatable("screen.wrights.follow"), button -> setAim(true));
         addRenderableWidget(lockButton);
         addRenderableWidget(followButton);
-        addRenderableWidget(new WrightsButton(controlsX + side, rotateY, row, 16, Component.translatable("screen.wrights.rotate_left"), button -> transform(BlueprintTransforms.Op.ROTATE_CCW)));
-        addRenderableWidget(new WrightsButton(controlsX + side + row + 4, rotateY, row, 16, Component.translatable("screen.wrights.rotate_right"), button -> transform(BlueprintTransforms.Op.ROTATE)));
-        addRenderableWidget(new WrightsButton(controlsX + side, flipY, row, 16, Component.translatable("screen.wrights.flip_horizontal"), button -> transform(BlueprintTransforms.Op.FLIP_X)));
-        addRenderableWidget(new WrightsButton(controlsX + side + row + 4, flipY, row, 16, Component.translatable("screen.wrights.flip_vertical"), button -> transform(BlueprintTransforms.Op.FLIP_Y)));
-        addRenderableWidget(new WrightsButton(controlsX + side, flipY + 18, row, 16, Component.translatable("screen.wrights.center_short"), button -> transform(BlueprintTransforms.Op.CENTER)));
-        addRenderableWidget(new WrightsButton(controlsX + side + row + 4, flipY + 18, row, 16, Component.translatable("screen.wrights.ground"), button -> transform(BlueprintTransforms.Op.GROUND)));
-        placeFluidsButton = new WrightsButton(controlsX + side, pasteY, inner, 16, Component.translatable("screen.wrights.place_fluids"), button -> togglePlaceFluids());
-        placeNbtButton = new WrightsButton(controlsX + side, pasteY + 18, inner, 16, Component.translatable("screen.wrights.place_nbt_blocks"), button -> togglePlaceNbt());
-        placeSettingsButton = new WrightsButton(controlsX + side, pasteY + 36, inner, 16, Component.translatable("screen.wrights.place_nbt_settings"), button -> togglePlaceSettings());
-        placeAllButton = new WrightsButton(controlsX + side, pasteY + 54, inner, 16, Component.translatable("screen.wrights.place_nbt_all"), button -> togglePlaceAll());
-        int voidY = pasteY + 36 + (WrightsClientState.showStoredSettings() ? 18 : 0) + (WrightsClientState.showStoredAll() ? 18 : 0);
-        voidBlocksButton = new WrightsButton(controlsX + side, voidY, row, 16, Component.translatable("screen.wrights.void_blocks"), button -> toggleVoidBlocks());
-        voidFluidsButton = new WrightsButton(controlsX + side + row + 4, voidY, row, 16, Component.translatable("screen.wrights.void_fluids"), button -> toggleVoidFluids());
-        voidNbtButton = new WrightsButton(controlsX + side, voidY + 18, inner, 16, Component.translatable("screen.wrights.void_nbt"), button -> toggleVoidNbt());
+        addRenderableWidget(new WrightsButton(controlsX + side, rotateY, row, btnH, Component.translatable("screen.wrights.rotate_left"), button -> transform(BlueprintTransforms.Op.ROTATE_CCW)));
+        addRenderableWidget(new WrightsButton(controlsX + side + row + 4, rotateY, row, btnH, Component.translatable("screen.wrights.rotate_right"), button -> transform(BlueprintTransforms.Op.ROTATE)));
+        addRenderableWidget(new WrightsButton(controlsX + side, flipY, row, btnH, Component.translatable("screen.wrights.flip_horizontal"), button -> transform(BlueprintTransforms.Op.FLIP_X)));
+        addRenderableWidget(new WrightsButton(controlsX + side + row + 4, flipY, row, btnH, Component.translatable("screen.wrights.flip_vertical"), button -> transform(BlueprintTransforms.Op.FLIP_Y)));
+        addRenderableWidget(new WrightsButton(controlsX + side, flipY + rowH, row, btnH, Component.translatable("screen.wrights.center_short"), button -> transform(BlueprintTransforms.Op.CENTER)));
+        addRenderableWidget(new WrightsButton(controlsX + side + row + 4, flipY + rowH, row, btnH, Component.translatable("screen.wrights.ground"), button -> transform(BlueprintTransforms.Op.GROUND)));
+        placeFluidsButton = new WrightsButton(controlsX + side, pasteY, inner, btnH, Component.translatable("screen.wrights.place_fluids"), button -> togglePlaceFluids());
+        placeNbtButton = new WrightsButton(controlsX + side, pasteY + rowH, inner, btnH, Component.translatable("screen.wrights.place_nbt_blocks"), button -> togglePlaceNbt());
+        placeSettingsButton = new WrightsButton(controlsX + side, pasteY + rowH * 2, inner, btnH, Component.translatable("screen.wrights.place_nbt_settings"), button -> togglePlaceSettings());
+        placeAllButton = new WrightsButton(controlsX + side, pasteY + rowH * 3, inner, btnH, Component.translatable("screen.wrights.place_nbt_all"), button -> togglePlaceAll());
+        int voidY = pasteY + rowH * 2 + (WrightsClientState.showStoredSettings() ? rowH : 0) + (WrightsClientState.showStoredAll() ? rowH : 0);
+        voidBlocksButton = new WrightsButton(controlsX + side, voidY, row, btnH, Component.translatable("screen.wrights.void_blocks"), button -> toggleVoidBlocks());
+        voidFluidsButton = new WrightsButton(controlsX + side + row + 4, voidY, row, btnH, Component.translatable("screen.wrights.void_fluids"), button -> toggleVoidFluids());
+        voidNbtButton = new WrightsButton(controlsX + side, voidY + rowH, inner, btnH, Component.translatable("screen.wrights.void_nbt"), button -> toggleVoidNbt());
         addRenderableWidget(placeFluidsButton);
         addRenderableWidget(placeNbtButton);
         addRenderableWidget(placeSettingsButton);
@@ -165,35 +183,37 @@ public class PlacementScreen extends Screen implements JeiPreview {
         addRenderableWidget(voidBlocksButton);
         addRenderableWidget(voidFluidsButton);
         addRenderableWidget(voidNbtButton);
-        int stackY = voidY + 18 + (voiding ? 18 : 0) + 10;
-        deployY = stackY + 14;
+        int stackY = voidY + rowH + (voiding ? rowH : 0) + 8;
+        deployY = stackY + section;
         boolean paceInstant = this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild && !this.minecraft.player.isSpectator() && WrightsClientConfig.INSTANT_JOBS.get();
         if (!paceInstant) {
             WrightsClientState.clampDeploy();
             step(controlsX + side, deployY, "-", () -> changeAssign(-1));
             step(controlsX + controlsW - stepW, deployY, "+", () -> changeAssign(1));
         }
-        int supplyY = deployY + 22;
-        inventoryButton = new WrightsButton(controlsX + side, supplyY + 14, row, 16, Component.translatable("screen.wrights.supply_player"), button -> useInventory());
-        chestButton = new WrightsButton(controlsX + side + row + 4, supplyY + 14, row, 16, Component.translatable("screen.wrights.supply_bind"), button -> bindChest());
+        int supplyY = deployY + rowH + 8;
+        inventoryButton = new WrightsButton(controlsX + side, supplyY + section, row, btnH, Component.translatable("screen.wrights.supply_player"), button -> useInventory());
+        chestButton = new WrightsButton(controlsX + side + row + 4, supplyY + section, row, btnH, Component.translatable("screen.wrights.supply_bind"), button -> bindChest());
         addRenderableWidget(inventoryButton);
         addRenderableWidget(chestButton);
         int clearW = 52;
         int highlightW = 68;
-        highlightSupplyButton = new WrightsButton(controlsX + controlsW - clearW - highlightW, supplyY + 36, highlightW, 16, Component.translatable("screen.wrights.supply_highlight"), button -> highlightSupply());
-        clearSupplyButton = new WrightsButton(controlsX + controlsW - clearW, supplyY + 36, clearW, 16, Component.translatable("screen.wrights.supply_clear"), button -> useInventory());
+        highlightSupplyButton = new WrightsButton(controlsX + controlsW - clearW - highlightW, supplyY + section + rowH + 4, highlightW, btnH, Component.translatable("screen.wrights.supply_highlight"), button -> highlightSupply());
+        clearSupplyButton = new WrightsButton(controlsX + controlsW - clearW, supplyY + section + rowH + 4, clearW, btnH, Component.translatable("screen.wrights.supply_clear"), button -> useInventory());
         addRenderableWidget(highlightSupplyButton);
         addRenderableWidget(clearSupplyButton);
-        int foot = supplyY + 58;
-        addRenderableWidget(new WrightsButton(controlsX + side, foot, inner, 16, Component.translatable("menu.wrights.materials"), button -> MaterialsScreen.request(WrightsClientState.buildId, WrightsClientState.viewX, WrightsClientState.viewY, WrightsClientState.viewZ, WrightsClientConfig.PLACE_FLUIDS.get(), this)));
+        int foot = supplyY + section + rowH * 2 + 10;
+        addRenderableWidget(new WrightsButton(controlsX + side, foot, inner, btnH, Component.translatable("menu.wrights.materials"), button -> MaterialsScreen.request(WrightsClientState.buildId, WrightsClientState.viewX, WrightsClientState.viewY, WrightsClientState.viewZ, WrightsClientConfig.PLACE_FLUIDS.get(), this)));
         int backW = 68;
         int backX = controlsW - backW;
-        addRenderableWidget(new WrightsButton(controlsX + side, foot + 18, backX - side - 4, 18, Component.translatable("screen.wrights.save_blueprint"), button -> saveBlueprint()));
-        addRenderableWidget(new WrightsButton(controlsX + backX, foot + 18, backW, 18, Component.translatable("screen.wrights.back"), button -> onClose()));
-        buildButton = new WrightsButton(controlsX + side, foot + 40, inner, 18, Component.translatable("menu.wrights.build"), button -> send());
+        int footBtn = Math.max(16, btnH + 2);
+        addRenderableWidget(new WrightsButton(controlsX + side, foot + rowH + 2, backX - side - 4, footBtn, Component.translatable("screen.wrights.save_blueprint"), button -> saveBlueprint()));
+        addRenderableWidget(new WrightsButton(controlsX + backX, foot + rowH + 2, backW, footBtn, Component.translatable("screen.wrights.back"), button -> onClose()));
+        buildButton = new WrightsButton(controlsX + side, foot + rowH + 2 + footBtn + 2, inner, footBtn, Component.translatable("menu.wrights.build"), button -> send());
         addRenderableWidget(buildButton);
-        int contentBottom = Math.max(locationY + 60, foot + 60);
-        panelH = Math.min(this.height - 8, Math.max(panelH, contentBottom - panelY + 8));
+        int contentBottom = Math.max(r2 + btnH + 8, foot + rowH + 2 + footBtn * 2 + 10);
+        contentH = contentBottom - (bodyTop - bodyScroll);
+        bodyScroll = Mth.clamp(bodyScroll, 0, Math.max(0, contentH - bodyViewH));
         refresh();
     }
 
@@ -232,14 +252,15 @@ public class PlacementScreen extends Screen implements JeiPreview {
             placeSettingsButton.setPicked(showSettings && WrightsClientState.placeSettingsChosen());
             placeAllButton.setShown(showAll);
             placeAllButton.setPicked(showAll && WrightsClientState.placeAllChosen());
-            int y = pasteY + 36;
+            int pitch = Math.max(14, rowH);
+            int y = pasteY + pitch * 2;
             if (showSettings) {
                 placeSettingsButton.setY(y);
-                y += 18;
+                y += pitch;
             }
             if (showAll) {
                 placeAllButton.setY(y);
-                y += 18;
+                y += pitch;
             }
             voidBlocksButton.setY(y);
             voidFluidsButton.setY(y);
@@ -248,7 +269,7 @@ public class PlacementScreen extends Screen implements JeiPreview {
             voidBlocksButton.setPicked(WrightsClientConfig.VOID_BLOCKS.get());
             voidFluidsButton.setPicked(WrightsClientConfig.VOID_FLUIDS.get());
             boolean voiding = WrightsClientConfig.VOID_BLOCKS.get() || WrightsClientConfig.VOID_FLUIDS.get();
-            voidNbtButton.setY(y + 18);
+            voidNbtButton.setY(y + pitch);
             voidNbtButton.setShown(voiding && WrightsConfig.allowVoidNbt());
             voidNbtButton.setPicked(voiding && WrightsClientConfig.VOID_NBT.get());
         }
@@ -266,36 +287,37 @@ public class PlacementScreen extends Screen implements JeiPreview {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
-        String title = WrightsClientState.buildName == null || WrightsClientState.buildName.isEmpty()
-                ? Component.translatable("screen.wrights.place").getString()
-                : WrightsClientState.buildName;
-        graphics.drawString(this.font, this.font.plainSubstrByWidth(title, panelW - 24), panelX + 14, panelY + 8, WrightsUi.COPPER, false);
-        graphics.drawString(this.font, Component.translatable("screen.wrights.placement"), controlsX + 12, panelY + 28, WrightsUi.TEXT, false);
+        renderBackground(graphics, mouseX, mouseY, partialTick);
+        graphics.enableScissor(panelX + 1, bodyTop, panelX + panelW - 1, bodyTop + bodyViewH);
+        for (Renderable renderable : this.renderables) {
+            renderable.render(graphics, mouseX, mouseY, partialTick);
+        }
+        graphics.drawString(this.font, Component.translatable("screen.wrights.placement"), controlsX + 12, bodyTop - bodyScroll, WrightsUi.TEXT, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.location"), modelX, locationY, WrightsUi.TEXT, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.size_label"), sizeLeft, locationY, WrightsUi.TEXT, false);
+        int fieldPitch = Math.max(12, btnH + 2);
         int locAxis = xBox.getX() + xBox.getWidth() + 20;
         int sizeAxis = sxBox.getX() + sxBox.getWidth() + 20;
         axis(graphics, locAxis, locationY + 12, "X");
-        axis(graphics, locAxis, locationY + 28, "Y");
-        axis(graphics, locAxis, locationY + 44, "Z");
+        axis(graphics, locAxis, locationY + 12 + fieldPitch, "Y");
+        axis(graphics, locAxis, locationY + 12 + fieldPitch * 2, "Z");
         axis(graphics, sizeAxis, locationY + 12, "X");
-        axis(graphics, sizeAxis, locationY + 28, "Y");
-        axis(graphics, sizeAxis, locationY + 44, "Z");
-        graphics.drawString(this.font, Component.translatable("screen.wrights.deploy_on_job"), controlsX + 12, deployY - 14, WrightsUi.TEXT, false);
-        int supplyLabelY = inventoryButton.getY() - 14;
+        axis(graphics, sizeAxis, locationY + 12 + fieldPitch, "Y");
+        axis(graphics, sizeAxis, locationY + 12 + fieldPitch * 2, "Z");
+        graphics.drawString(this.font, Component.translatable("screen.wrights.deploy_on_job"), controlsX + 12, deployY - 12, WrightsUi.TEXT, false);
+        int supplyLabelY = inventoryButton.getY() - 12;
         graphics.drawString(this.font, Component.translatable("screen.wrights.use_items_from"), controlsX + 12, supplyLabelY, WrightsUi.MUTED, false);
         boolean bound = WrightsClientState.supplyBound && WrightsClientState.supplyPos != null;
         if (bound) {
             Component supplyLine = Component.translatable("screen.wrights.supply_at", WrightsClientState.supplyPos.getX(), WrightsClientState.supplyPos.getY(), WrightsClientState.supplyPos.getZ());
             int room = Math.max(40, highlightSupplyButton.getX() - (controlsX + 12) - 6);
-            graphics.drawString(this.font, this.font.plainSubstrByWidth(supplyLine.getString(), room), controlsX + 12, highlightSupplyButton.getY() + 4, WrightsUi.TEXT, false);
+            graphics.drawString(this.font, this.font.plainSubstrByWidth(supplyLine.getString(), room), controlsX + 12, highlightSupplyButton.getY() + 3, WrightsUi.TEXT, false);
         } else if (WrightsClientState.bindSupply) {
-            graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("screen.wrights.supply_aim").getString(), panelX + panelW - 24 - controlsX), controlsX + 12, highlightSupplyButton.getY() + 4, WrightsUi.MUTED, false);
+            graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("screen.wrights.supply_aim").getString(), panelX + panelW - 24 - controlsX), controlsX + 12, highlightSupplyButton.getY() + 3, WrightsUi.MUTED, false);
         }
         boolean paceInstant = this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild && !this.minecraft.player.isSpectator() && WrightsClientConfig.INSTANT_JOBS.get();
         if (paceInstant) {
-            graphics.drawString(this.font, Component.translatable("screen.wrights.drones_instant"), controlsX + 12, deployY + 4, WrightsUi.MUTED, false);
+            graphics.drawString(this.font, Component.translatable("screen.wrights.drones_instant"), controlsX + 12, deployY + 3, WrightsUi.MUTED, false);
         } else if (this.minecraft.player != null) {
             Component line;
             int color;
@@ -313,12 +335,18 @@ public class PlacementScreen extends Screen implements JeiPreview {
                         : Component.translatable("screen.wrights.drones_send", Math.min(WrightsClientState.deployCount, cap), cap);
                 color = cap <= 0 ? 0xFFE07A7A : WrightsUi.BLUE;
             }
-            graphics.drawString(this.font, this.font.plainSubstrByWidth(line.getString(), 168), controlsX + 32, deployY + 4, color, false);
+            graphics.drawString(this.font, this.font.plainSubstrByWidth(line.getString(), Math.max(80, controlsW - 48)), controlsX + 32, deployY + 3, color, false);
         }
         column.render(graphics);
         graphics.drawString(this.font, Component.translatable("screen.wrights.rotate"), controlsX + 12, rotateY - 12, WrightsUi.TEXT, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.flip"), controlsX + 12, flipY - 12, WrightsUi.TEXT, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.paste_options"), controlsX + 12, pasteY - 12, WrightsUi.TEXT, false);
+        graphics.disableScissor();
+        String title = WrightsClientState.buildName == null || WrightsClientState.buildName.isEmpty()
+                ? Component.translatable("screen.wrights.place").getString()
+                : WrightsClientState.buildName;
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(title, panelW - 24), panelX + 14, panelY + 8, WrightsUi.COPPER, false);
+        WrightsUi.scrollBar(graphics, panelX + panelW - 5, bodyTop, bodyViewH, bodyScroll, contentH);
     }
 
     @Override
@@ -352,16 +380,31 @@ public class PlacementScreen extends Screen implements JeiPreview {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (column.mouseClicked(mouseX, mouseY, button)) {
+        if (!insideBody(mouseX, mouseY) && mouseY >= bodyTop) {
+            return false;
+        }
+        if (insideBody(mouseX, mouseY) && column.mouseClicked(mouseX, mouseY, button)) {
             return true;
+        }
+        if (!insideBody(mouseX, mouseY)) {
+            return false;
         }
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        if (column.mouseScrolled(mouseX, mouseY, scrollY)) {
+        if (insideBody(mouseX, mouseY) && column.mouseScrolled(mouseX, mouseY, scrollY)) {
             return true;
+        }
+        if (insideBody(mouseX, mouseY)) {
+            int max = Math.max(0, contentH - bodyViewH);
+            int next = Mth.clamp(bodyScroll - (int) Math.signum(scrollY) * 18, 0, max);
+            if (next != bodyScroll) {
+                bodyScroll = next;
+                this.rebuildWidgets();
+                return true;
+            }
         }
         return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
@@ -538,7 +581,7 @@ public class PlacementScreen extends Screen implements JeiPreview {
     }
 
     private EditBox number(int x, int y, int width) {
-        EditBox box = new EditBox(this.font, x, y, width, 14, Component.empty());
+        EditBox box = new EditBox(this.font, x, y, width, Math.max(12, btnH), Component.empty());
         box.setMaxLength(8);
         box.setFilter(text -> text.matches("-?\\d{0,7}"));
         box.setResponder(value -> onFields());
@@ -547,7 +590,12 @@ public class PlacementScreen extends Screen implements JeiPreview {
     }
 
     private void step(int x, int y, String label, Runnable action) {
-        addRenderableWidget(new WrightsButton(x, y, 16, 14, Component.literal(label), button -> action.run()));
+        int size = Math.max(12, btnH);
+        addRenderableWidget(new WrightsButton(x, y, size, size, Component.literal(label), button -> action.run()));
+    }
+
+    private boolean insideBody(double mouseX, double mouseY) {
+        return mouseX >= panelX && mouseX < panelX + panelW && mouseY >= bodyTop && mouseY < bodyTop + bodyViewH;
     }
 
     private void togglePlaceFluids() {
