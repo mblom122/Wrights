@@ -1,6 +1,38 @@
 # Changelog
 
+## 0.1.8
+
+### Features
+- Place build mode: Look, To me, and Bridge. Look forms cover Floor, Wall, Pillar, Beam, Circle, and Stairs.
+- Place Circle Mount (Floor / Wall), Left/Right rotate for Floor, Wall, Beam, and Circle, and Void on Bridge / Stairs paths.
+- Bridge and Stairs path offset, width, and To me width/height (1–12), with a clear ON/OFF banner while a path is armed.
+- Exchange tool with Floor / Wall / Pillar / Beam / Circle forms, Match look, Similar blocks, silk touch, and Void that only suppresses returned drops.
+- Shape, Exchange, and Mirror Shift+right-click quick tweaks; middle-click picks Shape and Exchange materials.
+- Configurable wrights per Shape / Exchange / Place job (shown under Build Mode); unfinished jobs and finished history caps in config.
+- Help as its own left-nav page; mode title above the hotbar by default, with timed helper tips for every controller mode.
+- Wrights show the block they are carrying under them for place, mine, and exchange.
+- Manage closes while new wrights fly in to dock, then reopens when the last one lands.
+
+### Changes
+- Shape sits under Exchange in the menu and controller; form presets replace the old 3D Exchange shapes.
+- Equal sides defaults on for Floor and Wall; Pillar / Beam default length is 5; plates default to a 3×3 footprint.
+- Jobs cards show mode, detail, size, and block count more tightly; finished cards show the job source.
+- Shorter HUD tips; Ctrl/Shift mode menus can sit beside the hotbar from Options.
+- Mirror gets a Shift+right-click Blocks / Blueprints quick tweak.
+- Departing wrights leave from a random height above home; Manage-add dock-ins come in from high up.
+
+### Fixes
+- Bind inventory HUD tip no longer shows the pick-blueprint line.
+- Shape undo works again for creative and void Shape jobs.
+- Shape / Exchange / Mirror anchor wires stay one block and no longer resize when Ctrl+scroll rotates a shape.
+- Creative middle-click pick is cancelled while the controller is in the main hand.
+- Two-corners New template keeps both pins when you re-click after Cancel.
+- Job flight works again; the Manage dock-in path only runs when adding wrights.
+- Stuck-block wait tooltips show for every job kind.
+- Bottom HUD sits cleanly above the health and hunger bars.
+
 ## 0.1.7
+
 
 ### Features
 - Shape build mode under Mirror: pick a kind, materials, and hollow option, then place with look aim or an anchor.
