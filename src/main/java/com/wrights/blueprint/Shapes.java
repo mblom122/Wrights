@@ -482,6 +482,28 @@ public final class Shapes {
         return id >= PIVOT_CENTER ? -1 : id % 9;
     }
 
+    /**
+     * Map Exchange’s 3×3 slot onto the form’s pin face.
+     * Floor / Beam / Circle use the bottom footprint; Wall uses the broad vertical face
+     * (UI top row = top of the wall); Pillar stays bottom-center.
+     */
+    public static int exchangePivotId(ExchangeForm form, int plane, int slot) {
+        int s = Mth.clamp(slot, 0, 8);
+        ExchangeForm kind = form == null ? ExchangeForm.FLOOR : form;
+        return switch (kind) {
+            case WALL -> {
+                // Broad face of the vertical plate after axis remap.
+                int face = clampPlane(plane) == AXIS_X ? 5 /* EAST */ : 2 /* NORTH */;
+                int col = s % 3;
+                int row = s / 3;
+                // Flip rows so the menu’s top row is the top of the wall (max Y).
+                yield pivotId(face, (2 - row) * 3 + col);
+            }
+            case PILLAR -> pivotId(0, 4);
+            default -> pivotId(0, s); // FLOOR, BEAM, CIRCLE — bottom footprint
+        };
+    }
+
     public static int pivotId(int face, int slot) {
         return Mth.clamp(face, 0, 5) * 9 + Mth.clamp(slot, 0, 8);
     }

@@ -1242,12 +1242,9 @@ final class ShapeMenuPanel {
         return key;
     }
 
-    /** Bottom-face 3×3 footprint pin for Exchange. Slot 4 (center) is the default. */
+    /** Exchange 3×3 pin (footprint on Floor/Beam; wall face on Wall). Slot 4 is the default. */
     private int drawExchangePivot(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width) {
-        int selected = Shapes.pivotSlot(WrightsClientConfig.exchangePivot());
-        if (selected < 0) {
-            selected = 4;
-        }
+        int selected = WrightsClientConfig.exchangePivotSlot();
         int gap = 4;
         int cell = Math.min(28, Math.max(18, (width - gap * 2) / 3));
         int gridW = cell * 3 + gap * 2;

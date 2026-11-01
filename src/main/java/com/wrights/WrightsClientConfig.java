@@ -908,13 +908,18 @@ public final class WrightsClientConfig {
         save();
     }
 
+    /** Logical 3×3 slot (0–8) chosen in the Exchange menu. */
+    public static int exchangePivotSlot() {
+        int slot = com.wrights.blueprint.Shapes.pivotSlot(EXCHANGE_PIVOT.get());
+        return slot < 0 ? 4 : slot;
+    }
+
+    /**
+     * Resolved AABB pivot for the active Exchange form.
+     * Floor/Beam use the bottom footprint; Wall maps the same 3×3 onto the vertical plate face.
+     */
     public static int exchangePivot() {
-        int pivot = EXCHANGE_PIVOT.get();
-        // Exchange only uses the bottom-face 3×3; map anything else to the face center.
-        if (com.wrights.blueprint.Shapes.pivotFace(pivot) != 0) {
-            return com.wrights.blueprint.Shapes.pivotId(0, 4);
-        }
-        return com.wrights.blueprint.Shapes.clampPivot(pivot);
+        return com.wrights.blueprint.Shapes.exchangePivotId(exchangeForm(), SHAPE_PLANE.get(), exchangePivotSlot());
     }
 
     public static void setExchangePivot(int pivot) {
@@ -922,6 +927,7 @@ public final class WrightsClientConfig {
         if (slot < 0) {
             slot = 4;
         }
+        // Store the logical slot only; {@link #exchangePivot()} maps it to the form’s face.
         EXCHANGE_PIVOT.set(com.wrights.blueprint.Shapes.pivotId(0, slot));
         save();
     }
