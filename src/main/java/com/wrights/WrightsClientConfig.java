@@ -252,6 +252,9 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.IntValue SHAPE_PIVOT = BUILDER
             .comment("Which point on the shape AABB pins to the look/anchor cell. Default is the bottom min corner so Ctrl+scroll swings the box around you; 54 = whole-shape center.")
             .defineInRange("shapePivot", com.wrights.blueprint.Shapes.pivotId(0, 0), 0, com.wrights.blueprint.Shapes.PIVOT_CENTER);
+    public static final ModConfigSpec.IntValue EXCHANGE_PIVOT = BUILDER
+            .comment("Exchange footprint pin: bottom-face 3×3 (0–8 as face*9+slot). Default is the face center.")
+            .defineInRange("exchangePivot", com.wrights.blueprint.Shapes.pivotId(0, 4), 0, com.wrights.blueprint.Shapes.PIVOT_CENTER);
     public static final ModConfigSpec.BooleanValue SHAPE_VOID = BUILDER
             .comment("When true, Wrights void the existing block at each placement cell before placing, like blueprints.")
             .define("shapeVoid", false);
@@ -890,6 +893,24 @@ public final class WrightsClientConfig {
 
     public static void setShapePivot(int pivot) {
         SHAPE_PIVOT.set(com.wrights.blueprint.Shapes.clampPivot(pivot));
+        save();
+    }
+
+    public static int exchangePivot() {
+        int pivot = EXCHANGE_PIVOT.get();
+        // Exchange only uses the bottom-face 3×3; map anything else to the face center.
+        if (com.wrights.blueprint.Shapes.pivotFace(pivot) != 0) {
+            return com.wrights.blueprint.Shapes.pivotId(0, 4);
+        }
+        return com.wrights.blueprint.Shapes.clampPivot(pivot);
+    }
+
+    public static void setExchangePivot(int pivot) {
+        int slot = com.wrights.blueprint.Shapes.pivotSlot(pivot);
+        if (slot < 0) {
+            slot = 4;
+        }
+        EXCHANGE_PIVOT.set(com.wrights.blueprint.Shapes.pivotId(0, slot));
         save();
     }
 

@@ -163,7 +163,9 @@ public final class SelectionRenderer {
         boolean hollow = WrightsClientConfig.SHAPE_HOLLOW.get() && WrightsConfig.allowShapeHollow();
         int plane = WrightsClientConfig.SHAPE_PLANE.get();
         int yaw = com.wrights.blueprint.Shapes.clampYaw(WrightsClientConfig.SHAPE_YAW.get());
-        int pivot = WrightsClientConfig.SHAPE_PIVOT.get();
+        int pivot = WrightsClientState.exchangeToolActive()
+                ? WrightsClientConfig.exchangePivot()
+                : WrightsClientConfig.SHAPE_PIVOT.get();
         // Cache axis-only mesh; yaw orbits the pin in world space (same as placement).
         ensureShapeLocal(kind, size, height, thickness, hollow, plane, 0);
         BlockPos pinLocal = com.wrights.blueprint.Shapes.pivotBlock(shapeLocalMin, shapeLocalMax, pivot);

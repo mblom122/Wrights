@@ -1800,7 +1800,7 @@ public final class WrightsClientState {
                 WrightsClientConfig.SHAPE_THICKNESS.get(),
                 WrightsClientConfig.SHAPE_PLANE.get(),
                 WrightsClientConfig.SHAPE_YAW.get(),
-                WrightsClientConfig.SHAPE_PIVOT.get(),
+                WrightsClientConfig.exchangePivot(),
                 WrightsClientConfig.SHAPE_HOLLOW.get(),
                 WrightsClientConfig.SHAPE_VOID.get(),
                 force,

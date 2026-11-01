@@ -217,8 +217,11 @@ final class ShapeMenuPanel {
             y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_LOOK_LOCK.get(),
                     "menu.wrights.shape_look_lock", "menu.wrights.shape_look_lock_hint", "look_lock");
         }
-        // Pivot stays for Shape; Exchange pins with the default look/anchor flow.
-        if (!exchangeMode) {
+        if (exchangeMode) {
+            drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.exchange_pivot", "menu.wrights.exchange_pivot_hint");
+            y += 12;
+            y = drawExchangePivot(graphics, mouseX, mouseY, x, y, leftW);
+        } else {
             drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_pivot", "menu.wrights.shape_pivot_hint");
             y += 12;
             graphics.drawString(font,
@@ -596,6 +599,12 @@ final class ShapeMenuPanel {
                 }
                 yield true;
             }
+            case "exchange_pivot" -> {
+                if (exchangeMode) {
+                    WrightsClientConfig.setExchangePivot(Shapes.pivotId(0, value));
+                }
+                yield true;
+            }
             case "hollow" -> {
                 if (WrightsConfig.allowShapeHollow()) {
                     WrightsClientConfig.setShapeHollow(!WrightsClientConfig.SHAPE_HOLLOW.get());
@@ -742,7 +751,10 @@ final class ShapeMenuPanel {
         if (minecraft.player == null || minecraft.level == null) {
             return;
         }
-        Shapes.Kind kind = Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
+        Shapes.Kind kind = exchangeMode
+                ? WrightsClientConfig.exchangeForm().kind()
+                : Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
+        int pivot = exchangeMode ? WrightsClientConfig.exchangePivot() : WrightsClientConfig.SHAPE_PIVOT.get();
         BlockPos anchor = Shapes.anchorStandingOnTop(
                 kind,
                 minecraft.player.blockPosition(),
@@ -752,7 +764,7 @@ final class ShapeMenuPanel {
                 WrightsClientConfig.SHAPE_HOLLOW.get(),
                 WrightsClientConfig.SHAPE_PLANE.get(),
                 WrightsClientConfig.SHAPE_YAW.get(),
-                WrightsClientConfig.SHAPE_PIVOT.get());
+                pivot);
         WrightsClientState.setShapeAnchor(anchor);
         WrightsClientConfig.setShapeUseAnchor(true);
         minecraft.player.displayClientMessage(
@@ -984,7 +996,7 @@ final class ShapeMenuPanel {
         net.minecraft.core.BlockPos pin = Shapes.pivotBlock(
                 BlockPos.ZERO,
                 new BlockPos(Math.max(0, meshSizeX - 1), Math.max(0, meshSizeY - 1), Math.max(0, meshSizeZ - 1)),
-                WrightsClientConfig.SHAPE_PIVOT.get());
+                exchangeMode ? WrightsClientConfig.exchangePivot() : WrightsClientConfig.SHAPE_PIVOT.get());
         BlueprintModelView.render(
                 graphics,
                 x + 1,
@@ -1159,6 +1171,49 @@ final class ShapeMenuPanel {
             }
         }
         return key;
+    }
+
+    /** Bottom-face 3×3 footprint pin for Exchange. Slot 4 (center) is the default. */
+    private int drawExchangePivot(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width) {
+        int selected = Shapes.pivotSlot(WrightsClientConfig.exchangePivot());
+        if (selected < 0) {
+            selected = 4;
+        }
+        int gap = 4;
+        int cell = Math.min(28, Math.max(18, (width - gap * 2) / 3));
+        int gridW = cell * 3 + gap * 2;
+        int gridX = x + Math.max(0, (width - gridW) / 2);
+        String[] keys = {
+                "screen.wrights.shape_pivot_slot_nw",
+                "screen.wrights.shape_pivot_slot_n",
+                "screen.wrights.shape_pivot_slot_ne",
+                "screen.wrights.shape_pivot_slot_w",
+                "screen.wrights.shape_pivot_slot_c",
+                "screen.wrights.shape_pivot_slot_e",
+                "screen.wrights.shape_pivot_slot_sw",
+                "screen.wrights.shape_pivot_slot_s",
+                "screen.wrights.shape_pivot_slot_se"
+        };
+        for (int slot = 0; slot < 9; slot++) {
+            int col = slot % 3;
+            int row = slot / 3;
+            int cx = gridX + col * (cell + gap);
+            int cy = y + row * (cell + gap);
+            boolean on = slot == selected;
+            boolean hover = mouseX >= cx && mouseX < cx + cell && mouseY >= cy && mouseY < cy + cell;
+            WrightsUi.choice(graphics, cx, cy, cell, cell, on, hover);
+            String mark = switch (slot) {
+                case 4 -> "●";
+                case 1, 3, 5, 7 -> "─";
+                default -> "·";
+            };
+            graphics.drawCenteredString(font, mark, cx + cell / 2, cy + cell / 2 - 4, on ? WrightsUi.TEXT : WrightsUi.MUTED);
+            hits.add(new Hit(cx, cy, cell, cell, "exchange_pivot", slot));
+            if (hover) {
+                tip = Component.translatable(keys[slot]);
+            }
+        }
+        return y + cell * 3 + gap * 2 + 8;
     }
 
     private int drawPriority(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width) {

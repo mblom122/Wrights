@@ -922,6 +922,8 @@
   "menu.wrights.exchange_title": "Exchange",
   "menu.wrights.exchange_to": "Replace with",
   "menu.wrights.exchange_to_hint": "Materials placed into exchanged cells. Shift+right-click a block in the world sets this list to that block. Same fill modes and priority list as Shape.",
+  "menu.wrights.exchange_pivot": "Shape pivot",
+  "menu.wrights.exchange_pivot_hint": "Which point on the exchange footprint pins to where you look or to the world anchor. Default is the center.",
   "menu.wrights.exchange_silk": "Silk touch",
   "menu.wrights.exchange_silk_hint": "Return the replaced blocks with silk touch instead of destroying them.",
   "menu.wrights.exchange_void_hint": "Clears each matching block before placing Replace with. Off skips occupied cells. Turn this on to actually swap solids.",
