@@ -2605,6 +2605,7 @@ public final class JobManager {
             int index = nextWork(level, player, schematic, job, hand, skipBudget);
             if (index == -2) {
                 scanning = true;
+                hand.aim = -1;
                 // Stay on site while the scan catches up — do not send the wright home.
                 publishHandStatus(level, player, schematic, job, hand, DroneEntity.WAIT_NONE);
                 continue;
@@ -2614,6 +2615,7 @@ public final class JobManager {
                 hand.awaitingItems = false;
                 hand.waitingOnOthers = true;
                 hand.idle = false;
+                hand.aim = -1;
                 // Stay near the build so this wright can place as soon as the support lands.
                 publishHandStatus(level, player, schematic, job, hand, DroneEntity.WAIT_FLOOR);
                 continue;
@@ -2621,6 +2623,7 @@ public final class JobManager {
             if (index == NEED_ITEMS) {
                 waiting = true;
                 waitingItems = true;
+                hand.aim = -1;
                 parkForItems(level, player, hand);
                 publishHandStatus(level, player, schematic, job, hand, DroneEntity.WAIT_ITEMS);
                 continue;
@@ -2633,10 +2636,20 @@ public final class JobManager {
                 } else {
                     hand.awaitingItems = false;
                     hand.idle = true;
+                    hand.aim = -1;
                     publishHandStatus(level, player, schematic, job, hand, DroneEntity.WAIT_IDLE);
                     continue;
                 }
             }
+            index = uncrowd(level, player, schematic, job, hand, index);
+            if (index < 0) {
+                hand.awaitingItems = false;
+                hand.idle = true;
+                hand.aim = -1;
+                publishHandStatus(level, player, schematic, job, hand, DroneEntity.WAIT_IDLE);
+                continue;
+            }
+            claimAim(job, hand, index);
             hand.awaitingItems = false;
             hand.idle = false;
             working = true;
@@ -2669,21 +2682,35 @@ public final class JobManager {
                 if (at == SUPPORT_WAIT) {
                     waiting = true;
                     hand.waitingOnOthers = true;
+                    hand.aim = -1;
                     handStatus = DroneEntity.WAIT_FLOOR;
                     break;
                 }
                 if (at == NEED_ITEMS) {
                     waiting = true;
                     waitingItems = true;
+                    hand.aim = -1;
                     handStatus = DroneEntity.WAIT_ITEMS;
                     parkForItems(level, player, hand);
                     break;
                 }
                 if (at < 0) {
+                    at = borrowWork(level, player, schematic, job, hand, true);
+                    if (at < 0) {
+                        hand.idle = true;
+                        hand.aim = -1;
+                        handStatus = DroneEntity.WAIT_IDLE;
+                        break;
+                    }
+                }
+                at = uncrowd(level, player, schematic, job, hand, at);
+                if (at < 0) {
                     hand.idle = true;
+                    hand.aim = -1;
                     handStatus = DroneEntity.WAIT_IDLE;
                     break;
                 }
+                claimAim(job, hand, at);
                 Schematic.Entry entry = schematic.entry(at);
                 BlockPos pos = job.min().offset(entry.x(), entry.y(), entry.z());
                 if (drone.distanceToSqr(Vec3.atCenterOf(pos)) > 9.0D) {
@@ -3100,6 +3127,7 @@ public final class JobManager {
      * Another part of this build that this wright can pay for.
      * {@code takeOwned} is true when this wright's own share is empty, so it may help with
      * cells that still belong to another wright.
+     * Skips cells another wright is already flying to so helpers spread out.
      */
     private static int borrowWork(ServerLevel level, ServerPlayer player, Schematic schematic, BuildJob job, BuildJob.Hand hand, boolean takeOwned) {
         for (int i = 0; i < schematic.blockCount(); i++) {
@@ -3108,6 +3136,9 @@ public final class JobManager {
                 continue;
             }
             if (falling(level, schematic, job, entry) != Falling.READY) {
+                continue;
+            }
+            if (aimedByOther(job, hand, i)) {
                 continue;
             }
             if (!canPay(player, level, job, hand, entry)) {
@@ -3119,6 +3150,67 @@ public final class JobManager {
             return i;
         }
         return -1;
+    }
+
+    private static boolean aimedByOther(BuildJob job, BuildJob.Hand hand, int index) {
+        if (index < 0) {
+            return false;
+        }
+        for (BuildJob.Hand other : job.hands()) {
+            if (other != hand && other.aim == index) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Mark this cell as taken for the crew; clear any helper that was also aiming here. */
+    private static void claimAim(BuildJob job, BuildJob.Hand hand, int index) {
+        hand.aim = index;
+        if (index < 0) {
+            return;
+        }
+        for (BuildJob.Hand other : job.hands()) {
+            if (other != hand && other.aim == index) {
+                other.aim = -1;
+            }
+        }
+    }
+
+    /**
+     * If another wright is already closer to this cell (or tied and claimed first), pick a
+     * different open cell so the crew does not stack on one block.
+     */
+    private static int uncrowd(ServerLevel level, ServerPlayer player, Schematic schematic, BuildJob job, BuildJob.Hand hand, int index) {
+        if (index < 0 || !aimedByOther(job, hand, index)) {
+            return index;
+        }
+        Schematic.Entry entry = schematic.entry(index);
+        Vec3 at = Vec3.atCenterOf(job.min().offset(entry.x(), entry.y(), entry.z()));
+        double ours = aimDistance(level, hand, at);
+        for (BuildJob.Hand other : job.hands()) {
+            if (other == hand || other.aim != index) {
+                continue;
+            }
+            if (aimDistance(level, other, at) <= ours) {
+                hand.aim = -1;
+                int alt = borrowWork(level, player, schematic, job, hand, true);
+                return alt;
+            }
+            other.aim = -1;
+        }
+        return index;
+    }
+
+    private static double aimDistance(ServerLevel level, BuildJob.Hand hand, Vec3 at) {
+        if (hand.entityId == null) {
+            return Double.MAX_VALUE;
+        }
+        Entity entity = level.getEntity(hand.entityId);
+        if (!(entity instanceof DroneEntity drone) || drone.isRemoved()) {
+            return Double.MAX_VALUE;
+        }
+        return drone.distanceToSqr(at);
     }
 
     private static boolean heldByOther(ServerLevel level, ServerPlayer player, BuildJob job, BuildJob.Hand hand, Schematic.Entry entry) {
@@ -3463,6 +3555,9 @@ public final class JobManager {
                 continue;
             }
             if (!ownShareEmpty && !ownsEntry(job, hand, entry)) {
+                continue;
+            }
+            if (ownShareEmpty && aimedByOther(job, hand, i)) {
                 continue;
             }
             if (falling(level, schematic, job, entry) != Falling.READY) {

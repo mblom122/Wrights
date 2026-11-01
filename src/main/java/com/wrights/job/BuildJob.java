@@ -1240,6 +1240,11 @@ public final class BuildJob {
         public boolean waitingOnOthers;
         /** Home because every block it can reach needs an item its supply does not have. Not saved. */
         public boolean awaitingItems;
+        /**
+         * Schematic index this wright is flying to or placing. Not saved.
+         * Helpers skip indexes already aimed at so the crew does not pile onto one block.
+         */
+        public int aim = -1;
         public UUID entityId;
         public BlockPos lastPos;
         /** Null = personal wrightport (player back). Set = placed wrightport block. */
