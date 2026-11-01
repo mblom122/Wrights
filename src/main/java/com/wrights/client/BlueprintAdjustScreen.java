@@ -22,6 +22,15 @@ public class BlueprintAdjustScreen extends Screen {
     private int panelY;
     private int panelW;
     private int panelH;
+    private int locationY;
+    private int sizeLeft;
+    private int locAxisX;
+    private int sizeAxisX;
+    private int volumeY;
+    private int rotateLabelY;
+    private int rotateY;
+    private int flipLabelY;
+    private int flipY;
     private EditBox nameBox;
     private EditBox xBox;
     private EditBox yBox;
@@ -69,48 +78,108 @@ public class BlueprintAdjustScreen extends Screen {
 
     @Override
     protected void init() {
-        panelW = 392;
-        panelH = 340;
+        int pad = 12;
+        int gap = 14;
+        int stepW = 16;
+        int axisRoom = 8;
+        int pairGap = 6;
+        int boxW = 44;
+        int colW = stepW + 2 + boxW + 2 + stepW + axisRoom;
+        int detailW = colW * 2 + pairGap;
+        int leftW = Math.max(190, detailW);
+        int modelMin = 96;
+        int toggles = (WrightsConfig.allowCopyFluids() ? 1 : 0) + 3;
+        // Name, side-by-side loc/size, volume, rotate, flip, reset, save.
+        int leftNeed = 28 + 16 + 8 + 12 + 54 + 14 + 12 + 16 + 12 + 16 + 20 + 16 + 24 + 18 + 8;
+        int rightChrome = 28 + 8 + toggles * 18 + 8;
+        int modelHWant = Math.min(176, Math.max(modelMin, this.height - 8 - rightChrome));
+        int rightNeed = rightChrome + modelHWant;
+        panelH = Math.min(this.height - 8, Math.max(leftNeed, rightNeed));
+        modelH = Math.max(modelMin, Math.min(176, panelH - rightChrome));
+        while (pad + leftW + gap + modelH + 8 + pad > this.width - 8 && boxW > 28) {
+            boxW--;
+            colW = stepW + 2 + boxW + 2 + stepW + axisRoom;
+            detailW = colW * 2 + pairGap;
+            leftW = Math.max(detailW, Math.min(190, leftW));
+        }
+        int modelWWant = Math.max(modelMin, modelH);
+        if (pad + leftW + gap + modelWWant + 8 + pad > this.width - 8) {
+            modelWWant = Math.max(modelMin, this.width - 8 - pad * 2 - gap - leftW - 8);
+            leftW = Math.min(leftW, this.width - 8 - pad * 2 - gap - modelWWant - 8);
+        }
+        panelW = pad + leftW + gap + modelWWant + 8 + pad;
         panelX = Math.max(8, (this.width - panelW) / 2);
         panelY = Math.max(4, (this.height - panelH) / 2);
-        nameBox = box(panelX + 12, panelY + 28, 190, 16, 48, false);
-        xBox = number(panelX + 32, panelY + 64, true);
-        yBox = number(panelX + 32, panelY + 82, true);
-        zBox = number(panelX + 32, panelY + 100, true);
-        sxBox = number(panelX + 32, panelY + 136, false);
-        syBox = number(panelX + 32, panelY + 154, false);
-        szBox = number(panelX + 32, panelY + 172, false);
-        step(panelX + 12, panelY + 64, "-", () -> nudge(-1, 0, 0));
-        step(panelX + 114, panelY + 64, "+", () -> nudge(1, 0, 0));
-        step(panelX + 12, panelY + 82, "-", () -> nudge(0, -1, 0));
-        step(panelX + 114, panelY + 82, "+", () -> nudge(0, 1, 0));
-        step(panelX + 12, panelY + 100, "-", () -> nudge(0, 0, -1));
-        step(panelX + 114, panelY + 100, "+", () -> nudge(0, 0, 1));
-        step(panelX + 12, panelY + 136, "-", () -> grow(0, -1));
-        step(panelX + 114, panelY + 136, "+", () -> grow(0, 1));
-        step(panelX + 12, panelY + 154, "-", () -> grow(1, -1));
-        step(panelX + 114, panelY + 154, "+", () -> grow(1, 1));
-        step(panelX + 12, panelY + 172, "-", () -> grow(2, -1));
-        step(panelX + 114, panelY + 172, "+", () -> grow(2, 1));
-        int turnRow = 93;
-        int turnLeft = panelX + 12;
-        int rotateY = panelY + 220;
-        int flipY = panelY + 256;
-        rotateLeftButton = new WrightsButton(turnLeft, rotateY, turnRow, 16, Component.translatable("screen.wrights.rotate_left"), button -> turn(BlueprintTransforms.Op.ROTATE_CCW));
-        rotateRightButton = new WrightsButton(turnLeft + turnRow + 4, rotateY, turnRow, 16, Component.translatable("screen.wrights.rotate_right"), button -> turn(BlueprintTransforms.Op.ROTATE));
-        flipHorizontalButton = new WrightsButton(turnLeft, flipY, turnRow, 16, Component.translatable("screen.wrights.flip_horizontal"), button -> turn(BlueprintTransforms.Op.FLIP_X));
-        flipVerticalButton = new WrightsButton(turnLeft + turnRow + 4, flipY, turnRow, 16, Component.translatable("screen.wrights.flip_vertical"), button -> turn(BlueprintTransforms.Op.FLIP_Y));
+
+        int left = panelX + pad;
+        nameBox = box(left, panelY + 28, leftW, 16, 48, false);
+        locationY = panelY + 52;
+        sizeLeft = left + colW + pairGap;
+        locAxisX = left + colW - axisRoom;
+        sizeAxisX = sizeLeft + colW - axisRoom;
+        int row0 = locationY + 12;
+        int row1 = locationY + 30;
+        int row2 = locationY + 48;
+        int locPlus = left + stepW + 2 + boxW + 2;
+        int sizePlus = sizeLeft + stepW + 2 + boxW + 2;
+        xBox = number(left + stepW + 2, row0, boxW, true);
+        yBox = number(left + stepW + 2, row1, boxW, true);
+        zBox = number(left + stepW + 2, row2, boxW, true);
+        sxBox = number(sizeLeft + stepW + 2, row0, boxW, false);
+        syBox = number(sizeLeft + stepW + 2, row1, boxW, false);
+        szBox = number(sizeLeft + stepW + 2, row2, boxW, false);
+        step(left, row0, "-", () -> nudge(-1, 0, 0));
+        step(locPlus, row0, "+", () -> nudge(1, 0, 0));
+        step(left, row1, "-", () -> nudge(0, -1, 0));
+        step(locPlus, row1, "+", () -> nudge(0, 1, 0));
+        step(left, row2, "-", () -> nudge(0, 0, -1));
+        step(locPlus, row2, "+", () -> nudge(0, 0, 1));
+        step(sizeLeft, row0, "-", () -> grow(0, -1));
+        step(sizePlus, row0, "+", () -> grow(0, 1));
+        step(sizeLeft, row1, "-", () -> grow(1, -1));
+        step(sizePlus, row1, "+", () -> grow(1, 1));
+        step(sizeLeft, row2, "-", () -> grow(2, -1));
+        step(sizePlus, row2, "+", () -> grow(2, 1));
+
+        volumeY = locationY + 68;
+        rotateLabelY = volumeY + 14;
+        rotateY = rotateLabelY + 12;
+        flipLabelY = rotateY + 20;
+        flipY = flipLabelY + 12;
+        int turnRow = (leftW - 4) / 2;
+        rotateLeftButton = new WrightsButton(left, rotateY, turnRow, 16, Component.translatable("screen.wrights.rotate_left"), button -> turn(BlueprintTransforms.Op.ROTATE_CCW));
+        rotateRightButton = new WrightsButton(left + turnRow + 4, rotateY, turnRow, 16, Component.translatable("screen.wrights.rotate_right"), button -> turn(BlueprintTransforms.Op.ROTATE));
+        flipHorizontalButton = new WrightsButton(left, flipY, turnRow, 16, Component.translatable("screen.wrights.flip_horizontal"), button -> turn(BlueprintTransforms.Op.FLIP_X));
+        flipVerticalButton = new WrightsButton(left + turnRow + 4, flipY, turnRow, 16, Component.translatable("screen.wrights.flip_vertical"), button -> turn(BlueprintTransforms.Op.FLIP_Y));
         addRenderableWidget(rotateLeftButton);
         addRenderableWidget(rotateRightButton);
         addRenderableWidget(flipHorizontalButton);
         addRenderableWidget(flipVerticalButton);
-        resetButton = new WrightsButton(panelX + 12, panelY + 280, 190, 16, Component.translatable(resetKey()), button -> reset());
+        int resetY = flipY + 20;
+        resetButton = new WrightsButton(left, resetY, leftW, 16, Component.translatable(resetKey()), button -> reset());
         addRenderableWidget(resetButton);
-        saveButton = new WrightsButton(panelX + 12, panelY + 306, 60, 18, Component.translatable("screen.wrights.save"), button -> save(false));
+        int saveY = resetY + 24;
+        int saveW = (leftW - 8) / 3;
+        saveButton = new WrightsButton(left, saveY, saveW, 18, Component.translatable("screen.wrights.save"), button -> save(false));
         addRenderableWidget(saveButton);
-        buildButton = new WrightsButton(panelX + 76, panelY + 306, 60, 18, Component.translatable("screen.wrights.send"), button -> build());
+        buildButton = new WrightsButton(left + saveW + 4, saveY, saveW, 18, Component.translatable("screen.wrights.send"), button -> build());
         addRenderableWidget(buildButton);
-        addRenderableWidget(new WrightsButton(panelX + 140, panelY + 306, 66, 18, Component.translatable("screen.wrights.cancel"), button -> cancel(), true));
+        addRenderableWidget(new WrightsButton(left + saveW * 2 + 8, saveY, leftW - saveW * 2 - 8, 18, Component.translatable("screen.wrights.cancel"), button -> cancel(), true));
+
+        modelX = panelX + pad + leftW + gap;
+        modelY = panelY + 28;
+        modelW = panelW - pad - (modelX - panelX);
+        fluidX = modelX;
+        fluidY = modelY + modelH + 8;
+        nbtX = modelX;
+        nbtY = fluidY + (WrightsConfig.allowCopyFluids() ? 18 : 0);
+        settingsX = modelX;
+        settingsY = nbtY + 18;
+        allX = modelX;
+        allY = settingsY + 18;
+
+        int contentBottom = Math.max(saveY + 18, allY + 12);
+        panelH = Math.min(this.height - 8, Math.max(panelH, contentBottom - panelY + 8));
         refresh();
     }
 
@@ -146,18 +215,19 @@ public class BlueprintAdjustScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTick);
         Component title = Component.translatable(WrightsClientState.editingId == null ? "screen.wrights.adjust" : "screen.wrights.adjust_edit");
         graphics.drawString(this.font, title, panelX + 14, panelY + 8, WrightsUi.COPPER, false);
-        graphics.drawString(this.font, Component.translatable("screen.wrights.location"), panelX + 12, panelY + 52, WrightsUi.BLUE, false);
-        graphics.drawString(this.font, Component.translatable("screen.wrights.size_label"), panelX + 12, panelY + 124, WrightsUi.BLUE, false);
-        graphics.drawString(this.font, Component.translatable("screen.wrights.rotate"), panelX + 12, panelY + 208, WrightsUi.BLUE, false);
-        graphics.drawString(this.font, Component.translatable("screen.wrights.flip"), panelX + 12, panelY + 244, WrightsUi.BLUE, false);
-        axis(graphics, panelY + 66, "X");
-        axis(graphics, panelY + 84, "Y");
-        axis(graphics, panelY + 102, "Z");
-        axis(graphics, panelY + 138, "X");
-        axis(graphics, panelY + 156, "Y");
-        axis(graphics, panelY + 174, "Z");
+        graphics.drawString(this.font, Component.translatable("screen.wrights.location"), panelX + 12, locationY, WrightsUi.BLUE, false);
+        graphics.drawString(this.font, Component.translatable("screen.wrights.size_label"), sizeLeft, locationY, WrightsUi.BLUE, false);
+        graphics.drawString(this.font, Component.translatable("screen.wrights.rotate"), panelX + 12, rotateLabelY, WrightsUi.BLUE, false);
+        graphics.drawString(this.font, Component.translatable("screen.wrights.flip"), panelX + 12, flipLabelY, WrightsUi.BLUE, false);
+        axis(graphics, locAxisX, locationY + 14, "X");
+        axis(graphics, locAxisX, locationY + 32, "Y");
+        axis(graphics, locAxisX, locationY + 50, "Z");
+        axis(graphics, sizeAxisX, locationY + 14, "X");
+        axis(graphics, sizeAxisX, locationY + 32, "Y");
+        axis(graphics, sizeAxisX, locationY + 50, "Z");
         helpTip = null;
         renderModel(graphics, mouseX, mouseY);
+        int volW = Math.max(40, sizeLeft + (sizeAxisX - sizeLeft) + 8 - (panelX + 12));
         if (WrightsClientState.cornerA != null && WrightsClientState.cornerB != null) {
             graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable(
                     "screen.wrights.volume",
@@ -165,9 +235,9 @@ public class BlueprintAdjustScreen extends Screen {
                     BoxEdits.span(WrightsClientState.cornerA, WrightsClientState.cornerB, 1),
                     BoxEdits.span(WrightsClientState.cornerA, WrightsClientState.cornerB, 2),
                     BoxEdits.volume(WrightsClientState.cornerA, WrightsClientState.cornerB),
-                    WrightsClientState.solidSelection()).getString(), 198), panelX + 12, panelY + 192, WrightsUi.MUTED, false);
+                    WrightsClientState.solidSelection()).getString(), volW), panelX + 12, volumeY, WrightsUi.MUTED, false);
         } else {
-            graphics.drawString(this.font, Component.translatable("hud.wrights.capture"), panelX + 12, panelY + 192, WrightsUi.MUTED, false);
+            graphics.drawString(this.font, Component.translatable("hud.wrights.capture"), panelX + 12, volumeY, WrightsUi.MUTED, false);
         }
         if (helpTip != null) {
             graphics.renderTooltip(this.font, helpTip, mouseX, mouseY);
@@ -463,31 +533,19 @@ public class BlueprintAdjustScreen extends Screen {
         return box;
     }
 
-    private EditBox number(int x, int y, boolean signed) {
-        return box(x, y, 78, 14, 8, true, signed);
+    private EditBox number(int x, int y, int width, boolean signed) {
+        return box(x, y, width, 16, 8, true, signed);
     }
 
     private void step(int x, int y, String label, Runnable action) {
-        addRenderableWidget(new WrightsButton(x, y, 16, 14, Component.literal(label), button -> action.run()));
+        addRenderableWidget(new WrightsButton(x, y, 16, 16, Component.literal(label), button -> action.run()));
     }
 
-    private void axis(GuiGraphics graphics, int y, String label) {
-        graphics.drawString(this.font, label, panelX + 134, y, WrightsUi.MUTED, false);
+    private void axis(GuiGraphics graphics, int x, int y, String label) {
+        graphics.drawString(this.font, label, x, y, WrightsUi.MUTED, false);
     }
 
     private void renderModel(GuiGraphics graphics, int mouseX, int mouseY) {
-        modelX = panelX + 222;
-        modelY = panelY + 28;
-        modelW = panelW - 234;
-        modelH = 176;
-        fluidX = modelX;
-        fluidY = modelY + modelH + 8;
-        nbtX = modelX;
-        nbtY = fluidY + 18;
-        settingsX = modelX;
-        settingsY = nbtY + 18;
-        allX = modelX;
-        allY = settingsY + 18;
         WrightsUi.inset(graphics, modelX - 4, modelY - 4, modelW + 8, modelH + 8);
         ensurePreview();
         if (!spinning) {
