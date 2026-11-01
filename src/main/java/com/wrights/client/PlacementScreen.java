@@ -58,6 +58,7 @@ public class PlacementScreen extends Screen implements JeiPreview {
     private WrightsButton lockButton;
     private WrightsButton followButton;
     private WrightsButton priorityButton;
+    private WrightsButton saveButton;
     private WrightsButton buildButton;
     private int supplySummaryY;
     private boolean suppress;
@@ -217,7 +218,8 @@ public class PlacementScreen extends Screen implements JeiPreview {
                 WrightsClientState.placeSettingsChosen(),
                 WrightsClientState.placeAllChosen(),
                 this)));
-        addRenderableWidget(new WrightsButton(controlsX + side + half + 4, foot, rightHalf, footBtn, Component.translatable("screen.wrights.save_blueprint"), button -> saveBlueprint()));
+        saveButton = new WrightsButton(controlsX + side + half + 4, foot, rightHalf, footBtn, Component.translatable("screen.wrights.save_changes"), button -> saveBlueprint());
+        addRenderableWidget(saveButton);
         int actionY = foot + footBtn + 2;
         addRenderableWidget(new WrightsButton(controlsX + side, actionY, half, footBtn, Component.translatable("screen.wrights.back"), button -> onClose()));
         // Confirm closes with the chosen settings; right-click in the world starts the job.
@@ -280,6 +282,11 @@ public class PlacementScreen extends Screen implements JeiPreview {
         }
         if (buildButton != null) {
             buildButton.setMessage(Component.translatable("screen.wrights.confirm"));
+        }
+        if (saveButton != null) {
+            boolean dirty = WrightsClientState.hasUnsavedBlueprintChanges(false);
+            saveButton.active = dirty;
+            saveButton.setMessage(Component.translatable("screen.wrights.save_changes"));
         }
         suppress = false;
     }
@@ -535,6 +542,9 @@ public class PlacementScreen extends Screen implements JeiPreview {
     }
 
     private void saveBlueprint() {
+        if (!WrightsClientState.hasUnsavedBlueprintChanges(false)) {
+            return;
+        }
         PacketDistributor.sendToServer(new BlueprintPayloads.SaveSession(
                 WrightsClientConfig.PLACE_FLUIDS.get(),
                 WrightsClientConfig.VOID_BLOCKS.get(),
@@ -543,6 +553,8 @@ public class PlacementScreen extends Screen implements JeiPreview {
                 WrightsClientConfig.PLACE_NBT_BLOCKS.get(),
                 WrightsClientState.keepStoredSettings(),
                 WrightsClientState.keepStoredAll()));
+        WrightsClientState.markBlueprintClean(false);
+        refresh();
     }
 
     private void transform(BlueprintTransforms.Op operation) {

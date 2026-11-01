@@ -127,7 +127,7 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
         int backW = 68;
         int backX = controlsW - backW;
         int footBtn = Math.max(16, btnH + 2);
-        saveButton = new WrightsButton(controlsX + side, footY + rowH + 2, backX - side - 4, footBtn, Component.translatable("screen.wrights.save"), button -> finish(true));
+        saveButton = new WrightsButton(controlsX + side, footY + rowH + 2, backX - side - 4, footBtn, Component.translatable("screen.wrights.save_changes"), button -> finish(true));
         cancelButton = new WrightsButton(controlsX + backX, footY + rowH + 2, backW, footBtn, Component.translatable("screen.wrights.cancel"), button -> onClose());
         addRenderableWidget(materialsButton);
         addRenderableWidget(saveButton);
@@ -148,6 +148,9 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
     private void finish(boolean keep) {
         if (leaving || this.minecraft == null) {
             return;
+        }
+        if (keep && !WrightsClientState.hasUnsavedBlueprintChanges(true)) {
+            keep = false;
         }
         leaving = true;
         if (WrightsClientState.editId != null) {
@@ -196,6 +199,11 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
             materialsButton.setY(footY);
             saveButton.setY(footY + pitch + 2);
             cancelButton.setY(footY + pitch + 2);
+        }
+        if (saveButton != null) {
+            boolean dirty = WrightsClientState.hasUnsavedBlueprintChanges(true);
+            saveButton.active = dirty;
+            saveButton.setMessage(Component.translatable("screen.wrights.save_changes"));
         }
         int contentBottom = Math.max(column.belowSelection(), footY + pitch + 2 + footBtn + 8);
         contentH = contentBottom - (bodyTop - bodyScroll);

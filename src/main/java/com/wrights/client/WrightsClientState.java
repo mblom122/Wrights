@@ -84,6 +84,8 @@ public final class WrightsClientState {
     public static DockNotice dockNotice;
     public static boolean storedSettings;
     public static boolean storedAll;
+    /** Fingerprint of the last loaded/saved blueprint options + geometry. */
+    private static String blueprintCleanKey = "";
     public static boolean sampled;
     public static boolean concealed;
     public static boolean follow;
@@ -1284,12 +1286,14 @@ public final class WrightsClientState {
             if (restorePlacementPending || !same || !wasBuild) {
                 applySavedPlacementOptions(payload);
                 restorePlacementPending = false;
+                markBlueprintClean(false);
             }
             cornerA = null;
             cornerB = null;
         } else if (switching || payload.openEditor()) {
             applySavedPlacementOptions(payload);
             restorePlacementPending = false;
+            markBlueprintClean(true);
         }
         updateFlags();
         if (payload.openEditor()) {
@@ -1758,6 +1762,45 @@ public final class WrightsClientState {
             return storedSettings;
         }
         return WrightsClientConfig.PLACE_NBT_SETTINGS.get();
+    }
+
+    /** Record the current blueprint options/geometry as the saved baseline. */
+    public static void markBlueprintClean(boolean edit) {
+        blueprintCleanKey = blueprintChangeKey(edit);
+    }
+
+    /** True when paste options or geometry differ from the last loaded/saved blueprint. */
+    public static boolean hasUnsavedBlueprintChanges(boolean edit) {
+        if (edit) {
+            if (editId == null) {
+                return false;
+            }
+        } else if (buildId == null) {
+            return false;
+        }
+        return !blueprintChangeKey(edit).equals(blueprintCleanKey);
+    }
+
+    private static String blueprintChangeKey(boolean edit) {
+        int blocks = edit ? editBlocks : blockCount;
+        int sx = edit ? editX : fullX;
+        int sy = edit ? editY : fullY;
+        int sz = edit ? editZ : fullZ;
+        int ax = edit ? editPivotX : pivotX;
+        int ay = edit ? editPivotY : pivotY;
+        int az = edit ? editPivotZ : pivotZ;
+        return blocks + "|" + sx + "|" + sy + "|" + sz + "|" + ax + "|" + ay + "|" + az
+                + "|" + bool(WrightsClientConfig.PLACE_FLUIDS.get())
+                + "|" + bool(WrightsClientConfig.VOID_BLOCKS.get())
+                + "|" + bool(WrightsClientConfig.VOID_FLUIDS.get())
+                + "|" + bool(WrightsClientConfig.VOID_NBT.get())
+                + "|" + bool(WrightsClientConfig.PLACE_NBT_BLOCKS.get())
+                + "|" + bool(keepStoredSettings())
+                + "|" + bool(keepStoredAll());
+    }
+
+    private static String bool(boolean value) {
+        return value ? "1" : "0";
     }
 
     public static void stepAnchor() {
