@@ -134,6 +134,9 @@ public class DroneEntity extends Entity {
         }
     }
 
+    /** Last launch height so two wrights in a row never pop in on the same Y. */
+    private static int lastLaunchHeight = -1;
+
     /** Leaves the personal port behind the player, aimed at the work site. */
     public void departFromPlayer(ServerPlayer player, Vec3 work, int lane, int lanes) {
         setHomePort(null);
@@ -161,13 +164,25 @@ public class DroneEntity extends Entity {
             side = side.normalize();
         }
         double spread = lanes <= 1 ? 0.0D : (lane - (lanes - 1) * 0.5D) * 0.45D;
-        Vec3 start = from.add(toward.scale(0.35D)).add(side.scale(spread));
+        // Pop in above the player / port at a random height so a swarm does not stack.
+        double lift = nextLaunchHeight();
+        Vec3 start = from.add(toward.scale(0.35D)).add(side.scale(spread)).add(0.0D, lift, 0.0D);
         float yaw = (float) (Mth.atan2(toward.z, toward.x) * Mth.RAD_TO_DEG) - 90.0F;
         if (!Float.isFinite(yaw)) {
             yaw = fallbackYaw;
         }
         this.moveTo(start.x, start.y, start.z, yaw, 0.0F);
         this.setYRot(yaw);
+    }
+
+    /** Random 3–10 blocks above the hatch / player; never repeats the previous pick. */
+    private int nextLaunchHeight() {
+        int height = 3 + this.getRandom().nextInt(8);
+        if (height == lastLaunchHeight) {
+            height = 3 + (height - 3 + 1 + this.getRandom().nextInt(7)) % 8;
+        }
+        lastLaunchHeight = height;
+        return height;
     }
 
     /** Returns to the personal port (behind the player) or a placed wrightport hatch. */
