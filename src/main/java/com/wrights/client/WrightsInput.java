@@ -483,6 +483,19 @@ public final class WrightsInput {
             return;
         }
         if (control) {
+            // Build with a template: Ctrl+scroll rotates 90° (up = clockwise, down = anti-clockwise).
+            if (WrightsClientState.mode == WrightsClientState.Mode.BUILD
+                    && WrightsClientState.buildId != null
+                    && !WrightsClientState.bindSupply
+                    && !(WrightsClientState.mirrorToolActive() && com.wrights.WrightsClientConfig.mirrorBlocks())) {
+                var op = event.getScrollDeltaY() > 0.0D
+                        ? com.wrights.blueprint.BlueprintTransforms.Op.ROTATE
+                        : com.wrights.blueprint.BlueprintTransforms.Op.ROTATE_CCW;
+                net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                        new BlueprintPayloads.TransformBlueprint(WrightsClientState.buildId, op.ordinal()));
+                event.setCanceled(true);
+                return;
+            }
             if (WrightsClientState.nudgeBoundary(event.getScrollDeltaY())) {
                 event.setCanceled(true);
             }
