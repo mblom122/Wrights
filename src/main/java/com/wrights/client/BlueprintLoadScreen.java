@@ -238,8 +238,10 @@ public class BlueprintLoadScreen extends Screen {
             return;
         }
         if (lines.isEmpty()) {
+            int emptyY = listY + 8;
             for (var line : this.font.split(Component.translatable("screen.wrights.slip_empty"), listW - 12)) {
-                graphics.drawString(this.font, line, listX + 6, listY + 8, WrightsUi.MUTED, false);
+                graphics.drawString(this.font, line, listX + 6, emptyY, WrightsUi.MUTED, false);
+                emptyY += 10;
             }
             return;
         }
