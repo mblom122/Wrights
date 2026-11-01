@@ -138,7 +138,8 @@ public final class Shapes {
         int band = clampHeight(thickness);
         // Always build Y-up / XZ cross-section, then orient with axis + rotation.
         switch (kind) {
-            case CIRCLE -> disk(out, center, r, hollow, AXIS_Y, false, limit);
+            // Size is diameter (full width in blocks), not radius.
+            case CIRCLE -> diskDiameter(out, center, r, hollow, AXIS_Y, limit);
             case RING -> ring(out, center, r, band, h, AXIS_Y, hollow, limit);
             case SQUARE -> square(out, center, r, hollow, AXIS_Y, limit);
             // Size / thickness / height are full block counts: Width × Depth × Height.
@@ -167,7 +168,8 @@ public final class Shapes {
         int band = Math.max(1, clampHeight(thickness));
         long diam = 2L * r + 1L;
         return switch (kind) {
-            case CIRCLE, SQUARE -> diam * diam;
+            case CIRCLE -> (long) r * (long) r;
+            case SQUARE -> diam * diam;
             case RING -> {
                 int tall = Math.max(1, h);
                 long along = tall <= 1 ? 1L : (long) tall;
@@ -196,7 +198,17 @@ public final class Shapes {
         int maxY;
         int maxZ;
         switch (kind) {
-            case CIRCLE, SQUARE -> {
+            case CIRCLE -> {
+                // Size is diameter (full block width).
+                int a0 = -(r - 1) / 2;
+                minX = a0;
+                maxX = a0 + r - 1;
+                minY = 0;
+                maxY = 0;
+                minZ = a0;
+                maxZ = a0 + r - 1;
+            }
+            case SQUARE -> {
                 minX = -r;
                 maxX = r;
                 minY = 0;
@@ -531,20 +543,29 @@ public final class Shapes {
         return new BlockPos(minX, minY, minZ);
     }
 
-    private static void disk(List<BlockPos> out, BlockPos center, int radius, boolean hollow, int plane, boolean filledOnly, int limit) {
-        int r2 = radius * radius;
-        int inner = hollow ? Math.max(0, radius - 1) : -1;
-        int inner2 = inner * inner;
-        for (int a = -radius; a <= radius; a++) {
-            for (int b = -radius; b <= radius; b++) {
-                int d2 = a * a + b * b;
-                if (d2 > r2) {
+    /**
+     * Flat disk whose {@code diameter} is the full width in blocks (not radius).
+     * Works for odd and even sizes; center sits on a block (odd) or between blocks (even).
+     */
+    private static void diskDiameter(List<BlockPos> out, BlockPos center, int diameter, boolean hollow, int plane, int limit) {
+        int d = Math.max(1, diameter);
+        int a0 = -(d - 1) / 2;
+        int b0 = -(d - 1) / 2;
+        double mid = (d - 1) * 0.5D;
+        double maxR2 = (d * 0.5D) * (d * 0.5D);
+        double innerR2 = hollow && d > 2 ? ((d - 2) * 0.5D) * ((d - 2) * 0.5D) : -1.0D;
+        for (int ia = 0; ia < d; ia++) {
+            for (int ib = 0; ib < d; ib++) {
+                double da = ia - mid;
+                double db = ib - mid;
+                double dist2 = da * da + db * db;
+                if (dist2 > maxR2 + 1.0E-6D) {
                     continue;
                 }
-                if (hollow && !filledOnly && d2 < inner2) {
+                if (innerR2 >= 0.0D && dist2 < innerR2 - 1.0E-6D) {
                     continue;
                 }
-                if (!take(out, flat(center, a, b, plane), limit)) {
+                if (!take(out, flat(center, a0 + ia, b0 + ib, plane), limit)) {
                     return;
                 }
             }

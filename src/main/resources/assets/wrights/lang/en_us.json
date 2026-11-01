@@ -922,6 +922,8 @@
   "menu.wrights.shape_pyramid_size_hint": "Half-width of the pyramid’s base in the plane perpendicular to Axis.",
   "menu.wrights.shape_ring_size_hint": "Radius of the ring to the outer edge, in the plane perpendicular to Axis.",
   "menu.wrights.shape_radius": "Radius",
+  "menu.wrights.shape_diameter": "Diameter",
+  "menu.wrights.shape_circle_diameter_hint": "Full width of the circle in blocks (2 × radius), in the plane perpendicular to Axis.",
   "menu.wrights.shape_circle_radius_hint": "Radius of the circle in the plane perpendicular to Axis.",
   "menu.wrights.shape_sphere_radius_hint": "Radius of the sphere, in blocks from the center.",
   "menu.wrights.shape_dome_radius_hint": "Radius of the dome’s floor in the plane perpendicular to Axis.",
