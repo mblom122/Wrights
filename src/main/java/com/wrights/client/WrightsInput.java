@@ -818,20 +818,7 @@ public final class WrightsInput {
         boolean lookMode = !com.wrights.WrightsClientConfig.SHAPE_USE_ANCHOR.get()
                 || !com.wrights.WrightsConfig.allowShapeAnchor();
         if (lookMode) {
-            boolean lockFirst = com.wrights.WrightsClientConfig.SHAPE_LOOK_LOCK.get();
-            if (lockFirst && !WrightsClientState.shapeLookSnapActive()) {
-                BlockHitResult aim = WrightsClientState.shapeLookHit();
-                if (aim == null) {
-                    player.displayClientMessage(Component.translatable("message.wrights.shape_look"), true);
-                    return;
-                }
-                WrightsClientState.lockShapeLookSnap(aim.getBlockPos(), aim.getDirection());
-                BlockPos pin = WrightsClientState.shapeLookSnapPos;
-                player.displayClientMessage(
-                        Component.translatable("message.wrights.shape_look_locked", pin.getX(), pin.getY(), pin.getZ()),
-                        true);
-                return;
-            }
+            // Exchange never uses Lock before build — follow look, or a snap set via Edit point.
             if (WrightsClientState.shapeLookSnapActive()) {
                 WrightsClientState.tryExchange(false, WrightsClientState.shapeLookSnapPos, Direction.UP);
             } else {

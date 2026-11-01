@@ -237,11 +237,11 @@ final class ShapeMenuPanel {
                 graphics.drawCenteredString(font, Component.translatable("menu.wrights.shape_under_me_btn"), x + leftW / 2, y + 5, WrightsUi.TEXT);
                 hits.add(new Hit(x, y, leftW, 18, "under_me", 0));
                 y += 22;
-            } else {
+            } else if (!exchangeMode) {
                 y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_LOOK_LOCK.get(),
                         "menu.wrights.shape_look_lock", "menu.wrights.shape_look_lock_hint", "look_lock");
             }
-        } else {
+        } else if (!exchangeMode) {
             y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_LOOK_LOCK.get(),
                     "menu.wrights.shape_look_lock", "menu.wrights.shape_look_lock_hint", "look_lock");
         }
@@ -619,11 +619,14 @@ final class ShapeMenuPanel {
             case "place" -> {
                 if (!WrightsConfig.allowShapeAnchor()) {
                     WrightsClientConfig.setShapeUseAnchor(false);
+                    WrightsClientState.clearShapeLookSnap();
                     yield true;
                 }
                 WrightsClientConfig.setShapeUseAnchor(value != 0);
-                if (value != 0) {
-                    WrightsClientState.clearShapeLookSnap();
+                // Look mode must follow the crosshair; drop any leftover snap pin.
+                WrightsClientState.clearShapeLookSnap();
+                if (exchangeMode && value == 0) {
+                    WrightsClientConfig.setShapeLookLock(false);
                 }
                 yield true;
             }

@@ -10,7 +10,7 @@ import com.wrights.blueprint.Shapes;
 
 /**
  * Compact translucent Shift+right-click tweak for Shape / Exchange:
- * size (and height/length when needed), Look vs On-anchor, look-lock, and a link
+ * size (and height/length when needed), Look vs On-anchor, and a link
  * into the existing look-snap / world-anchor editors. Same light-veil panel style
  * as {@link ShapeLookSnapScreen} so the world preview stays visible underneath.
  */
@@ -28,6 +28,8 @@ public class ShapeTweakScreen extends Screen {
     private int sizeY = -1;
     private int alongY = -1;
     private int thicknessY = -1;
+    private int placeLabelY = -1;
+    private int placeChoicesY = -1;
     private int valueX;
     private int valueW;
     private Component tip;
@@ -65,12 +67,15 @@ public class ShapeTweakScreen extends Screen {
         boolean showSize = !line;
         boolean showAlong = line || kind.usesHeight();
         boolean showThickness = !line && (kind == Shapes.Kind.BOX || kind == Shapes.Kind.RING);
+        // Shape keeps Lock before in this compact menu; Exchange does not.
+        boolean showLookLock = !exchange && anchors && !WrightsClientConfig.SHAPE_USE_ANCHOR.get();
         int rows = 1 // title
                 + (showSize ? 1 : 0)
                 + (showAlong ? 1 : 0)
                 + (showThickness ? 1 : 0)
-                + 1 // place mode
-                + (anchors && !WrightsClientConfig.SHAPE_USE_ANCHOR.get() ? 1 : 0) // look lock
+                + 1 // Build at label
+                + 1 // Build at choices
+                + (showLookLock ? 2 : 0) // lock label + Off/On
                 + 1; // buttons
         panelH = PAD + 12 + GAP + rows * (ROW + GAP) + PAD;
         panelH = WrightsUi.fitH(panelH, this.height);
@@ -83,7 +88,7 @@ public class ShapeTweakScreen extends Screen {
         int plusX = valueX + fieldW + 2;
         int y = panelY + PAD + 12 + GAP;
 
-        sizeY = alongY = thicknessY = -1;
+        sizeY = alongY = thicknessY = placeLabelY = placeChoicesY = -1;
         if (showSize) {
             sizeY = y;
             step(minusX, y, "-", () -> nudgeSize(-1));
@@ -103,10 +108,13 @@ public class ShapeTweakScreen extends Screen {
             y += ROW + GAP;
         }
 
-        // Place mode row is drawn; choices are hit-tested in mouseClicked.
+        placeLabelY = y;
         y += ROW + GAP;
-        if (anchors && !WrightsClientConfig.SHAPE_USE_ANCHOR.get()) {
-            y += ROW + GAP; // look lock row
+        placeChoicesY = y;
+        y += ROW + GAP;
+        if (showLookLock) {
+            y += ROW + GAP; // lock label
+            y += ROW + GAP; // Off / On
         }
 
         int half = (panelW - PAD * 2 - GAP) / 2;
@@ -159,45 +167,37 @@ public class ShapeTweakScreen extends Screen {
             drawValue(graphics, thicknessY, WrightsClientConfig.SHAPE_THICKNESS.get());
         }
 
-        int y = placeModeY();
-        graphics.drawString(this.font, Component.translatable("menu.wrights.shape_place"),
-                panelX + PAD, y + 3, WrightsUi.MUTED, false);
         boolean anchors = WrightsConfig.allowShapeAnchor();
         boolean useAnchor = anchors && WrightsClientConfig.SHAPE_USE_ANCHOR.get();
-        int choiceX = valueX - STEP - 2;
-        int choiceW = (panelX + panelW - PAD - choiceX - GAP) / 2;
-        drawChoice(graphics, mouseX, mouseY, choiceX, y, choiceW,
-                !useAnchor, "menu.wrights.shape_place_look");
-        drawChoice(graphics, mouseX, mouseY, choiceX + choiceW + GAP, y, panelX + panelW - PAD - (choiceX + choiceW + GAP),
-                useAnchor, "menu.wrights.shape_place_anchor");
+        if (placeLabelY >= 0) {
+            graphics.drawString(this.font, Component.translatable("menu.wrights.shape_place"),
+                    panelX + PAD, placeLabelY + 3, WrightsUi.MUTED, false);
+        }
+        if (placeChoicesY >= 0) {
+            int choiceX = panelX + PAD;
+            int choiceW = (panelW - PAD * 2 - GAP) / 2;
+            drawChoice(graphics, mouseX, mouseY, choiceX, placeChoicesY, choiceW,
+                    !useAnchor, "menu.wrights.shape_place_look");
+            drawChoice(graphics, mouseX, mouseY, choiceX + choiceW + GAP, placeChoicesY,
+                    panelW - PAD * 2 - choiceW - GAP, useAnchor, "menu.wrights.shape_place_anchor");
+        }
 
-        if (anchors && !useAnchor) {
-            int lockY = y + ROW + GAP;
+        if (!exchange && anchors && !useAnchor && placeChoicesY >= 0) {
+            int lockLabelY = placeChoicesY + ROW + GAP;
+            int lockChoicesY = lockLabelY + ROW + GAP;
+            int choiceX = panelX + PAD;
+            int choiceW = (panelW - PAD * 2 - GAP) / 2;
             graphics.drawString(this.font, Component.translatable("menu.wrights.shape_look_lock"),
-                    panelX + PAD, lockY + 3, WrightsUi.MUTED, false);
+                    panelX + PAD, lockLabelY + 3, WrightsUi.MUTED, false);
             boolean lock = WrightsClientConfig.SHAPE_LOOK_LOCK.get();
-            drawChoice(graphics, mouseX, mouseY, choiceX, lockY, choiceW, !lock, "menu.wrights.off");
-            drawChoice(graphics, mouseX, mouseY, choiceX + choiceW + GAP, lockY,
-                    panelX + panelW - PAD - (choiceX + choiceW + GAP), lock, "menu.wrights.on");
+            drawChoice(graphics, mouseX, mouseY, choiceX, lockChoicesY, choiceW, !lock, "menu.wrights.off");
+            drawChoice(graphics, mouseX, mouseY, choiceX + choiceW + GAP, lockChoicesY,
+                    panelW - PAD * 2 - choiceW - GAP, lock, "menu.wrights.on");
         }
 
         if (tip != null) {
             graphics.renderTooltip(this.font, this.font.split(tip, 220), mouseX, mouseY);
         }
-    }
-
-    private int placeModeY() {
-        int y = panelY + PAD + 12 + GAP;
-        if (sizeY >= 0) {
-            y += ROW + GAP;
-        }
-        if (alongY >= 0) {
-            y += ROW + GAP;
-        }
-        if (thicknessY >= 0) {
-            y += ROW + GAP;
-        }
-        return y;
     }
 
     private void drawValue(GuiGraphics graphics, int y, int value) {
@@ -233,28 +233,37 @@ public class ShapeTweakScreen extends Screen {
     private boolean handleModeClick(double mouseX, double mouseY) {
         boolean anchors = WrightsConfig.allowShapeAnchor();
         boolean useAnchor = anchors && WrightsClientConfig.SHAPE_USE_ANCHOR.get();
-        int y = placeModeY();
-        int choiceX = valueX - STEP - 2;
-        int choiceW = (panelX + panelW - PAD - choiceX - GAP) / 2;
-        if (hit(mouseX, mouseY, choiceX, y, choiceW, ROW)) {
+        if (placeChoicesY < 0) {
+            return false;
+        }
+        int choiceX = panelX + PAD;
+        int choiceW = (panelW - PAD * 2 - GAP) / 2;
+        if (hit(mouseX, mouseY, choiceX, placeChoicesY, choiceW, ROW)) {
+            // Where I look: drop any stale snap so the hologram follows the crosshair again.
             WrightsClientConfig.setShapeUseAnchor(false);
-            rebuild();
-            return true;
-        }
-        if (anchors && hit(mouseX, mouseY, choiceX + choiceW + GAP, y,
-                panelX + panelW - PAD - (choiceX + choiceW + GAP), ROW)) {
-            WrightsClientConfig.setShapeUseAnchor(true);
-            rebuild();
-            return true;
-        }
-        if (anchors && !useAnchor) {
-            int lockY = y + ROW + GAP;
-            if (hit(mouseX, mouseY, choiceX, lockY, choiceW, ROW)) {
+            WrightsClientState.clearShapeLookSnap();
+            if (exchange) {
                 WrightsClientConfig.setShapeLookLock(false);
+            }
+            rebuild();
+            return true;
+        }
+        if (anchors && hit(mouseX, mouseY, choiceX + choiceW + GAP, placeChoicesY,
+                panelW - PAD * 2 - choiceW - GAP, ROW)) {
+            WrightsClientConfig.setShapeUseAnchor(true);
+            WrightsClientState.clearShapeLookSnap();
+            rebuild();
+            return true;
+        }
+        if (!exchange && anchors && !useAnchor) {
+            int lockChoicesY = placeChoicesY + ROW + GAP + ROW + GAP;
+            if (hit(mouseX, mouseY, choiceX, lockChoicesY, choiceW, ROW)) {
+                WrightsClientConfig.setShapeLookLock(false);
+                WrightsClientState.clearShapeLookSnap();
                 return true;
             }
-            if (hit(mouseX, mouseY, choiceX + choiceW + GAP, lockY,
-                    panelX + panelW - PAD - (choiceX + choiceW + GAP), ROW)) {
+            if (hit(mouseX, mouseY, choiceX + choiceW + GAP, lockChoicesY,
+                    panelW - PAD * 2 - choiceW - GAP, ROW)) {
                 WrightsClientConfig.setShapeLookLock(true);
                 return true;
             }
