@@ -239,6 +239,10 @@ public class WrightsMenuScreen extends Screen {
     private int optionThumbH;
     private boolean optionDragging;
     private int optionDragGrab;
+    private int helpHeadY;
+    private int helpButtonX;
+    private int helpButtonY;
+    private int helpButtonW;
     private int hologramHeadY;
     private int buildHeadY;
     private int supplyHeadY;
@@ -1203,11 +1207,18 @@ public class WrightsMenuScreen extends Screen {
         int x = optionViewX + 10;
         int controls = optionControlsX(x);
         int local = 2;
+        helpHeadY = optionY(local);
+        local += 16;
+        Component openHelp = Component.translatable("help.wrights.open");
+        helpButtonW = Math.max(88, this.font.width(openHelp) + 16);
+        helpButtonX = controls;
+        helpButtonY = optionY(local - 3);
+        local += 28;
         hologramHeadY = optionY(local);
         // Keep the hologram sample clear of the color swatches on the left.
         optionPreviewX = optionViewX + optionViewW - 16 - 48;
         optionPreviewY = optionY(local);
-        local = 34;
+        local += 32;
         wallSwatchY = optionY(local - 2);
         local += 20;
         int sliderW = Mth.clamp(optionViewX + optionViewW - 18 - controls - 42, 48, 120);
@@ -1369,6 +1380,13 @@ public class WrightsMenuScreen extends Screen {
         optionTip = null;
         graphics.enableScissor(optionViewX, optionViewY, optionViewX + optionViewW - 6, optionViewY + optionViewH);
         int lineEnd = optionViewX + optionViewW - 16;
+        drawOptionSection(graphics, x, helpHeadY, "menu.wrights.section_help", lineEnd);
+        Component openHelp = Component.translatable("help.wrights.open");
+        boolean helpHover = mouseX >= helpButtonX && mouseX < helpButtonX + helpButtonW && mouseY >= helpButtonY && mouseY < helpButtonY + 16;
+        WrightsUi.choice(graphics, helpButtonX, helpButtonY, helpButtonW, 16, true, helpHover);
+        graphics.drawCenteredString(this.font, openHelp, helpButtonX + helpButtonW / 2, helpButtonY + 4, WrightsUi.TEXT);
+        drawOptionHelp(graphics, mouseX, mouseY, x, helpButtonY + 3, openHelp, helpButtonX, helpButtonX + helpButtonW,
+                Component.translatable("help.wrights.open_hint"));
         drawOptionSection(graphics, x, hologramHeadY, "menu.wrights.section_hologram", optionPreviewX - 8);
         int preview = (Math.round(WrightsClientConfig.wallAlpha() * 255.0F) << 24) | WrightsClientConfig.wallRgb();
         graphics.fill(optionPreviewX, optionPreviewY, optionPreviewX + 48, optionPreviewY + 28, preview);
@@ -2764,6 +2782,10 @@ public class WrightsMenuScreen extends Screen {
             }
             if (insideOptionView(mouseX, mouseY)) {
                 if (overOptionHelp(mouseX, mouseY)) {
+                    return true;
+                }
+                if (mouseX >= helpButtonX && mouseX < helpButtonX + helpButtonW && mouseY >= helpButtonY && mouseY < helpButtonY + 16) {
+                    this.minecraft.setScreen(new HelpScreen(this));
                     return true;
                 }
                 if (pickSwatch(mouseX, mouseY, wallSwatchY, 0) || pickSwatch(mouseX, mouseY, edgeSwatchY, 1) || pickSwatch(mouseX, mouseY, queueEdgeSwatchY, 2) || pickSwatch(mouseX, mouseY, placeEdgeSwatchY, 3)) {
