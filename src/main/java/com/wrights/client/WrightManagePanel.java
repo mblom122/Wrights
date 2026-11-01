@@ -218,14 +218,21 @@ final class WrightManagePanel {
 
         int listTop = listTop();
         int listBottom = panelY + panelH - 62;
+        int listX = panelX + 8;
+        int listW = Math.max(40, panelW - 16);
+        int contentH = contentHeight(screen, swarm);
         int view = Math.max(1, listBottom - listTop);
-        scroll = Mth.clamp(scroll, 0, Math.max(0, contentHeight(screen, swarm) - view));
-        graphics.enableScissor(panelX + 8, listTop, panelX + panelW - 8, listBottom);
+        boolean bar = contentH > view;
+        int barPad = bar ? 8 : 0;
+        scroll = Mth.clamp(scroll, 0, Math.max(0, contentH - view));
+        WrightsUi.inset(graphics, listX, listTop, listW, view);
+        graphics.enableScissor(listX + 1, listTop + 1, listX + listW - 1 - barPad, listBottom - 1);
         if (home == 0) {
             graphics.drawString(screen.font(), Component.translatable(swarm.units().isEmpty() ? "screen.wrights.hangar_empty" : "screen.wrights.manage_home_empty"),
-                    panelX + 12, listTop + 4, WrightsUi.MUTED, false);
+                    listX + 6, listTop + 6, WrightsUi.MUTED, false);
         }
-        int y = listTop - scroll;
+        int y = listTop + 2 - scroll;
+        int rowRight = listX + listW - 4 - barPad;
         for (int i = 0; i < swarm.units().size(); i++) {
             if (away(screen, swarm, i)) {
                 checked.remove(swarm.units().get(i).id());
@@ -236,37 +243,38 @@ final class WrightManagePanel {
             if (y + ROW >= listTop && y < listBottom) {
                 boolean mark = checked.contains(unit.id());
                 if (mark || i == expanded) {
-                    graphics.fill(panelX + 10, y - 1, panelX + panelW - 10, y + ROW - 1, i == expanded ? 0x553C2A1A : 0x33243340);
+                    graphics.fill(listX + 2, y - 1, rowRight, y + ROW - 1, i == expanded ? 0x553C2A1A : 0x33243340);
                 }
-                drawCheck(graphics, panelX + 12, y + 2, mark, true, mouseX, mouseY);
+                drawCheck(graphics, listX + 4, y + 2, mark, true, mouseX, mouseY);
                 Component tierName = Component.translatable(WrightTier.nameKey(tier));
                 int tierWidth = screen.font().width(tierName);
-                String name = screen.font().plainSubstrByWidth(unit.title(i + 1).getString(), Math.max(24, panelW - 28 - 18 - tierWidth));
-                graphics.drawString(screen.font(), name, panelX + 28, y + 3, WrightsUi.TEXT, false);
-                graphics.drawString(screen.font(), tierName, panelX + panelW - 14 - tierWidth, y + 3, WrightTier.textColor(tier), false);
+                String name = screen.font().plainSubstrByWidth(unit.title(i + 1).getString(), Math.max(24, rowRight - listX - 22 - tierWidth));
+                graphics.drawString(screen.font(), name, listX + 20, y + 3, WrightsUi.TEXT, false);
+                graphics.drawString(screen.font(), tierName, rowRight - tierWidth, y + 3, WrightTier.textColor(tier), false);
             }
             y += ROW;
             if (i == expanded) {
                 placeNameBox(screen, swarm, i, y, listTop, listBottom);
                 if (y + EXPAND > listTop && y < listBottom) {
-                    graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_pace"), panelX + 18, y + 20, WrightsUi.TEXT, false);
+                    graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_pace"), listX + 10, y + 20, WrightsUi.TEXT, false);
                     boolean canDowngrade = tier > WrightTier.BASE;
                     if (tier < WrightTier.NETHERITE) {
                         Component next = Component.translatable(WrightTier.nameKey(tier + 1));
-                        graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_next", next), panelX + 18, y + 32, WrightsUi.MUTED, false);
+                        graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_next", next), listX + 10, y + 32, WrightsUi.MUTED, false);
                         boolean have = canAfford(screen, tier, tier + 1);
                         drawMini(graphics, screen, upX(), y + 46, upW(), Component.translatable("screen.wrights.manage_upgrade", next), have, false, mouseX, mouseY);
-                        drawMini(graphics, screen, downX(), y + 46, downW(), Component.translatable("screen.wrights.manage_remove_upgrade"), canDowngrade, false, mouseX, mouseY);
+                        drawMini(graphics, screen, downX(barPad), y + 46, downW(barPad), Component.translatable("screen.wrights.manage_remove_upgrade"), canDowngrade, false, mouseX, mouseY);
                     } else {
-                        graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_best"), panelX + 18, y + 32, WrightsUi.MUTED, false);
+                        graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_best"), listX + 10, y + 32, WrightsUi.MUTED, false);
                         drawMini(graphics, screen, upX(), y + 46, upW(), Component.translatable("screen.wrights.manage_remove_upgrade"), canDowngrade, false, mouseX, mouseY);
                     }
-                    drawTiers(graphics, screen, y + 64, tier, mouseX, mouseY);
+                    drawTiers(graphics, screen, y + 64, tier, mouseX, mouseY, barPad);
                 }
                 y += EXPAND;
             }
         }
         graphics.disableScissor();
+        WrightsUi.scrollBar(graphics, listX + listW - 5, listTop + 2, view - 4, scroll, contentH);
         if (nameBox != null && expanded < 0) {
             nameBox.setVisible(false);
         }
@@ -336,10 +344,11 @@ final class WrightManagePanel {
         }
         int listTop = listTop();
         int listBottom = panelY + panelH - 62;
-        if (mouseX < panelX + 8 || mouseX > panelX + panelW - 8 || mouseY < listTop || mouseY >= listBottom) {
+        int barPad = listBarPad(screen, swarm, listTop, listBottom);
+        if (mouseX < panelX + 8 || mouseX > panelX + panelW - 8 - barPad || mouseY < listTop || mouseY >= listBottom) {
             return false;
         }
-        int local = (int) mouseY - listTop + scroll;
+        int local = (int) mouseY - listTop - 2 + scroll;
         int y = 0;
         for (int i = 0; i < swarm.units().size(); i++) {
             if (away(screen, swarm, i)) {
@@ -365,15 +374,15 @@ final class WrightManagePanel {
                         screen.edit(HangarOps.UPGRADE, i);
                         return true;
                     }
-                    int downX = tier < WrightTier.NETHERITE ? downX() : upX();
-                    int downW = tier < WrightTier.NETHERITE ? downW() : upW();
+                    int downX = tier < WrightTier.NETHERITE ? downX(barPad) : upX();
+                    int downW = tier < WrightTier.NETHERITE ? downW(barPad) : upW();
                     if (tier > WrightTier.BASE && mouseX >= downX && mouseX < downX + downW) {
                         screen.edit(HangarOps.DOWNGRADE, i);
                         return true;
                     }
                 }
                 if (local >= y + 64 && local < y + 78) {
-                    int picked = tierAt(mouseX);
+                    int picked = tierAt(mouseX, panelX + 18, panelW - 36 - barPad);
                     if (picked >= WrightTier.BASE && picked != tier && (picked < tier || canAfford(screen, tier, picked))) {
                         screen.batch(HangarOps.TO_TIER, picked, new int[] { i });
                     }
@@ -549,8 +558,8 @@ final class WrightManagePanel {
         drawMini(graphics, screen, dx + dw - 78, dy + dh - 26, 66, Component.translatable("screen.wrights.manage_cancel"), true, false, mouseX, mouseY);
     }
 
-    private void drawTiers(GuiGraphics graphics, ManageHost screen, int y, int current, int mouseX, int mouseY) {
-        drawTierChoices(graphics, screen, panelX + 18, y, panelW - 36, current, mouseX, mouseY);
+    private void drawTiers(GuiGraphics graphics, ManageHost screen, int y, int current, int mouseX, int mouseY, int barPad) {
+        drawTierChoices(graphics, screen, panelX + 18, y, panelW - 36 - barPad, current, mouseX, mouseY);
     }
 
     private void drawTierChoices(GuiGraphics graphics, ManageHost screen, int x, int y, int width, int current, int mouseX, int mouseY) {
@@ -634,7 +643,8 @@ final class WrightManagePanel {
         }
         nameBox.setX(panelX + 18);
         nameBox.setY(y + 2);
-        nameBox.setWidth(Math.max(60, panelW - 36));
+        int barPad = listBarPad(screen, swarm, listTop, listBottom);
+        nameBox.setWidth(Math.max(60, panelW - 36 - barPad));
         if (nameFor != index && index >= 0 && index < swarm.units().size()) {
             String current = swarm.units().get(index).name();
             if (current == null) {
@@ -673,6 +683,10 @@ final class WrightManagePanel {
         return panelY + 52 + headExtra;
     }
 
+    private int listBarPad(ManageHost screen, Swarm swarm, int listTop, int listBottom) {
+        return contentHeight(screen, swarm) > Math.max(1, listBottom - listTop) ? 8 : 0;
+    }
+
     private int upX() {
         return panelX + 18;
     }
@@ -681,12 +695,12 @@ final class WrightManagePanel {
         return Math.min(160, Math.max(40, (panelW - 44) / 2));
     }
 
-    private int downX() {
-        return panelX + panelW - 18 - downW();
+    private int downX(int barPad) {
+        return panelX + panelW - 18 - barPad - downW(barPad);
     }
 
-    private int downW() {
-        return Math.min(156, Math.max(40, panelW - 44 - upW() - 8));
+    private int downW(int barPad) {
+        return Math.min(156, Math.max(40, panelW - 44 - barPad - upW() - 8));
     }
 
     private int contentHeight(ManageHost screen, Swarm swarm) {
