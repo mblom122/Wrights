@@ -16,6 +16,8 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
+import com.wrights.util.BlockFilters;
+
 /**
  * Shape material palette with Random (weighted), Priority (use until stock runs out),
  * and Order (alternate left-to-right in batches) fill modes.
@@ -42,7 +44,7 @@ public final class ShapeMaterials {
                 return null;
             }
             BlockState state = blockItem.getBlock().defaultBlockState();
-            return state.isAir() ? null : state;
+            return BlockFilters.canStore(state) ? state : null;
         }
     }
 
@@ -70,7 +72,7 @@ public final class ShapeMaterials {
                     continue;
                 }
                 Item item = BuiltInRegistries.ITEM.get(id);
-                if (!(item instanceof BlockItem)) {
+                if (!(item instanceof BlockItem blockItem) || !BlockFilters.canStore(blockItem.getBlock().defaultBlockState())) {
                     continue;
                 }
                 int weight = 1;
@@ -113,7 +115,7 @@ public final class ShapeMaterials {
 
     public static List<Entry> add(List<Entry> current, Item item) {
         List<Entry> next = new ArrayList<>(current == null ? List.of() : current);
-        if (!(item instanceof BlockItem)) {
+        if (!(item instanceof BlockItem blockItem) || !BlockFilters.canStore(blockItem.getBlock().defaultBlockState())) {
             return next;
         }
         for (int i = 0; i < next.size(); i++) {

@@ -42,5 +42,6 @@ public class WrightsJeiPlugin implements IModPlugin {
         registration.addGhostIngredientHandler(BlueprintEditScreen.class, new PreviewGhostHandler<>());
         registration.addGhostIngredientHandler(PlacementScreen.class, new PreviewGhostHandler<>());
         registration.addGhostIngredientHandler(BlueprintMapScreen.class, new PreviewGhostHandler<>());
+        registration.addGhostIngredientHandler(BlockPickerScreen.class, new PickerGhostHandler());
     }
 }

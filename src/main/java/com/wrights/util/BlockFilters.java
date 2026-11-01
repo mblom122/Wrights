@@ -15,6 +15,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.BushBlock;
 import net.minecraft.world.level.block.CactusBlock;
 import net.minecraft.world.level.block.DoorBlock;
+import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.FallingBlock;
 import net.minecraft.world.level.block.DoublePlantBlock;
 import net.minecraft.world.level.block.EndGatewayBlock;
@@ -170,7 +171,7 @@ public final class BlockFilters {
     }
 
     public static boolean canStore(BlockState state) {
-        if (state.isAir() || state.hasBlockEntity()) {
+        if (state == null || state.isAir() || isNbtBlock(state)) {
             return false;
         }
         var block = state.getBlock();
@@ -183,6 +184,14 @@ public final class BlockFilters {
             return false;
         }
         return block.asItem() != Items.AIR;
+    }
+
+    /**
+     * Chests, machines, and other block-entity blocks. Shape materials and the plain block picker
+     * refuse these — shapes only place default states with no NBT.
+     */
+    public static boolean isNbtBlock(BlockState state) {
+        return state != null && (state.hasBlockEntity() || state.getBlock() instanceof EntityBlock);
     }
 
     /** Sand, gravel, anvils, and the other blocks that fall when the block under them is missing. */

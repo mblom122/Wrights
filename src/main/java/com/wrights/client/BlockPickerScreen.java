@@ -116,7 +116,7 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
             return;
         }
         for (BlockState state : initial) {
-            if (state == null || state.isAir()) {
+            if (!BlockFilters.canStore(state)) {
                 continue;
             }
             Item item = state.getBlock().asItem();
@@ -421,6 +421,10 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
             if (blocksOnly && choice.fluid() != null) {
                 continue;
             }
+            // Shape materials / plain picks: never list chests, machines, or other NBT blocks.
+            if (blocksOnly && !BlockFilters.canStore(Block.stateById(choice.stateId()))) {
+                continue;
+            }
             if (!query.isEmpty() && !choice.name().getString().toLowerCase(Locale.ROOT).contains(query)) {
                 continue;
             }
@@ -515,6 +519,11 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
     }
 
     private void choose(Choice choice) {
+        BlockState state = Block.stateById(choice.stateId());
+        // Shape material tray only accepts plain blocks (no block-entity / NBT blocks).
+        if (blocksOnly && !BlockFilters.canStore(state)) {
+            return;
+        }
         if (multi) {
             int existing = indexInSelected(choice);
             if (existing >= 0) {
@@ -527,7 +536,6 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
             return;
         }
         remember(choice);
-        BlockState state = Block.stateById(choice.stateId());
         if (pick != null) {
             pick.accept(state);
             this.minecraft.setScreen(parent);
@@ -567,14 +575,62 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
         }
         List<BlockState> states = new ArrayList<>(selected.size());
         for (Choice choice : selected) {
-            remember(choice);
             BlockState state = Block.stateById(choice.stateId());
-            if (state != null && !state.isAir()) {
-                states.add(state);
+            if (!BlockFilters.canStore(state)) {
+                continue;
             }
+            remember(choice);
+            states.add(state);
+        }
+        if (states.isEmpty()) {
+            return;
         }
         pickMany.accept(states);
         this.minecraft.setScreen(parent);
+    }
+
+    /** JEI / external drop into the shape materials tray — plain blocks only. */
+    public boolean acceptMaterial(BlockState state) {
+        if (!multi || !blocksOnly || !BlockFilters.canStore(state)) {
+            return false;
+        }
+        Item item = state.getBlock().asItem();
+        if (!(item instanceof BlockItem blockItem)) {
+            return false;
+        }
+        Choice choice = Choice.ofBlock(blockItem);
+        int existing = indexInSelected(choice);
+        if (existing >= 0) {
+            return true;
+        }
+        if (selected.size() >= TRAY_MAX_ROWS * COLS) {
+            return false;
+        }
+        selected.add(choice);
+        remember(choice);
+        markAdd();
+        return true;
+    }
+
+    /** True while this screen is the shape materials multi-picker. */
+    public boolean acceptsMaterials() {
+        return multi && blocksOnly;
+    }
+
+    public int trayPixelX() {
+        return trayX;
+    }
+
+    public int trayPixelY() {
+        return trayY + 12;
+    }
+
+    public int trayPixelW() {
+        return COLS * CELL;
+    }
+
+    public int trayPixelH() {
+        return trayRows() * CELL;
     }
 
     @Override
