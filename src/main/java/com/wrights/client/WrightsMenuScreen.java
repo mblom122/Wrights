@@ -197,6 +197,8 @@ public class WrightsMenuScreen extends Screen {
     private boolean workAllPaused;
     /** Exact job-control hitboxes from the last Jobs render — clicks use these, not a second layout pass. */
     private final List<JobHit> jobHits = new ArrayList<>();
+    /** Until this millis, draw the controller banner brighter after a blocked click. */
+    private long needControllerFlashUntil;
     private int drag;
     private int wallSliderX;
     private int wallSliderY;
@@ -440,10 +442,8 @@ public class WrightsMenuScreen extends Screen {
         if (toolHeld()) {
             return true;
         }
-        if (this.minecraft != null && this.minecraft.player != null) {
-            this.minecraft.player.displayClientMessage(
-                    Component.translatable("message.wrights.need_controller"), true);
-        }
+        // Action-bar toasts sit under this menu — flash the in-panel banner instead.
+        needControllerFlashUntil = System.currentTimeMillis() + 2500L;
         return false;
     }
 
@@ -740,9 +740,6 @@ public class WrightsMenuScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, Component.translatable("menu.wrights.title"), panelX + 16, panelY + 10, WrightsUi.COPPER, false);
         graphics.drawString(this.font, Component.translatable("menu.wrights.subtitle"), panelX + 16, panelY + 22, WrightsUi.MUTED, false);
-        if (!toolHeld()) {
-            drawNeedController(graphics);
-        }
         if (taskBuildingY() >= 0) {
             drawTask(graphics, Component.translatable("menu.wrights.building"), buildingPage(), false, taskBuildingY());
             if (buildingPage()) {
@@ -762,38 +759,27 @@ public class WrightsMenuScreen extends Screen {
         drawTask(graphics, Component.translatable("menu.wrights.options"), options, false, taskOptionsY());
         if (options) {
             renderOptions(graphics, mouseX, mouseY);
-            return;
-        }
-        if (infoPage) {
+        } else if (infoPage) {
             if (System.currentTimeMillis() - WrightsClientState.digitalInfoAt > 2000L) {
                 requestDigitalInfo();
                 WrightsClientState.digitalInfoAt = System.currentTimeMillis();
             }
             renderInfo(graphics, mouseX, mouseY);
-            return;
-        }
-        if (jobsPage) {
+        } else if (jobsPage) {
             renderJobs(graphics, mouseX, mouseY);
-            return;
-        }
-        if (managePage) {
+        } else if (managePage) {
             if (System.currentTimeMillis() - WrightsClientState.digitalInfoAt > 2000L) {
                 requestDigitalInfo();
                 WrightsClientState.digitalInfoAt = System.currentTimeMillis();
             }
             renderManage(graphics, mouseX, mouseY);
-            return;
-        }
-
-        if (mirrorPage) {
+        } else if (mirrorPage) {
             renderMirror(graphics, mouseX, mouseY);
             if (mirrorTip != null) {
                 graphics.renderTooltip(this.font, this.font.split(mirrorTip, 240), mouseX, mouseY);
                 mirrorTip = null;
             }
-            return;
-        }
-        if (shapePage) {
+        } else if (shapePage) {
             if (shapePanel == null) {
                 shapePanel = new ShapeMenuPanel(this.font);
             }
@@ -806,39 +792,56 @@ public class WrightsMenuScreen extends Screen {
             } else if (!shapePanel.hoveredStack().isEmpty()) {
                 graphics.renderTooltip(this.font, shapePanel.hoveredStack(), mouseX, mouseY);
             }
-            return;
+        } else {
+            drawScope(graphics, mouseX, mouseY);
+            drawTabs(graphics, mouseX, mouseY);
+            renderList(graphics, mouseX, mouseY);
+            renderDetail(graphics);
+            if (!toolHeld() && buildButton != null && buildButton.visible) {
+                Component needed = Component.translatable("menu.wrights.controller_needed");
+                int textW = this.font.width(needed);
+                int labelX = buildButton.getX() + buildButton.getWidth() / 2 - textW / 2;
+                int minX = detailX + 4;
+                int maxX = detailX + detailW - 4 - textW;
+                labelX = Mth.clamp(labelX, minX, Math.max(minX, maxX));
+                graphics.drawString(this.font, needed, labelX, buildButton.getY() - 11, 0xFFFF5555, false);
+            }
+            if (sortOpen) {
+                renderSortMenu(graphics, mouseX, mouseY);
+            }
         }
-        drawScope(graphics, mouseX, mouseY);
-        drawTabs(graphics, mouseX, mouseY);
-        renderList(graphics, mouseX, mouseY);
-        renderDetail(graphics);
-        if (!toolHeld() && buildButton != null && buildButton.visible) {
-            Component needed = Component.translatable("menu.wrights.controller_needed");
-            int textW = this.font.width(needed);
-            int labelX = buildButton.getX() + buildButton.getWidth() / 2 - textW / 2;
-            int minX = detailX + 4;
-            int maxX = detailX + detailW - 4 - textW;
-            labelX = Mth.clamp(labelX, minX, Math.max(minX, maxX));
-            graphics.drawString(this.font, needed, labelX, buildButton.getY() - 11, 0xFFFF5555, false);
-        }
-        if (sortOpen) {
-            renderSortMenu(graphics, mouseX, mouseY);
+        // Always last so Jobs/Manage cards cannot cover the warning.
+        if (!toolHeld()) {
+            drawNeedController(graphics);
         }
     }
 
     private void drawNeedController(GuiGraphics graphics) {
         Component label = Component.translatable("menu.wrights.need_controller");
-        float scale = 1.5F;
-        int width = this.font.width(label);
-        int room = panelW - 160;
-        if (width > 0 && width * scale > room) {
-            scale = Math.max(1.0F, room / (float) width);
+        boolean flash = System.currentTimeMillis() < needControllerFlashUntil;
+        float scale = flash ? 2.2F : 1.85F;
+        int textW = this.font.width(label);
+        int cardX = listX - 2;
+        int cardW = panelX + panelW - 12 - cardX;
+        int room = Math.max(80, cardW - 24);
+        if (textW > 0 && textW * scale > room) {
+            scale = Math.max(1.35F, room / (float) textW);
         }
+        int bannerW = Math.min(cardW - 8, Math.round(textW * scale) + 24);
+        int bannerH = Math.round(10 * scale) + 14;
+        int bannerX = cardX + (cardW - bannerW) / 2;
+        int bannerY = jobsPage || managePage || options || infoPage || mirrorPage || shapePage
+                ? jobsInsetY() + 4
+                : panelY + 8;
+        int fill = flash ? 0xF0481018 : 0xE0321018;
+        int edge = flash ? 0xFFFF6666 : 0xFFCC4444;
+        graphics.fill(bannerX, bannerY, bannerX + bannerW, bannerY + bannerH, fill);
+        WrightsUi.border(graphics, bannerX, bannerY, bannerW, bannerH, edge);
         var pose = graphics.pose();
         pose.pushPose();
-        pose.translate(panelX + 148, panelY + 7, 0);
+        pose.translate(bannerX + bannerW / 2.0F, bannerY + bannerH / 2.0F - 4.0F * scale, 200.0F);
         pose.scale(scale, scale, 1.0F);
-        graphics.drawString(this.font, label, 0, 0, 0xFFFF5555, false);
+        graphics.drawString(this.font, label, -textW / 2, 0, flash ? 0xFFFF8888 : 0xFFFF5555, true);
         pose.popPose();
     }
 
