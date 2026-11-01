@@ -2986,6 +2986,8 @@ public final class JobManager {
             return found;
         }
         int best = -1;
+        double bestDist = Double.MAX_VALUE;
+        Vec3 origin = handOrigin(level, hand);
         boolean waiting = false;
         boolean shortItems = false;
         for (BuildJob.Slice slice : hand.slices) {
@@ -2998,8 +3000,20 @@ public final class JobManager {
                 shortItems = true;
                 continue;
             }
-            if (found >= 0 && (best < 0 || found < best)) {
+            if (found < 0) {
+                continue;
+            }
+            // On site: nearest open cell in any owned slice. First dispatch (no origin): lowest index.
+            if (origin == null) {
+                if (best < 0 || found < best) {
+                    best = found;
+                }
+                continue;
+            }
+            double dist = entryDistSqr(job, schematic.entry(found), origin);
+            if (best < 0 || dist < bestDist || (dist == bestDist && found < best)) {
                 best = found;
+                bestDist = dist;
             }
         }
         if (best >= 0) {
@@ -3083,17 +3097,27 @@ public final class JobManager {
      * Next block this range can act on. A falling block whose floor is not down yet is left in place,
      * so the wright can build that floor and wrap back to the sand or gravel. A block this supply cannot
      * pay for is left in place too, and the scan keeps looking.
+     * Once the wright is on site, picks the nearest ready cell in range; before that, first-by-index.
      */
     private static int scan(ServerLevel level, ServerPlayer player, Schematic schematic, BuildJob job, BuildJob.Hand hand, int cursor, int start, java.util.function.Predicate<Schematic.Entry> include) {
         boolean waiting = false;
         boolean shortItems = false;
-        for (int i = Math.max(0, start); i < schematic.blockCount(); i++) {
+        Vec3 origin = handOrigin(level, hand);
+        boolean nearest = origin != null;
+        // Keep the current target while flying so nearest-search does not zig-zag every tick.
+        if (nearest && aimStillOpen(level, player, schematic, job, hand, include, false)) {
+            return hand.aim;
+        }
+        int best = -1;
+        double bestDist = Double.MAX_VALUE;
+        int from = nearest ? 0 : Math.max(0, start);
+        for (int i = from; i < schematic.blockCount(); i++) {
             Schematic.Entry entry = schematic.entry(i);
             if (!include.test(entry)) {
                 continue;
             }
             if (job.outsideClip(entry) || satisfied(level, job, entry)) {
-                if (i == cursor) {
+                if (!nearest && i == cursor) {
                     return i;
                 }
                 continue;
@@ -3115,7 +3139,17 @@ public final class JobManager {
                 shortItems = true;
                 continue;
             }
-            return i;
+            if (!nearest) {
+                return i;
+            }
+            double dist = entryDistSqr(job, entry, origin);
+            if (best < 0 || dist < bestDist || (dist == bestDist && i < best)) {
+                best = i;
+                bestDist = dist;
+            }
+        }
+        if (best >= 0) {
+            return best;
         }
         if (shortItems) {
             return NEED_ITEMS;
@@ -3128,8 +3162,15 @@ public final class JobManager {
      * {@code takeOwned} is true when this wright's own share is empty, so it may help with
      * cells that still belong to another wright.
      * Skips cells another wright is already flying to so helpers spread out.
+     * Once on site, prefers the closest untaken ready cell.
      */
     private static int borrowWork(ServerLevel level, ServerPlayer player, Schematic schematic, BuildJob job, BuildJob.Hand hand, boolean takeOwned) {
+        Vec3 origin = handOrigin(level, hand);
+        if (origin != null && aimStillOpen(level, player, schematic, job, hand, null, takeOwned)) {
+            return hand.aim;
+        }
+        int best = -1;
+        double bestDist = Double.MAX_VALUE;
         for (int i = 0; i < schematic.blockCount(); i++) {
             Schematic.Entry entry = schematic.entry(i);
             if (job.outsideClip(entry) || satisfied(level, job, entry)) {
@@ -3147,9 +3188,65 @@ public final class JobManager {
             if (!takeOwned && heldByOther(level, player, job, hand, entry)) {
                 continue;
             }
-            return i;
+            if (origin == null) {
+                return i;
+            }
+            double dist = entryDistSqr(job, entry, origin);
+            if (best < 0 || dist < bestDist || (dist == bestDist && i < best)) {
+                best = i;
+                bestDist = dist;
+            }
         }
-        return -1;
+        return best;
+    }
+
+    /** Live drone position, else last known spot. Null before the wright has been sent out. */
+    private static Vec3 handOrigin(ServerLevel level, BuildJob.Hand hand) {
+        if (hand.entityId != null) {
+            Entity entity = level.getEntity(hand.entityId);
+            if (entity instanceof DroneEntity drone && drone.isAlive()) {
+                return drone.position();
+            }
+        }
+        if (hand.lastPos != null) {
+            return Vec3.atCenterOf(hand.lastPos);
+        }
+        return null;
+    }
+
+    private static double entryDistSqr(BuildJob job, Schematic.Entry entry, Vec3 origin) {
+        return origin.distanceToSqr(Vec3.atCenterOf(job.min().offset(entry.x(), entry.y(), entry.z())));
+    }
+
+    /**
+     * True when {@link BuildJob.Hand#aim} is still a placeable cell for this wright.
+     * {@code include} limits own-share scans; null means any cell (helper borrow).
+     */
+    private static boolean aimStillOpen(ServerLevel level, ServerPlayer player, Schematic schematic, BuildJob job, BuildJob.Hand hand, Predicate<Schematic.Entry> include, boolean takeOwned) {
+        int index = hand.aim;
+        if (index < 0 || index >= schematic.blockCount()) {
+            return false;
+        }
+        Schematic.Entry entry = schematic.entry(index);
+        if (include != null && !include.test(entry)) {
+            return false;
+        }
+        if (job.outsideClip(entry) || satisfied(level, job, entry)) {
+            return false;
+        }
+        if (falling(level, schematic, job, entry) != Falling.READY) {
+            return false;
+        }
+        if (entry.secondary() && secondaryWaiting(level, job, entry)) {
+            return false;
+        }
+        if (!canPay(player, level, job, hand, entry)) {
+            return false;
+        }
+        if (include == null && !takeOwned && heldByOther(level, player, job, hand, entry)) {
+            return false;
+        }
+        return !aimedByOther(job, hand, index);
     }
 
     private static boolean aimedByOther(BuildJob job, BuildJob.Hand hand, int index) {
@@ -3203,14 +3300,8 @@ public final class JobManager {
     }
 
     private static double aimDistance(ServerLevel level, BuildJob.Hand hand, Vec3 at) {
-        if (hand.entityId == null) {
-            return Double.MAX_VALUE;
-        }
-        Entity entity = level.getEntity(hand.entityId);
-        if (!(entity instanceof DroneEntity drone) || drone.isRemoved()) {
-            return Double.MAX_VALUE;
-        }
-        return drone.distanceToSqr(at);
+        Vec3 origin = handOrigin(level, hand);
+        return origin == null ? Double.MAX_VALUE : origin.distanceToSqr(at);
     }
 
     private static boolean heldByOther(ServerLevel level, ServerPlayer player, BuildJob job, BuildJob.Hand hand, Schematic.Entry entry) {
