@@ -2000,17 +2000,12 @@ public final class WrightsClientState {
         }
         WrightsClientConfig.enforceExchangeLineFootprint();
         if (WrightsClientConfig.placePathStyle()) {
-            // Force-place fills every empty cell from the player out to the offset.
-            int placed = 0;
-            for (BlockPos at : placePathCells(minecraft.player)) {
-                BlockState state = minecraft.level.getBlockState(at);
-                if (!state.isAir() && !state.canBeReplaced()) {
-                    continue;
-                }
-                PacketDistributor.sendToServer(pathCellPlace(at, false));
-                placed++;
-            }
-            return placed > 0;
+            // Force-place: one job for the whole path (offset × width), not one job per block.
+            return sendPlaceCells(
+                    placePathCells(minecraft.player),
+                    false,
+                    force,
+                    WrightsClientConfig.placeStairsStyle() ? "Place - Stairs" : "Place - Bridge");
         }
         if (style == 1) {
             BlockHitResult aim = shapeLookHit();
@@ -2019,16 +2014,11 @@ public final class WrightsClientState {
                 return false;
             }
             boolean voidBlocks = WrightsClientConfig.SHAPE_VOID.get() && WrightsConfig.allowShapeVoid();
-            int placed = 0;
-            for (BlockPos at : placeToMeCells(minecraft.player, aim.getBlockPos(), aim.getDirection())) {
-                BlockState state = minecraft.level.getBlockState(at);
-                if (!voidBlocks && !state.isAir() && !state.canBeReplaced()) {
-                    continue;
-                }
-                PacketDistributor.sendToServer(pathCellPlace(at, voidBlocks));
-                placed++;
-            }
-            if (placed == 0) {
+            if (!sendPlaceCells(
+                    placeToMeCells(minecraft.player, aim.getBlockPos(), aim.getDirection()),
+                    voidBlocks,
+                    force,
+                    "Place - To me")) {
                 minecraft.player.displayClientMessage(Component.translatable("message.wrights.shape_nowhere"), true);
                 return false;
             }
@@ -2150,33 +2140,37 @@ public final class WrightsClientState {
         return cells;
     }
 
-    private static BlueprintPayloads.ShapePlace pathCellPlace(BlockPos at, boolean voidBlocks) {
-        return new BlueprintPayloads.ShapePlace(
-                at,
-                Direction.UP.get3DDataValue(),
-                false,
-                false,
-                BlockPos.ZERO,
-                Shapes.Kind.RECTANGLE.ordinal(),
-                1,
-                1,
-                1,
-                Shapes.AXIS_Y,
-                0,
-                Shapes.pivotId(0, 4),
-                false,
+    /**
+     * One Place job for every empty / replaceable cell in the path (Bridge, Stairs, To me).
+     * Returns false when nothing was sent.
+     */
+    private static boolean sendPlaceCells(java.util.List<BlockPos> cells, boolean voidBlocks, boolean force, String title) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || minecraft.level == null || cells == null || cells.isEmpty()) {
+            return false;
+        }
+        java.util.ArrayList<BlockPos> open = new java.util.ArrayList<>(cells.size());
+        for (BlockPos at : cells) {
+            BlockState state = minecraft.level.getBlockState(at);
+            if (!voidBlocks && !state.isAir() && !state.canBeReplaced()) {
+                continue;
+            }
+            open.add(at.immutable());
+        }
+        if (open.isEmpty()) {
+            return false;
+        }
+        PacketDistributor.sendToServer(new BlueprintPayloads.PlaceCells(
+                open,
                 voidBlocks,
-                false,
-                true,
+                force,
                 WrightsClientConfig.SHAPE_FILL_MODE.get(),
                 WrightsClientConfig.SHAPE_ORDER_BATCH.get(),
                 WrightsClientConfig.SHAPE_MATERIALS.get(),
                 WrightsClientConfig.SHAPE_SUPPLY.get(),
-                false,
-                "",
-                false,
-                1,
-                true);
+                title,
+                WrightsClientConfig.droneCountFor(true)));
+        return true;
     }
 
     /** Place every empty Bridge / Stairs cell from the player out to the offset while the toggle is on. */
@@ -2196,16 +2190,12 @@ public final class WrightsClientState {
         if (WrightsClientConfig.shapeMaterials().isEmpty()) {
             return;
         }
-        int placed = 0;
-        for (BlockPos at : placePathCells(minecraft.player)) {
-            BlockState state = minecraft.level.getBlockState(at);
-            if (!state.isAir() && !state.canBeReplaced()) {
-                continue;
-            }
-            PacketDistributor.sendToServer(pathCellPlace(at, false));
-            placed++;
-        }
-        bridgeCooldown = placed > 0 ? 3 : 2;
+        boolean placed = sendPlaceCells(
+                placePathCells(minecraft.player),
+                false,
+                false,
+                WrightsClientConfig.placeStairsStyle() ? "Place - Stairs" : "Place - Bridge");
+        bridgeCooldown = placed ? 3 : 2;
     }
 
     public static boolean showStoredSettings() {

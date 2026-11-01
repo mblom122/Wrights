@@ -1033,7 +1033,11 @@ public final class JobManager {
         job.setPasteOptions(false, voidBlocks, voidBlocks, false, false, false, false);
         job.setClip(job.boxSizeX(), job.boxSizeY(), job.boxSizeZ());
         job.setAnchor(min);
-        job.setBlueprintName(shapeJobTitle(exchange, kind, size, height, thickness, axis));
+        String title = shapeJobTitle(exchange, kind, size, height, thickness, axis);
+        if (placeTool && !exchange && title.startsWith("Shape - ")) {
+            title = "Place - " + title.substring("Shape - ".length());
+        }
+        job.setBlueprintName(title);
         com.wrights.blueprint.BlueprintSessions.BlueprintSession session = com.wrights.blueprint.BlueprintSessions.get(player);
         job.setSupply(session.supplyPos(), session.supplyDimension());
         job.setSupplyOrder(supplyOrder);
@@ -1083,6 +1087,142 @@ public final class JobManager {
         }
         launched(player, job);
         BlueprintNetwork.syncJobs(player);
+        return true;
+    }
+
+    /**
+     * Place tool path modes: one ephemeral paste job for every cell (Bridge / Stairs / To me),
+     * so width × height × length is a single job card — not one job per block.
+     */
+    public static boolean startPlaceCells(
+            ServerPlayer player,
+            java.util.List<BlockPos> cells,
+            boolean voidBlocks,
+            String materials,
+            int fillMode,
+            int orderBatch,
+            long seed,
+            String supplyOrder,
+            String title,
+            int drones) {
+        if (player == null || cells == null || cells.isEmpty()) {
+            return false;
+        }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        if (!jobSlotOpen(player, library)) {
+            return false;
+        }
+        BlockPos min = cells.get(0);
+        BlockPos max = cells.get(0);
+        for (BlockPos at : cells) {
+            min = new BlockPos(
+                    Math.min(min.getX(), at.getX()),
+                    Math.min(min.getY(), at.getY()),
+                    Math.min(min.getZ(), at.getZ()));
+            max = new BlockPos(
+                    Math.max(max.getX(), at.getX()),
+                    Math.max(max.getY(), at.getY()),
+                    Math.max(max.getZ(), at.getZ()));
+        }
+        if (overlapsJobBoxes(library, player.level().dimension(), min, max)) {
+            Messages.actionBar(player, "message.wrights.build_overlap");
+            return false;
+        }
+        int sizeX = max.getX() - min.getX() + 1;
+        int sizeY = max.getY() - min.getY() + 1;
+        int sizeZ = max.getZ() - min.getZ() + 1;
+        java.util.List<com.wrights.blueprint.ShapeMaterials.Entry> palette =
+                com.wrights.blueprint.ShapeMaterials.parse(materials);
+        java.util.List<com.wrights.blueprint.ShapeMaterials.Entry> usable = new java.util.ArrayList<>();
+        for (com.wrights.blueprint.ShapeMaterials.Entry entry : palette) {
+            if (entry != null && entry.state() != null) {
+                usable.add(entry);
+            }
+        }
+        if (usable.isEmpty()) {
+            return false;
+        }
+        com.wrights.blueprint.ShapeMaterials.FillMode mode =
+                com.wrights.blueprint.ShapeMaterials.FillMode.byId(fillMode);
+        java.util.List<BlockState> planned = com.wrights.blueprint.ShapeMaterials.assign(
+                usable,
+                cells.size(),
+                mode,
+                com.wrights.blueprint.ShapeMaterials.clampBatch(orderBatch),
+                new java.util.Random(seed),
+                true,
+                item -> Long.MAX_VALUE,
+                true);
+        java.util.List<Schematic.Entry> entries = new java.util.ArrayList<>(cells.size());
+        for (int i = 0; i < cells.size() && i < planned.size(); i++) {
+            BlockPos at = cells.get(i);
+            int dx = at.getX() - min.getX();
+            int dy = at.getY() - min.getY();
+            int dz = at.getZ() - min.getZ();
+            if (dx < Short.MIN_VALUE || dx > Short.MAX_VALUE
+                    || dy < Short.MIN_VALUE || dy > Short.MAX_VALUE
+                    || dz < Short.MIN_VALUE || dz > Short.MAX_VALUE) {
+                continue;
+            }
+            BlockState state = planned.get(i);
+            if (state == null || state.isAir()) {
+                continue;
+            }
+            entries.add(new Schematic.Entry((short) dx, (short) dy, (short) dz, state, false));
+        }
+        if (entries.isEmpty()) {
+            return false;
+        }
+        String jobTitle = title == null || title.isBlank() ? "Place" : title.trim();
+        if (!jobTitle.startsWith("Place")) {
+            jobTitle = "Place - " + jobTitle;
+        }
+        Schematic schematic = new Schematic(
+                java.util.UUID.randomUUID(),
+                jobTitle,
+                sizeX,
+                sizeY,
+                sizeZ,
+                entries,
+                min,
+                max,
+                player.level().dimension().location().toString(),
+                0,
+                0,
+                0,
+                true);
+        library.putSchematic(schematic);
+        boolean ok = startBlueprintBuild(
+                player,
+                schematic.id(),
+                min,
+                sizeX,
+                sizeY,
+                sizeZ,
+                Math.max(0, drones),
+                false,
+                voidBlocks,
+                voidBlocks,
+                false,
+                supplyOrder,
+                false,
+                false,
+                false,
+                false,
+                false);
+        if (!ok) {
+            library.removeSchematic(schematic.id());
+            return false;
+        }
+        for (BuildJob job : library.jobs()) {
+            if (schematic.id().equals(job.schematicId()) && job.owner().equals(player.getUUID())) {
+                job.setBlueprintName(jobTitle);
+                job.setPlaceTool(true);
+                job.setPasteOptions(false, voidBlocks, voidBlocks, false, false, false, false);
+                BlueprintNetwork.syncJobs(player);
+                break;
+            }
+        }
         return true;
     }
 
@@ -2457,16 +2597,20 @@ public final class JobManager {
         }
         if (job.kind() == BuildJob.Kind.SHAPE) {
             String current = job.blueprintName();
-            if (current != null && (current.startsWith("Shape - ") || current.startsWith("Exchange - "))) {
+            if (current != null && (current.startsWith("Shape - ") || current.startsWith("Exchange - ") || current.startsWith("Place - "))) {
                 return clipJobTitle(current);
             }
-            return clipJobTitle(shapeJobTitle(
+            String titled = shapeJobTitle(
                     job.exchangeJob(),
                     job.shapeKind(),
                     job.shapeSize(),
                     job.shapeHeight(),
                     job.shapeThickness(),
-                    job.shapeAxis()));
+                    job.shapeAxis());
+            if (job.placeTool() && !job.exchangeJob() && titled.startsWith("Shape - ")) {
+                titled = "Place - " + titled.substring("Shape - ".length());
+            }
+            return clipJobTitle(titled);
         }
         if (job.kind() == BuildJob.Kind.COPY) {
             String current = job.blueprintName();
@@ -2476,10 +2620,10 @@ public final class JobManager {
             String bare = current == null || current.isBlank() ? "Saving" : current;
             return clipJobTitle(blueprintJobTitle(bare));
         }
-        // PASTE — blueprints and mirror copies.
+        // PASTE — blueprints, mirror copies, and Place path batches.
         String current = job.blueprintName();
         if (current != null && !current.isBlank()) {
-            if (current.startsWith("Blueprint - ") || current.startsWith("Mirror")) {
+            if (current.startsWith("Blueprint - ") || current.startsWith("Mirror") || current.startsWith("Place - ")) {
                 return clipJobTitle(current);
             }
             if (current.equals("Build") || current.equals("Saving") || current.equals("Blueprint")) {

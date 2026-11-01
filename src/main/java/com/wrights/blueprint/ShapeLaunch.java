@@ -204,6 +204,124 @@ public final class ShapeLaunch {
     }
 
     /**
+     * Place tool Bridge / Stairs / To me: one job for every path cell (width × height × length),
+     * not one job per block.
+     */
+    public static void placeCells(ServerPlayer player, BlueprintPayloads.PlaceCells payload) {
+        if (!ControllerItem.isHeld(player) || payload == null) {
+            return;
+        }
+        if (WrightsConfig.refuse(player, WrightsConfig.allowPlaceTool())) {
+            return;
+        }
+        List<ShapeMaterials.Entry> materials = ShapeMaterials.parse(payload.materials());
+        if (materials.isEmpty()) {
+            Messages.actionBar(player, "message.wrights.shape_need_materials");
+            return;
+        }
+        boolean hasState = false;
+        for (ShapeMaterials.Entry entry : materials) {
+            if (entry != null && entry.state() != null) {
+                hasState = true;
+                break;
+            }
+        }
+        if (!hasState) {
+            Messages.actionBar(player, "message.wrights.shape_need_materials");
+            return;
+        }
+        List<BlockPos> raw = payload.cells();
+        if (raw == null || raw.isEmpty()) {
+            Messages.actionBar(player, "message.wrights.shape_nowhere");
+            return;
+        }
+        int maxBlocks = Math.max(1, WrightsConfig.MAX_BLOCKS.getAsInt());
+        if (raw.size() > maxBlocks) {
+            Messages.actionBar(player, "message.wrights.shape_too_many", maxBlocks);
+            return;
+        }
+        ServerLevel level = player.serverLevel();
+        boolean voidBlocks = payload.voidBlocks() && WrightsConfig.allowShapeVoid();
+        List<BlockPos> cells = new ArrayList<>(raw.size());
+        for (BlockPos at : raw) {
+            if (at == null || !BoxEdits.inWorld(at)) {
+                continue;
+            }
+            if (player.distanceToSqr(at.getCenter()) > range()) {
+                continue;
+            }
+            BlockState state = level.getBlockState(at);
+            if (!voidBlocks && !state.isAir() && !state.canBeReplaced()) {
+                continue;
+            }
+            cells.add(at.immutable());
+            if (cells.size() >= maxBlocks) {
+                break;
+            }
+        }
+        if (cells.isEmpty()) {
+            Messages.actionBar(player, "message.wrights.shape_nowhere");
+            return;
+        }
+        ShapeMaterials.FillMode fillMode = ShapeMaterials.FillMode.byId(payload.fillMode());
+        int orderBatch = ShapeMaterials.clampBatch(payload.orderBatch());
+        long seed = player.getUUID().getMostSignificantBits()
+                ^ level.getGameTime()
+                ^ cells.size()
+                ^ materials.hashCode()
+                ^ fillMode.ordinal();
+        boolean creative = player.getAbilities().instabuild || player.isSpectator();
+        if (!payload.force() && !creative) {
+            List<BlockState> planned = ShapeMaterials.assign(
+                    materials,
+                    cells.size(),
+                    fillMode,
+                    orderBatch,
+                    new Random(seed),
+                    true,
+                    item -> Long.MAX_VALUE,
+                    true);
+            Map<Item, Integer> need = new HashMap<>();
+            for (BlockState state : planned) {
+                if (state == null || state.isAir()) {
+                    continue;
+                }
+                Item item = state.getBlock().asItem();
+                if (item != null) {
+                    need.merge(item, 1, Integer::sum);
+                }
+            }
+            List<Requirements.Cost> costs = new ArrayList<>();
+            for (Map.Entry<Item, Integer> entry : need.entrySet()) {
+                costs.add(new Requirements.Cost(Item.getId(entry.getKey()), entry.getValue()));
+            }
+            BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
+            List<Requirements.Cost> listed = Requirements.ordered(player, costs, session.supplyPos(), session.supplyDimension());
+            if (Requirements.anyShort(listed)) {
+                BlueprintNetwork.materials(player, MATERIALS_ID, true, listed);
+                return;
+            }
+        }
+        String title = payload.title() == null || payload.title().isBlank() ? "Place" : payload.title();
+        boolean ok = JobManager.startPlaceCells(
+                player,
+                cells,
+                voidBlocks,
+                ShapeMaterials.encode(materials),
+                fillMode.ordinal(),
+                orderBatch,
+                seed,
+                ShapeSupply.encode(ShapeSupply.parse(payload.supplyOrder())),
+                title,
+                Math.max(0, payload.drones()));
+        if (!ok) {
+            Messages.actionBar(player, "message.wrights.shape_failed");
+            return;
+        }
+        Messages.actionBar(player, "message.wrights.shape_started", cells.size());
+    }
+
+    /**
      * Count placeable cells in the shape (or exchangeable solids), then assign the material
      * palette so Materials needed matches what the job will try to spend.
      */

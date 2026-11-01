@@ -2136,6 +2136,66 @@ public final class BlueprintPayloads {
         }
     }
 
+    /**
+     * Place tool path modes (Bridge / Stairs / To me): every cell in one job, not one job per block.
+     */
+    public record PlaceCells(
+            List<BlockPos> cells,
+            boolean voidBlocks,
+            boolean force,
+            int fillMode,
+            int orderBatch,
+            String materials,
+            String supplyOrder,
+            String title,
+            int drones) implements CustomPacketPayload {
+        public static final Type<PlaceCells> TYPE = payloadType("place_cells");
+        public static final StreamCodec<RegistryFriendlyByteBuf, PlaceCells> STREAM_CODEC =
+                StreamCodec.of((buf, value) -> value.write(buf), PlaceCells::read);
+
+        public void write(RegistryFriendlyByteBuf buf) {
+            List<BlockPos> list = cells == null ? List.of() : cells;
+            buf.writeVarInt(list.size());
+            for (BlockPos at : list) {
+                buf.writeBlockPos(at);
+            }
+            buf.writeBoolean(voidBlocks);
+            buf.writeBoolean(force);
+            buf.writeVarInt(fillMode);
+            buf.writeVarInt(orderBatch);
+            buf.writeUtf(materials == null ? "" : materials, 512);
+            buf.writeUtf(supplyOrder == null ? "" : supplyOrder, 64);
+            buf.writeUtf(title == null ? "" : title, 64);
+            buf.writeVarInt(Math.max(0, drones));
+        }
+
+        public static PlaceCells read(RegistryFriendlyByteBuf buf) {
+            int count = buf.readVarInt();
+            if (count < 0 || count > 65_536) {
+                throw new IllegalArgumentException("place_cells");
+            }
+            List<BlockPos> cells = new ArrayList<>(count);
+            for (int i = 0; i < count; i++) {
+                cells.add(buf.readBlockPos());
+            }
+            return new PlaceCells(
+                    cells,
+                    buf.readBoolean(),
+                    buf.readBoolean(),
+                    buf.readVarInt(),
+                    buf.readVarInt(),
+                    buf.readUtf(512),
+                    buf.readUtf(64),
+                    buf.readUtf(64),
+                    buf.readVarInt());
+        }
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     private static void writeBlob(RegistryFriendlyByteBuf buf, byte[] data) {
         byte[] bytes = data == null ? new byte[0] : data;
         buf.writeVarInt(bytes.length);
