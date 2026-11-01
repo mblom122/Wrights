@@ -1024,6 +1024,7 @@ public final class JobManager {
         }
         if (job.paused()) {
             job.setWaitKind(BuildJob.WAIT_NONE);
+            publishShapeDroneStatus(level, job, null, DroneEntity.WAIT_PAUSED);
             return;
         }
         if (job.queued()) {
@@ -1068,6 +1069,8 @@ public final class JobManager {
         int scanned = 0;
         int placed = 0;
         DroneEntity drone = null;
+        BlockState statusState = null;
+        int statusWait = DroneEntity.WAIT_NONE;
         com.wrights.blueprint.Shapes.Kind shapeKind = com.wrights.blueprint.Shapes.Kind.byId(job.shapeKind());
         BlockPos shapePinLocal = com.wrights.blueprint.Shapes.pinLocal(
                 shapeKind,
@@ -1103,6 +1106,7 @@ public final class JobManager {
             if (!level.isLoaded(pos)) {
                 if (WrightsConfig.REQUIRE_CHUNKS_LOADED.getAsBoolean()) {
                     job.setWaitKind(BuildJob.WAIT_CHUNK);
+                    publishShapeDroneStatus(level, job, statusState, DroneEntity.WAIT_CHUNK);
                     library.setDirty();
                     return;
                 }
@@ -1131,6 +1135,14 @@ public final class JobManager {
                 scanned++;
                 continue;
             }
+            BlockState state = shapeNextState(job, usable, fillMode, random);
+            if (state == null) {
+                statusState = usable.get(0).state();
+                statusWait = DroneEntity.WAIT_ITEMS;
+                job.setWaitKind(BuildJob.WAIT_ITEMS);
+                break;
+            }
+            statusState = state;
             if (!fast) {
                 if (drone == null) {
                     drone = ensureDrone(level, player, job, pos);
@@ -1147,14 +1159,10 @@ public final class JobManager {
                     drone.moveToward(hover, step);
                     job.setLastDronePos(drone.blockPosition());
                     job.setWaitKind(BuildJob.WAIT_NONE);
+                    drone.setWorkStatus(BlockFilters.icon(state), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
                     library.setDirty();
                     return;
                 }
-            }
-            BlockState state = shapeNextState(job, usable, fillMode, random);
-            if (state == null) {
-                job.setWaitKind(BuildJob.WAIT_ITEMS);
-                break;
             }
             int dx = pos.getX() - job.min().getX();
             int dy = pos.getY() - job.min().getY();
@@ -1170,10 +1178,13 @@ public final class JobManager {
             PlaceResult result = placeOne(level, player, job, pos, entry, false, null);
             if (result == PlaceResult.PAUSE) {
                 job.setWaitKind(BuildJob.WAIT_CHUNK);
+                publishShapeDroneStatus(level, job, state, DroneEntity.WAIT_CHUNK);
                 library.setDirty();
                 return;
             }
             if (result == PlaceResult.WAIT) {
+                statusState = state;
+                statusWait = DroneEntity.WAIT_ITEMS;
                 job.setWaitKind(BuildJob.WAIT_ITEMS);
                 break;
             }
@@ -1181,14 +1192,46 @@ public final class JobManager {
             job.shapeOrderAdvance();
             scanned++;
             placed++;
+            statusWait = DroneEntity.WAIT_NONE;
         }
         if (job.waitKind() != BuildJob.WAIT_ITEMS && job.waitKind() != BuildJob.WAIT_CHUNK) {
             job.setWaitKind(BuildJob.WAIT_NONE);
+            statusWait = DroneEntity.WAIT_NONE;
+        } else if (job.waitKind() == BuildJob.WAIT_ITEMS) {
+            statusWait = DroneEntity.WAIT_ITEMS;
+        } else if (job.waitKind() == BuildJob.WAIT_CHUNK) {
+            statusWait = DroneEntity.WAIT_CHUNK;
+        }
+        if (statusState != null || statusWait != DroneEntity.WAIT_NONE) {
+            if (drone != null) {
+                drone.setWorkStatus(
+                        statusState == null ? ItemStack.EMPTY : BlockFilters.icon(statusState),
+                        ItemStack.EMPTY,
+                        statusWait);
+            } else {
+                publishShapeDroneStatus(level, job, statusState, statusWait);
+            }
         }
         library.setDirty();
         if (job.cursor() >= job.total()) {
             finishPaste(server, library, player, job);
         }
+    }
+
+    /** Push Shape/Exchange current block + wait reason onto the assigned wright for Jade / info look. */
+    private static void publishShapeDroneStatus(ServerLevel level, BuildJob job, BlockState state, int waitReason) {
+        if (level == null || job == null || job.crewUnits().isEmpty()) {
+            return;
+        }
+        UUID id = job.crewUnits().get(0);
+        if (id == null || !(level.getEntity(id) instanceof DroneEntity drone) || !drone.isAlive()) {
+            return;
+        }
+        int reason = waitReason;
+        if (job.paused() && reason == DroneEntity.WAIT_NONE) {
+            reason = DroneEntity.WAIT_PAUSED;
+        }
+        drone.setWorkStatus(state == null ? ItemStack.EMPTY : BlockFilters.icon(state), ItemStack.EMPTY, reason);
     }
 
     private static BlockState shapeNextState(

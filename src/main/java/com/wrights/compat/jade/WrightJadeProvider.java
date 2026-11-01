@@ -34,13 +34,16 @@ public enum WrightJadeProvider implements IEntityComponentProvider, StreamServer
     public void appendTooltip(ITooltip tooltip, EntityAccessor accessor, IPluginConfig config) {
         if (accessor.getEntity() instanceof DroneEntity drone) {
             tooltip.add(Component.translatable("jade.wrights.tier", Component.translatable(WrightTier.nameKey(drone.tier()))));
-            if (!drone.currentBlock().isEmpty()) {
+            int reason = drone.waitReason();
+            boolean waitingItemsOrFloor = reason == DroneEntity.WAIT_ITEMS || reason == DroneEntity.WAIT_FLOOR;
+            // Wait line already names the stuck block — skip a duplicate "Placing".
+            if (!drone.currentBlock().isEmpty() && !waitingItemsOrFloor) {
                 tooltip.add(Component.translatable("hud.wrights.info_wright_placing", drone.currentBlock().getHoverName()));
             }
             if (!drone.nextBlock().isEmpty()) {
                 tooltip.add(Component.translatable("hud.wrights.info_wright_next", drone.nextBlock().getHoverName()));
             }
-            Component waiting = waitLine(drone.waitReason());
+            Component waiting = waitLine(drone);
             if (waiting != null) {
                 tooltip.add(waiting);
             }
@@ -57,10 +60,16 @@ public enum WrightJadeProvider implements IEntityComponentProvider, StreamServer
         });
     }
 
-    private static Component waitLine(int reason) {
+    private static Component waitLine(DroneEntity drone) {
+        int reason = drone.waitReason();
+        boolean named = !drone.currentBlock().isEmpty();
         return switch (reason) {
-            case DroneEntity.WAIT_FLOOR -> Component.translatable("hud.wrights.info_wright_wait_floor");
-            case DroneEntity.WAIT_ITEMS -> Component.translatable("hud.wrights.info_wright_wait_items");
+            case DroneEntity.WAIT_FLOOR -> named
+                    ? Component.translatable("hud.wrights.info_wright_wait_floor_named", drone.currentBlock().getHoverName())
+                    : Component.translatable("hud.wrights.info_wright_wait_floor");
+            case DroneEntity.WAIT_ITEMS -> named
+                    ? Component.translatable("hud.wrights.info_wright_wait_items_named", drone.currentBlock().getHoverName())
+                    : Component.translatable("hud.wrights.info_wright_wait_items");
             case DroneEntity.WAIT_CHUNK -> Component.translatable("hud.wrights.info_wright_wait_chunk");
             case DroneEntity.WAIT_IDLE -> Component.translatable("hud.wrights.info_wright_idle");
             case DroneEntity.WAIT_HOME -> Component.translatable("hud.wrights.info_wright_home");
