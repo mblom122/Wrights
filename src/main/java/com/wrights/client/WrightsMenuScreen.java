@@ -233,6 +233,8 @@ public class WrightsMenuScreen extends Screen {
     private int mirrorViewTop;
     private int mirrorViewH;
     private int mirrorContentH;
+    /** Left task strip scroll (Building + subs + Jobs…). */
+    private int navScroll;
     private int optionThumbY;
     private int optionThumbH;
     private boolean optionDragging;
@@ -775,6 +777,10 @@ public class WrightsMenuScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, Component.translatable("menu.wrights.title"), panelX + 16, panelY + 10, WrightsUi.COPPER, false);
         graphics.drawString(this.font, Component.translatable("menu.wrights.subtitle"), panelX + 16, panelY + 22, WrightsUi.MUTED, false);
+        clampNavScroll();
+        int navTop = navViewTop();
+        int navH = navViewH();
+        graphics.enableScissor(panelX + 8, navTop, panelX + 122, navTop + navH);
         if (taskBuildingY() >= 0) {
             drawTask(graphics, Component.translatable("menu.wrights.building"), buildingPage(), false, taskBuildingY());
             if (buildingPage()) {
@@ -792,6 +798,8 @@ public class WrightsMenuScreen extends Screen {
             drawTask(graphics, Component.translatable("menu.wrights.info"), infoPage, false, taskInfoY());
         }
         drawTask(graphics, Component.translatable("menu.wrights.options"), options, false, taskOptionsY());
+        graphics.disableScissor();
+        WrightsUi.scrollBar(graphics, panelX + 118, navTop, navH, navScroll, navContentH());
         if (options) {
             renderOptions(graphics, mouseX, mouseY);
         } else if (infoPage) {
@@ -881,7 +889,11 @@ public class WrightsMenuScreen extends Screen {
         pose.popPose();
     }
 
-    private void drawTask(GuiGraphics graphics, Component label, boolean active, boolean soon, int y) {
+    private void drawTask(GuiGraphics graphics, Component label, boolean active, boolean soon, int contentY) {
+        int y = navScreenY(contentY);
+        if (y < 0) {
+            return;
+        }
         int x = panelX + 14;
         WrightsUi.rail(graphics, x, y, 100, 22, active, WrightsUi.COPPER);
         graphics.drawString(this.font, label, x + 8, y + 7, active ? WrightsUi.TEXT : WrightsUi.MUTED, false);
@@ -1622,29 +1634,30 @@ public class WrightsMenuScreen extends Screen {
         }
     }
 
+    /** Content Y for left-nav rows (0 at top of the strip). Screen Y = {@link #navScreenY(int)}. */
     private int taskBuildingY() {
-        return WrightsConfig.showBuilding() ? panelY + 46 : -1;
+        return WrightsConfig.showBuilding() ? 0 : -1;
     }
 
     private int taskBlueprintsY() {
         if (!buildingPage() || !WrightsConfig.allowBlueprints()) {
             return -1;
         }
-        return panelY + 70;
+        return 24;
     }
 
     private int taskMirrorY() {
         if (!buildingPage() || !WrightsConfig.allowMirror()) {
             return -1;
         }
-        return panelY + 70 + (WrightsConfig.allowBlueprints() ? 20 : 0);
+        return 24 + (WrightsConfig.allowBlueprints() ? 20 : 0);
     }
 
     private int taskShapeY() {
         if (!buildingPage() || !WrightsConfig.allowShape()) {
             return -1;
         }
-        int y = panelY + 70;
+        int y = 24;
         if (WrightsConfig.allowBlueprints()) {
             y += 20;
         }
@@ -1658,7 +1671,7 @@ public class WrightsMenuScreen extends Screen {
         if (!buildingPage() || !WrightsConfig.allowExchange()) {
             return -1;
         }
-        int y = panelY + 70;
+        int y = 24;
         if (WrightsConfig.allowBlueprints()) {
             y += 20;
         }
@@ -1693,7 +1706,7 @@ public class WrightsMenuScreen extends Screen {
 
     /** Jobs, manage, mining, info, options, packed under whatever building left behind. */
     private int mainTaskY(int slot) {
-        int y = WrightsConfig.showBuilding() ? (buildingPage() ? subsBottom() : panelY + 72) : panelY + 46;
+        int y = WrightsConfig.showBuilding() ? (buildingPage() ? subsBottom() : 26) : 0;
         boolean[] show = {
                 WrightsConfig.allowJobs(),
                 WrightsConfig.allowManage(),
@@ -1716,9 +1729,44 @@ public class WrightsMenuScreen extends Screen {
     private int subsBottom() {
         int count = (WrightsConfig.allowBlueprints() ? 1 : 0) + (WrightsConfig.allowMirror() ? 1 : 0) + (WrightsConfig.allowShape() ? 1 : 0) + (WrightsConfig.allowExchange() ? 1 : 0);
         if (count == 0) {
-            return panelY + 72;
+            return 26;
         }
-        return panelY + 70 + 20 * count + 4;
+        return 24 + 20 * count + 4;
+    }
+
+    private int navViewTop() {
+        return panelY + 40;
+    }
+
+    private int navViewH() {
+        return Math.max(48, panelY + panelH - 10 - navViewTop());
+    }
+
+    private int navContentH() {
+        int last = taskOptionsY();
+        if (last < 0) {
+            last = taskInfoY();
+        }
+        if (last < 0) {
+            last = taskMiningY();
+        }
+        return Math.max(22, last + 24);
+    }
+
+    private int navScreenY(int contentY) {
+        if (contentY < 0) {
+            return -1;
+        }
+        return navViewTop() + contentY - navScroll;
+    }
+
+    private void clampNavScroll() {
+        navScroll = Mth.clamp(navScroll, 0, Math.max(0, navContentH() - navViewH()));
+    }
+
+    private boolean insideNav(double mouseX, double mouseY) {
+        return mouseX >= panelX + 8 && mouseX < panelX + 122
+                && mouseY >= navViewTop() && mouseY < navViewTop() + navViewH();
     }
 
     private void drawBuildSubs(GuiGraphics graphics) {
@@ -1726,9 +1774,11 @@ public class WrightsMenuScreen extends Screen {
         if (last < 0) {
             return;
         }
-        int railTop = taskBuildingY() + 22;
-        int railBot = last + 18;
-        graphics.fill(panelX + 22, railTop, panelX + 24, railBot, WrightsUi.COPPER_DIM);
+        int railTop = navScreenY(taskBuildingY()) + 22;
+        int railBot = navScreenY(last) + 18;
+        if (railBot > railTop) {
+            graphics.fill(panelX + 22, railTop, panelX + 24, railBot, WrightsUi.COPPER_DIM);
+        }
         if (taskBlueprintsY() >= 0) {
             drawSubTask(graphics, Component.translatable("menu.wrights.sub_blueprints"), !mirrorPage && !shapePage && !exchangePage, taskBlueprintsY());
         }
@@ -1743,14 +1793,22 @@ public class WrightsMenuScreen extends Screen {
         }
     }
 
-    private void drawSubTask(GuiGraphics graphics, Component label, boolean active, int y) {
+    private void drawSubTask(GuiGraphics graphics, Component label, boolean active, int contentY) {
+        int y = navScreenY(contentY);
+        if (y < 0) {
+            return;
+        }
         int x = panelX + 30;
         WrightsUi.rail(graphics, x, y, 84, 18, active, WrightsUi.TEAL);
         String text = this.font.plainSubstrByWidth(label.getString(), 74);
         graphics.drawString(this.font, text, x + 8, y + 5, active ? WrightsUi.TEXT : WrightsUi.MUTED, false);
     }
 
-    private boolean hitSub(double mouseX, double mouseY, int y) {
+    private boolean hitSub(double mouseX, double mouseY, int contentY) {
+        if (contentY < 0 || !insideNav(mouseX, mouseY)) {
+            return false;
+        }
+        int y = navScreenY(contentY);
         return y >= 0 && mouseX >= panelX + 30 && mouseX < panelX + 114 && mouseY >= y && mouseY < y + 18;
     }
 
@@ -2988,7 +3046,11 @@ public class WrightsMenuScreen extends Screen {
         return mouseX >= barX && mouseX < optionViewX + optionViewW && mouseY >= optionViewY && mouseY < optionViewY + optionViewH;
     }
 
-    private boolean hitTask(double mouseX, double mouseY, int y) {
+    private boolean hitTask(double mouseX, double mouseY, int contentY) {
+        if (contentY < 0 || !insideNav(mouseX, mouseY)) {
+            return false;
+        }
+        int y = navScreenY(contentY);
         return y >= 0 && mouseX >= panelX + 14 && mouseX < panelX + 114 && mouseY >= y && mouseY < y + 22;
     }
 
@@ -3969,6 +4031,10 @@ public class WrightsMenuScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (insideNav(mouseX, mouseY) && navContentH() > navViewH()) {
+            navScroll = Mth.clamp(navScroll - (int) Math.signum(scrollY) * 22, 0, Math.max(0, navContentH() - navViewH()));
+            return true;
+        }
         if (infoPage) {
             infoScroll = Mth.clamp(infoScroll - (int) Math.signum(scrollY), 0, infoMaxScroll);
             savedInfoScroll = infoScroll;
