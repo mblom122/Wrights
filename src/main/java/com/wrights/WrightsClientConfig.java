@@ -128,8 +128,8 @@ public final class WrightsClientConfig {
             .comment("Last new-blueprint tool. 0 corners, 1 box, 2 move.")
             .defineInRange("lastStyle", 1, 0, 2);
     public static final ModConfigSpec.IntValue LAST_BUILD_TOOL = BUILDER
-            .comment("Last build sub-tool. 0 use template, 1 mirror, 2 shape, 3 bind inventory.")
-            .defineInRange("lastBuildTool", 0, 0, 3);
+            .comment("Last build sub-tool. 0 use template, 1 mirror, 2 shape, 3 bind inventory, 4 exchange.")
+            .defineInRange("lastBuildTool", 0, 0, 4);
     public static final ModConfigSpec.ConfigValue<String> LAST_BUILD = BUILDER
             .comment("Last blueprint that was being built.")
             .define("lastBuild", "");
@@ -264,6 +264,9 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.ConfigValue<String> SHAPE_MATERIALS = BUILDER
             .comment("Weighted blocks used by Shape mode. Format id=weight;id=weight. At least one is required.")
             .define("shapeMaterials", "");
+    public static final ModConfigSpec.ConfigValue<String> EXCHANGE_FROM = BUILDER
+            .comment("Blocks Exchange replaces. Empty = any non-air block in the volume. Format id=weight;… (weights ignored).")
+            .define("exchangeFrom", "");
 
     static final ModConfigSpec SPEC = BUILDER.build();
 
@@ -619,7 +622,7 @@ public final class WrightsClientConfig {
     public static void setLastMode(int mode, int style, int buildTool, String buildId) {
         LAST_MODE.set(clamp(mode, 0, 6));
         LAST_STYLE.set(clamp(style, 0, 2));
-        LAST_BUILD_TOOL.set(clamp(buildTool, 0, 3));
+        LAST_BUILD_TOOL.set(clamp(buildTool, 0, 4));
         LAST_BUILD.set(buildId == null ? "" : buildId);
         save();
     }
@@ -960,6 +963,23 @@ public final class WrightsClientConfig {
 
     public static void shapeMaterialMove(int index, int delta) {
         setShapeMaterials(com.wrights.blueprint.ShapeMaterials.move(shapeMaterials(), index, delta));
+    }
+
+    public static java.util.List<com.wrights.blueprint.ShapeMaterials.Entry> exchangeFrom() {
+        return com.wrights.blueprint.ShapeMaterials.parse(EXCHANGE_FROM.get());
+    }
+
+    public static void setExchangeFrom(java.util.List<com.wrights.blueprint.ShapeMaterials.Entry> entries) {
+        EXCHANGE_FROM.set(com.wrights.blueprint.ShapeMaterials.encode(entries == null ? java.util.List.of() : entries));
+        save();
+    }
+
+    public static void exchangeFromRemove(int index) {
+        java.util.List<com.wrights.blueprint.ShapeMaterials.Entry> entries = exchangeFrom();
+        if (index < 0 || index >= entries.size()) {
+            return;
+        }
+        setExchangeFrom(com.wrights.blueprint.ShapeMaterials.remove(entries, index));
     }
 
     private static int clamp(int value, int min, int max) {

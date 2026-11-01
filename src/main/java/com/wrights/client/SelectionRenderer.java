@@ -112,7 +112,7 @@ public final class SelectionRenderer {
         if ((adjust || !gui) && capture) {
             drawCapture(pose, buffers, camera);
             drawCaptureGhosts(pose, buffers, camera, minecraft);
-        } else if (guiOk && WrightsClientState.shapeToolActive()) {
+        } else if (guiOk && (WrightsClientState.shapeToolActive() || WrightsClientState.exchangeToolActive())) {
             drawShapeGhosts(pose, buffers, camera, minecraft);
         } else if (guiOk && WrightsClientState.mode == WrightsClientState.Mode.BUILD && !WrightsClientState.bindSupply && !mirrorBlocks()) {
             drawPreview(pose, buffers, camera);

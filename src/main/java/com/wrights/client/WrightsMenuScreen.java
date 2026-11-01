@@ -140,8 +140,10 @@ public class WrightsMenuScreen extends Screen {
     private boolean managePage;
     private boolean mirrorPage;
     private boolean shapePage;
+    private boolean exchangePage;
     private static boolean savedMirror;
     private static boolean savedShape;
+    private static boolean savedExchange;
     private Component mirrorTip;
     private ShapeMenuPanel shapePanel;
     private final WrightManagePanel manage = new WrightManagePanel();
@@ -302,18 +304,30 @@ public class WrightsMenuScreen extends Screen {
             options = false;
             infoPage = false;
             managePage = false;
-            if (WrightsClientState.shapeAim && WrightsConfig.allowShape()) {
+            if (WrightsClientState.exchangeAim && WrightsConfig.allowExchange()) {
+                exchangePage = true;
+                shapePage = false;
+                mirrorPage = false;
+            } else if (WrightsClientState.shapeAim && WrightsConfig.allowShape()) {
                 shapePage = true;
                 mirrorPage = false;
+                exchangePage = false;
             } else if (WrightsClientState.mirrorAim && WrightsConfig.allowMirror()) {
                 mirrorPage = true;
                 shapePage = false;
+                exchangePage = false;
+            } else if (savedExchange && WrightsConfig.allowExchange()) {
+                exchangePage = true;
+                shapePage = false;
+                mirrorPage = false;
             } else if (savedShape && WrightsConfig.allowShape()) {
                 shapePage = true;
                 mirrorPage = false;
+                exchangePage = false;
             } else {
                 mirrorPage = savedMirror && WrightsConfig.allowMirror();
                 shapePage = false;
+                exchangePage = false;
             }
         } else {
             jobsPage = savedPage == PAGE_JOBS;
@@ -321,8 +335,9 @@ public class WrightsMenuScreen extends Screen {
             infoPage = savedPage == PAGE_INFO;
             managePage = savedPage == PAGE_MANAGE;
             boolean building = !jobsPage && !options && !infoPage && !managePage;
-            shapePage = building && savedShape && WrightsConfig.allowShape();
-            mirrorPage = building && !shapePage && savedMirror && WrightsConfig.allowMirror();
+            exchangePage = building && savedExchange && WrightsConfig.allowExchange();
+            shapePage = building && !exchangePage && savedShape && WrightsConfig.allowShape();
+            mirrorPage = building && !exchangePage && !shapePage && savedMirror && WrightsConfig.allowMirror();
         }
         scroll = savedScroll;
         jobScroll = 0;
@@ -427,6 +442,7 @@ public class WrightsMenuScreen extends Screen {
         if (savedPage == PAGE_BUILDING) {
             savedMirror = mirrorPage;
             savedShape = shapePage;
+            savedExchange = exchangePage;
         }
         sendHold(false);
         savedScroll = scroll;
@@ -460,7 +476,7 @@ public class WrightsMenuScreen extends Screen {
 
     private void layout() {
         panelW = WrightsUi.fitW(540, this.width);
-        panelH = WrightsUi.fitH(mirrorPage || shapePage ? 480 : 360, this.height);
+        panelH = WrightsUi.fitH(mirrorPage || shapePage || exchangePage ? 480 : 360, this.height);
         panelX = WrightsUi.centerX(panelW, this.width);
         panelY = WrightsUi.centerY(panelH, this.height);
         listX = panelX + 126;
@@ -556,7 +572,7 @@ public class WrightsMenuScreen extends Screen {
             suggestRename = false;
         }
         boolean capture = WrightsClientState.mode == WrightsClientState.Mode.CAPTURE;
-        boolean building = !options && !jobsPage && !infoPage && !managePage && !mirrorPage && !shapePage;
+        boolean building = !options && !jobsPage && !infoPage && !managePage && !mirrorPage && !shapePage && !exchangePage;
         placeClose(building);
         search.setX(listX);
         search.setY(searchY);
@@ -718,7 +734,7 @@ public class WrightsMenuScreen extends Screen {
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         WrightsUi.scrim(graphics, this.width, this.height);
         WrightsUi.panel(graphics, panelX, panelY, panelW, panelH);
-        if ((mirrorPage || shapePage) && !options && !jobsPage && !infoPage && !managePage) {
+        if ((mirrorPage || shapePage || exchangePage) && !options && !jobsPage && !infoPage && !managePage) {
             int x = listX - 2;
             int width = panelX + panelW - 12 - x;
             int top = panelY + 34;
@@ -751,7 +767,7 @@ public class WrightsMenuScreen extends Screen {
                 manage.layoutChrome(manageHost);
             }
         }
-        boolean blueprints = !options && !jobsPage && !infoPage && !managePage && !mirrorPage && !shapePage;
+        boolean blueprints = !options && !jobsPage && !infoPage && !managePage && !mirrorPage && !shapePage && !exchangePage;
         if (blueprints) {
             BlueprintList.Row row = selectedRow();
             syncDetailScrollLayout(true, row != null && !row.folder() && marked.size() <= 1);
@@ -798,10 +814,11 @@ public class WrightsMenuScreen extends Screen {
                 graphics.renderTooltip(this.font, this.font.split(mirrorTip, 240), mouseX, mouseY);
                 mirrorTip = null;
             }
-        } else if (shapePage) {
+        } else if (shapePage || exchangePage) {
             if (shapePanel == null) {
                 shapePanel = new ShapeMenuPanel(this.font);
             }
+            shapePanel.setExchangeMode(exchangePage);
             int x = listX + 8;
             int w = Math.max(120, panelX + panelW - 28 - listX);
             int closeTop = closeButton != null && closeButton.visible ? closeButton.getY() - 6 : panelY + panelH - 28;
@@ -849,7 +866,7 @@ public class WrightsMenuScreen extends Screen {
         int bannerW = Math.min(cardW - 8, Math.round(textW * scale) + 24);
         int bannerH = Math.round(10 * scale) + 14;
         int bannerX = cardX + (cardW - bannerW) / 2;
-        int bannerY = jobsPage || managePage || options || infoPage || mirrorPage || shapePage
+        int bannerY = jobsPage || managePage || options || infoPage || mirrorPage || shapePage || exchangePage
                 ? jobsInsetY() + 4
                 : panelY + 8;
         int fill = flash ? 0xF0481018 : 0xE0321018;
@@ -1508,6 +1525,7 @@ public class WrightsMenuScreen extends Screen {
         if (buildingPage()) {
             savedMirror = mirrorPage;
             savedShape = shapePage;
+            savedExchange = exchangePage;
         }
     }
 
@@ -1515,6 +1533,7 @@ public class WrightsMenuScreen extends Screen {
     static void preferBlueprintsStrip() {
         savedShape = false;
         savedMirror = false;
+        savedExchange = false;
         WrightsClientState.clearBuildAims();
     }
 
@@ -1582,11 +1601,13 @@ public class WrightsMenuScreen extends Screen {
                 options = true;
             }
         } else if (buildingPage()) {
-            if (!WrightsConfig.allowBlueprints() && !mirrorPage && !shapePage) {
+            if (!WrightsConfig.allowBlueprints() && !mirrorPage && !shapePage && !exchangePage) {
                 if (WrightsConfig.allowMirror()) {
                     mirrorPage = true;
                 } else if (WrightsConfig.allowShape()) {
                     shapePage = true;
+                } else if (WrightsConfig.allowExchange()) {
+                    exchangePage = true;
                 }
             }
             if (!WrightsConfig.allowMirror()) {
@@ -1594,6 +1615,9 @@ public class WrightsMenuScreen extends Screen {
             }
             if (!WrightsConfig.allowShape()) {
                 shapePage = false;
+            }
+            if (!WrightsConfig.allowExchange()) {
+                exchangePage = false;
             }
         }
     }
@@ -1625,6 +1649,23 @@ public class WrightsMenuScreen extends Screen {
             y += 20;
         }
         if (WrightsConfig.allowMirror()) {
+            y += 20;
+        }
+        return y;
+    }
+
+    private int taskExchangeY() {
+        if (!buildingPage() || !WrightsConfig.allowExchange()) {
+            return -1;
+        }
+        int y = panelY + 70;
+        if (WrightsConfig.allowBlueprints()) {
+            y += 20;
+        }
+        if (WrightsConfig.allowMirror()) {
+            y += 20;
+        }
+        if (WrightsConfig.allowShape()) {
             y += 20;
         }
         return y;
@@ -1673,7 +1714,7 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private int subsBottom() {
-        int count = (WrightsConfig.allowBlueprints() ? 1 : 0) + (WrightsConfig.allowMirror() ? 1 : 0) + (WrightsConfig.allowShape() ? 1 : 0);
+        int count = (WrightsConfig.allowBlueprints() ? 1 : 0) + (WrightsConfig.allowMirror() ? 1 : 0) + (WrightsConfig.allowShape() ? 1 : 0) + (WrightsConfig.allowExchange() ? 1 : 0);
         if (count == 0) {
             return panelY + 72;
         }
@@ -1681,7 +1722,7 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private void drawBuildSubs(GuiGraphics graphics) {
-        int last = taskShapeY() >= 0 ? taskShapeY() : taskMirrorY() >= 0 ? taskMirrorY() : taskBlueprintsY();
+        int last = taskExchangeY() >= 0 ? taskExchangeY() : taskShapeY() >= 0 ? taskShapeY() : taskMirrorY() >= 0 ? taskMirrorY() : taskBlueprintsY();
         if (last < 0) {
             return;
         }
@@ -1689,13 +1730,16 @@ public class WrightsMenuScreen extends Screen {
         int railBot = last + 18;
         graphics.fill(panelX + 22, railTop, panelX + 24, railBot, WrightsUi.COPPER_DIM);
         if (taskBlueprintsY() >= 0) {
-            drawSubTask(graphics, Component.translatable("menu.wrights.sub_blueprints"), !mirrorPage && !shapePage, taskBlueprintsY());
+            drawSubTask(graphics, Component.translatable("menu.wrights.sub_blueprints"), !mirrorPage && !shapePage && !exchangePage, taskBlueprintsY());
         }
         if (taskMirrorY() >= 0) {
             drawSubTask(graphics, Component.translatable("menu.wrights.sub_mirror"), mirrorPage, taskMirrorY());
         }
         if (taskShapeY() >= 0) {
             drawSubTask(graphics, Component.translatable("menu.wrights.sub_shape"), shapePage, taskShapeY());
+        }
+        if (taskExchangeY() >= 0) {
+            drawSubTask(graphics, Component.translatable("menu.wrights.sub_exchange"), exchangePage, taskExchangeY());
         }
     }
 
@@ -2479,9 +2523,11 @@ public class WrightsMenuScreen extends Screen {
         if (button == 0 && buildingPage() && hitSub(mouseX, mouseY, taskBlueprintsY())) {
             mirrorPage = false;
             shapePage = false;
+            exchangePage = false;
             savedMirror = false;
             savedShape = false;
-            // Drop Shape/Mirror aim so reopening (e.g. after Edit → Cancel) stays on Blueprints.
+            savedExchange = false;
+            // Drop Shape/Mirror/Exchange aim so reopening (e.g. after Edit → Cancel) stays on Blueprints.
             if (requireTool()) {
                 WrightsClientState.selectBlueprintTool();
             } else {
@@ -2495,10 +2541,14 @@ public class WrightsMenuScreen extends Screen {
         if (button == 0 && buildingPage() && hitSub(mouseX, mouseY, taskMirrorY())) {
             mirrorPage = true;
             shapePage = false;
+            exchangePage = false;
             savedMirror = true;
             savedShape = false;
+            savedExchange = false;
             if (requireTool()) {
                 WrightsClientState.selectMirrorTool();
+            } else {
+                WrightsClientState.clearBuildAims();
             }
             sortOpen = false;
             setFocused(null);
@@ -2508,10 +2558,31 @@ public class WrightsMenuScreen extends Screen {
         if (button == 0 && buildingPage() && hitSub(mouseX, mouseY, taskShapeY())) {
             shapePage = true;
             mirrorPage = false;
+            exchangePage = false;
             savedShape = true;
             savedMirror = false;
+            savedExchange = false;
             if (requireTool()) {
                 WrightsClientState.selectShapeTool();
+            } else {
+                WrightsClientState.clearBuildAims();
+            }
+            sortOpen = false;
+            setFocused(null);
+            refresh();
+            return true;
+        }
+        if (button == 0 && buildingPage() && hitSub(mouseX, mouseY, taskExchangeY())) {
+            exchangePage = true;
+            shapePage = false;
+            mirrorPage = false;
+            savedExchange = true;
+            savedShape = false;
+            savedMirror = false;
+            if (requireTool()) {
+                WrightsClientState.selectExchangeTool();
+            } else {
+                WrightsClientState.clearBuildAims();
             }
             sortOpen = false;
             setFocused(null);
@@ -2525,8 +2596,9 @@ public class WrightsMenuScreen extends Screen {
             jobsPage = false;
             infoPage = false;
             if (!stay) {
-                shapePage = savedShape && WrightsConfig.allowShape();
-                mirrorPage = !shapePage && savedMirror && WrightsConfig.allowMirror();
+                exchangePage = savedExchange && WrightsConfig.allowExchange();
+                shapePage = !exchangePage && savedShape && WrightsConfig.allowShape();
+                mirrorPage = !exchangePage && !shapePage && savedMirror && WrightsConfig.allowMirror();
             }
             refresh();
             return true;
@@ -2703,7 +2775,7 @@ public class WrightsMenuScreen extends Screen {
             }
             return true;
         }
-        if (shapePage && buildingPage()) {
+        if ((shapePage || exchangePage) && buildingPage()) {
             if (overWidget(mouseX, mouseY)) {
                 return super.mouseClicked(mouseX, mouseY, button);
             }
@@ -2792,7 +2864,7 @@ public class WrightsMenuScreen extends Screen {
             applyDrag(mouseX);
             return true;
         }
-        if (shapePage && shapePanel != null && button == 0 && shapePanel.mouseDragged(mouseX, mouseY, dragX, dragY)) {
+        if ((shapePage || exchangePage) && shapePanel != null && button == 0 && shapePanel.mouseDragged(mouseX, mouseY, dragX, dragY)) {
             return true;
         }
         if (spinning && button == 0) {
@@ -2805,7 +2877,7 @@ public class WrightsMenuScreen extends Screen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (button == 0 && shapePage && shapePanel != null && shapePanel.mouseReleased()) {
+        if (button == 0 && (shapePage || exchangePage) && shapePanel != null && shapePanel.mouseReleased()) {
             return true;
         }
         if (button == 0 && shelfPress != null) {
@@ -2851,7 +2923,7 @@ public class WrightsMenuScreen extends Screen {
 
     @Override
     public boolean charTyped(char code, int modifiers) {
-        if (shapePage && shapePanel != null && shapePanel.editingValue() && shapePanel.charTyped(code)) {
+        if ((shapePage || exchangePage) && shapePanel != null && shapePanel.editingValue() && shapePanel.charTyped(code)) {
             return true;
         }
         return super.charTyped(code, modifiers);
@@ -2859,7 +2931,7 @@ public class WrightsMenuScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (shapePage && shapePanel != null && shapePanel.editingValue() && shapePanel.keyPressed(keyCode)) {
+        if ((shapePage || exchangePage) && shapePanel != null && shapePanel.editingValue() && shapePanel.keyPressed(keyCode)) {
             return true;
         }
         if (managePage && manage.keyPressed(manageHost, keyCode, scanCode, modifiers)) {
@@ -3948,10 +4020,10 @@ public class WrightsMenuScreen extends Screen {
             mirrorScroll = Mth.clamp(mirrorScroll - (int) Math.signum(scrollY) * 16, 0, max);
             return true;
         }
-        if (shapePage && shapePanel != null && shapePanel.mouseScrolled(mouseX, mouseY, scrollY)) {
+        if ((shapePage || exchangePage) && shapePanel != null && shapePanel.mouseScrolled(mouseX, mouseY, scrollY)) {
             return true;
         }
-        if (!options && !jobsPage && !infoPage && !managePage && !mirrorPage && !shapePage && insideDetailBody(mouseX, mouseY)) {
+        if (!options && !jobsPage && !infoPage && !managePage && !mirrorPage && !shapePage && !exchangePage && insideDetailBody(mouseX, mouseY)) {
             int max = Math.max(0, detailContentH - detailBodyH);
             int next = Mth.clamp(detailScroll - (int) Math.signum(scrollY) * 16, 0, max);
             if (next != detailScroll) {

@@ -910,6 +910,31 @@ public final class JobManager {
             long seed,
             String supplyOrder,
             boolean deferSupplies) {
+        return startShapeBuild(player, min, max, center, kind, size, height, thickness, axis, yaw, pivot, hollow, voidBlocks, materials, fillMode, orderBatch, seed, supplyOrder, deferSupplies, false, "");
+    }
+
+    public static boolean startShapeBuild(
+            ServerPlayer player,
+            BlockPos min,
+            BlockPos max,
+            BlockPos center,
+            int kind,
+            int size,
+            int height,
+            int thickness,
+            int axis,
+            int yaw,
+            int pivot,
+            boolean hollow,
+            boolean voidBlocks,
+            String materials,
+            int fillMode,
+            int orderBatch,
+            long seed,
+            String supplyOrder,
+            boolean deferSupplies,
+            boolean exchange,
+            String exchangeFrom) {
         if (player == null || min == null || max == null) {
             return false;
         }
@@ -919,11 +944,12 @@ public final class JobManager {
             return false;
         }
         BuildJob job = BuildJob.shape(player.getUUID(), player.getUUID(), player.level().dimension(), min, max);
-        job.setShapeStream(kind, size, height, thickness, axis, yaw, pivot, hollow, center, materials, fillMode, orderBatch, seed);
-        job.setPasteOptions(false, voidBlocks, voidBlocks, false, false, false, false);
+        job.setShapeStream(kind, size, height, thickness, axis, yaw, pivot, hollow, center, materials, fillMode, orderBatch, seed, exchange, exchangeFrom);
+        // Exchange always replaces matching cells; voidBlocks still gates wiping non-matching when false.
+        job.setPasteOptions(false, exchange || voidBlocks, exchange || voidBlocks, false, false, false, false);
         job.setClip(job.boxSizeX(), job.boxSizeY(), job.boxSizeZ());
         job.setAnchor(min);
-        job.setBlueprintName("Shape");
+        job.setBlueprintName(exchange ? "Exchange" : "Shape");
         com.wrights.blueprint.BlueprintSessions.BlueprintSession session = com.wrights.blueprint.BlueprintSessions.get(player);
         job.setSupply(session.supplyPos(), session.supplyDimension());
         job.setSupplyOrder(supplyOrder);
@@ -1066,7 +1092,14 @@ public final class JobManager {
                 continue;
             }
             BlockState current = level.getBlockState(pos);
-            if (!job.voidBlocks() && !current.isAir() && !current.canBeReplaced()) {
+            if (job.exchangeJob()) {
+                if (!exchangeMatches(current, job.exchangeFrom())) {
+                    job.advance();
+                    job.skippedOne();
+                    scanned++;
+                    continue;
+                }
+            } else if (!job.voidBlocks() && !current.isAir() && !current.canBeReplaced()) {
                 job.advance();
                 job.skippedOne();
                 scanned++;
@@ -1149,6 +1182,28 @@ public final class JobManager {
             case PRIORITY -> usable.get(0).state();
             case RANDOM -> com.wrights.blueprint.ShapeMaterials.pick(usable, random);
         };
+    }
+
+    /** Empty from-list = any non-air; otherwise match block item against the filter. */
+    private static boolean exchangeMatches(BlockState current, String fromRaw) {
+        if (current == null || current.isAir()) {
+            return false;
+        }
+        java.util.List<com.wrights.blueprint.ShapeMaterials.Entry> from =
+                com.wrights.blueprint.ShapeMaterials.parse(fromRaw);
+        if (from.isEmpty()) {
+            return !current.canBeReplaced();
+        }
+        net.minecraft.world.item.Item item = current.getBlock().asItem();
+        if (!(item instanceof net.minecraft.world.item.BlockItem)) {
+            return false;
+        }
+        for (com.wrights.blueprint.ShapeMaterials.Entry entry : from) {
+            if (entry != null && entry.item() == item) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void tickCopy(MinecraftServer server, SchematicLibrary library, BuildJob job) {

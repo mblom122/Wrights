@@ -77,9 +77,16 @@ final class ShapeMenuPanel {
     private float previewYaw = 35.0F;
     private float previewPitch = 28.0F;
     private boolean previewSpinning;
+    /** When true, title/from-materials UI are Exchange; geometry still uses Shape config. */
+    private boolean exchangeMode;
+    private int selectedFrom;
 
     ShapeMenuPanel(Font font) {
         this.font = font;
+    }
+
+    void setExchangeMode(boolean exchange) {
+        this.exchangeMode = exchange;
     }
 
     Component tip() {
@@ -109,9 +116,13 @@ final class ShapeMenuPanel {
         graphics.enableScissor(x - 4, viewTop, x + leftW + 2, viewTop + viewH);
         int y = viewTop - scroll;
         int lineEnd = x + leftW;
-        graphics.drawString(font, Component.translatable("menu.wrights.shape_title"), x, y, WrightsUi.COPPER, false);
+        graphics.drawString(font, Component.translatable(exchangeMode ? "menu.wrights.exchange_title" : "menu.wrights.shape_title"), x, y, WrightsUi.COPPER, false);
         y += 14;
-        y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd, "menu.wrights.shape_kind", "menu.wrights.shape_kind_hint", true);
+        if (exchangeMode) {
+            y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd, "menu.wrights.exchange_from", "menu.wrights.exchange_from_hint", true);
+            y = drawFromMaterials(graphics, mouseX, mouseY, x, y, leftW);
+        }
+        y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd, "menu.wrights.shape_kind", "menu.wrights.shape_kind_hint", !exchangeMode);
         y = drawKinds(graphics, mouseX, mouseY, x, y, leftW);
         Shapes.Kind kind = Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
         int axis = WrightsClientConfig.SHAPE_PLANE.get();
@@ -218,7 +229,9 @@ final class ShapeMenuPanel {
             y = drawStatus(graphics, mouseX, mouseY, x, y, leftW);
         }
         y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
-                "menu.wrights.shape_materials", "menu.wrights.shape_materials_hint", false);
+                exchangeMode ? "menu.wrights.exchange_to" : "menu.wrights.shape_materials",
+                exchangeMode ? "menu.wrights.exchange_to_hint" : "menu.wrights.shape_materials_hint",
+                false);
         y = drawMaterials(graphics, mouseX, mouseY, x, y, leftW);
         y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
                 "menu.wrights.shape_priority", "menu.wrights.shape_priority_hint", false);
@@ -601,6 +614,28 @@ final class ShapeMenuPanel {
                 selectedMaterial = value;
                 yield true;
             }
+            case "from_pick" -> {
+                if (host != null) {
+                    List<BlockState> initial = new ArrayList<>();
+                    for (ShapeMaterials.Entry entry : WrightsClientConfig.exchangeFrom()) {
+                        BlockState state = entry.state();
+                        if (state != null && !state.isAir()) {
+                            initial.add(state);
+                        }
+                    }
+                    BlockPickerScreen.openBlocks(host, initial, this::setFromMaterials);
+                }
+                yield true;
+            }
+            case "from_remove" -> {
+                WrightsClientConfig.exchangeFromRemove(value);
+                selectedFrom = Math.min(selectedFrom, Math.max(0, WrightsClientConfig.exchangeFrom().size() - 1));
+                yield true;
+            }
+            case "from_select" -> {
+                selectedFrom = value;
+                yield true;
+            }
             case "mat_pick" -> {
                 if (host != null) {
                     List<BlockState> initial = new ArrayList<>();
@@ -719,6 +754,64 @@ final class ShapeMenuPanel {
         minecraft.player.displayClientMessage(
                 Component.translatable("message.wrights.shape_under_me", anchor.getX(), anchor.getY(), anchor.getZ()),
                 true);
+    }
+
+    private void setFromMaterials(List<BlockState> states) {
+        List<ShapeMaterials.Entry> next = new ArrayList<>();
+        java.util.Set<net.minecraft.world.item.Item> seen = new java.util.HashSet<>();
+        if (states != null) {
+            for (BlockState state : states) {
+                if (state == null || state.isAir()) {
+                    continue;
+                }
+                net.minecraft.world.item.Item item = state.getBlock().asItem();
+                if (!(item instanceof net.minecraft.world.item.BlockItem) || !seen.add(item)) {
+                    continue;
+                }
+                next.add(new ShapeMaterials.Entry(item, 1));
+            }
+        }
+        WrightsClientConfig.setExchangeFrom(next);
+        selectedFrom = Math.min(selectedFrom, Math.max(0, next.size() - 1));
+    }
+
+    private int drawFromMaterials(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width) {
+        List<ShapeMaterials.Entry> entries = WrightsClientConfig.exchangeFrom();
+        if (entries.isEmpty()) {
+            graphics.drawString(font, Component.translatable("menu.wrights.exchange_from_any"), x, y + 4, WrightsUi.MUTED, false);
+            y += 16;
+        } else {
+            selectedFrom = Mth.clamp(selectedFrom, 0, entries.size() - 1);
+            int gap = 4;
+            int cols = Math.max(1, (width + gap) / (CHIP + gap));
+            for (int i = 0; i < entries.size(); i++) {
+                int col = i % cols;
+                int row = i / cols;
+                int cx = x + col * (CHIP + gap);
+                int cy = y + row * (CHIP + gap);
+                boolean on = i == selectedFrom;
+                boolean hover = mouseX >= cx && mouseX < cx + CHIP && mouseY >= cy && mouseY < cy + CHIP;
+                WrightsUi.slot(graphics, cx, cy, on || hover ? WrightsUi.COPPER : 0xFF31404E);
+                ItemStack stack = entries.get(i).item().getDefaultInstance();
+                graphics.renderItem(stack, cx + 1, cy + 1);
+                hits.add(new Hit(cx, cy, CHIP, CHIP, "from_select", i));
+                if (hover) {
+                    hoveredStack = stack;
+                }
+            }
+            int rows = (entries.size() + cols - 1) / cols;
+            y += rows * (CHIP + gap) + 2;
+            ShapeMaterials.Entry selected = entries.get(selectedFrom);
+            String name = font.plainSubstrByWidth(selected.item().getDefaultInstance().getHoverName().getString(), Math.max(40, width - 40));
+            graphics.drawString(font, name, x, y + 4, WrightsUi.TEXT, false);
+            drawMini(graphics, mouseX, mouseY, x + width - 16, y + 1, 16, "x", "from_remove", selectedFrom, true);
+            y += 20;
+        }
+        boolean pickHover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 18;
+        WrightsUi.choice(graphics, x, y, width, 18, false, pickHover);
+        graphics.drawCenteredString(font, Component.translatable("menu.wrights.exchange_from_pick"), x + width / 2, y + 5, WrightsUi.TEXT);
+        hits.add(new Hit(x, y, width, 18, "from_pick", 0));
+        return y + 22;
     }
 
     /** Replace the materials list with the picker tray, keeping weights for blocks that stay. */

@@ -793,6 +793,10 @@ public final class BuildJob {
     private boolean shapeHollow;
     private BlockPos shapeCenter = BlockPos.ZERO;
     private String shapeMaterials = "";
+    /** Exchange replaces matching world blocks instead of only filling air. */
+    private boolean exchange;
+    /** Blocks to replace when {@link #exchange}; blank = any non-air. */
+    private String exchangeFrom = "";
     private int shapeFillMode;
     private int shapeOrderBatch = 1;
     private long shapeSeed;
@@ -812,6 +816,25 @@ public final class BuildJob {
             int fillMode,
             int orderBatch,
             long seed) {
+        setShapeStream(kind, size, height, thickness, axis, yaw, pivot, hollow, center, materials, fillMode, orderBatch, seed, false, "");
+    }
+
+    public void setShapeStream(
+            int kind,
+            int size,
+            int height,
+            int thickness,
+            int axis,
+            int yaw,
+            int pivot,
+            boolean hollow,
+            BlockPos center,
+            String materials,
+            int fillMode,
+            int orderBatch,
+            long seed,
+            boolean exchange,
+            String exchangeFrom) {
         this.shapeKind = kind;
         this.shapeSize = Math.max(1, size);
         this.shapeHeight = Math.max(1, height);
@@ -822,10 +845,20 @@ public final class BuildJob {
         this.shapeHollow = hollow;
         this.shapeCenter = center == null ? BlockPos.ZERO : center.immutable();
         this.shapeMaterials = materials == null ? "" : materials;
+        this.exchange = exchange;
+        this.exchangeFrom = exchangeFrom == null ? "" : exchangeFrom;
         this.shapeFillMode = fillMode;
         this.shapeOrderBatch = Math.max(1, orderBatch);
         this.shapeSeed = seed;
         this.shapeOrderIndex = 0;
+    }
+
+    public boolean exchangeJob() {
+        return exchange;
+    }
+
+    public String exchangeFrom() {
+        return exchangeFrom;
     }
 
     public int shapeKind() {
@@ -1156,6 +1189,8 @@ public final class BuildJob {
             tag.putBoolean("shapeHollow", shapeHollow);
             tag.put("shapeCenter", NbtUtils.writeBlockPos(shapeCenter));
             tag.putString("shapeMaterials", shapeMaterials == null ? "" : shapeMaterials);
+            tag.putBoolean("exchange", exchange);
+            tag.putString("exchangeFrom", exchangeFrom == null ? "" : exchangeFrom);
             tag.putInt("shapeFillMode", shapeFillMode);
             tag.putInt("shapeOrderBatch", shapeOrderBatch);
             tag.putLong("shapeSeed", shapeSeed);
@@ -1338,6 +1373,8 @@ public final class BuildJob {
             job.shapeHollow = tag.getBoolean("shapeHollow");
             job.shapeCenter = NbtUtils.readBlockPos(tag, "shapeCenter").orElse(BlockPos.ZERO);
             job.shapeMaterials = tag.getString("shapeMaterials");
+            job.exchange = tag.getBoolean("exchange");
+            job.exchangeFrom = tag.contains("exchangeFrom") ? tag.getString("exchangeFrom") : "";
             job.shapeFillMode = tag.getInt("shapeFillMode");
             job.shapeOrderBatch = Math.max(1, tag.contains("shapeOrderBatch") ? tag.getInt("shapeOrderBatch") : 1);
             job.shapeSeed = tag.getLong("shapeSeed");

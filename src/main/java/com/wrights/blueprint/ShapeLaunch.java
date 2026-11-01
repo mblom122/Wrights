@@ -25,7 +25,11 @@ public final class ShapeLaunch {
     }
 
     public static void place(ServerPlayer player, BlueprintPayloads.ShapePlace payload) {
-        if (!ControllerItem.isHeld(player) || payload == null || WrightsConfig.refuse(player, WrightsConfig.allowShape())) {
+        if (!ControllerItem.isHeld(player) || payload == null) {
+            return;
+        }
+        boolean exchange = payload.exchange();
+        if (WrightsConfig.refuse(player, exchange ? WrightsConfig.allowExchange() : WrightsConfig.allowShape())) {
             return;
         }
         List<ShapeMaterials.Entry> materials = ShapeMaterials.parse(payload.materials());
@@ -130,12 +134,14 @@ public final class ShapeLaunch {
                 orderBatch,
                 seed,
                 ShapeSupply.encode(order),
-                deferSupplies);
+                deferSupplies,
+                exchange,
+                exchange ? (payload.fromMaterials() == null ? "" : payload.fromMaterials()) : "");
         if (!ok) {
-            Messages.actionBar(player, "message.wrights.shape_failed");
+            Messages.actionBar(player, exchange ? "message.wrights.exchange_failed" : "message.wrights.shape_failed");
             return;
         }
-        Messages.actionBar(player, "message.wrights.shape_started", volume);
+        Messages.actionBar(player, exchange ? "message.wrights.exchange_started" : "message.wrights.shape_started", volume);
     }
 
     private static double range() {

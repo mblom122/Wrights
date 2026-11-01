@@ -86,7 +86,10 @@ public final class WrightsHud {
         } else if (WrightsClientState.mode == WrightsClientState.Mode.SAVING) {
             line = Component.translatable("hud.wrights.saving", WrightsClientState.name);
         } else if (WrightsClientState.mode == WrightsClientState.Mode.BUILD) {
-            if (WrightsClientState.shapeToolActive()) {
+            if (WrightsClientState.exchangeToolActive()) {
+                line = Component.translatable("hud.wrights.tool_exchange");
+                sub = Component.translatable("hud.wrights.exchange_explain");
+            } else if (WrightsClientState.shapeToolActive()) {
                 line = Component.translatable("hud.wrights.tool_shape");
                 sub = Component.translatable(shapeFooter(minecraft));
             } else if (WrightsClientState.mirrorToolActive() && WrightsClientConfig.mirrorBlocks()) {
@@ -373,7 +376,9 @@ public final class WrightsHud {
                 ? (WrightsClientState.styleAnnounce
                         ? Component.translatable("hud.wrights.mode_now", Component.translatable(styleKey(WrightsClientState.captureStyle)))
                         : Component.translatable("hud.wrights.mode_how"))
-                : WrightsClientState.shapeAim
+                : WrightsClientState.exchangeAim
+                        ? Component.translatable("hud.wrights.exchange_explain")
+                        : WrightsClientState.shapeAim
                         ? Component.translatable(shapeFooter(minecraft))
                         : WrightsClientState.mirrorAim
                         ? Component.translatable(mirrorFooter(minecraft))
@@ -387,8 +392,10 @@ public final class WrightsHud {
         Component bind = Component.translatable("hud.wrights.tool_bind");
         Component mirror = Component.translatable("hud.wrights.tool_mirror");
         Component shape = Component.translatable("hud.wrights.tool_shape");
+        Component exchange = Component.translatable("hud.wrights.tool_exchange");
         Component mirrorMark = Component.translatable(WrightsClientConfig.mirrorBlocks() ? "menu.wrights.mirror_blocks" : "menu.wrights.mirror_blueprints");
         Component shapeMark = Component.translatable("menu.wrights.shape_kind_" + com.wrights.blueprint.Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get()).name().toLowerCase());
+        Component exchangeMark = Component.translatable("menu.wrights.exchange_mark");
         Component selected = Component.translatable("hud.wrights.mode_selected");
         Component corners = Component.translatable("hud.wrights.mode_corners");
         Component box = Component.translatable("hud.wrights.mode_box");
@@ -397,6 +404,7 @@ public final class WrightsHud {
         boolean canMove = WrightsClientState.hasBox();
         boolean showMirror = WrightsConfig.allowMirror();
         boolean showShape = WrightsConfig.allowShape();
+        boolean showExchange = WrightsConfig.allowExchange();
         int width = 188;
         width = Math.max(width, minecraft.font.width(title) + 28);
         width = Math.max(width, minecraft.font.width(use) + minecraft.font.width(selected) + 36);
@@ -408,6 +416,9 @@ public final class WrightsHud {
         if (showShape) {
             width = Math.max(width, minecraft.font.width(shape) + minecraft.font.width(shapeMark) + 36);
         }
+        if (showExchange) {
+            width = Math.max(width, minecraft.font.width(exchange) + minecraft.font.width(exchangeMark) + 36);
+        }
         int nest = 18;
         if (making) {
             width = Math.max(width, minecraft.font.width(corners) + minecraft.font.width(selected) + 36 + nest);
@@ -415,7 +426,7 @@ public final class WrightsHud {
             width = Math.max(width, minecraft.font.width(move) + minecraft.font.width(canMove ? selected : need) + 36 + nest);
         }
         int row = 18;
-        int rows = 3 + (showMirror ? 1 : 0) + (showShape ? 1 : 0) + (making ? 3 : 0);
+        int rows = 3 + (showMirror ? 1 : 0) + (showShape ? 1 : 0) + (showExchange ? 1 : 0) + (making ? 3 : 0);
         int textWidth = width - 24;
         int footer = footerHeight(minecraft, how, textWidth);
         int height = 28 + row * rows + footer;
@@ -438,7 +449,7 @@ public final class WrightsHud {
             yAfterNew = subY + row * 3;
         }
         int toolY = yAfterNew;
-        drawToolRow(graphics, minecraft, x, toolY, width, building && !WrightsClientState.bindSupply && !WrightsClientState.mirrorAim && !WrightsClientState.shapeAim, use, selected);
+        drawToolRow(graphics, minecraft, x, toolY, width, building && !WrightsClientState.bindSupply && !WrightsClientState.mirrorAim && !WrightsClientState.shapeAim && !WrightsClientState.exchangeAim, use, selected);
         toolY += row;
         if (showMirror) {
             drawToolRow(graphics, minecraft, x, toolY, width, building && WrightsClientState.mirrorAim, mirror, mirrorMark);
@@ -446,6 +457,10 @@ public final class WrightsHud {
         }
         if (showShape) {
             drawToolRow(graphics, minecraft, x, toolY, width, building && WrightsClientState.shapeAim, shape, shapeMark);
+            toolY += row;
+        }
+        if (showExchange) {
+            drawToolRow(graphics, minecraft, x, toolY, width, building && WrightsClientState.exchangeAim, exchange, exchangeMark);
             toolY += row;
         }
         drawToolRow(graphics, minecraft, x, toolY, width, building && WrightsClientState.bindSupply, bind, selected);

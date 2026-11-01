@@ -197,6 +197,9 @@ public final class WrightsConfig {
     public static final ModConfigSpec.BooleanValue ALLOW_SHAPE_ANCHOR = BUILDER
             .comment("Shape builds may use On anchor / Set under me. Off forces Where I look.")
             .define("shapeAnchor", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_EXCHANGE = BUILDER
+            .comment("Exchange mode. Replaces matching blocks inside a shape volume with chosen materials.")
+            .define("exchange", true);
     public static final ModConfigSpec.BooleanValue ALLOW_MIRROR_BLOCKS = BUILDER
             .comment("Mirroring the block in the other hand.")
             .define("mirrorBlocks", true);
@@ -400,6 +403,10 @@ public final class WrightsConfig {
         return allowShape() && read(ALLOW_SHAPE_ANCHOR, true);
     }
 
+    public static boolean allowExchange() {
+        return allowBuilding() && read(ALLOW_EXCHANGE, true);
+    }
+
     /**
      * Cap for shape size / height / thickness. Never above {@link #MAX_AXIS}.
      */
@@ -437,9 +444,9 @@ public final class WrightsConfig {
         return read(ALLOW_LINK, true);
     }
 
-    /** Building has a blueprint list, mirror page, or shape page to show. */
+    /** Building has a blueprint list, mirror page, shape page, or exchange page to show. */
     public static boolean showBuilding() {
-        return allowBlueprints() || allowMirror() || allowShape();
+        return allowBlueprints() || allowMirror() || allowShape() || allowExchange();
     }
 
     /** Highest copy count the server still allows. */

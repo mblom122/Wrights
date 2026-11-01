@@ -374,6 +374,10 @@ public final class WrightsInput {
             useShapeClick(player, pos, face);
             return;
         }
+        if (WrightsClientState.exchangeToolActive()) {
+            useExchangeClick(player, pos, face);
+            return;
+        }
         if (WrightsClientState.bindSupply) {
             if (player.isShiftKeyDown()) {
                 Minecraft.getInstance().setScreen(new SupplyBindScreen());
@@ -527,7 +531,8 @@ public final class WrightsInput {
         if (control) {
             // Shape tool: Ctrl+scroll yaws the whole footprint around the look/anchor pin.
             // Scroll up = clockwise so the AABB orbits that cell (needs a corner/edge pivot).
-            if (WrightsClientState.shapeToolActive() && com.wrights.WrightsConfig.allowShape()) {
+            if ((WrightsClientState.shapeToolActive() && com.wrights.WrightsConfig.allowShape())
+                    || (WrightsClientState.exchangeToolActive() && com.wrights.WrightsConfig.allowExchange())) {
                 // Center pivot spins a cube in place — move to the bottom min corner so scroll orbits the box.
                 if (com.wrights.WrightsClientConfig.SHAPE_PIVOT.get() == com.wrights.blueprint.Shapes.PIVOT_CENTER) {
                     com.wrights.WrightsClientConfig.setShapePivot(com.wrights.blueprint.Shapes.pivotId(0, 0));
@@ -629,6 +634,68 @@ public final class WrightsInput {
             return;
         }
         WrightsClientState.tryShape(false, pos, face);
+    }
+
+    /** Same look/anchor flow as Shape, but starts an Exchange job. */
+    private static void useExchangeClick(net.minecraft.world.entity.player.Player player, BlockPos pos, Direction face) {
+        if (!com.wrights.WrightsConfig.allowExchange()) {
+            player.displayClientMessage(Component.translatable("message.wrights.feature_off"), true);
+            return;
+        }
+        boolean lookMode = !com.wrights.WrightsClientConfig.SHAPE_USE_ANCHOR.get()
+                || !com.wrights.WrightsConfig.allowShapeAnchor();
+        if (lookMode) {
+            if (player.isShiftKeyDown()) {
+                if (!WrightsClientState.shapeLookSnapActive()) {
+                    BlockHitResult aim = WrightsClientState.shapeLookHit();
+                    if (aim == null) {
+                        player.displayClientMessage(Component.translatable("message.wrights.shape_look"), true);
+                        return;
+                    }
+                    WrightsClientState.lockShapeLookSnap(aim.getBlockPos(), aim.getDirection());
+                }
+                Minecraft.getInstance().setScreen(new ShapeLookSnapScreen());
+                return;
+            }
+            boolean lockFirst = com.wrights.WrightsClientConfig.SHAPE_LOOK_LOCK.get();
+            if (lockFirst && !WrightsClientState.shapeLookSnapActive()) {
+                BlockHitResult aim = WrightsClientState.shapeLookHit();
+                if (aim == null) {
+                    player.displayClientMessage(Component.translatable("message.wrights.shape_look"), true);
+                    return;
+                }
+                WrightsClientState.lockShapeLookSnap(aim.getBlockPos(), aim.getDirection());
+                BlockPos pin = WrightsClientState.shapeLookSnapPos;
+                player.displayClientMessage(
+                        Component.translatable("message.wrights.shape_look_locked", pin.getX(), pin.getY(), pin.getZ()),
+                        true);
+                return;
+            }
+            if (WrightsClientState.shapeLookSnapActive()) {
+                WrightsClientState.tryExchange(false, WrightsClientState.shapeLookSnapPos, Direction.UP);
+            } else {
+                BlockHitResult aim = WrightsClientState.shapeLookHit();
+                if (aim == null) {
+                    player.displayClientMessage(Component.translatable("message.wrights.shape_look"), true);
+                    return;
+                }
+                WrightsClientState.tryExchange(false, aim.getBlockPos(), aim.getDirection());
+            }
+            return;
+        }
+        if (player.isShiftKeyDown()) {
+            BlockHitResult aim = WrightsClientState.lookHit();
+            BlockPos at = aim != null ? aim.getBlockPos() : pos;
+            if (at != null) {
+                WrightsClientState.setShapeAnchor(at);
+                player.displayClientMessage(Component.translatable("message.wrights.shape_set", at.getX(), at.getY(), at.getZ()), true);
+            } else {
+                com.wrights.WrightsClientConfig.clearShapeAnchor();
+                player.displayClientMessage(Component.translatable("message.wrights.shape_cleared"), true);
+            }
+            return;
+        }
+        WrightsClientState.tryExchange(false, pos, face);
     }
 
     private static String mirrorAxisKey(Direction.Axis axis) {

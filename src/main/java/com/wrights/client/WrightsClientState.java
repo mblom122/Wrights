@@ -94,6 +94,8 @@ public final class WrightsClientState {
     public static boolean mirrorAim;
     /** Build-tool slot for Shape mode. */
     public static boolean shapeAim;
+    /** Build-tool slot for Exchange mode (shape volume + replace filter). */
+    public static boolean exchangeAim;
 
     /** True only while the mirror build-tool is the active tool in Build mode. */
     public static boolean mirrorToolActive() {
@@ -103,6 +105,11 @@ public final class WrightsClientState {
     /** True only while the shape build-tool is the active tool in Build mode. */
     public static boolean shapeToolActive() {
         return mode == Mode.BUILD && shapeAim;
+    }
+
+    /** True only while the exchange build-tool is the active tool in Build mode. */
+    public static boolean exchangeToolActive() {
+        return mode == Mode.BUILD && exchangeAim;
     }
 
     /**
@@ -613,6 +620,9 @@ public final class WrightsClientState {
         if (bindSupply) {
             return 3;
         }
+        if (exchangeAim) {
+            return 4;
+        }
         return 0;
     }
 
@@ -650,15 +660,16 @@ public final class WrightsClientState {
         com.wrights.WrightsClientConfig.setLastMode(modeId, style, tool, id);
     }
 
-    /** Drop Shape / Mirror / Bind aims without changing mode or remembered tool. */
+    /** Drop Shape / Mirror / Exchange / Bind aims without changing mode or remembered tool. */
     public static void clearBuildAims() {
         mirrorAim = false;
         shapeAim = false;
+        exchangeAim = false;
         bindSupply = false;
         bindFromMenu = false;
     }
 
-    /** Restore Mirror / Shape / Bind inventory after Build mode comes back. */
+    /** Restore Mirror / Shape / Exchange / Bind inventory after Build mode comes back. */
     public static void applyLastBuildTool() {
         clearBuildAims();
         int tool = com.wrights.WrightsClientConfig.LAST_BUILD_TOOL.get();
@@ -669,6 +680,8 @@ public final class WrightsClientState {
             shapeAim = true;
         } else if (tool == 3) {
             bindSupply = true;
+        } else if (tool == 4 && WrightsConfig.allowExchange()) {
+            exchangeAim = true;
         }
         rememberedTool = currentBuildTool();
     }
@@ -687,6 +700,7 @@ public final class WrightsClientState {
         seq = -1;
         mirrorAim = false;
         shapeAim = false;
+        exchangeAim = false;
         bindSupply = false;
         bindFromMenu = false;
         int style = com.wrights.WrightsClientConfig.LAST_STYLE.get();
@@ -1716,7 +1730,78 @@ public final class WrightsClientState {
                 WrightsClientConfig.SHAPE_FILL_MODE.get(),
                 WrightsClientConfig.SHAPE_ORDER_BATCH.get(),
                 WrightsClientConfig.SHAPE_MATERIALS.get(),
-                WrightsClientConfig.SHAPE_SUPPLY.get());
+                WrightsClientConfig.SHAPE_SUPPLY.get(),
+                false,
+                "");
+        PacketDistributor.sendToServer(pendingShape);
+        if (lookPinned) {
+            clearShapeLookSnap();
+        }
+        return true;
+    }
+
+    public static boolean tryExchange(boolean force) {
+        if (pendingShape == null) {
+            return false;
+        }
+        return tryExchange(force, pendingShape.pos(), Direction.from3DDataValue(pendingShape.face()));
+    }
+
+    public static boolean tryExchange(boolean force, BlockPos pos, Direction face) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || !ControllerItem.isHeld(minecraft.player)) {
+            return false;
+        }
+        if (WrightsClientConfig.shapeMaterials().isEmpty()) {
+            minecraft.player.displayClientMessage(Component.translatable("message.wrights.shape_need_materials"), true);
+            return false;
+        }
+        String dimension = minecraft.level == null ? "" : minecraft.level.dimension().location().toString();
+        boolean useAnchor = WrightsConfig.allowShapeAnchor() && WrightsClientConfig.SHAPE_USE_ANCHOR.get();
+        boolean anchorSet = WrightsClientConfig.shapePlaced(dimension);
+        if (useAnchor && !anchorSet) {
+            minecraft.player.displayClientMessage(Component.translatable("message.wrights.shape_need_anchor"), true);
+            return false;
+        }
+        boolean lookPinned = false;
+        if (!useAnchor) {
+            if (shapeLookSnapActive()) {
+                pos = shapeLookSnapPos;
+                face = Direction.UP;
+                lookPinned = true;
+            } else if (pos == null || face == null) {
+                BlockHitResult aim = shapeLookHit();
+                if (aim == null) {
+                    minecraft.player.displayClientMessage(Component.translatable("message.wrights.shape_look"), true);
+                    return false;
+                }
+                pos = aim.getBlockPos();
+                face = aim.getDirection();
+            }
+        }
+        pendingShape = new BlueprintPayloads.ShapePlace(
+                pos == null ? BlockPos.ZERO : pos,
+                face == null ? 0 : face.get3DDataValue(),
+                useAnchor,
+                anchorSet,
+                anchorSet ? WrightsClientConfig.shapeAnchor() : BlockPos.ZERO,
+                WrightsClientConfig.SHAPE_KIND.get(),
+                WrightsClientConfig.SHAPE_SIZE.get(),
+                WrightsClientConfig.SHAPE_HEIGHT.get(),
+                WrightsClientConfig.SHAPE_THICKNESS.get(),
+                WrightsClientConfig.SHAPE_PLANE.get(),
+                WrightsClientConfig.SHAPE_YAW.get(),
+                WrightsClientConfig.SHAPE_PIVOT.get(),
+                WrightsClientConfig.SHAPE_HOLLOW.get(),
+                WrightsClientConfig.SHAPE_VOID.get(),
+                force,
+                lookPinned,
+                WrightsClientConfig.SHAPE_FILL_MODE.get(),
+                WrightsClientConfig.SHAPE_ORDER_BATCH.get(),
+                WrightsClientConfig.SHAPE_MATERIALS.get(),
+                WrightsClientConfig.SHAPE_SUPPLY.get(),
+                true,
+                WrightsClientConfig.EXCHANGE_FROM.get());
         PacketDistributor.sendToServer(pendingShape);
         if (lookPinned) {
             clearShapeLookSnap();
@@ -1889,7 +1974,10 @@ public final class WrightsClientState {
             return;
         }
         int styles = styleSteps();
-        int extras = 2 + (WrightsConfig.allowMirror() ? 1 : 0) + (WrightsConfig.allowShape() ? 1 : 0);
+        int extras = 2
+                + (WrightsConfig.allowMirror() ? 1 : 0)
+                + (WrightsConfig.allowShape() ? 1 : 0)
+                + (WrightsConfig.allowExchange() ? 1 : 0);
         int count = styles + extras;
         int next = Math.floorMod(buildToolSlot() + direction, count);
         if (next < styles) {
@@ -1897,26 +1985,16 @@ public final class WrightsClientState {
         } else {
             int tool = next - styles;
             int cursor = 0;
-            if (tool == cursor) {
+            if (tool == cursor++) {
                 selectBuildTool(false);
+            } else if (WrightsConfig.allowMirror() && tool == cursor++) {
+                selectMirrorTool();
+            } else if (WrightsConfig.allowShape() && tool == cursor++) {
+                selectShapeTool();
+            } else if (WrightsConfig.allowExchange() && tool == cursor++) {
+                selectExchangeTool();
             } else {
-                cursor++;
-                if (WrightsConfig.allowMirror()) {
-                    if (tool == cursor) {
-                        selectMirrorTool();
-                    } else {
-                        cursor++;
-                        if (WrightsConfig.allowShape() && tool == cursor) {
-                            selectShapeTool();
-                        } else {
-                            selectBuildTool(true);
-                        }
-                    }
-                } else if (WrightsConfig.allowShape() && tool == cursor) {
-                    selectShapeTool();
-                } else {
-                    selectBuildTool(true);
-                }
+                selectBuildTool(true);
             }
         }
         styleHudTicks = STYLE_HUD_TICKS;
@@ -1938,7 +2016,7 @@ public final class WrightsClientState {
         return CaptureStyle.MOVE;
     }
 
-    /** New template styles, then Use template, Mirror, Shape, and Bind inventory. */
+    /** New template styles, then Use template, Mirror, Shape, Exchange, and Bind inventory. */
     private static int buildToolSlot() {
         if (mode == Mode.CAPTURE) {
             int offset = switch (captureStyle) {
@@ -1949,7 +2027,7 @@ public final class WrightsClientState {
             return Math.min(offset, styleSteps() - 1);
         }
         int slot = styleSteps();
-        if (mode == Mode.BUILD && !bindSupply && !mirrorAim && !shapeAim) {
+        if (mode == Mode.BUILD && !bindSupply && !mirrorAim && !shapeAim && !exchangeAim) {
             return slot;
         }
         slot++;
@@ -1965,13 +2043,19 @@ public final class WrightsClientState {
             }
             slot++;
         }
+        if (WrightsConfig.allowExchange()) {
+            if (mode == Mode.BUILD && exchangeAim) {
+                return slot;
+            }
+            slot++;
+        }
         if (mode == Mode.BUILD && bindSupply) {
             return slot;
         }
         return styleSteps();
     }
 
-    /** Use-template / blueprints strip — clears Mirror, Shape, and Bind inventory aims. */
+    /** Use-template / blueprints strip — clears Mirror, Shape, Exchange, and Bind inventory aims. */
     public static void selectBlueprintTool() {
         selectBuildTool(false);
     }
@@ -1983,7 +2067,6 @@ public final class WrightsClientState {
     public static void selectMirrorTool() {
         selectBuildTool(false);
         mirrorAim = true;
-        shapeAim = false;
         WrightsClientConfig.setMirrorBlocks(true);
         rememberMode();
     }
@@ -1991,7 +2074,12 @@ public final class WrightsClientState {
     public static void selectShapeTool() {
         selectBuildTool(false);
         shapeAim = true;
-        mirrorAim = false;
+        rememberMode();
+    }
+
+    public static void selectExchangeTool() {
+        selectBuildTool(false);
+        exchangeAim = true;
         rememberMode();
     }
 
