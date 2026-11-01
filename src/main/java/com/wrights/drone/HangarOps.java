@@ -373,12 +373,8 @@ public final class HangarOps {
             if (tier == target) {
                 continue;
             }
-            if (target == tier + 1 && !canAfford(player, tier, target)) {
+            if (target > tier && !canAfford(player, tier, target)) {
                 craftNeed++;
-                continue;
-            }
-            if (target > tier + 1) {
-                stuck++;
                 continue;
             }
             next = applyTier(player, next, index, tier, target);
@@ -415,15 +411,11 @@ public final class HangarOps {
             Messages.actionBar(player, "message.wrights.tier_same", Component.translatable(WrightTier.nameKey(target)));
             return swarm;
         }
-        if (target > tier + 1) {
-            Messages.actionBar(player, "message.wrights.upgrade_need", Component.translatable(WrightTier.nameKey(tier + 1)));
-            return swarm;
-        }
         if (target > tier && !canAfford(player, tier, target)) {
             if (orderCraft(player, WrightTier.upgradeItem(target), 1)) {
                 Messages.actionBar(player, "message.wrights.digital_crafting");
             } else if (!DigitalNetworks.craftFailureExplained()) {
-                Messages.actionBar(player, "message.wrights.upgrade_need", Component.translatable(WrightTier.nameKey(missingStep(player, tier, target))));
+                Messages.actionBar(player, "message.wrights.upgrade_need", Component.translatable(WrightTier.nameKey(target)));
             }
             return swarm;
         }
@@ -449,30 +441,18 @@ public final class HangarOps {
         }
         Swarm next = swarm;
         boolean[] raised = new boolean[picked.length];
-        int guard = picked.length * WrightTier.NETHERITE;
-        while (guard-- > 0) {
-            int best = -1;
-            int bestTier = Integer.MAX_VALUE;
-            for (int i = 0; i < picked.length; i++) {
-                int tier = WrightTier.clamp(next.units().get(picked[i]).speed());
-                if (tier >= WrightTier.NETHERITE || tier >= bestTier) {
-                    continue;
-                }
-                Item upgrade = WrightTier.upgradeItem(tier + 1);
-                if (upgrade != null && afford(player, upgrade, 1)) {
-                    best = i;
-                    bestTier = tier;
-                }
+        for (int i = 0; i < picked.length; i++) {
+            int tier = WrightTier.clamp(next.units().get(picked[i]).speed());
+            int goal = highestAffordable(player, tier);
+            if (goal <= tier) {
+                continue;
             }
-            if (best < 0) {
-                break;
+            Swarm changed = applyTier(player, next, picked[i], tier, goal);
+            if (changed == next) {
+                continue;
             }
-            if (takeUpgrade(player, WrightTier.upgradeItem(bestTier + 1), 1).result() != ItemSource.Result.OK) {
-                break;
-            }
-            refundInstalled(player, bestTier);
-            next = next.withSpeed(picked[best], bestTier + 1);
-            raised[best] = true;
+            next = changed;
+            raised[i] = true;
         }
         int count = 0;
         for (boolean one : raised) {
@@ -484,10 +464,17 @@ public final class HangarOps {
             int[] missing = new int[WrightTier.NETHERITE + 1];
             for (int index : picked) {
                 int tier = WrightTier.clamp(swarm.units().get(index).speed());
-                if (tier >= WrightTier.NETHERITE || afford(player, WrightTier.upgradeItem(tier + 1), 1)) {
+                if (tier >= WrightTier.NETHERITE) {
                     continue;
                 }
-                missing[tier + 1]++;
+                int want = WrightTier.NETHERITE;
+                for (int step = WrightTier.NETHERITE; step > tier; step--) {
+                    if (ItemSource.craftable(player, WrightTier.upgradeItem(step))) {
+                        want = step;
+                        break;
+                    }
+                }
+                missing[want]++;
             }
             boolean ordered = false;
             for (int step = WrightTier.COPPER; step <= WrightTier.NETHERITE; step++) {
@@ -504,6 +491,17 @@ public final class HangarOps {
         }
         Messages.actionBar(player, "message.wrights.marked_raised", count);
         return next;
+    }
+
+    /** Highest tier above {@code tier} that only needs that tier's upgrade item. */
+    private static int highestAffordable(ServerPlayer player, int tier) {
+        int best = tier;
+        for (int step = WrightTier.NETHERITE; step > tier; step--) {
+            if (canAfford(player, tier, step)) {
+                return step;
+            }
+        }
+        return best;
     }
 
     private static Swarm downOne(ServerPlayer player, Swarm swarm, int[] units) {
@@ -546,9 +544,6 @@ public final class HangarOps {
 
     private static Swarm applyTier(ServerPlayer player, Swarm swarm, int index, int tier, int target) {
         if (target > tier) {
-            if (target != tier + 1) {
-                return swarm;
-            }
             Item upgrade = WrightTier.upgradeItem(target);
             if (upgrade != null && takeUpgrade(player, upgrade, 1).result() != ItemSource.Result.OK) {
                 return swarm;
@@ -565,24 +560,13 @@ public final class HangarOps {
         return swarm.withSpeed(index, target);
     }
 
+    /** Only the destination upgrade is spent; lower steps are not required. */
     private static boolean canAfford(ServerPlayer player, int tier, int target) {
-        for (int step = tier + 1; step <= target; step++) {
-            Item upgrade = WrightTier.upgradeItem(step);
-            if (upgrade == null || !afford(player, upgrade, 1)) {
-                return false;
-            }
+        if (target <= tier) {
+            return true;
         }
-        return true;
-    }
-
-    private static int missingStep(ServerPlayer player, int tier, int target) {
-        for (int step = tier + 1; step <= target; step++) {
-            Item upgrade = WrightTier.upgradeItem(step);
-            if (upgrade == null || !afford(player, upgrade, 1)) {
-                return step;
-            }
-        }
-        return target;
+        Item upgrade = WrightTier.upgradeItem(target);
+        return upgrade == null || afford(player, upgrade, 1);
     }
 
     private static boolean afford(ServerPlayer player, Item item, int count) {

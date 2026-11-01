@@ -374,7 +374,7 @@ final class WrightManagePanel {
                 }
                 if (local >= y + 64 && local < y + 78) {
                     int picked = tierAt(mouseX);
-                    if (picked >= WrightTier.BASE && picked != tier && (picked < tier || (picked == tier + 1 && canAfford(screen, tier, picked)))) {
+                    if (picked >= WrightTier.BASE && picked != tier && (picked < tier || canAfford(screen, tier, picked))) {
                         screen.batch(HangarOps.TO_TIER, picked, new int[] { i });
                     }
                     return true;
@@ -561,7 +561,7 @@ final class WrightManagePanel {
             int chipX = x + (tier - WrightTier.BASE) * (chip + gap);
             boolean enabled = current < WrightTier.BASE || tier != current;
             if (current >= WrightTier.BASE && tier > current) {
-                enabled = tier == current + 1 && canAfford(screen, current, tier);
+                enabled = canAfford(screen, current, tier);
             }
             drawMini(graphics, screen, chipX, y, chip, Component.translatable(WrightTier.nameKey(tier)), enabled || tier == current, tier == current, mouseX, mouseY);
         }
@@ -811,17 +811,16 @@ final class WrightManagePanel {
         return screen.minecraft().player.getInventory().countItem(item);
     }
 
+    /** Destination upgrade only — intermediate steps are not required. */
     private static boolean canAfford(ManageHost screen, int tier, int target) {
+        if (target <= tier) {
+            return true;
+        }
         if (screen.minecraft().player != null && screen.minecraft().player.getAbilities().instabuild) {
             return true;
         }
-        for (int step = tier + 1; step <= target; step++) {
-            Item upgrade = WrightTier.upgradeItem(step);
-            if (count(screen, upgrade) <= 0 && digitalStock(upgrade) <= 0L && !digitalCraftable(upgrade)) {
-                return false;
-            }
-        }
-        return true;
+        Item upgrade = WrightTier.upgradeItem(target);
+        return upgrade == null || count(screen, upgrade) > 0 || digitalStock(upgrade) > 0L || digitalCraftable(upgrade);
     }
 
     private static BlueprintPayloads.DigitalInfoLine digitalLine(Item item) {

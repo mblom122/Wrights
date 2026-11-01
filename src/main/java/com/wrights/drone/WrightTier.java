@@ -6,8 +6,9 @@ import net.minecraft.world.item.Item;
 import com.wrights.item.ModItems;
 
 /**
- * Stock through netherite. A crafted wright has no upgrade. Each step, including
- * stock to copper, is the same gap that separates copper from iron.
+ * Stock through netherite. A crafted wright has no upgrade. Any higher tier can
+ * be applied directly with that tier's upgrade item; intermediate steps are not
+ * required. Each step, including stock to copper, is the same pace gap.
  */
 public final class WrightTier {
     public static final int BASE = 0;
