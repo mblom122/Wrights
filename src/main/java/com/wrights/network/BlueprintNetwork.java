@@ -963,7 +963,8 @@ public final class BlueprintNetwork {
 
     /** Keeps a big build under the packet cap by stepping through it, so the ghost still shows. */
     private static java.util.List<BlueprintPayloads.Bit> hologramBits(BuildJob job, Schematic schematic) {
-        int limit = Math.max(1, com.wrights.WrightsConfig.maxPreviewBlocks());
+        // Active job ghosts are redrawn often — cap harder than menu previews so huge spheres stay playable.
+        int limit = Math.max(1, Math.min(4096, com.wrights.WrightsConfig.maxPreviewBlocks()));
         java.util.Set<Long> settled = new java.util.HashSet<>();
         job.collectSettledGhosts(settled);
         int count = 0;

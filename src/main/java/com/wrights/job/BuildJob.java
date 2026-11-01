@@ -94,6 +94,8 @@ public final class BuildJob {
     private int clipZ = Integer.MAX_VALUE;
     private BlockPos anchor;
     private int workedTicks;
+    /** Approximate held-for-floor count for the HUD. Refreshed on a throttle; never scanned every sync. */
+    private int heldHint;
 
     private BuildJob(UUID id, UUID owner, UUID controllerId, Kind kind, ResourceKey<Level> dimension, BlockPos min, BlockPos max, int total) {
         this.id = id;
@@ -674,6 +676,14 @@ public final class BuildJob {
 
     public int workedTicks() {
         return workedTicks;
+    }
+
+    public int heldHint() {
+        return heldHint;
+    }
+
+    public void setHeldHint(int heldHint) {
+        this.heldHint = Math.max(0, heldHint);
     }
 
     public int elapsedSeconds() {

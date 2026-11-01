@@ -79,6 +79,13 @@ import com.wrights.util.Messages;
 @EventBusSubscriber(modid = WrightsMod.MOD_ID)
 public final class JobManager {
     private static final double DRONE_REACH_SQR = 2.25D;
+    /**
+     * Hard cap on how many schematic cells one scan/borrow may inspect. Large jobs used to walk the
+     * entire list from index 0 on every place, which locked the server tick and blocked Stop/Remove.
+     */
+    private static final int CREW_SCAN_CAP = 512;
+    /** Shared across all hands for one crew tick — skips of already-done cells, not world scans. */
+    private static final int CREW_SKIP_BUDGET = 256;
 
     private JobManager() {
     }
@@ -111,7 +118,8 @@ public final class JobManager {
                 discardDrone(server, job);
                 library.removeJob(job);
             }
-            if (!job.finished() && library.job(job.id()).isPresent()) {
+            // Progress is in memory; dirty every second is enough and avoids heavy NBT churn mid-build.
+            if (!job.finished() && library.job(job.id()).isPresent() && server.getTickCount() % 20 == 0) {
                 library.setDirty();
             }
         }
@@ -2599,7 +2607,7 @@ public final class JobManager {
         boolean waiting = false;
         boolean waitingChunk = false;
         boolean waitingItems = false;
-        int[] skipBudget = {8192};
+        int[] skipBudget = {CREW_SKIP_BUDGET};
         for (BuildJob.Hand hand : job.hands()) {
             if (hand.sheltering) {
                 working = true;
@@ -2757,7 +2765,10 @@ public final class JobManager {
         if (!job.hungFalls().isEmpty()) {
             scrubHangRegion(level, job);
         }
-        shareWithIdle(level, job, schematic);
+        // Slice sharing walks open counts — only when someone is idle, and not every tick.
+        if (level.getGameTime() % 20L == 0L) {
+            shareWithIdle(level, job, schematic);
+        }
         // Only send spare wrights home when the job has nothing left to place or hold.
         if (!jobHasRemainingWork(level, schematic, job)) {
             releaseIdle(level, player, job, schematic);
@@ -2776,7 +2787,13 @@ public final class JobManager {
                 }
             }
         }
-        library.setDirty();
+        if (level.getGameTime() % 20L == 0L) {
+            refreshHeldHint(level, schematic, job);
+        }
+        // Large jobs skip per-block ghost packets; refresh the stepped hologram on a throttle instead.
+        if (job.total() > 8000 && level.getGameTime() % 40L == 0L) {
+            BlueprintNetwork.showJobHologram(player, job, schematic);
+        }
         int reason = BuildJob.WAIT_NONE;
         if (waitingChunk) {
             reason = BuildJob.WAIT_CHUNK;
@@ -2959,6 +2976,7 @@ public final class JobManager {
                 }
                 return index;
             }
+            job.settleGhost(entry.x(), entry.y(), entry.z());
             budget[0]--;
             noteProgress(schematic, job, hand, entry, index);
         }
@@ -3065,6 +3083,9 @@ public final class JobManager {
                 continue;
             }
             if (job.outsideClip(entry) || satisfied(level, job, entry)) {
+                if (!job.outsideClip(entry)) {
+                    job.settleGhost(entry.x(), entry.y(), entry.z());
+                }
                 cursor++;
                 continue;
             }
@@ -3119,8 +3140,16 @@ public final class JobManager {
         }
         int best = -1;
         double bestDist = Double.MAX_VALUE;
-        int from = nearest ? 0 : Math.max(0, start);
-        for (int i = from; i < schematic.blockCount(); i++) {
+        int count = schematic.blockCount();
+        // Continue from the cursor/probe — never rescan the whole schematic from 0 each place.
+        int from = Math.max(0, Math.min(count, nearest ? Math.max(cursor, start) : start));
+        int examined = 0;
+        for (int offset = 0; offset < count && examined < CREW_SCAN_CAP; offset++) {
+            int i = nearest ? (from + offset) % count : from + offset;
+            if (!nearest && i >= count) {
+                break;
+            }
+            examined++;
             Schematic.Entry entry = schematic.entry(i);
             if (!include.test(entry)) {
                 continue;
@@ -3180,7 +3209,12 @@ public final class JobManager {
         }
         int best = -1;
         double bestDist = Double.MAX_VALUE;
-        for (int i = 0; i < schematic.blockCount(); i++) {
+        int count = schematic.blockCount();
+        int from = Math.max(0, Math.min(count, hand.cursor));
+        int examined = 0;
+        for (int offset = 0; offset < count && examined < CREW_SCAN_CAP; offset++) {
+            int i = (from + offset) % count;
+            examined++;
             Schematic.Entry entry = schematic.entry(i);
             if (job.outsideClip(entry) || satisfied(level, job, entry)) {
                 continue;
@@ -3647,9 +3681,14 @@ public final class JobManager {
     private static int[] peekHandTargets(ServerLevel level, Schematic schematic, BuildJob job, BuildJob.Hand hand) {
         int current = -1;
         int next = -1;
-        // Compute once — calling countOpen inside the loop was O(n²) on large blueprints and hitching flight.
-        boolean ownShareEmpty = countOpen(level, schematic, job, hand) == 0;
-        for (int i = 0; i < schematic.blockCount(); i++) {
+        // Cheap ownership check: only fall back to helping others when no owned open cell is nearby.
+        boolean ownShareEmpty = !anyOpen(level, schematic, job, hand);
+        int count = schematic.blockCount();
+        int from = Math.max(0, Math.min(count, hand.cursor));
+        int examined = 0;
+        for (int offset = 0; offset < count && examined < CREW_SCAN_CAP && next < 0; offset++) {
+            int i = (from + offset) % count;
+            examined++;
             Schematic.Entry entry = schematic.entry(i);
             if (job.outsideClip(entry) || satisfied(level, job, entry)) {
                 continue;
@@ -3668,7 +3707,6 @@ public final class JobManager {
                 continue;
             }
             next = i;
-            break;
         }
         return new int[] { current, next };
     }
@@ -3822,7 +3860,7 @@ public final class JobManager {
         for (int n = 0; n < job.hands().size(); n++) {
             BuildJob.Hand receiver = null;
             for (BuildJob.Hand hand : job.hands()) {
-                if (countOpen(level, schematic, job, hand) == 0) {
+                if (!anyOpen(level, schematic, job, hand)) {
                     receiver = hand;
                     break;
                 }
@@ -3848,11 +3886,11 @@ public final class JobManager {
         }
         boolean busy = false;
         int going = 0;
-        int[] open = new int[job.hands().size()];
+        boolean[] open = new boolean[job.hands().size()];
         for (int i = 0; i < job.hands().size(); i++) {
             BuildJob.Hand hand = job.hands().get(i);
-            open[i] = countOpen(level, schematic, job, hand);
-            if (hand.idle && open[i] == 0) {
+            open[i] = anyOpen(level, schematic, job, hand);
+            if (hand.idle && !open[i]) {
                 going++;
             } else if (!hand.idle) {
                 busy = true;
@@ -3864,7 +3902,7 @@ public final class JobManager {
         int slot = 0;
         for (int i = 0; i < job.hands().size(); i++) {
             BuildJob.Hand hand = job.hands().get(i);
-            if (!hand.idle || open[i] > 0 || hand.entityId == null) {
+            if (!hand.idle || open[i] || hand.entityId == null) {
                 continue;
             }
             recall(level, player, hand.entityId, slot++, going, hand.homePort);
@@ -3952,6 +3990,55 @@ public final class JobManager {
         return count;
     }
 
+    /** True if this wright still has at least one unsettled cell (cheap; no world/falling checks). */
+    private static boolean anyOpen(ServerLevel level, Schematic schematic, BuildJob job, BuildJob.Hand hand) {
+        if (!hand.slices.isEmpty()) {
+            for (BuildJob.Slice slice : hand.slices) {
+                if (anyOpen(level, schematic, job, slice)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        for (int i = 0; i < schematic.blockCount(); i++) {
+            Schematic.Entry entry = schematic.entry(i);
+            if (!ownsEntry(job, hand, entry)) {
+                continue;
+            }
+            if (cheapUnsettled(job, entry)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean anyOpen(ServerLevel level, Schematic schematic, BuildJob job, BuildJob.Slice slice) {
+        for (int i = Math.max(0, slice.cursor); i < schematic.blockCount(); i++) {
+            Schematic.Entry entry = schematic.entry(i);
+            if (!slice.contains(entry.x(), entry.y(), entry.z())) {
+                continue;
+            }
+            if (cheapUnsettled(job, entry)) {
+                return true;
+            }
+        }
+        // Holes behind the cursor still count.
+        for (int i = 0; i < Math.min(slice.cursor, schematic.blockCount()); i++) {
+            Schematic.Entry entry = schematic.entry(i);
+            if (!slice.contains(entry.x(), entry.y(), entry.z())) {
+                continue;
+            }
+            if (cheapUnsettled(job, entry)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean cheapUnsettled(BuildJob job, Schematic.Entry entry) {
+        return !job.outsideClip(entry) && !skippedContent(job, entry) && !job.isSettled(entry.x(), entry.y(), entry.z());
+    }
+
     /** Blocks still left to place or skip in this wright's slices. */
     private static int countOpen(ServerLevel level, Schematic schematic, BuildJob job, BuildJob.Hand hand) {
         int count = 0;
@@ -3961,7 +4048,12 @@ public final class JobManager {
         if (!hand.slices.isEmpty()) {
             return count;
         }
-        for (int i = 0; i < schematic.blockCount(); i++) {
+        int total = schematic.blockCount();
+        int from = Math.max(0, Math.min(total, hand.cursor));
+        int examined = 0;
+        for (int offset = 0; offset < total && examined < CREW_SCAN_CAP; offset++) {
+            int i = (from + offset) % total;
+            examined++;
             Schematic.Entry entry = schematic.entry(i);
             if (!ownsEntry(job, hand, entry)) {
                 continue;
@@ -3975,7 +4067,12 @@ public final class JobManager {
 
     private static int countOpen(ServerLevel level, Schematic schematic, BuildJob job, BuildJob.Slice slice) {
         int count = 0;
-        for (int i = 0; i < schematic.blockCount(); i++) {
+        int total = schematic.blockCount();
+        int from = Math.max(0, Math.min(total, slice.cursor));
+        int examined = 0;
+        for (int offset = 0; offset < total && examined < CREW_SCAN_CAP; offset++) {
+            int i = (from + offset) % total;
+            examined++;
             Schematic.Entry entry = schematic.entry(i);
             if (!slice.contains(entry.x(), entry.y(), entry.z())) {
                 continue;
@@ -4002,17 +4099,13 @@ public final class JobManager {
         return falling(level, schematic, job, entry) != Falling.SKIP;
     }
 
-    /** True while any schematic cell still needs to be placed or is only held for later. */
+    /** True while any schematic cell is still unsettled (O(n) hash lookups only — safe every tick). */
     private static boolean jobHasRemainingWork(ServerLevel level, Schematic schematic, BuildJob job) {
         if (schematic == null) {
             return false;
         }
         for (int i = 0; i < schematic.blockCount(); i++) {
-            Schematic.Entry entry = schematic.entry(i);
-            if (job.outsideClip(entry) || satisfied(level, job, entry)) {
-                continue;
-            }
-            if (falling(level, schematic, job, entry) != Falling.SKIP) {
+            if (cheapUnsettled(job, schematic.entry(i))) {
                 return true;
             }
         }
@@ -4022,21 +4115,27 @@ public final class JobManager {
     /**
      * Cells that are not skipped forever, but cannot be placed yet (need the block under them,
      * or another support that is still coming). Distinct from {@link BuildJob#skipped()}.
+     * Uses a cached hint — a full schematic walk every HUD sync was freezing large builds.
      */
     public static int countHeld(ServerPlayer player, SchematicLibrary library, BuildJob job) {
-        if (job == null || job.finished() || job.undoing() || job.kind() != BuildJob.Kind.PASTE || job.schematicId() == null) {
+        if (job == null || job.finished() || job.undoing() || job.kind() != BuildJob.Kind.PASTE) {
             return 0;
         }
-        Schematic schematic = library.schematic(job.schematicId()).orElse(null);
-        if (schematic == null || player.getServer() == null) {
-            return 0;
-        }
-        ServerLevel level = player.getServer().getLevel(job.dimension());
-        if (level == null) {
-            return 0;
+        return job.heldHint();
+    }
+
+    private static void refreshHeldHint(ServerLevel level, Schematic schematic, BuildJob job) {
+        if (schematic == null) {
+            job.setHeldHint(0);
+            return;
         }
         int held = 0;
-        for (int i = 0; i < schematic.blockCount(); i++) {
+        int count = schematic.blockCount();
+        int from = Math.max(0, Math.min(count, job.cursor()));
+        int examined = 0;
+        for (int offset = 0; offset < count && examined < CREW_SCAN_CAP; offset++) {
+            int i = (from + offset) % count;
+            examined++;
             Schematic.Entry entry = schematic.entry(i);
             if (job.outsideClip(entry) || satisfied(level, job, entry)) {
                 continue;
@@ -4045,7 +4144,7 @@ public final class JobManager {
                 held++;
             }
         }
-        return held;
+        job.setHeldHint(held);
     }
 
     private static int countRefunds(BuildJob job, BuildJob.Hand hand) {
@@ -4568,6 +4667,10 @@ public final class JobManager {
     /** The cell is filled, so the preview ghost for it is finished. */
     private static void clearPlacedGhost(ServerPlayer player, BuildJob job, Schematic.Entry entry) {
         job.settleGhost(entry.x(), entry.y(), entry.z());
+        // Per-block packets on a 20k+ job flood the client; the throttled hologram refresh covers those.
+        if (job.total() > 8000) {
+            return;
+        }
         com.wrights.network.BlueprintNetwork.dropJobGhost(player, job.id(), entry.x(), entry.y(), entry.z());
     }
 
