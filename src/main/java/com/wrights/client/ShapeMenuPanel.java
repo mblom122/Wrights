@@ -161,7 +161,13 @@ final class ShapeMenuPanel {
                 graphics.drawCenteredString(font, Component.translatable("menu.wrights.shape_under_me_btn"), x + leftW / 2, y + 5, WrightsUi.TEXT);
                 hits.add(new Hit(x, y, leftW, 18, "under_me", 0));
                 y += 22;
+            } else {
+                y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_LOOK_LOCK.get(),
+                        "menu.wrights.shape_look_lock", "menu.wrights.shape_look_lock_hint", "look_lock");
             }
+        } else {
+            y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_LOOK_LOCK.get(),
+                    "menu.wrights.shape_look_lock", "menu.wrights.shape_look_lock_hint", "look_lock");
         }
         drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_pivot", "menu.wrights.shape_pivot_hint");
         y += 12;
@@ -390,6 +396,16 @@ final class ShapeMenuPanel {
                     yield true;
                 }
                 WrightsClientConfig.setShapeUseAnchor(value != 0);
+                if (value != 0) {
+                    WrightsClientState.clearShapeLookSnap();
+                }
+                yield true;
+            }
+            case "look_lock" -> {
+                WrightsClientConfig.setShapeLookLock(!WrightsClientConfig.SHAPE_LOOK_LOCK.get());
+                if (!WrightsClientConfig.SHAPE_LOOK_LOCK.get()) {
+                    WrightsClientState.clearShapeLookSnap();
+                }
                 yield true;
             }
             case "under_me" -> {

@@ -233,6 +233,9 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.BooleanValue SHAPE_USE_ANCHOR = BUILDER
             .comment("When true, builds on the shape anchor. When false, builds where you look.")
             .define("shapeUseAnchor", false);
+    public static final ModConfigSpec.BooleanValue SHAPE_LOOK_LOCK = BUILDER
+            .comment("In look mode: when true, right-click locks the snap first and a second right-click builds. When false, right-click builds immediately.")
+            .define("shapeLookLock", false);
     public static final ModConfigSpec.IntValue SHAPE_PIVOT = BUILDER
             .comment("Which point on the shape AABB pins to the look/anchor cell. face*9+slot (0–53) or 54 = whole-shape center.")
             .defineInRange("shapePivot", com.wrights.blueprint.Shapes.PIVOT_CENTER, 0, com.wrights.blueprint.Shapes.PIVOT_CENTER);
@@ -834,6 +837,11 @@ public final class WrightsClientConfig {
 
     public static void setShapeUseAnchor(boolean useAnchor) {
         SHAPE_USE_ANCHOR.set(useAnchor);
+        save();
+    }
+
+    public static void setShapeLookLock(boolean lookLock) {
+        SHAPE_LOOK_LOCK.set(lookLock);
         save();
     }
 

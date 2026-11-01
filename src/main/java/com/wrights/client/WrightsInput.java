@@ -567,7 +567,7 @@ public final class WrightsInput {
                 || !com.wrights.WrightsConfig.allowShapeAnchor();
         if (lookMode) {
             if (player.isShiftKeyDown()) {
-                // Shift opens the look-snap editor (locks at current aim first if needed).
+                // Shift opens the anchor-point editor (locks at current aim first if needed).
                 if (!WrightsClientState.shapeLookSnapActive()) {
                     BlockHitResult aim = WrightsClientState.shapeLookHit();
                     if (aim == null) {
@@ -579,7 +579,8 @@ public final class WrightsInput {
                 Minecraft.getInstance().setScreen(new ShapeLookSnapScreen());
                 return;
             }
-            if (!WrightsClientState.shapeLookSnapActive()) {
+            boolean lockFirst = com.wrights.WrightsClientConfig.SHAPE_LOOK_LOCK.get();
+            if (lockFirst && !WrightsClientState.shapeLookSnapActive()) {
                 BlockHitResult aim = WrightsClientState.shapeLookHit();
                 if (aim == null) {
                     player.displayClientMessage(Component.translatable("message.wrights.shape_look"), true);
@@ -592,8 +593,16 @@ public final class WrightsInput {
                         true);
                 return;
             }
-            // Second right-click with a locked snap builds.
-            WrightsClientState.tryShape(false, WrightsClientState.shapeLookSnapPos, Direction.UP);
+            if (WrightsClientState.shapeLookSnapActive()) {
+                WrightsClientState.tryShape(false, WrightsClientState.shapeLookSnapPos, Direction.UP);
+            } else {
+                BlockHitResult aim = WrightsClientState.shapeLookHit();
+                if (aim == null) {
+                    player.displayClientMessage(Component.translatable("message.wrights.shape_look"), true);
+                    return;
+                }
+                WrightsClientState.tryShape(false, aim.getBlockPos(), aim.getDirection());
+            }
             return;
         }
         if (player.isShiftKeyDown()) {
