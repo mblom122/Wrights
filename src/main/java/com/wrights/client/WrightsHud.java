@@ -186,10 +186,19 @@ public final class WrightsHud {
             int rows = 1 + (sub == null ? 0 : 1) + (note == null || hideNote ? 0 : 1) + (offset == null ? 0 : 1);
             detailHeight = 6 + rows * 12;
         }
-        // Mode title stays centered just above the hotbar; timed help stacks above it.
+        // Mode title + timed help use Options → Move messages (default: Bottom = above hotbar).
         int taskH = 14;
-        int taskX = HudAnchor.aboveHotbarX(graphics.guiWidth(), taskWidth);
-        int taskY = HudAnchor.aboveHotbarY(graphics.guiHeight(), taskH);
+        int stackWidth = Math.max(taskWidth, Math.max(detailWidth, 1));
+        int stackHeight = taskH + (detailHeight == 0 ? 0 : 4 + detailHeight);
+        int stackX = HudAnchor.hintX(graphics.guiWidth(), stackWidth);
+        int stackY = HudAnchor.hintY(graphics.guiHeight(), stackHeight);
+        int center = stackX + stackWidth / 2;
+        int taskX = center - taskWidth / 2;
+        // Near the bottom (default), keep the mode title closest to the hotbar and stack help above.
+        boolean helpAbove = detailHeight > 0 && (HudAnchor.hintSpot() == HudAnchor.BOTTOM
+                || stackY + stackHeight / 2 > graphics.guiHeight() / 2);
+        int taskY = helpAbove ? stackY + detailHeight + 4 : stackY;
+        int detailTop = helpAbove ? stackY : stackY + taskH + 4;
         graphics.fill(taskX, taskY, taskX + taskWidth, taskY + taskH, 0xC0101822);
         graphics.fill(taskX, taskY, taskX + 2, taskY + taskH, WrightsUi.COPPER);
         graphics.drawString(minecraft.font, task, taskX + 8, taskY + 3, WrightsUi.COPPER, false);
@@ -197,14 +206,10 @@ public final class WrightsHud {
             return;
         }
         if (!look.isEmpty() || line != null) {
-            int top = taskY - 4 - detailHeight;
-            int x = HudAnchor.aboveHotbarX(graphics.guiWidth(), detailWidth);
-            if (top < 2) {
-                top = 2;
-            }
-            graphics.fill(x, top, x + detailWidth, top + detailHeight, 0xC0101822);
-            graphics.fill(x, top, x + 2, top + detailHeight, WrightsUi.COPPER);
-            int textY = top + 4;
+            int x = center - detailWidth / 2;
+            graphics.fill(x, detailTop, x + detailWidth, detailTop + detailHeight, 0xC0101822);
+            graphics.fill(x, detailTop, x + 2, detailTop + detailHeight, WrightsUi.COPPER);
+            int textY = detailTop + 4;
             if (!look.isEmpty()) {
                 for (int i = 0; i < look.size(); i++) {
                     graphics.drawString(minecraft.font, look.get(i), x + 8, textY, i == 0 ? WrightsUi.TEXT : WrightsUi.MUTED, false);

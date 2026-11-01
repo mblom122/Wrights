@@ -68,7 +68,8 @@ public final class HudAnchor {
     public static int y(int spot, int custom, int screen, int size) {
         int raw = switch (spot) {
             case TOP -> 6;
-            case BOTTOM -> screen - HOTBAR_CLEARANCE - size;
+            // Flush above the hotbar (mode title default). HOTBAR_CLEARANCE kept for callers that need action-bar room.
+            case BOTTOM -> hotbarTop(screen) - HOTBAR_GAP - size;
             case CUSTOM -> custom * screen / 1000 - size / 2;
             default -> (screen - size) / 2;
         };

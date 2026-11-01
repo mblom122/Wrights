@@ -149,7 +149,7 @@ public final class WrightsClientConfig {
             .comment("When true, a build takes blocks from your inventory before a bound chest. When false, the chest is used first.")
             .define("supplyPlayerFirst", true);
     public static final ModConfigSpec.IntValue HUD_HINT = BUILDER
-            .comment("Where controller hints sit. 0 top, 1 above the hotbar, 2 left, 3 right, 4 middle, 5 a dragged spot.")
+            .comment("Where the mode title and short help sit. 0 top, 1 above the hotbar (default), 2 left, 3 right, 4 middle, 5 a dragged spot.")
             .defineInRange("hudHint", 1, 0, 5);
     public static final ModConfigSpec.IntValue HUD_HINT_X = BUILDER
             .defineInRange("hudHintX", 500, 0, 1000);
