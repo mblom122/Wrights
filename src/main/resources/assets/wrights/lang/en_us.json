@@ -1224,9 +1224,7 @@
   "menu.wrights.sub_place": "Place",
   "menu.wrights.place_title": "Place",
   "menu.wrights.place_aim": "Build mode",
-  "menu.wrights.place_aim_hint": "Look: right-click builds the selected form where you aim. Pick Bridge under Form for a flat walking path (toggle while walking).
-To me: from the block you aim at, builds along that face’s axis until it matches your standing coordinate on that axis.
-Stairs: right-click toggles rising or descending steps ahead. Shift+right-click opens the quick tweak.",
+  "menu.wrights.place_aim_hint": "Look: right-click builds the selected form where you aim. Pick Bridge under Form for a flat walking path (toggle while walking).\nTo me: from the block you aim at, builds along that face’s axis until it matches your standing coordinate on that axis.\nStairs: right-click toggles rising or descending steps ahead. Shift+right-click opens the quick tweak.",
   "menu.wrights.place_aim_look": "Look",
   "menu.wrights.place_aim_me": "To me",
   "menu.wrights.place_aim_bridge": "Bridge",
@@ -1271,7 +1269,7 @@ Stairs: right-click toggles rising or descending steps ahead. Shift+right-click 
   "message.wrights.place_stairs_toggle": "%s · %s · %s blocks ahead",
   "help.wrights.nav.place": "Place",
   "help.wrights.place.lead": "Place builds Exchange-style forms into the world — floors, walls, pillars, beams, circles, and Bridge paths — without swapping existing blocks.",
-  "help.wrights.place.h1": "Build mode",,
+  "help.wrights.place.h1": "Build mode",
   "help.wrights.place.p1": "Look builds the selected form where you aim — only Look shows Form and shape options. Choose Bridge under Form for a flat walking path. To me fills from the aimed block along that face’s axis to your matching coordinate. Stairs toggles rising or descending steps ahead (pick Up or Down). Path offset is 1–12.",
   "help.wrights.place.h2": "Clicks",
   "help.wrights.place.p2": "Shift+right-click opens the Place tweak (Build mode, offset, Stairs Up/Down). Ctrl+Shift+right-click opens the Place page. Middle-click sets materials. Ctrl+scroll changes Size (or path offset while Bridge form / Stairs is selected).",
