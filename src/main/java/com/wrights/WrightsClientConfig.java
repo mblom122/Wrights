@@ -233,6 +233,9 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.BooleanValue SHAPE_USE_ANCHOR = BUILDER
             .comment("When true, builds on the shape anchor. When false, builds where you look.")
             .define("shapeUseAnchor", false);
+    public static final ModConfigSpec.IntValue SHAPE_PIVOT = BUILDER
+            .comment("Which point on the shape AABB pins to the look/anchor cell. face*9+slot (0–53) or 54 = whole-shape center.")
+            .defineInRange("shapePivot", com.wrights.blueprint.Shapes.PIVOT_CENTER, 0, com.wrights.blueprint.Shapes.PIVOT_CENTER);
     public static final ModConfigSpec.BooleanValue SHAPE_VOID = BUILDER
             .comment("When true, Wrights void the existing block at each placement cell before placing, like blueprints.")
             .define("shapeVoid", false);
@@ -831,6 +834,11 @@ public final class WrightsClientConfig {
 
     public static void setShapeUseAnchor(boolean useAnchor) {
         SHAPE_USE_ANCHOR.set(useAnchor);
+        save();
+    }
+
+    public static void setShapePivot(int pivot) {
+        SHAPE_PIVOT.set(com.wrights.blueprint.Shapes.clampPivot(pivot));
         save();
     }
 

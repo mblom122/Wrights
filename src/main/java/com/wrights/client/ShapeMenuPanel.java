@@ -161,6 +161,17 @@ final class ShapeMenuPanel {
                 y += 22;
             }
         }
+        drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_pivot", "menu.wrights.shape_pivot_hint");
+        y += 12;
+        graphics.drawString(font,
+                font.plainSubstrByWidth(ShapePivotScreen.pivotSummary(WrightsClientConfig.SHAPE_PIVOT.get()).getString(), Math.max(24, leftW - 8)),
+                x, y, WrightsUi.MUTED, false);
+        y += 12;
+        boolean pivotHover = mouseX >= x && mouseX < x + leftW && mouseY >= y && mouseY < y + 18;
+        WrightsUi.choice(graphics, x, y, leftW, 18, false, pivotHover);
+        graphics.drawCenteredString(font, Component.translatable("menu.wrights.shape_pivot_btn"), x + leftW / 2, y + 5, WrightsUi.TEXT);
+        hits.add(new Hit(x, y, leftW, 18, "pivot", 0));
+        y += 22;
         if (WrightsConfig.allowShapeHollow()) {
             y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_HOLLOW.get(), "menu.wrights.shape_hollow", "menu.wrights.shape_hollow_hint", "hollow");
         }
@@ -356,6 +367,12 @@ final class ShapeMenuPanel {
                 }
                 yield true;
             }
+            case "pivot" -> {
+                if (host != null) {
+                    net.minecraft.client.Minecraft.getInstance().setScreen(new ShapePivotScreen(host));
+                }
+                yield true;
+            }
             case "hollow" -> {
                 if (WrightsConfig.allowShapeHollow()) {
                     WrightsClientConfig.setShapeHollow(!WrightsClientConfig.SHAPE_HOLLOW.get());
@@ -467,7 +484,8 @@ final class ShapeMenuPanel {
                 WrightsClientConfig.SHAPE_THICKNESS.get(),
                 WrightsClientConfig.SHAPE_HOLLOW.get(),
                 WrightsClientConfig.SHAPE_PLANE.get(),
-                WrightsClientConfig.SHAPE_YAW.get());
+                WrightsClientConfig.SHAPE_YAW.get(),
+                WrightsClientConfig.SHAPE_PIVOT.get());
         WrightsClientState.setShapeAnchor(anchor);
         WrightsClientConfig.setShapeUseAnchor(true);
         minecraft.player.displayClientMessage(

@@ -173,26 +173,106 @@ public final class Shapes {
     }
 
     /**
-     * World positions with the shape's bounding-box min corner (lowest X/Y/Z) at {@code corner}.
-     * Used by “where I look” placement so the aim cell is the bottom corner of the box, not the center.
+     * Pivot on the shape AABB: {@code face * 9 + slot} for a face’s 3×3 (corners, edge mids, face center),
+     * or {@link #PIVOT_CENTER} for the middle of the whole box. Faces match {@link Direction#get3DDataValue()}.
      */
-    public static List<BlockPos> blocksFromCorner(Kind kind, BlockPos corner, int size, int height, boolean hollow, int axis) {
-        return blocksFromCorner(kind, corner, size, height, 1, hollow, axis, 0);
+    public static final int PIVOT_CENTER = 54;
+    public static final int PIVOT_COUNT = 55;
+
+    public static int clampPivot(int pivot) {
+        return Mth.clamp(pivot, 0, PIVOT_CENTER);
     }
 
-    public static List<BlockPos> blocksFromCorner(Kind kind, BlockPos corner, int size, int height, int thickness, boolean hollow, int axis) {
-        return blocksFromCorner(kind, corner, size, height, thickness, hollow, axis, 0);
+    public static int pivotFace(int pivot) {
+        int id = clampPivot(pivot);
+        return id >= PIVOT_CENTER ? -1 : id / 9;
     }
 
-    public static List<BlockPos> blocksFromCorner(Kind kind, BlockPos corner, int size, int height, int thickness, boolean hollow, int axis, int rotation) {
+    public static int pivotSlot(int pivot) {
+        int id = clampPivot(pivot);
+        return id >= PIVOT_CENTER ? -1 : id % 9;
+    }
+
+    public static int pivotId(int face, int slot) {
+        return Mth.clamp(face, 0, 5) * 9 + Mth.clamp(slot, 0, 8);
+    }
+
+    /** Inclusive AABB max for a non-empty block list. */
+    public static BlockPos extent(List<BlockPos> worlds) {
+        if (worlds == null || worlds.isEmpty()) {
+            return BlockPos.ZERO;
+        }
+        int maxX = Integer.MIN_VALUE;
+        int maxY = Integer.MIN_VALUE;
+        int maxZ = Integer.MIN_VALUE;
+        for (BlockPos pos : worlds) {
+            maxX = Math.max(maxX, pos.getX());
+            maxY = Math.max(maxY, pos.getY());
+            maxZ = Math.max(maxZ, pos.getZ());
+        }
+        return new BlockPos(maxX, maxY, maxZ);
+    }
+
+    /**
+     * Block on the shape AABB that pins to the world target.
+     * Slot UV: u = (slot % 3) / 2, v = (slot / 3) / 2 → corners, edge mids, and face center.
+     */
+    public static BlockPos pivotBlock(BlockPos min, BlockPos max, int pivot) {
+        if (min == null || max == null) {
+            return BlockPos.ZERO;
+        }
+        int id = clampPivot(pivot);
+        int minX = Math.min(min.getX(), max.getX());
+        int minY = Math.min(min.getY(), max.getY());
+        int minZ = Math.min(min.getZ(), max.getZ());
+        int maxX = Math.max(min.getX(), max.getX());
+        int maxY = Math.max(min.getY(), max.getY());
+        int maxZ = Math.max(min.getZ(), max.getZ());
+        if (id >= PIVOT_CENTER) {
+            return new BlockPos((minX + maxX) >> 1, (minY + maxY) >> 1, (minZ + maxZ) >> 1);
+        }
+        int face = id / 9;
+        int slot = id % 9;
+        float u = (slot % 3) * 0.5F;
+        float v = (slot / 3) * 0.5F;
+        int alongU = Math.round(u * (maxX - minX));
+        int alongV = Math.round(v * (maxZ - minZ));
+        int alongY = Math.round(v * (maxY - minY));
+        int alongZU = Math.round(u * (maxZ - minZ));
+        return switch (face) {
+            case 1 -> new BlockPos(minX + alongU, maxY, minZ + alongV); // UP
+            case 2 -> new BlockPos(minX + alongU, minY + alongY, minZ); // NORTH
+            case 3 -> new BlockPos(minX + alongU, minY + alongY, maxZ); // SOUTH
+            case 4 -> new BlockPos(minX, minY + alongY, minZ + alongZU); // WEST
+            case 5 -> new BlockPos(maxX, minY + alongY, minZ + alongZU); // EAST
+            default -> new BlockPos(minX + alongU, minY, minZ + alongV); // DOWN
+        };
+    }
+
+    /**
+     * World positions with the chosen AABB pivot pinned to {@code worldTarget}.
+     * Used by both look-at and on-anchor placement.
+     */
+    public static List<BlockPos> blocksPinned(
+            Kind kind,
+            BlockPos worldTarget,
+            int size,
+            int height,
+            int thickness,
+            boolean hollow,
+            int axis,
+            int rotation,
+            int pivot) {
         List<BlockPos> local = blocks(kind, BlockPos.ZERO, size, height, thickness, hollow, axis, rotation);
-        if (local.isEmpty() || corner == null) {
+        if (local.isEmpty() || worldTarget == null) {
             return local;
         }
         BlockPos min = origin(local);
-        int dx = corner.getX() - min.getX();
-        int dy = corner.getY() - min.getY();
-        int dz = corner.getZ() - min.getZ();
+        BlockPos max = extent(local);
+        BlockPos pin = pivotBlock(min, max, pivot);
+        int dx = worldTarget.getX() - pin.getX();
+        int dy = worldTarget.getY() - pin.getY();
+        int dz = worldTarget.getZ() - pin.getZ();
         if (dx == 0 && dy == 0 && dz == 0) {
             return local;
         }
@@ -201,6 +281,25 @@ public final class Shapes {
             out.add(pos.offset(dx, dy, dz));
         }
         return out;
+    }
+
+    /** @deprecated prefer {@link #blocksPinned} with a pivot */
+    @Deprecated
+    public static List<BlockPos> blocksFromCorner(Kind kind, BlockPos corner, int size, int height, boolean hollow, int axis) {
+        return blocksFromCorner(kind, corner, size, height, 1, hollow, axis, 0);
+    }
+
+    /** @deprecated prefer {@link #blocksPinned} with a pivot */
+    @Deprecated
+    public static List<BlockPos> blocksFromCorner(Kind kind, BlockPos corner, int size, int height, int thickness, boolean hollow, int axis) {
+        return blocksFromCorner(kind, corner, size, height, thickness, hollow, axis, 0);
+    }
+
+    /** @deprecated prefer {@link #blocksPinned} with a pivot */
+    @Deprecated
+    public static List<BlockPos> blocksFromCorner(Kind kind, BlockPos corner, int size, int height, int thickness, boolean hollow, int axis, int rotation) {
+        // Min corner of the AABB = DOWN face, slot 0 (u=0,v=0).
+        return blocksPinned(kind, corner, size, height, thickness, hollow, axis, rotation, pivotId(0, 0));
     }
 
     /** Origin for a wright schematic that covers every offset. */
@@ -481,7 +580,8 @@ public final class Shapes {
             int thickness,
             boolean hollow,
             int axis,
-            int rotation) {
+            int rotation,
+            int pivot) {
         if (feet == null) {
             return BlockPos.ZERO;
         }
@@ -489,30 +589,21 @@ public final class Shapes {
         if (local.isEmpty()) {
             return feet.below();
         }
-        int minX = Integer.MAX_VALUE;
-        int maxX = Integer.MIN_VALUE;
-        int maxY = Integer.MIN_VALUE;
-        int minZ = Integer.MAX_VALUE;
-        int maxZ = Integer.MIN_VALUE;
-        for (BlockPos pos : local) {
-            minX = Math.min(minX, pos.getX());
-            maxX = Math.max(maxX, pos.getX());
-            maxY = Math.max(maxY, pos.getY());
-            minZ = Math.min(minZ, pos.getZ());
-            maxZ = Math.max(maxZ, pos.getZ());
-        }
-        int topCenterX = (minX + maxX) >> 1;
-        int topCenterZ = (minZ + maxZ) >> 1;
-        // Top of the shape should be the block under the player's feet.
+        BlockPos min = origin(local);
+        BlockPos max = extent(local);
+        BlockPos pin = pivotBlock(min, max, pivot);
+        int topCenterX = (min.getX() + max.getX()) >> 1;
+        int topCenterZ = (min.getZ() + max.getZ()) >> 1;
+        // Place so the chosen pivot lands on the returned anchor, and the top sits under the player's feet.
         return new BlockPos(
-                feet.getX() - topCenterX,
-                feet.getY() - 1 - maxY,
-                feet.getZ() - topCenterZ);
+                feet.getX() - (topCenterX - pin.getX()),
+                feet.getY() - 1 - (max.getY() - pin.getY()),
+                feet.getZ() - (topCenterZ - pin.getZ()));
     }
 
     /**
      * Aim cell for look-at builds: the block next to the clicked face.
-     * That cell becomes the shape’s bottom corner ({@link #blocksFromCorner}), not its center.
+     * That cell is where the shape’s chosen pivot is pinned.
      */
     public static BlockPos lookCorner(BlockPos clicked, Direction face) {
         if (clicked == null) {

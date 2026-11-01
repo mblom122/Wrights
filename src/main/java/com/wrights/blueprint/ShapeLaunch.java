@@ -48,18 +48,19 @@ public final class ShapeLaunch {
         int thickness = Shapes.clampHeight(payload.thickness());
         int plane = Shapes.clampPlane(payload.plane());
         int yaw = Shapes.clampYaw(payload.yaw());
+        int pivot = Shapes.clampPivot(payload.pivot());
         boolean hollow = payload.hollow() && WrightsConfig.allowShapeHollow();
         boolean voidBlocks = payload.voidBlocks() && WrightsConfig.allowShapeVoid();
         List<Integer> order = ShapeSupply.parse(payload.supplyOrder());
-        BlockPos center;
+        BlockPos target;
         boolean useAnchor = payload.useAnchor() && WrightsConfig.allowShapeAnchor();
         if (useAnchor) {
             if (!payload.anchorSet()) {
                 Messages.actionBar(player, "message.wrights.shape_need_anchor");
                 return;
             }
-            center = payload.anchor().immutable();
-            if (player.distanceToSqr(center.getX() + 0.5D, center.getY() + 0.5D, center.getZ() + 0.5D) > range()) {
+            target = payload.anchor().immutable();
+            if (player.distanceToSqr(target.getX() + 0.5D, target.getY() + 0.5D, target.getZ() + 0.5D) > range()) {
                 Messages.actionBar(player, "message.wrights.shape_far");
                 return;
             }
@@ -74,12 +75,10 @@ public final class ShapeLaunch {
                 Messages.actionBar(player, "message.wrights.place_out_of_range");
                 return;
             }
-            center = Shapes.lookCorner(clicked, face);
+            target = Shapes.lookCorner(clicked, face);
         }
-        // Anchor mode keeps the shape centered on the anchor. Look mode pins the bottom corner of the box.
-        List<BlockPos> worlds = useAnchor
-                ? Shapes.blocks(kind, center, size, height, thickness, hollow, plane, yaw)
-                : Shapes.blocksFromCorner(kind, center, size, height, thickness, hollow, plane, yaw);
+        // Both modes pin the chosen shape AABB pivot to the world target.
+        List<BlockPos> worlds = Shapes.blocksPinned(kind, target, size, height, thickness, hollow, plane, yaw, pivot);
         if (worlds.isEmpty()) {
             Messages.actionBar(player, "message.wrights.shape_empty");
             return;
