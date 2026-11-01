@@ -325,8 +325,13 @@ public class DroneEntity extends Entity {
 
     /**
      * Block rendered under the wright.
-     * Place jobs set {@link #currentBlock()} so the material shows while flying out.
-     * Mine jobs leave current empty until {@link #takeHaul} fills carried after the break.
+     * <ul>
+     *   <li>Place / Shape / Exchange outbound: {@link #currentBlock()} is the material being placed.</li>
+     *   <li>Mine: current stays empty until {@link #takeHaul} fills carried after the break.</li>
+     *   <li>Exchange (void off): after the swap, current clears so carried (old block) shows;
+     *       void on never hauls, so place material stays.</li>
+     *   <li>Homebound: always {@link #carried()}.</li>
+     * </ul>
      */
     public ItemStack displayCargo() {
         if (returning()) {
@@ -337,6 +342,13 @@ public class DroneEntity extends Entity {
             return placing;
         }
         return carried();
+    }
+
+    /** Drop the place/mine preview so {@link #displayCargo()} can show haul. */
+    public void clearCurrentBlock() {
+        if (!this.entityData.get(CURRENT_BLOCK).isEmpty()) {
+            this.entityData.set(CURRENT_BLOCK, ItemStack.EMPTY);
+        }
     }
 
     private static final class HaulLine {

@@ -1627,10 +1627,7 @@ public final class JobManager {
         }
         if (statusState != null || statusWait != DroneEntity.WAIT_NONE) {
             if (drone != null) {
-                drone.setWorkStatus(
-                        statusState == null ? ItemStack.EMPTY : BlockFilters.icon(statusState),
-                        ItemStack.EMPTY,
-                        statusWait);
+                drone.setWorkStatus(shapeStatusCargo(job, statusState, statusWait), ItemStack.EMPTY, statusWait);
             } else {
                 publishShapeDroneStatus(level, job, statusState, statusWait);
             }
@@ -1754,7 +1751,7 @@ public final class JobManager {
         if (job.paused() && reason == DroneEntity.WAIT_NONE) {
             reason = DroneEntity.WAIT_PAUSED;
         }
-        drone.setWorkStatus(state == null ? ItemStack.EMPTY : BlockFilters.icon(state), ItemStack.EMPTY, reason);
+        drone.setWorkStatus(shapeStatusCargo(job, state, reason), ItemStack.EMPTY, reason);
     }
 
     private static BlockState shapeNextState(
@@ -5660,7 +5657,10 @@ public final class JobManager {
         return PlaceResult.DONE;
     }
 
-    /** Fold this break’s drops into the wright’s haul; the cargo icon shows majority / last-picked. */
+    /**
+     * Fold this break’s drops into the wright’s haul, then clear the place/mine preview
+     * so the under-wright icon switches to what was actually received (mine / exchange void-off).
+     */
     private static void showCarry(ServerLevel level, BuildJob job, BuildJob.Hand hand, java.util.List<ItemStack> drops) {
         if (drops == null || drops.isEmpty()) {
             return;
@@ -5671,7 +5671,26 @@ public final class JobManager {
         }
         if (level.getEntity(id) instanceof DroneEntity drone && drone.isAlive()) {
             drone.takeHaul(drops);
+            if (!drone.carried().isEmpty()) {
+                drone.clearCurrentBlock();
+            }
         }
+    }
+
+    /**
+     * Under-wright place preview for Shape / Exchange status.
+     * Exchange void-off while idle/paused leaves current empty so haul shows after a swap;
+     * the fly-to-next path sets the place material again when outbound. Void-on keeps the place icon.
+     */
+    private static ItemStack shapeStatusCargo(BuildJob job, BlockState state, int waitReason) {
+        if (state == null) {
+            return ItemStack.EMPTY;
+        }
+        if (job != null && job.exchangeJob() && !job.voidBlocks()
+                && (waitReason == DroneEntity.WAIT_NONE || waitReason == DroneEntity.WAIT_PAUSED)) {
+            return ItemStack.EMPTY;
+        }
+        return BlockFilters.icon(state);
     }
 
     private static PlaceResult placeOne(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos pos, Schematic.Entry entry, boolean quiet) {
