@@ -725,7 +725,7 @@ public final class WrightsClientConfig {
         return placeBridgeStyle() || placeStairsStyle();
     }
 
-    /** Place Look Floor / Wall / Beam — Left/Right yaw around the look pin. */
+    /** Place Look Floor / Wall / Beam / Circle — Left/Right yaw around the look pin. */
     public static boolean placeFormYawRotatable() {
         if (placeStyle() != 0) {
             return false;
@@ -733,7 +733,35 @@ public final class WrightsClientConfig {
         com.wrights.blueprint.Shapes.ExchangeForm form = exchangeForm();
         return form == com.wrights.blueprint.Shapes.ExchangeForm.FLOOR
                 || form == com.wrights.blueprint.Shapes.ExchangeForm.WALL
-                || form == com.wrights.blueprint.Shapes.ExchangeForm.BEAM;
+                || form == com.wrights.blueprint.Shapes.ExchangeForm.BEAM
+                || form == com.wrights.blueprint.Shapes.ExchangeForm.CIRCLE;
+    }
+
+    /** Place Look Circle form — Flat (floor) vs upright (wall) mount. */
+    public static boolean placeCircleForm() {
+        return placeStyle() == 0 && exchangeForm() == com.wrights.blueprint.Shapes.ExchangeForm.CIRCLE;
+    }
+
+    /** True when Circle is tipped onto a vertical plane. */
+    public static boolean placeCircleWall() {
+        return placeCircleForm() && SHAPE_PLANE.get() != com.wrights.blueprint.Shapes.AXIS_Y;
+    }
+
+    /**
+     * Flat: disk on the floor (Y up). Wall: disk stands across the player's look,
+     * same facing snap as the Wall form.
+     */
+    public static void setPlaceCircleWall(boolean wall, net.minecraft.world.entity.player.Player player) {
+        if (wall) {
+            net.minecraft.core.Direction facing = player == null
+                    ? net.minecraft.core.Direction.NORTH
+                    : player.getDirection();
+            setShapePlane(facing.getAxis() == net.minecraft.core.Direction.Axis.X
+                    ? com.wrights.blueprint.Shapes.AXIS_X
+                    : com.wrights.blueprint.Shapes.AXIS_Z);
+        } else {
+            setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
+        }
     }
 
     /** Nudge shape yaw by quarter-turns (positive = left / CCW). */
@@ -1347,7 +1375,19 @@ public final class WrightsClientConfig {
                     setShapeThickness(1);
                 }
             }
-            case CIRCLE -> setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
+            case CIRCLE -> {
+                // Keep wall mount if already tipped; otherwise flat on the floor.
+                if (SHAPE_PLANE.get() != com.wrights.blueprint.Shapes.AXIS_Y) {
+                    setShapePlane(facing.getAxis() == net.minecraft.core.Direction.Axis.X
+                            ? com.wrights.blueprint.Shapes.AXIS_X
+                            : com.wrights.blueprint.Shapes.AXIS_Z);
+                } else {
+                    setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
+                }
+                if (SHAPE_SIZE.get() <= 1) {
+                    setShapeSize(5);
+                }
+            }
             case STAIRS -> {
                 // Manual Place form — same footprint controls as Floor / Wall.
                 setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);

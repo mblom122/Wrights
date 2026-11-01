@@ -44,6 +44,7 @@ public class PlaceTweakScreen extends Screen {
     private int widthY = -1;
     private int toMeHeightY = -1;
     private int stairsDirY = -1;
+    private int circleMountY = -1;
     private int rotateY = -1;
     private int matsLabelY = -1;
     private int matsRowY = -1;
@@ -76,6 +77,7 @@ public class PlaceTweakScreen extends Screen {
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_stairs_width")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_to_me_height")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_stairs_dir")));
+        labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_circle_mount")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.shape_rotation")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.shape_materials")));
         int rowInner = labelW + 4 + stepW + 2 + fieldW + 2 + stepW;
@@ -94,6 +96,7 @@ public class PlaceTweakScreen extends Screen {
         boolean line = look && !stairsForm && WrightsClientConfig.exchangeForm().line();
         boolean showFormDims = look && !stairsForm;
         boolean pathDims = bridge || stairsForm;
+        boolean circleMount = WrightsClientConfig.placeCircleForm();
         boolean yawRotate = WrightsClientConfig.placeFormYawRotatable();
         int rows = 1 // title
                 + 1 // build mode label
@@ -103,6 +106,7 @@ public class PlaceTweakScreen extends Screen {
                 + (pathDims ? 2 : 0) // offset + width
                 + (toMe ? 2 : 0) // width + height
                 + (stairsForm ? 1 : 0) // up/down
+                + (circleMount ? 1 : 0) // floor / wall
                 + (yawRotate ? 1 : 0) // rotate left/right
                 + 1 // materials label
                 + 1 // icons
@@ -118,7 +122,7 @@ public class PlaceTweakScreen extends Screen {
         int plusX = valueX + fieldW + 2;
         int y = panelY + PAD + 12 + GAP;
 
-        sizeY = alongY = styleLabelY = styleChoicesY = offsetY = widthY = toMeHeightY = stairsDirY = rotateY = matsLabelY = matsRowY = -1;
+        sizeY = alongY = styleLabelY = styleChoicesY = offsetY = widthY = toMeHeightY = stairsDirY = circleMountY = rotateY = matsLabelY = matsRowY = -1;
 
         styleLabelY = y;
         y += ROW + GAP;
@@ -159,6 +163,10 @@ public class PlaceTweakScreen extends Screen {
         }
         if (stairsForm) {
             stairsDirY = y;
+            y += ROW + GAP;
+        }
+        if (circleMount) {
+            circleMountY = y;
             y += ROW + GAP;
         }
         if (yawRotate) {
@@ -277,6 +285,16 @@ public class PlaceTweakScreen extends Screen {
             drawChoice(graphics, mouseX, mouseY, choiceX + choiceW + gap, stairsDirY,
                     panelW - PAD * 2 - choiceW - gap, !up, "menu.wrights.place_stairs_down");
         }
+        if (circleMountY >= 0) {
+            boolean wall = WrightsClientConfig.placeCircleWall();
+            int gap = GAP;
+            int choiceW = (panelW - PAD * 2 - gap) / 2;
+            int choiceX = panelX + PAD;
+            drawChoice(graphics, mouseX, mouseY, choiceX, circleMountY, choiceW,
+                    !wall, "menu.wrights.place_circle_floor");
+            drawChoice(graphics, mouseX, mouseY, choiceX + choiceW + gap, circleMountY,
+                    panelW - PAD * 2 - choiceW - gap, wall, "menu.wrights.place_circle_wall");
+        }
         if (matsLabelY >= 0) {
             graphics.drawString(this.font, Component.translatable("menu.wrights.shape_materials"),
                     panelX + PAD, matsLabelY + 3, WrightsUi.MUTED, false);
@@ -377,6 +395,20 @@ public class PlaceTweakScreen extends Screen {
             }
             if (hit(mouseX, mouseY, choiceX + choiceW + gap, stairsDirY, rightW, ROW)) {
                 WrightsClientConfig.setPlaceStairsUp(false);
+                return true;
+            }
+        }
+        if (button == 0 && circleMountY >= 0) {
+            int gap = GAP;
+            int choiceW = (panelW - PAD * 2 - gap) / 2;
+            int choiceX = panelX + PAD;
+            int rightW = panelW - PAD * 2 - choiceW - gap;
+            if (hit(mouseX, mouseY, choiceX, circleMountY, choiceW, ROW)) {
+                WrightsClientConfig.setPlaceCircleWall(false, this.minecraft != null ? this.minecraft.player : null);
+                return true;
+            }
+            if (hit(mouseX, mouseY, choiceX + choiceW + gap, circleMountY, rightW, ROW)) {
+                WrightsClientConfig.setPlaceCircleWall(true, this.minecraft != null ? this.minecraft.player : null);
                 return true;
             }
         }

@@ -702,9 +702,18 @@ final class ShapeMenuPanel {
                 yield true;
             }
             case "place_yaw" -> {
-                // Action pair: 0 = Left (CCW), 1 = Right (CW) — Floor / Wall / Beam only.
+                // Action pair: 0 = Left (CCW), 1 = Right (CW) — Floor / Wall / Beam / Circle.
                 if (placeMode && WrightsClientConfig.placeFormYawRotatable()) {
                     WrightsClientConfig.nudgeShapeYaw(value == 0 ? 1 : -1);
+                }
+                yield true;
+            }
+            case "place_circle_mount" -> {
+                // drawPair: 0 = Floor (flat), 1 = Wall (upright across look).
+                if (placeMode && WrightsClientConfig.placeCircleForm()) {
+                    WrightsClientConfig.setPlaceCircleWall(
+                            value != 0,
+                            net.minecraft.client.Minecraft.getInstance().player);
                 }
                 yield true;
             }
@@ -1134,6 +1143,17 @@ final class ShapeMenuPanel {
                 int axis = WrightsClientConfig.SHAPE_PLANE.get();
                 y = drawFormDimensions(graphics, mouseX, mouseY, x, y, leftW, kind, form, exchangeLine, exchangePlate,
                         kind == Shapes.Kind.RING, kind == Shapes.Kind.BOX, axis);
+                if (form == Shapes.ExchangeForm.CIRCLE) {
+                    drawField(graphics, mouseX, mouseY, x, y,
+                            "menu.wrights.place_circle_mount", "menu.wrights.place_circle_mount_hint");
+                    y += 12;
+                    y = drawPair(graphics, mouseX, mouseY, x, y, leftW,
+                            WrightsClientConfig.placeCircleWall(),
+                            "menu.wrights.place_circle_floor",
+                            "menu.wrights.place_circle_wall",
+                            "place_circle_mount");
+                    y += 4;
+                }
                 if (WrightsClientConfig.placeFormYawRotatable()) {
                     drawField(graphics, mouseX, mouseY, x, y,
                             "menu.wrights.shape_rotation", "menu.wrights.place_form_rotation_hint");
