@@ -2410,7 +2410,7 @@ public final class WrightsClientState {
             return null;
         }
         BlockPos place = fallbackAnchor(player);
-        // lookCenter(place.below(), UP) == place
+        // lookCorner(place.below(), UP) == place — that cell is the shape box min corner
         return new BlockHitResult(Vec3.atCenterOf(place), Direction.UP, place.below(), false);
     }
 

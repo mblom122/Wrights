@@ -73,9 +73,12 @@ public final class ShapeLaunch {
                 Messages.actionBar(player, "message.wrights.place_out_of_range");
                 return;
             }
-            center = Shapes.lookCenter(clicked, face);
+            center = Shapes.lookCorner(clicked, face);
         }
-        List<BlockPos> worlds = Shapes.blocks(kind, center, size, height, hollow, plane, flipVertical);
+        // Anchor mode keeps the shape centered on the anchor. Look mode pins the bottom corner of the box.
+        List<BlockPos> worlds = payload.useAnchor()
+                ? Shapes.blocks(kind, center, size, height, hollow, plane, flipVertical)
+                : Shapes.blocksFromCorner(kind, center, size, height, hollow, plane, flipVertical);
         if (worlds.isEmpty()) {
             Messages.actionBar(player, "message.wrights.shape_empty");
             return;

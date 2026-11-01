@@ -140,20 +140,21 @@ public final class SelectionRenderer {
             if (hit == null) {
                 return;
             }
-            center = com.wrights.blueprint.Shapes.lookCenter(hit.getBlockPos(), hit.getDirection());
+            center = com.wrights.blueprint.Shapes.lookCorner(hit.getBlockPos(), hit.getDirection());
         }
         List<com.wrights.blueprint.ShapeMaterials.Entry> materials = WrightsClientConfig.shapeMaterials();
         if (com.wrights.blueprint.ShapeMaterials.states(materials).isEmpty()) {
             return;
         }
-        List<BlockPos> worlds = com.wrights.blueprint.Shapes.blocks(
-                com.wrights.blueprint.Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get()),
-                center,
-                WrightsClientConfig.SHAPE_SIZE.get(),
-                WrightsClientConfig.SHAPE_HEIGHT.get(),
-                WrightsClientConfig.SHAPE_HOLLOW.get(),
-                WrightsClientConfig.SHAPE_PLANE.get(),
-                WrightsClientConfig.SHAPE_FLIP_VERTICAL.get());
+        com.wrights.blueprint.Shapes.Kind kind = com.wrights.blueprint.Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
+        int size = WrightsClientConfig.SHAPE_SIZE.get();
+        int height = WrightsClientConfig.SHAPE_HEIGHT.get();
+        boolean hollow = WrightsClientConfig.SHAPE_HOLLOW.get();
+        int plane = WrightsClientConfig.SHAPE_PLANE.get();
+        boolean flip = WrightsClientConfig.SHAPE_FLIP_VERTICAL.get();
+        List<BlockPos> worlds = WrightsClientConfig.SHAPE_USE_ANCHOR.get()
+                ? com.wrights.blueprint.Shapes.blocks(kind, center, size, height, hollow, plane, flip)
+                : com.wrights.blueprint.Shapes.blocksFromCorner(kind, center, size, height, hollow, plane, flip);
         boolean replace = WrightsClientConfig.SHAPE_REPLACE.get() && WrightsConfig.allowShapeReplace();
         List<BlockPos> ready = new java.util.ArrayList<>();
         for (BlockPos world : worlds) {

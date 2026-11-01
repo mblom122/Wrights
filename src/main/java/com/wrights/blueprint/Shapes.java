@@ -96,6 +96,29 @@ public final class Shapes {
         return out;
     }
 
+    /**
+     * World positions with the shape's bounding-box min corner (lowest X/Y/Z) at {@code corner}.
+     * Used by “where I look” placement so the aim cell is the bottom corner of the box, not the center.
+     */
+    public static List<BlockPos> blocksFromCorner(Kind kind, BlockPos corner, int size, int height, boolean hollow, int plane, boolean flipVertical) {
+        List<BlockPos> local = blocks(kind, BlockPos.ZERO, size, height, hollow, plane, flipVertical);
+        if (local.isEmpty() || corner == null) {
+            return local;
+        }
+        BlockPos min = origin(local);
+        int dx = corner.getX() - min.getX();
+        int dy = corner.getY() - min.getY();
+        int dz = corner.getZ() - min.getZ();
+        if (dx == 0 && dy == 0 && dz == 0) {
+            return local;
+        }
+        List<BlockPos> out = new ArrayList<>(local.size());
+        for (BlockPos pos : local) {
+            out.add(pos.offset(dx, dy, dz));
+        }
+        return out;
+    }
+
     /** Origin for a wright schematic that covers every offset. */
     public static BlockPos origin(List<BlockPos> worlds) {
         if (worlds == null || worlds.isEmpty()) {
@@ -270,11 +293,20 @@ public final class Shapes {
         };
     }
 
-    /** Center for look-at builds: the block next to the clicked face. */
-    public static BlockPos lookCenter(BlockPos clicked, Direction face) {
+    /**
+     * Aim cell for look-at builds: the block next to the clicked face.
+     * That cell becomes the shape’s bottom corner ({@link #blocksFromCorner}), not its center.
+     */
+    public static BlockPos lookCorner(BlockPos clicked, Direction face) {
         if (clicked == null) {
             return null;
         }
         return face == null ? clicked.immutable() : clicked.relative(face);
+    }
+
+    /** @deprecated use {@link #lookCorner} */
+    @Deprecated
+    public static BlockPos lookCenter(BlockPos clicked, Direction face) {
+        return lookCorner(clicked, face);
     }
 }
