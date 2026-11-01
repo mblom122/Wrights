@@ -63,21 +63,30 @@ public final class Shapes {
 
     /** World positions for one shape centered on {@code center}. */
     public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, boolean hollow, int plane) {
-        return blocks(kind, center, size, height, hollow, plane, false);
+        return blocks(kind, center, size, height, 1, hollow, plane, false);
     }
 
     /** World positions for one shape centered on {@code center}. When {@code flipVertical}, mirrors on Y through the center. */
     public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, boolean hollow, int plane, boolean flipVertical) {
+        return blocks(kind, center, size, height, 1, hollow, plane, flipVertical);
+    }
+
+    /**
+     * @param height extrusion / cylinder height
+     * @param thickness ring band width (outer radius inward); ignored by other kinds
+     */
+    public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, int thickness, boolean hollow, int plane, boolean flipVertical) {
         List<BlockPos> out = new ArrayList<>();
         if (center == null || kind == null) {
             return out;
         }
         int r = clampSize(size);
         int h = clampHeight(height);
+        int band = clampHeight(thickness);
         int flat = clampPlane(plane);
         switch (kind) {
             case CIRCLE -> disk(out, center, r, hollow, flat, false);
-            case RING -> ring(out, center, r, h, flat);
+            case RING -> ring(out, center, r, band, h, flat);
             case SQUARE -> square(out, center, r, hollow, flat);
             case LINE -> line(out, center, r, flat);
             case SPHERE -> sphere(out, center, r, hollow);
@@ -101,7 +110,11 @@ public final class Shapes {
      * Used by “where I look” placement so the aim cell is the bottom corner of the box, not the center.
      */
     public static List<BlockPos> blocksFromCorner(Kind kind, BlockPos corner, int size, int height, boolean hollow, int plane, boolean flipVertical) {
-        List<BlockPos> local = blocks(kind, BlockPos.ZERO, size, height, hollow, plane, flipVertical);
+        return blocksFromCorner(kind, corner, size, height, 1, hollow, plane, flipVertical);
+    }
+
+    public static List<BlockPos> blocksFromCorner(Kind kind, BlockPos corner, int size, int height, int thickness, boolean hollow, int plane, boolean flipVertical) {
+        List<BlockPos> local = blocks(kind, BlockPos.ZERO, size, height, thickness, hollow, plane, flipVertical);
         if (local.isEmpty() || corner == null) {
             return local;
         }
@@ -153,21 +166,36 @@ public final class Shapes {
         }
     }
 
-    /** Annulus: outer radius {@code radius}, band width {@code thickness} (1 = one-block rim). */
-    private static void ring(List<BlockPos> out, BlockPos center, int radius, int thickness, int plane) {
+    /**
+     * Annulus / donut: outer radius {@code radius}, band width {@code thickness} (1 = one-block rim),
+     * extruded {@code height} blocks along the plane normal (1 = flat ring, taller = donut tube).
+     */
+    private static void ring(List<BlockPos> out, BlockPos center, int radius, int thickness, int height, int plane) {
         int band = Mth.clamp(thickness, 1, radius);
+        int tall = Math.max(1, height);
         int inner = Math.max(0, radius - band);
         int r2 = radius * radius;
         int inner2 = inner * inner;
-        for (int a = -radius; a <= radius; a++) {
-            for (int b = -radius; b <= radius; b++) {
-                int d2 = a * a + b * b;
-                if (d2 > r2 || d2 < inner2) {
-                    continue;
+        for (int layer = 0; layer < tall; layer++) {
+            for (int a = -radius; a <= radius; a++) {
+                for (int b = -radius; b <= radius; b++) {
+                    int d2 = a * a + b * b;
+                    if (d2 > r2 || d2 < inner2) {
+                        continue;
+                    }
+                    out.add(ringCell(center, a, b, layer, plane));
                 }
-                out.add(flat(center, a, b, plane));
             }
         }
+    }
+
+    /** Ring in the chosen plane, extruded along that plane’s normal. */
+    private static BlockPos ringCell(BlockPos center, int a, int b, int along, int plane) {
+        return switch (plane) {
+            case PLANE_XY -> center.offset(a, b, along);
+            case PLANE_YZ -> center.offset(along, a, b);
+            default -> center.offset(a, along, b);
+        };
     }
 
     private static void square(List<BlockPos> out, BlockPos center, int radius, boolean hollow, int plane) {

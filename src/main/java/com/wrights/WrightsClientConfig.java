@@ -208,8 +208,11 @@ public final class WrightsClientConfig {
             .comment("Radius or half-width of the shape.")
             .defineInRange("shapeSize", 4, 1, 64);
     public static final ModConfigSpec.IntValue SHAPE_HEIGHT = BUILDER
-            .comment("Height for cylinders and pyramids.")
+            .comment("Height for cylinders, pyramids, and ring/donut extrusion.")
             .defineInRange("shapeHeight", 6, 1, 64);
+    public static final ModConfigSpec.IntValue SHAPE_THICKNESS = BUILDER
+            .comment("Ring band width from the outer edge inward (1 = thin rim).")
+            .defineInRange("shapeThickness", 1, 1, 64);
     public static final ModConfigSpec.IntValue SHAPE_PLANE = BUILDER
             .comment("Flat-shape plane. 0 XZ, 1 XY, 2 YZ.")
             .defineInRange("shapePlane", 0, 0, 2);
@@ -786,6 +789,11 @@ public final class WrightsClientConfig {
 
     public static void setShapeHeight(int height) {
         SHAPE_HEIGHT.set(com.wrights.blueprint.Shapes.clampHeight(height));
+        save();
+    }
+
+    public static void setShapeThickness(int thickness) {
+        SHAPE_THICKNESS.set(com.wrights.blueprint.Shapes.clampHeight(thickness));
         save();
     }
 

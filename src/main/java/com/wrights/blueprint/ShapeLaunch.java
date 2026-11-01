@@ -45,6 +45,7 @@ public final class ShapeLaunch {
         Shapes.Kind kind = Shapes.Kind.byId(payload.kind());
         int size = Shapes.clampSize(payload.size());
         int height = Shapes.clampHeight(payload.height());
+        int thickness = Shapes.clampHeight(payload.thickness());
         int plane = Shapes.clampPlane(payload.plane());
         boolean hollow = payload.hollow();
         boolean flipVertical = payload.flipVertical();
@@ -77,8 +78,8 @@ public final class ShapeLaunch {
         }
         // Anchor mode keeps the shape centered on the anchor. Look mode pins the bottom corner of the box.
         List<BlockPos> worlds = payload.useAnchor()
-                ? Shapes.blocks(kind, center, size, height, hollow, plane, flipVertical)
-                : Shapes.blocksFromCorner(kind, center, size, height, hollow, plane, flipVertical);
+                ? Shapes.blocks(kind, center, size, height, thickness, hollow, plane, flipVertical)
+                : Shapes.blocksFromCorner(kind, center, size, height, thickness, hollow, plane, flipVertical);
         if (worlds.isEmpty()) {
             Messages.actionBar(player, "message.wrights.shape_empty");
             return;

@@ -36,6 +36,7 @@ final class ShapeMenuPanel {
     private int scroll;
     private int sizeY = -1;
     private int heightY = -1;
+    private int thicknessY = -1;
     private int sizeW;
     private int selectedMaterial;
     private final List<Hit> hits = new ArrayList<>();
@@ -90,17 +91,30 @@ final class ShapeMenuPanel {
         graphics.drawString(font, Integer.toString(size), x + sizeW + 8, y, WrightsUi.TEXT, false);
         y += 18;
         heightY = -1;
-        if (volume || ring) {
-            drawSection(graphics, mouseX, mouseY, x, y,
-                    ring ? "menu.wrights.shape_thickness" : "menu.wrights.shape_height",
-                    ring ? "menu.wrights.shape_thickness_hint" : "menu.wrights.shape_height_hint");
+        thicknessY = -1;
+        if (ring) {
+            drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_thickness", "menu.wrights.shape_thickness_hint");
+            y += 12;
+            thicknessY = y;
+            int thicknessMax = Math.max(1, size);
+            int thickness = Math.min(WrightsClientConfig.SHAPE_THICKNESS.get(), thicknessMax);
+            drawSlider(graphics, x, y, sizeW, thickness - 1, Math.max(1, thicknessMax - 1));
+            graphics.drawString(font, Integer.toString(thickness), x + sizeW + 8, y, WrightsUi.TEXT, false);
+            y += 18;
+            drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_height", "menu.wrights.shape_ring_height_hint");
             y += 12;
             heightY = y;
             int height = WrightsClientConfig.SHAPE_HEIGHT.get();
-            int heightMax = ring ? Math.max(1, size) : max;
-            int heightValue = ring ? Math.min(height, heightMax) : height;
-            drawSlider(graphics, x, y, sizeW, heightValue - 1, Math.max(1, heightMax - 1));
-            graphics.drawString(font, Integer.toString(heightValue), x + sizeW + 8, y, WrightsUi.TEXT, false);
+            drawSlider(graphics, x, y, sizeW, height - 1, Math.max(1, max - 1));
+            graphics.drawString(font, Integer.toString(height), x + sizeW + 8, y, WrightsUi.TEXT, false);
+            y += 18;
+        } else if (volume) {
+            drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_height", "menu.wrights.shape_height_hint");
+            y += 12;
+            heightY = y;
+            int height = WrightsClientConfig.SHAPE_HEIGHT.get();
+            drawSlider(graphics, x, y, sizeW, height - 1, Math.max(1, max - 1));
+            graphics.drawString(font, Integer.toString(height), x + sizeW + 8, y, WrightsUi.TEXT, false);
             y += 18;
         }
         if (!volume) {
@@ -169,8 +183,14 @@ final class ShapeMenuPanel {
             WrightsClientConfig.setShapeSize(value);
             return true;
         }
+        if (thicknessY >= 0 && mouseY >= thicknessY && mouseY < thicknessY + 12 && mouseX >= bodyX && mouseX < bodyX + sizeW) {
+            int max = Math.max(1, Math.min(WrightsClientConfig.SHAPE_SIZE.get(), Math.min(64, WrightsConfig.MAX_AXIS.getAsInt())));
+            int value = 1 + (int) Math.round((mouseX - bodyX) * (max - 1) / Math.max(1, sizeW));
+            WrightsClientConfig.setShapeThickness(value);
+            return true;
+        }
         if (heightY >= 0 && mouseY >= heightY && mouseY < heightY + 12 && mouseX >= bodyX && mouseX < bodyX + sizeW) {
-            int max = heightSliderMax();
+            int max = Math.max(1, Math.min(64, WrightsConfig.MAX_AXIS.getAsInt()));
             int value = 1 + (int) Math.round((mouseX - bodyX) * (max - 1) / Math.max(1, sizeW));
             WrightsClientConfig.setShapeHeight(value);
             return true;
@@ -198,18 +218,20 @@ final class ShapeMenuPanel {
         if (heightY < 0) {
             return false;
         }
-        int max = heightSliderMax();
+        int max = Math.max(1, Math.min(64, WrightsConfig.MAX_AXIS.getAsInt()));
         int value = 1 + (int) Math.round((mouseX - bodyX) * (max - 1) / Math.max(1, sizeW));
         WrightsClientConfig.setShapeHeight(value);
         return true;
     }
 
-    private int heightSliderMax() {
-        int cap = Math.max(1, Math.min(64, WrightsConfig.MAX_AXIS.getAsInt()));
-        if (Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get()) == Shapes.Kind.RING) {
-            return Math.max(1, Math.min(cap, WrightsClientConfig.SHAPE_SIZE.get()));
+    boolean dragThickness(double mouseX) {
+        if (thicknessY < 0) {
+            return false;
         }
-        return cap;
+        int max = Math.max(1, Math.min(WrightsClientConfig.SHAPE_SIZE.get(), Math.min(64, WrightsConfig.MAX_AXIS.getAsInt())));
+        int value = 1 + (int) Math.round((mouseX - bodyX) * (max - 1) / Math.max(1, sizeW));
+        WrightsClientConfig.setShapeThickness(value);
+        return true;
     }
 
     private boolean apply(String id, int value) {
@@ -270,7 +292,14 @@ final class ShapeMenuPanel {
             }
             case "mat_pick" -> {
                 if (host != null) {
-                    BlockPickerScreen.openBlocks(host, this::addMaterials);
+                    List<BlockState> initial = new ArrayList<>();
+                    for (ShapeMaterials.Entry entry : WrightsClientConfig.shapeMaterials()) {
+                        BlockState state = entry.state();
+                        if (state != null && !state.isAir()) {
+                            initial.add(state);
+                        }
+                    }
+                    BlockPickerScreen.openBlocks(host, initial, this::setMaterials);
                 }
                 yield true;
             }
@@ -319,17 +348,32 @@ final class ShapeMenuPanel {
         };
     }
 
-    private void addMaterials(List<BlockState> states) {
+    /** Replace the materials list with the picker tray, keeping weights for blocks that stay. */
+    private void setMaterials(List<BlockState> states) {
         if (states == null || states.isEmpty()) {
             return;
         }
+        java.util.Map<net.minecraft.world.item.Item, Integer> weights = new java.util.HashMap<>();
+        for (ShapeMaterials.Entry entry : WrightsClientConfig.shapeMaterials()) {
+            weights.put(entry.item(), entry.weight());
+        }
+        List<ShapeMaterials.Entry> next = new ArrayList<>();
+        java.util.Set<net.minecraft.world.item.Item> seen = new java.util.HashSet<>();
         for (BlockState state : states) {
             if (state == null || state.isAir()) {
                 continue;
             }
-            WrightsClientConfig.shapeMaterialAdd(state.getBlock().asItem());
+            net.minecraft.world.item.Item item = state.getBlock().asItem();
+            if (!(item instanceof net.minecraft.world.item.BlockItem) || !seen.add(item)) {
+                continue;
+            }
+            next.add(new ShapeMaterials.Entry(item, weights.getOrDefault(item, 1)));
         }
-        selectedMaterial = Math.max(0, WrightsClientConfig.shapeMaterials().size() - 1);
+        if (next.isEmpty()) {
+            return;
+        }
+        WrightsClientConfig.setShapeMaterials(next);
+        selectedMaterial = Math.min(selectedMaterial, next.size() - 1);
     }
 
     private int drawMaterials(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width) {
@@ -464,18 +508,19 @@ final class ShapeMenuPanel {
         Shapes.Kind kind = Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
         int size = Shapes.clampSize(WrightsClientConfig.SHAPE_SIZE.get());
         int height = Shapes.clampHeight(WrightsClientConfig.SHAPE_HEIGHT.get());
+        int thickness = Shapes.clampHeight(WrightsClientConfig.SHAPE_THICKNESS.get());
         boolean hollow = WrightsClientConfig.SHAPE_HOLLOW.get();
         boolean flip = WrightsClientConfig.SHAPE_FLIP_VERTICAL.get();
         int plane = WrightsClientConfig.SHAPE_PLANE.get();
         List<ShapeMaterials.Entry> materials = WrightsClientConfig.shapeMaterials();
         ShapeMaterials.FillMode mode = WrightsClientConfig.shapeFillMode();
         int batch = WrightsClientConfig.SHAPE_ORDER_BATCH.get();
-        long key = previewMaterialsKey(kind, size, height, plane, hollow, flip, materials, mode, batch);
+        long key = previewMaterialsKey(kind, size, height, thickness, plane, hollow, flip, materials, mode, batch);
         if (key == previewKey) {
             return;
         }
         previewKey = key;
-        List<BlockPos> worlds = Shapes.blocks(kind, BlockPos.ZERO, size, height, hollow, plane, flip);
+        List<BlockPos> worlds = Shapes.blocks(kind, BlockPos.ZERO, size, height, thickness, hollow, plane, flip);
         if (worlds.isEmpty()) {
             previewGhosts = List.of();
             previewSizeX = previewSizeY = previewSizeZ = 1;
@@ -537,6 +582,7 @@ final class ShapeMenuPanel {
             Shapes.Kind kind,
             int size,
             int height,
+            int thickness,
             int plane,
             boolean hollow,
             boolean flip,
@@ -547,6 +593,7 @@ final class ShapeMenuPanel {
         key = key * 31L + kind.ordinal();
         key = key * 31L + size;
         key = key * 31L + height;
+        key = key * 31L + thickness;
         key = key * 31L + plane;
         key = key * 31L + (hollow ? 1 : 0);
         key = key * 31L + (flip ? 1 : 0);

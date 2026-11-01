@@ -2003,7 +2003,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record ShapePlace(BlockPos pos, int face, boolean useAnchor, boolean anchorSet, BlockPos anchor, int kind, int size, int height, int plane, boolean hollow, boolean flipVertical, boolean replace, boolean voidBlocks, boolean force, int fillMode, int orderBatch, String materials, String supplyOrder) implements CustomPacketPayload {
+    public record ShapePlace(BlockPos pos, int face, boolean useAnchor, boolean anchorSet, BlockPos anchor, int kind, int size, int height, int thickness, int plane, boolean hollow, boolean flipVertical, boolean replace, boolean voidBlocks, boolean force, int fillMode, int orderBatch, String materials, String supplyOrder) implements CustomPacketPayload {
         public static final Type<ShapePlace> TYPE = payloadType("shape_place");
         public static final StreamCodec<RegistryFriendlyByteBuf, ShapePlace> STREAM_CODEC = StreamCodec.of((buf, value) -> value.write(buf), ShapePlace::read);
 
@@ -2016,6 +2016,7 @@ public final class BlueprintPayloads {
             buf.writeVarInt(kind);
             buf.writeVarInt(size);
             buf.writeVarInt(height);
+            buf.writeVarInt(thickness);
             buf.writeVarInt(plane);
             buf.writeBoolean(hollow);
             buf.writeBoolean(flipVertical);
@@ -2035,6 +2036,7 @@ public final class BlueprintPayloads {
                     buf.readBoolean(),
                     buf.readBoolean(),
                     buf.readBlockPos(),
+                    buf.readVarInt(),
                     buf.readVarInt(),
                     buf.readVarInt(),
                     buf.readVarInt(),

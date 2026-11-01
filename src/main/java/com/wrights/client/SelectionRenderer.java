@@ -149,12 +149,13 @@ public final class SelectionRenderer {
         com.wrights.blueprint.Shapes.Kind kind = com.wrights.blueprint.Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
         int size = WrightsClientConfig.SHAPE_SIZE.get();
         int height = WrightsClientConfig.SHAPE_HEIGHT.get();
+        int thickness = WrightsClientConfig.SHAPE_THICKNESS.get();
         boolean hollow = WrightsClientConfig.SHAPE_HOLLOW.get();
         int plane = WrightsClientConfig.SHAPE_PLANE.get();
         boolean flip = WrightsClientConfig.SHAPE_FLIP_VERTICAL.get();
         List<BlockPos> worlds = WrightsClientConfig.SHAPE_USE_ANCHOR.get()
-                ? com.wrights.blueprint.Shapes.blocks(kind, center, size, height, hollow, plane, flip)
-                : com.wrights.blueprint.Shapes.blocksFromCorner(kind, center, size, height, hollow, plane, flip);
+                ? com.wrights.blueprint.Shapes.blocks(kind, center, size, height, thickness, hollow, plane, flip)
+                : com.wrights.blueprint.Shapes.blocksFromCorner(kind, center, size, height, thickness, hollow, plane, flip);
         boolean replace = WrightsClientConfig.SHAPE_REPLACE.get() && WrightsConfig.allowShapeReplace();
         List<BlockPos> ready = new java.util.ArrayList<>();
         for (BlockPos world : worlds) {
