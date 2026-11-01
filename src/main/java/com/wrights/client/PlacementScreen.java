@@ -209,7 +209,8 @@ public class PlacementScreen extends Screen implements JeiPreview {
         int footBtn = Math.max(16, btnH + 2);
         addRenderableWidget(new WrightsButton(controlsX + side, foot + rowH + 2, backX - side - 4, footBtn, Component.translatable("screen.wrights.save_blueprint"), button -> saveBlueprint()));
         addRenderableWidget(new WrightsButton(controlsX + backX, foot + rowH + 2, backW, footBtn, Component.translatable("screen.wrights.back"), button -> onClose()));
-        buildButton = new WrightsButton(controlsX + side, foot + rowH + 2 + footBtn + 2, inner, footBtn, Component.translatable("menu.wrights.build"), button -> send());
+        // Confirm closes with the chosen settings; right-click in the world starts the job.
+        buildButton = new WrightsButton(controlsX + side, foot + rowH + 2 + footBtn + 2, inner, footBtn, Component.translatable("screen.wrights.confirm"), button -> confirm());
         addRenderableWidget(buildButton);
         int contentBottom = Math.max(r2 + btnH + 8, foot + rowH + 2 + footBtn * 2 + 10);
         contentH = contentBottom - (bodyTop - bodyScroll);
@@ -274,8 +275,7 @@ public class PlacementScreen extends Screen implements JeiPreview {
             voidNbtButton.setPicked(voiding && WrightsClientConfig.VOID_NBT.get());
         }
         if (buildButton != null) {
-            boolean queue = WrightsClientConfig.QUEUE_JOBS.get() && WrightsClientState.queueInstead();
-            buildButton.setMessage(Component.translatable(queue ? "menu.wrights.queue" : "menu.wrights.build"));
+            buildButton.setMessage(Component.translatable("screen.wrights.confirm"));
         }
         suppress = false;
     }
@@ -535,11 +535,9 @@ public class PlacementScreen extends Screen implements JeiPreview {
         this.minecraft.setScreen(null);
     }
 
-    private void send() {
-        if (WrightsClientState.tryBuild()) {
-            WrightsClientState.stepAnchor();
-            refresh();
-        }
+    /** Keep the menu choices and return to the world — place with right-click. */
+    private void confirm() {
+        onClose();
     }
 
     public void selectCell(int x, int y, int z) {
