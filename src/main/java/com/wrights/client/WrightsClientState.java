@@ -31,6 +31,7 @@ import com.wrights.drone.Swarm;
 import com.wrights.WrightsConfig;
 import com.wrights.blueprint.BoxEdits;
 import com.wrights.blueprint.BlueprintClientFlags;
+import com.wrights.blueprint.Shapes;
 import com.wrights.item.ControllerItem;
 import com.wrights.network.BlueprintPayloads;
 
@@ -96,6 +97,11 @@ public final class WrightsClientState {
     public static boolean shapeAim;
     /** Build-tool slot for Exchange mode (shape volume + replace filter). */
     public static boolean exchangeAim;
+    /** Place tool — Exchange-style forms that build instead of swap. */
+    public static boolean placeAim;
+    /** Bridge style armed — right-click toggles while Place is active. */
+    public static boolean bridgeActive;
+    private static int bridgeCooldown;
 
     /** True only while the mirror build-tool is the active tool in Build mode. */
     public static boolean mirrorToolActive() {
@@ -110,6 +116,10 @@ public final class WrightsClientState {
     /** True only while the exchange build-tool is the active tool in Build mode. */
     public static boolean exchangeToolActive() {
         return mode == Mode.BUILD && exchangeAim;
+    }
+
+    public static boolean placeToolActive() {
+        return mode == Mode.BUILD && placeAim;
     }
 
     /**
@@ -627,6 +637,9 @@ public final class WrightsClientState {
         if (exchangeAim) {
             return 4;
         }
+        if (placeAim) {
+            return 5;
+        }
         return 0;
     }
 
@@ -669,6 +682,8 @@ public final class WrightsClientState {
         mirrorAim = false;
         shapeAim = false;
         exchangeAim = false;
+        placeAim = false;
+        bridgeActive = false;
         bindSupply = false;
         bindFromMenu = false;
     }
@@ -686,6 +701,8 @@ public final class WrightsClientState {
             bindSupply = true;
         } else if (tool == 4 && WrightsConfig.allowExchange()) {
             exchangeAim = true;
+        } else if (tool == 5 && WrightsConfig.allowPlaceTool()) {
+            placeAim = true;
         }
         rememberedTool = currentBuildTool();
     }
@@ -705,6 +722,8 @@ public final class WrightsClientState {
         mirrorAim = false;
         shapeAim = false;
         exchangeAim = false;
+        placeAim = false;
+        bridgeActive = false;
         bindSupply = false;
         bindFromMenu = false;
         int style = com.wrights.WrightsClientConfig.LAST_STYLE.get();
@@ -1704,10 +1723,10 @@ public final class WrightsClientState {
             return;
         }
         Direction side = face == null ? Direction.UP : face;
-        // Exchange swaps the aimed solids; Shape places into the adjacent cell.
-        BlockPos pin = exchangeToolActive()
+        // Exchange / Place pin on the aimed block; Shape places into the adjacent cell.
+        BlockPos pin = exchangeToolActive() || placeToolActive()
                 ? clicked.immutable()
-                : com.wrights.blueprint.Shapes.lookCorner(clicked, side);
+                : Shapes.lookCorner(clicked, side);
         setShapeLookSnapTarget(pin);
         shapeLookSnapFace = side;
     }
@@ -1729,6 +1748,27 @@ public final class WrightsClientState {
 
     /** World cell the look-mode shape pivot pins to (locked snap or current aim). */
     public static BlockPos shapeLookTarget() {
+        if (placeToolActive()) {
+            Minecraft minecraft = Minecraft.getInstance();
+            if (minecraft.player == null) {
+                return null;
+            }
+            int style = WrightsClientConfig.placeStyle();
+            if (style == 1) {
+                return minecraft.player.blockPosition().below();
+            }
+            if (style == 2) {
+                Direction forward = minecraft.player.getDirection();
+                return minecraft.player.blockPosition()
+                        .relative(forward, WrightsClientConfig.placeBridgeOffset())
+                        .below();
+            }
+            if (shapeLookSnapActive()) {
+                return shapeLookSnapPos;
+            }
+            BlockHitResult hit = shapeLookHit();
+            return hit == null ? null : hit.getBlockPos();
+        }
         if (shapeLookSnapActive()) {
             return shapeLookSnapPos;
         }
@@ -1740,7 +1780,7 @@ public final class WrightsClientState {
         if (exchangeToolActive()) {
             return hit.getBlockPos();
         }
-        return com.wrights.blueprint.Shapes.lookCorner(hit.getBlockPos(), hit.getDirection());
+        return Shapes.lookCorner(hit.getBlockPos(), hit.getDirection());
     }
 
     private static BlueprintPayloads.ShapePlace pendingShape;
@@ -1891,6 +1931,138 @@ public final class WrightsClientState {
             clearShapeLookSnap();
         }
         return true;
+    }
+
+    public static boolean tryPlace(boolean force) {
+        if (pendingShape == null) {
+            return false;
+        }
+        return tryPlace(force, pendingShape.pos(), Direction.from3DDataValue(pendingShape.face()));
+    }
+
+    /**
+     * Place tool: same footprint as Exchange, but builds instead of swaps.
+     * Style Look → aim cell; To me → under the player; Bridge → toggle continuous path.
+     */
+    public static boolean tryPlace(boolean force, BlockPos pos, Direction face) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || !ControllerItem.isHeld(minecraft.player)) {
+            return false;
+        }
+        if (WrightsClientConfig.shapeMaterials().isEmpty()) {
+            minecraft.player.displayClientMessage(Component.translatable("message.wrights.shape_need_materials"), true);
+            return false;
+        }
+        int style = WrightsClientConfig.placeStyle();
+        if (style == 2 && !force) {
+            bridgeActive = !bridgeActive;
+            bridgeCooldown = 0;
+            minecraft.player.displayClientMessage(
+                    Component.translatable(
+                            bridgeActive ? "message.wrights.place_bridge_on" : "message.wrights.place_bridge_off",
+                            WrightsClientConfig.placeBridgeOffset()),
+                    true);
+            return true;
+        }
+        WrightsClientConfig.enforceExchangeLineFootprint();
+        if (style == 1 || style == 2) {
+            if (style == 2) {
+                Direction forward = minecraft.player.getDirection();
+                pos = minecraft.player.blockPosition()
+                        .relative(forward, WrightsClientConfig.placeBridgeOffset())
+                        .below();
+            } else {
+                pos = minecraft.player.blockPosition().below();
+            }
+            face = Direction.UP;
+        } else if (pos == null || face == null) {
+            BlockHitResult aim = shapeLookHit();
+            if (aim == null) {
+                minecraft.player.displayClientMessage(Component.translatable("message.wrights.shape_look"), true);
+                return false;
+            }
+            pos = aim.getBlockPos();
+            face = aim.getDirection();
+        }
+        pendingShape = new BlueprintPayloads.ShapePlace(
+                pos,
+                face.get3DDataValue(),
+                false,
+                false,
+                BlockPos.ZERO,
+                WrightsClientConfig.exchangeKind().ordinal(),
+                WrightsClientConfig.SHAPE_SIZE.get(),
+                WrightsClientConfig.SHAPE_HEIGHT.get(),
+                WrightsClientConfig.SHAPE_THICKNESS.get(),
+                WrightsClientConfig.SHAPE_PLANE.get(),
+                WrightsClientConfig.SHAPE_YAW.get(),
+                WrightsClientConfig.exchangePivot(),
+                false,
+                WrightsClientConfig.SHAPE_VOID.get(),
+                force,
+                style != 0,
+                WrightsClientConfig.SHAPE_FILL_MODE.get(),
+                WrightsClientConfig.SHAPE_ORDER_BATCH.get(),
+                WrightsClientConfig.SHAPE_MATERIALS.get(),
+                WrightsClientConfig.SHAPE_SUPPLY.get(),
+                false,
+                "",
+                false);
+        PacketDistributor.sendToServer(pendingShape);
+        return true;
+    }
+
+    /** Place a single bridge cell under the player, offset forward. */
+    public static void tickBridge() {
+        if (!placeToolActive() || !bridgeActive || WrightsClientConfig.placeStyle() != 2) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || minecraft.level == null || !ControllerItem.isHeld(minecraft.player)) {
+            bridgeActive = false;
+            return;
+        }
+        if (bridgeCooldown > 0) {
+            bridgeCooldown--;
+            return;
+        }
+        if (WrightsClientConfig.shapeMaterials().isEmpty()) {
+            return;
+        }
+        Direction forward = minecraft.player.getDirection();
+        int offset = WrightsClientConfig.placeBridgeOffset();
+        BlockPos at = minecraft.player.blockPosition().relative(forward, offset).below();
+        BlockState state = minecraft.level.getBlockState(at);
+        if (!state.isAir() && !state.canBeReplaced()) {
+            bridgeCooldown = 2;
+            return;
+        }
+        pendingShape = new BlueprintPayloads.ShapePlace(
+                at,
+                Direction.UP.get3DDataValue(),
+                false,
+                false,
+                BlockPos.ZERO,
+                Shapes.Kind.RECTANGLE.ordinal(),
+                1,
+                1,
+                1,
+                Shapes.AXIS_Y,
+                0,
+                Shapes.pivotId(0, 4),
+                false,
+                false,
+                false,
+                true,
+                WrightsClientConfig.SHAPE_FILL_MODE.get(),
+                WrightsClientConfig.SHAPE_ORDER_BATCH.get(),
+                WrightsClientConfig.SHAPE_MATERIALS.get(),
+                WrightsClientConfig.SHAPE_SUPPLY.get(),
+                false,
+                "",
+                false);
+        PacketDistributor.sendToServer(pendingShape);
+        bridgeCooldown = 3;
     }
 
     public static boolean showStoredSettings() {
@@ -2059,6 +2231,7 @@ public final class WrightsClientState {
         }
         int styles = styleSteps();
         int extras = 2
+                + (WrightsConfig.allowPlaceTool() ? 1 : 0)
                 + (WrightsConfig.allowMirror() ? 1 : 0)
                 + (WrightsConfig.allowShape() ? 1 : 0)
                 + (WrightsConfig.allowExchange() ? 1 : 0);
@@ -2071,6 +2244,8 @@ public final class WrightsClientState {
             int cursor = 0;
             if (tool == cursor++) {
                 selectBuildTool(false);
+            } else if (WrightsConfig.allowPlaceTool() && tool == cursor++) {
+                selectPlaceTool();
             } else if (WrightsConfig.allowMirror() && tool == cursor++) {
                 selectMirrorTool();
             } else if (WrightsConfig.allowExchange() && tool == cursor++) {
@@ -2100,7 +2275,7 @@ public final class WrightsClientState {
         return CaptureStyle.MOVE;
     }
 
-    /** New template styles, then Use template, Mirror, Shape, Exchange, and Bind inventory. */
+    /** New template styles, then Use template, Place, Mirror, Exchange, Shape, and Bind inventory. */
     private static int buildToolSlot() {
         if (mode == Mode.CAPTURE) {
             int offset = switch (captureStyle) {
@@ -2111,10 +2286,16 @@ public final class WrightsClientState {
             return Math.min(offset, styleSteps() - 1);
         }
         int slot = styleSteps();
-        if (mode == Mode.BUILD && !bindSupply && !mirrorAim && !shapeAim && !exchangeAim) {
+        if (mode == Mode.BUILD && !bindSupply && !mirrorAim && !shapeAim && !exchangeAim && !placeAim) {
             return slot;
         }
         slot++;
+        if (WrightsConfig.allowPlaceTool()) {
+            if (mode == Mode.BUILD && placeAim) {
+                return slot;
+            }
+            slot++;
+        }
         if (WrightsConfig.allowMirror()) {
             if (mode == Mode.BUILD && mirrorAim) {
                 return slot;
@@ -2170,6 +2351,15 @@ public final class WrightsClientState {
         if (WrightsConfig.allowShapeVoid() && !WrightsClientConfig.SHAPE_VOID.get()) {
             WrightsClientConfig.setShapeVoid(true);
         }
+        rememberMode();
+    }
+
+    public static void selectPlaceTool() {
+        selectBuildTool(false);
+        placeAim = true;
+        bridgeActive = false;
+        // Same form presets as Exchange — Place builds them instead of swapping.
+        WrightsClientConfig.applyExchangeForm(WrightsClientConfig.EXCHANGE_FORM.get(), Minecraft.getInstance().player);
         rememberMode();
     }
 

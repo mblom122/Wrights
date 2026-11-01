@@ -18,6 +18,7 @@ public final class HelpTopics {
             new Topic("new", "help.wrights.nav.new"),
             new Topic("build", "help.wrights.nav.build"),
             new Topic("mirror", "help.wrights.nav.mirror"),
+            new Topic("place", "help.wrights.nav.place"),
             new Topic("shape", "help.wrights.nav.shape"),
             new Topic("exchange", "help.wrights.nav.exchange"),
             new Topic("bind", "help.wrights.nav.bind"),
@@ -101,6 +102,14 @@ public final class HelpTopics {
                     line("P", "help.wrights.shape.p_void"),
                     line("K", "Right-click|Shift+Right-click|Ctrl+Right-click|Ctrl+Shift+Right-click|Middle-click|Ctrl+Scroll"),
                     line("T", "help.wrights.shape.tip")
+            };
+            case "place" -> new Line[] {
+                    line("H", "help.wrights.place.h1"),
+                    line("P", "help.wrights.place.p1"),
+                    line("H", "help.wrights.place.h2"),
+                    line("P", "help.wrights.place.p2"),
+                    line("K", "Right-click|Shift+Right-click|Ctrl+Shift+Right-click|Middle-click|Ctrl+Scroll"),
+                    line("T", "help.wrights.place.tip")
             };
             case "exchange" -> new Line[] {
                     line("H", "help.wrights.exchange.h1"),

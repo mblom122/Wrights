@@ -112,7 +112,9 @@ public final class SelectionRenderer {
         if ((adjust || !gui) && capture) {
             drawCapture(pose, buffers, camera);
             drawCaptureGhosts(pose, buffers, camera, minecraft);
-        } else if (guiOk && (WrightsClientState.shapeToolActive() || WrightsClientState.exchangeToolActive())) {
+        } else if (guiOk && (WrightsClientState.shapeToolActive()
+                || WrightsClientState.exchangeToolActive()
+                || WrightsClientState.placeToolActive())) {
             drawShapeGhosts(pose, buffers, camera, minecraft);
         } else if (guiOk && WrightsClientState.mode == WrightsClientState.Mode.BUILD && !WrightsClientState.bindSupply && !mirrorBlocks()) {
             drawPreview(pose, buffers, camera);
@@ -133,12 +135,23 @@ public final class SelectionRenderer {
     }
 
     private static void drawShapeGhosts(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
-        if (minecraft.player == null || minecraft.level == null || !WrightsConfig.allowShape()) {
+        boolean place = WrightsClientState.placeToolActive();
+        boolean exchange = WrightsClientState.exchangeToolActive();
+        if (minecraft.player == null || minecraft.level == null) {
+            return;
+        }
+        if (place ? !WrightsConfig.allowPlaceTool() : !WrightsConfig.allowShape() && !exchange) {
+            return;
+        }
+        if (exchange && !WrightsConfig.allowExchange()) {
             return;
         }
         String here = minecraft.level.dimension().location().toString();
         BlockPos target;
-        boolean useAnchor = WrightsConfig.allowShapeAnchor() && WrightsClientConfig.SHAPE_USE_ANCHOR.get();
+        // Place uses Look / To me / Bridge — never the Shape world anchor.
+        boolean useAnchor = !place
+                && WrightsConfig.allowShapeAnchor()
+                && WrightsClientConfig.SHAPE_USE_ANCHOR.get();
         if (useAnchor) {
             if (!WrightsClientConfig.shapePlaced(here)) {
                 return;
@@ -154,21 +167,27 @@ public final class SelectionRenderer {
         if (com.wrights.blueprint.ShapeMaterials.states(materials).isEmpty()) {
             return;
         }
-        boolean exchange = WrightsClientState.exchangeToolActive();
-        com.wrights.blueprint.Shapes.Kind kind = exchange
+        boolean formPresets = exchange || place;
+        com.wrights.blueprint.Shapes.Kind kind = formPresets
                 ? WrightsClientConfig.exchangeKind()
                 : com.wrights.blueprint.Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
-        if (exchange) {
+        if (formPresets) {
             WrightsClientConfig.enforceExchangeLineFootprint();
         }
-        int size = WrightsClientConfig.SHAPE_SIZE.get();
-        int height = WrightsClientConfig.SHAPE_HEIGHT.get();
-        int thickness = WrightsClientConfig.SHAPE_THICKNESS.get();
-        boolean hollow = WrightsClientConfig.SHAPE_HOLLOW.get() && WrightsConfig.allowShapeHollow();
+        // Bridge always previews the single path cell under/ahead of the player.
+        int size = place && WrightsClientConfig.placeStyle() == 2 ? 1 : WrightsClientConfig.SHAPE_SIZE.get();
+        int height = place && WrightsClientConfig.placeStyle() == 2 ? 1 : WrightsClientConfig.SHAPE_HEIGHT.get();
+        int thickness = place && WrightsClientConfig.placeStyle() == 2 ? 1 : WrightsClientConfig.SHAPE_THICKNESS.get();
+        if (place && WrightsClientConfig.placeStyle() == 2) {
+            kind = com.wrights.blueprint.Shapes.Kind.RECTANGLE;
+        }
+        boolean hollow = !place && WrightsClientConfig.SHAPE_HOLLOW.get() && WrightsConfig.allowShapeHollow();
         int plane = WrightsClientConfig.SHAPE_PLANE.get();
         int yaw = com.wrights.blueprint.Shapes.clampYaw(WrightsClientConfig.SHAPE_YAW.get());
-        int pivot = WrightsClientState.exchangeToolActive()
-                ? WrightsClientConfig.exchangePivot()
+        int pivot = formPresets
+                ? (place && WrightsClientConfig.placeStyle() == 2
+                        ? com.wrights.blueprint.Shapes.pivotId(0, 4)
+                        : WrightsClientConfig.exchangePivot())
                 : WrightsClientConfig.SHAPE_PIVOT.get();
         // Cache axis-only mesh; yaw orbits the pin in world space (same as placement).
         ensureShapeLocal(kind, size, height, thickness, hollow, plane, 0);

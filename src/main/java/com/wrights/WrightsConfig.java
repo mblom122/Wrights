@@ -200,6 +200,9 @@ public final class WrightsConfig {
     public static final ModConfigSpec.BooleanValue ALLOW_EXCHANGE = BUILDER
             .comment("Exchange mode. Replaces matching blocks inside a shape volume with chosen materials.")
             .define("exchange", true);
+    public static final ModConfigSpec.BooleanValue ALLOW_PLACE_TOOL = BUILDER
+            .comment("Place mode. Builds Exchange-style forms where you look, to your feet, or as a walking bridge.")
+            .define("placeTool", true);
     public static final ModConfigSpec.BooleanValue ALLOW_MIRROR_BLOCKS = BUILDER
             .comment("Mirroring the block in the other hand.")
             .define("mirrorBlocks", true);
@@ -407,6 +410,11 @@ public final class WrightsConfig {
         return allowBuilding() && read(ALLOW_EXCHANGE, true);
     }
 
+    /** Standard Place build tool (Look / To me / Bridge). Separate from blueprint place. */
+    public static boolean allowPlaceTool() {
+        return allowBuilding() && read(ALLOW_PLACE_TOOL, true);
+    }
+
     /**
      * Cap for shape size / height / thickness. Never above {@link #MAX_AXIS}.
      */
@@ -444,9 +452,9 @@ public final class WrightsConfig {
         return read(ALLOW_LINK, true);
     }
 
-    /** Building has a blueprint list, mirror page, shape page, or exchange page to show. */
+    /** Building has a blueprint list, place, mirror, shape, or exchange page to show. */
     public static boolean showBuilding() {
-        return allowBlueprints() || allowMirror() || allowShape() || allowExchange();
+        return allowBlueprints() || allowMirror() || allowShape() || allowExchange() || allowPlaceTool();
     }
 
     /** Highest copy count the server still allows. */

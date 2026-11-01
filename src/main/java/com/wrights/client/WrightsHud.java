@@ -96,7 +96,13 @@ public final class WrightsHud {
         } else if (WrightsClientState.mode == WrightsClientState.Mode.SAVING) {
             line = Component.translatable("hud.wrights.saving", WrightsClientState.name);
         } else if (WrightsClientState.mode == WrightsClientState.Mode.BUILD) {
-            if (WrightsClientState.exchangeToolActive()) {
+            if (WrightsClientState.placeToolActive()) {
+                line = placeStatusLine();
+                sub = Component.translatable(placeFooter());
+                if (WrightsClientConfig.shapeMaterials().isEmpty()) {
+                    note = Component.translatable("hud.wrights.shape_pick_material");
+                }
+            } else if (WrightsClientState.exchangeToolActive()) {
                 line = exchangeStatusLine();
                 sub = Component.translatable("hud.wrights.exchange_explain");
             } else if (WrightsClientState.shapeToolActive()) {
@@ -265,6 +271,9 @@ public final class WrightsHud {
         if (WrightsClientState.mode == WrightsClientState.Mode.CAPTURE && WrightsClientState.hasBox()) {
             return CtrlHelp.RESIZE;
         }
+        if (WrightsClientState.placeToolActive() && WrightsConfig.allowPlaceTool()) {
+            return CtrlHelp.SIZE;
+        }
         if (WrightsClientState.exchangeToolActive() && WrightsConfig.allowExchange()) {
             return CtrlHelp.SIZE;
         }
@@ -282,23 +291,26 @@ public final class WrightsHud {
 
     private static void drawCtrlHelp(GuiGraphics graphics, Minecraft minecraft) {
         CtrlHelp kind = ctrlHelpKind();
+        boolean bridgeScroll = kind == CtrlHelp.SIZE
+                && WrightsClientState.placeToolActive()
+                && WrightsClientConfig.placeStyle() == 2;
         String titleKey = switch (kind) {
-            case SIZE -> "hud.wrights.ctrl_size_title";
+            case SIZE -> bridgeScroll ? "hud.wrights.ctrl_bridge_title" : "hud.wrights.ctrl_size_title";
             case ROTATE -> "hud.wrights.ctrl_rotate_title";
             default -> "hud.wrights.ctrl_resize_title";
         };
         String upKey = switch (kind) {
-            case SIZE -> "hud.wrights.ctrl_size_up";
+            case SIZE -> bridgeScroll ? "hud.wrights.ctrl_bridge_up" : "hud.wrights.ctrl_size_up";
             case ROTATE -> "hud.wrights.ctrl_rotate_up";
             default -> "hud.wrights.ctrl_resize_up";
         };
         String downKey = switch (kind) {
-            case SIZE -> "hud.wrights.ctrl_size_down";
+            case SIZE -> bridgeScroll ? "hud.wrights.ctrl_bridge_down" : "hud.wrights.ctrl_size_down";
             case ROTATE -> "hud.wrights.ctrl_rotate_down";
             default -> "hud.wrights.ctrl_resize_down";
         };
         String tipKey = switch (kind) {
-            case SIZE -> "hud.wrights.ctrl_size_tip";
+            case SIZE -> bridgeScroll ? "hud.wrights.ctrl_bridge_tip" : "hud.wrights.ctrl_size_tip";
             case ROTATE -> WrightsClientState.shapeToolActive()
                     ? "hud.wrights.ctrl_rotate_shape_tip"
                     : "hud.wrights.ctrl_rotate_tip";
@@ -348,7 +360,11 @@ public final class WrightsHud {
             key.append('|').append(step);
             key.append('|').append(WrightsClientState.boxDragging).append('|').append(WrightsClientState.moveGrabbed);
         } else if (mode == WrightsClientState.Mode.BUILD) {
-            if (WrightsClientState.exchangeToolActive()) {
+            if (WrightsClientState.placeToolActive()) {
+                key.append("|place|").append(WrightsClientConfig.placeStyle());
+                key.append('|').append(WrightsClientConfig.exchangeForm().name());
+                key.append('|').append(WrightsClientState.bridgeActive);
+            } else if (WrightsClientState.exchangeToolActive()) {
                 key.append("|exchange|").append(WrightsClientConfig.exchangeForm().name());
             } else if (WrightsClientState.shapeToolActive()) {
                 key.append("|shape|").append(WrightsClientConfig.SHAPE_KIND.get());
@@ -385,7 +401,8 @@ public final class WrightsHud {
             return true;
         }
         if (WrightsClientState.mode == WrightsClientState.Mode.BUILD) {
-            if (WrightsClientState.exchangeToolActive()
+            if (WrightsClientState.placeToolActive()
+                    || WrightsClientState.exchangeToolActive()
                     || WrightsClientState.shapeToolActive()
                     || WrightsClientState.mirrorToolActive()) {
                 return line != null;
@@ -408,7 +425,9 @@ public final class WrightsHud {
         }
         if (WrightsClientState.mode == WrightsClientState.Mode.BUILD) {
             String tool;
-            if (WrightsClientState.exchangeToolActive()) {
+            if (WrightsClientState.placeToolActive()) {
+                tool = "hud.wrights.tool_place";
+            } else if (WrightsClientState.exchangeToolActive()) {
                 tool = "hud.wrights.tool_exchange";
             } else if (WrightsClientState.shapeToolActive()) {
                 tool = "hud.wrights.tool_shape";
@@ -511,16 +530,19 @@ public final class WrightsHud {
         Component bind = Component.translatable("hud.wrights.tool_bind");
         Component mirror = Component.translatable("hud.wrights.tool_mirror");
         Component shape = Component.translatable("hud.wrights.tool_shape");
+        Component place = Component.translatable("hud.wrights.tool_place");
         Component exchange = Component.translatable("hud.wrights.tool_exchange");
         Component mirrorMark = Component.translatable(WrightsClientConfig.mirrorBlocks() ? "menu.wrights.mirror_blocks" : "menu.wrights.mirror_blueprints");
         Component shapeMark = Component.translatable("menu.wrights.shape_kind_" + com.wrights.blueprint.Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get()).name().toLowerCase());
         Component exchangeMark = Component.translatable(WrightsClientConfig.exchangeForm().langKey());
+        Component placeMark = Component.translatable(placeAimKey());
         Component selected = Component.translatable("hud.wrights.mode_selected");
         Component corners = Component.translatable("hud.wrights.mode_corners");
         Component box = Component.translatable("hud.wrights.mode_box");
         Component move = Component.translatable("hud.wrights.mode_move");
         Component need = Component.translatable("hud.wrights.mode_move_need");
         boolean canMove = WrightsClientState.hasBox();
+        boolean showPlace = WrightsConfig.allowPlaceTool();
         boolean showMirror = WrightsConfig.allowMirror();
         boolean showShape = WrightsConfig.allowShape();
         boolean showExchange = WrightsConfig.allowExchange();
@@ -529,6 +551,9 @@ public final class WrightsHud {
         width = Math.max(width, minecraft.font.width(use) + minecraft.font.width(selected) + 36);
         width = Math.max(width, minecraft.font.width(fresh) + minecraft.font.width(selected) + 36);
         width = Math.max(width, minecraft.font.width(bind) + minecraft.font.width(selected) + 36);
+        if (showPlace) {
+            width = Math.max(width, minecraft.font.width(place) + minecraft.font.width(placeMark) + 36);
+        }
         if (showMirror) {
             width = Math.max(width, minecraft.font.width(mirror) + minecraft.font.width(mirrorMark) + 36);
         }
@@ -545,7 +570,7 @@ public final class WrightsHud {
             width = Math.max(width, minecraft.font.width(move) + minecraft.font.width(canMove ? selected : need) + 36 + nest);
         }
         int row = 18;
-        int rows = 3 + (showMirror ? 1 : 0) + (showShape ? 1 : 0) + (showExchange ? 1 : 0) + (making ? 3 : 0);
+        int rows = 3 + (showPlace ? 1 : 0) + (showMirror ? 1 : 0) + (showShape ? 1 : 0) + (showExchange ? 1 : 0) + (making ? 3 : 0);
         int textWidth = width - 24;
         int footer = footerHeight(minecraft, how, textWidth);
         int height = 28 + row * rows + footer;
@@ -568,8 +593,12 @@ public final class WrightsHud {
             yAfterNew = subY + row * 3;
         }
         int toolY = yAfterNew;
-        drawToolRow(graphics, minecraft, x, toolY, width, building && !WrightsClientState.bindSupply && !WrightsClientState.mirrorAim && !WrightsClientState.shapeAim && !WrightsClientState.exchangeAim, use, selected);
+        drawToolRow(graphics, minecraft, x, toolY, width, building && !WrightsClientState.bindSupply && !WrightsClientState.mirrorAim && !WrightsClientState.shapeAim && !WrightsClientState.exchangeAim && !WrightsClientState.placeAim, use, selected);
         toolY += row;
+        if (showPlace) {
+            drawToolRow(graphics, minecraft, x, toolY, width, building && WrightsClientState.placeAim, place, placeMark);
+            toolY += row;
+        }
         if (showMirror) {
             drawToolRow(graphics, minecraft, x, toolY, width, building && WrightsClientState.mirrorAim, mirror, mirrorMark);
             toolY += row;
@@ -634,6 +663,40 @@ public final class WrightsHud {
         Shapes.ExchangeForm form = WrightsClientConfig.exchangeForm();
         Component name = Component.translatable(form.langKey());
         return Component.translatable("hud.wrights.tool_exchange_detail", name, exchangeDimText(form));
+    }
+
+    /** Title line: Place form + Look / To me / Bridge status. */
+    private static Component placeStatusLine() {
+        Shapes.ExchangeForm form = WrightsClientConfig.exchangeForm();
+        Component name = Component.translatable(form.langKey());
+        Component aim = Component.translatable(placeAimKey());
+        if (WrightsClientConfig.placeStyle() == 2) {
+            return Component.translatable(
+                    WrightsClientState.bridgeActive
+                            ? "hud.wrights.tool_place_bridge_on"
+                            : "hud.wrights.tool_place_bridge_off",
+                    name,
+                    WrightsClientConfig.placeBridgeOffset());
+        }
+        return Component.translatable("hud.wrights.tool_place_detail", name, exchangeDimText(form), aim);
+    }
+
+    private static String placeAimKey() {
+        return switch (WrightsClientConfig.placeStyle()) {
+            case 1 -> "menu.wrights.place_aim_me";
+            case 2 -> "menu.wrights.place_aim_bridge";
+            default -> "menu.wrights.place_aim_look";
+        };
+    }
+
+    private static String placeFooter() {
+        return switch (WrightsClientConfig.placeStyle()) {
+            case 1 -> "hud.wrights.place_me_explain";
+            case 2 -> WrightsClientState.bridgeActive
+                    ? "hud.wrights.place_bridge_ready"
+                    : "hud.wrights.place_bridge_explain";
+            default -> "hud.wrights.place_look_explain";
+        };
     }
 
     /** Title line: Blocks/Blueprints plus copies or axis mix. */
@@ -775,6 +838,9 @@ public final class WrightsHud {
     }
 
     private static String buildToolKey() {
+        if (WrightsClientState.placeAim) {
+            return "hud.wrights.tool_place";
+        }
         if (WrightsClientState.exchangeAim) {
             return "hud.wrights.tool_exchange";
         }

@@ -146,6 +146,12 @@ public class MaterialsScreen extends Screen {
             return;
         }
         if (id.equals(com.wrights.blueprint.ShapeLaunch.MATERIALS_ID)) {
+            if (WrightsClientState.placeToolActive()) {
+                if (WrightsClientState.tryPlace(true)) {
+                    onClose();
+                }
+                return;
+            }
             if (WrightsClientState.tryShape(true)) {
                 onClose();
             }

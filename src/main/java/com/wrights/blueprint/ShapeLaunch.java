@@ -41,7 +41,11 @@ public final class ShapeLaunch {
             return;
         }
         boolean exchange = payload.exchange();
-        if (WrightsConfig.refuse(player, exchange ? WrightsConfig.allowExchange() : WrightsConfig.allowShape())) {
+        // Place tool reuses ShapePlace with exchange=false; allow Shape or Place tool.
+        boolean allowed = exchange
+                ? WrightsConfig.allowExchange()
+                : (WrightsConfig.allowShape() || WrightsConfig.allowPlaceTool());
+        if (WrightsConfig.refuse(player, allowed)) {
             return;
         }
         List<ShapeMaterials.Entry> materials = ShapeMaterials.parse(payload.materials());

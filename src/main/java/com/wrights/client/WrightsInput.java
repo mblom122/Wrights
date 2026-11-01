@@ -100,6 +100,7 @@ public final class WrightsInput {
         }
         wasHeld = held;
         if (!held) {
+            WrightsClientState.bridgeActive = false;
             WrightsClientState.noteUnequipped();
             // World placement/capture UIs need the tool; the main menu and library edit do not.
             if (minecraft.screen instanceof BlueprintAdjustScreen
@@ -115,6 +116,7 @@ public final class WrightsInput {
         WrightsClientState.tickCapture();
         if (held) {
             WrightsClientState.tickFollow();
+            WrightsClientState.tickBridge();
         }
         while (MENU.consumeClick()) {
             if (minecraft.screen != null && minecraft.screen.getFocused() instanceof EditBox) {
@@ -138,7 +140,8 @@ public final class WrightsInput {
                     || minecraft.screen instanceof JobDroneScreen
                     || minecraft.screen instanceof DroneRosterScreen
                     || minecraft.screen instanceof ShapeLookSnapScreen
-                    || minecraft.screen instanceof ShapeTweakScreen) {
+                    || minecraft.screen instanceof ShapeTweakScreen
+                    || minecraft.screen instanceof PlaceTweakScreen) {
                 minecraft.setScreen(null);
             }
         }
@@ -410,6 +413,10 @@ public final class WrightsInput {
             pickMaterialBlock(minecraft.player, true);
             return;
         }
+        if (WrightsClientState.placeToolActive() && com.wrights.WrightsConfig.allowPlaceTool()) {
+            pickMaterialBlock(minecraft.player, false);
+            return;
+        }
         if (WrightsClientState.shapeToolActive() && com.wrights.WrightsConfig.allowShape()) {
             pickMaterialBlock(minecraft.player, false);
         }
@@ -450,6 +457,10 @@ public final class WrightsInput {
         }
         if (WrightsClientState.exchangeToolActive()) {
             useExchangeClick(player, pos, face);
+            return;
+        }
+        if (WrightsClientState.placeToolActive()) {
+            usePlaceClick(player, pos, face);
             return;
         }
         if (WrightsClientState.bindSupply) {
@@ -624,8 +635,19 @@ public final class WrightsInput {
             return;
         }
         if (control) {
-            // Exchange: Ctrl+scroll grows Size (Pillar height / Beam length for line forms).
-            if (WrightsClientState.exchangeToolActive() && com.wrights.WrightsConfig.allowExchange()) {
+            // Place Bridge: Ctrl+scroll adjusts how far ahead the path builds (1–12).
+            if (WrightsClientState.placeToolActive()
+                    && com.wrights.WrightsConfig.allowPlaceTool()
+                    && com.wrights.WrightsClientConfig.placeStyle() == 2) {
+                int step = event.getScrollDeltaY() > 0.0D ? 1 : -1;
+                com.wrights.WrightsClientConfig.setPlaceBridgeOffset(
+                        com.wrights.WrightsClientConfig.placeBridgeOffset() + step);
+                event.setCanceled(true);
+                return;
+            }
+            // Exchange / Place Look·To me: Ctrl+scroll grows Size (Pillar height / Beam length).
+            if ((WrightsClientState.exchangeToolActive() && com.wrights.WrightsConfig.allowExchange())
+                    || (WrightsClientState.placeToolActive() && com.wrights.WrightsConfig.allowPlaceTool())) {
                 int step = event.getScrollDeltaY() > 0.0D ? 1 : -1;
                 com.wrights.blueprint.Shapes.ExchangeForm form = com.wrights.WrightsClientConfig.exchangeForm();
                 if (form.line()) {
@@ -789,6 +811,26 @@ public final class WrightsInput {
     /** Shift+block: compact translucent size / aim tweak (Style matches look-snap). */
     private static void openShapeTweakMenu(boolean exchange) {
         Minecraft.getInstance().setScreen(new ShapeTweakScreen(exchange));
+    }
+
+    /**
+     * Place tool: Look builds at aim, To me under feet, Bridge toggles a walking path.
+     * Shift+RMB opens the quick tweak (style + bridge offset). Ctrl+Shift opens the Place page.
+     */
+    private static void usePlaceClick(net.minecraft.world.entity.player.Player player, BlockPos pos, Direction face) {
+        if (!com.wrights.WrightsConfig.allowPlaceTool()) {
+            player.displayClientMessage(Component.translatable("message.wrights.feature_off"), true);
+            return;
+        }
+        if (menuChord(player)) {
+            openToolMenu();
+            return;
+        }
+        if (player.isShiftKeyDown()) {
+            Minecraft.getInstance().setScreen(new PlaceTweakScreen());
+            return;
+        }
+        WrightsClientState.tryPlace(false, pos, face);
     }
 
     /** Same look/anchor flow as Shape. Middle-click picks Replace with. Ctrl+Shift opens Exchange options. */
