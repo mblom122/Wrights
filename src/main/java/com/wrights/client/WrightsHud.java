@@ -2,6 +2,7 @@ package com.wrights.client;
 
 import java.util.List;
 
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
@@ -98,7 +99,7 @@ public final class WrightsHud {
         } else if (WrightsClientState.mode == WrightsClientState.Mode.BUILD) {
             if (WrightsClientState.placeToolActive()) {
                 line = placeStatusLine();
-                sub = Component.translatable(placeFooter());
+                sub = placeFooter();
                 if (WrightsClientConfig.shapeMaterials().isEmpty()) {
                     note = Component.translatable("hud.wrights.shape_pick_material");
                 }
@@ -672,13 +673,13 @@ public final class WrightsHud {
         Component name = Component.translatable(form.langKey());
         Component aim = Component.translatable(placeAimKey());
         int style = WrightsClientConfig.placeStyle();
+        int offset = WrightsClientConfig.placeBridgeOffset();
         if (style == 2) {
             return Component.translatable(
-                    WrightsClientState.bridgeActive
-                            ? "hud.wrights.tool_place_bridge_on"
-                            : "hud.wrights.tool_place_bridge_off",
+                    "hud.wrights.tool_place_bridge_status",
                     name,
-                    WrightsClientConfig.placeBridgeOffset());
+                    pathStateLabel(true, WrightsClientState.bridgeActive),
+                    offset);
         }
         if (style == 3) {
             Component dir = Component.translatable(
@@ -686,14 +687,21 @@ public final class WrightsHud {
                             ? "menu.wrights.place_stairs_up"
                             : "menu.wrights.place_stairs_down");
             return Component.translatable(
-                    WrightsClientState.bridgeActive
-                            ? "hud.wrights.tool_place_stairs_on"
-                            : "hud.wrights.tool_place_stairs_off",
+                    "hud.wrights.tool_place_stairs_status",
                     name,
                     dir,
-                    WrightsClientConfig.placeBridgeOffset());
+                    pathStateLabel(false, WrightsClientState.bridgeActive),
+                    offset);
         }
         return Component.translatable("hud.wrights.tool_place_detail", name, exchangeDimText(form), aim);
+    }
+
+    /** Bridge ON / Stairs ON in green; Bridge / Stairs off in red. */
+    private static Component pathStateLabel(boolean bridge, boolean on) {
+        String key = bridge
+                ? (on ? "hud.wrights.place_bridge_state_on" : "hud.wrights.place_bridge_state_off")
+                : (on ? "hud.wrights.place_stairs_state_on" : "hud.wrights.place_stairs_state_off");
+        return Component.translatable(key).withStyle(on ? ChatFormatting.GREEN : ChatFormatting.RED);
     }
 
     private static String placeAimKey() {
@@ -705,16 +713,24 @@ public final class WrightsHud {
         };
     }
 
-    private static String placeFooter() {
+    private static Component placeFooter() {
         return switch (WrightsClientConfig.placeStyle()) {
-            case 1 -> "hud.wrights.place_me_explain";
+            case 1 -> Component.translatable("hud.wrights.place_me_explain");
             case 2 -> WrightsClientState.bridgeActive
-                    ? "hud.wrights.place_bridge_ready"
-                    : "hud.wrights.place_bridge_explain";
+                    ? Component.translatable(
+                            "hud.wrights.place_bridge_ready",
+                            Component.translatable("hud.wrights.place_bridge_state_on").withStyle(ChatFormatting.GREEN))
+                    : Component.translatable(
+                            "hud.wrights.place_bridge_explain",
+                            Component.translatable("hud.wrights.place_bridge_state_off").withStyle(ChatFormatting.RED));
             case 3 -> WrightsClientState.bridgeActive
-                    ? "hud.wrights.place_stairs_ready"
-                    : "hud.wrights.place_stairs_explain";
-            default -> "hud.wrights.place_look_explain";
+                    ? Component.translatable(
+                            "hud.wrights.place_stairs_ready",
+                            Component.translatable("hud.wrights.place_stairs_state_on").withStyle(ChatFormatting.GREEN))
+                    : Component.translatable(
+                            "hud.wrights.place_stairs_explain",
+                            Component.translatable("hud.wrights.place_stairs_state_off").withStyle(ChatFormatting.RED));
+            default -> Component.translatable("hud.wrights.place_look_explain");
         };
     }
 

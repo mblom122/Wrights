@@ -1955,9 +1955,17 @@ public final class WrightsClientState {
             bridgeActive = !bridgeActive;
             bridgeCooldown = 0;
             if (style == 3) {
+                Component state = Component.translatable(
+                                bridgeActive
+                                        ? "hud.wrights.place_stairs_state_on"
+                                        : "hud.wrights.place_stairs_state_off")
+                        .withStyle(bridgeActive
+                                ? net.minecraft.ChatFormatting.GREEN
+                                : net.minecraft.ChatFormatting.RED);
                 minecraft.player.displayClientMessage(
                         Component.translatable(
-                                bridgeActive ? "message.wrights.place_stairs_on" : "message.wrights.place_stairs_off",
+                                "message.wrights.place_stairs_toggle",
+                                state,
                                 Component.translatable(
                                         WrightsClientConfig.placeStairsUp()
                                                 ? "menu.wrights.place_stairs_up"
@@ -1965,9 +1973,17 @@ public final class WrightsClientState {
                                 WrightsClientConfig.placeBridgeOffset()),
                         true);
             } else {
+                Component state = Component.translatable(
+                                bridgeActive
+                                        ? "hud.wrights.place_bridge_state_on"
+                                        : "hud.wrights.place_bridge_state_off")
+                        .withStyle(bridgeActive
+                                ? net.minecraft.ChatFormatting.GREEN
+                                : net.minecraft.ChatFormatting.RED);
                 minecraft.player.displayClientMessage(
                         Component.translatable(
-                                bridgeActive ? "message.wrights.place_bridge_on" : "message.wrights.place_bridge_off",
+                                "message.wrights.place_bridge_toggle",
+                                state,
                                 WrightsClientConfig.placeBridgeOffset()),
                         true);
             }
