@@ -48,9 +48,10 @@ public final class WrightsConfig {
 
     public static final ModConfigSpec.IntValue MAX_BLOCKS = BUILDER
             .comment(
-                    "Largest volume, in blocks, for blueprints and Shape builds. Air counts toward this cap.",
-                    "100000 matches Building Gadgets. Raise for bigger solid shapes; raising uses more memory and can lag the server.")
-            .defineInRange("maxBlocks", 100_000, 1, 16_777_216);
+                    "Largest volume, in blocks, for blueprints and Shape builds. Separate from maxShapeAxis (slider length).",
+                    "A 512-wide solid shape needs far more than this — raise maxBlocks for big solids, or use Hollow.",
+                    "Raising uses more memory and can lag the server.")
+            .defineInRange("maxBlocks", 1_000_000, 1, 16_777_216);
 
     public static final ModConfigSpec.IntValue BLOCKS_PER_TICK = BUILDER
             .comment(
