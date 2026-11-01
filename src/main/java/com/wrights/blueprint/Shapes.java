@@ -53,14 +53,16 @@ public final class Shapes {
     }
 
     /**
-     * Exchange presets (flat + 1-wide column). Each picks a Kind and Axis so Wall/Floor/Column
-     * are oriented correctly without the Shape orientation controls.
+     * Exchange presets. Each picks a Kind and Axis so Wall/Floor/Pillar/Beam are oriented
+     * without the Shape orientation controls.
+     * Pillar = vertical 1×1 post; Beam = horizontal 1-thick line across your look.
      * Rectangle = width×height plate; Square = equal size only.
      */
     public enum ExchangeForm {
         FLOOR,
         WALL,
-        COLUMN,
+        PILLAR,
+        BEAM,
         CIRCLE,
         RECTANGLE,
         SQUARE;
@@ -68,10 +70,15 @@ public final class Shapes {
         public Kind kind() {
             return switch (this) {
                 case FLOOR, WALL, RECTANGLE -> Kind.SQUARE;
-                case COLUMN -> Kind.BOX;
+                case PILLAR, BEAM -> Kind.BOX;
                 case CIRCLE -> Kind.CIRCLE;
                 case SQUARE -> Kind.RECTANGLE;
             };
+        }
+
+        /** True for the 1-block-thick line forms (vertical pillar / horizontal beam). */
+        public boolean line() {
+            return this == PILLAR || this == BEAM;
         }
 
         public static ExchangeForm byId(int id) {

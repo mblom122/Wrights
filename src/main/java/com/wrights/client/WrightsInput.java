@@ -592,14 +592,14 @@ public final class WrightsInput {
             return;
         }
         if (control) {
-            // Exchange: Ctrl+scroll grows Size (or Column height — footprint stays 1×1).
+            // Exchange: Ctrl+scroll grows Size (Pillar height / Beam length for line forms).
             if (WrightsClientState.exchangeToolActive() && com.wrights.WrightsConfig.allowExchange()) {
                 int step = event.getScrollDeltaY() > 0.0D ? 1 : -1;
-                if (com.wrights.WrightsClientConfig.exchangeForm()
-                        == com.wrights.blueprint.Shapes.ExchangeForm.COLUMN) {
-                    com.wrights.WrightsClientConfig.setShapeHeight(
-                            com.wrights.WrightsClientConfig.SHAPE_HEIGHT.get() + step);
-                    com.wrights.WrightsClientConfig.enforceExchangeColumnFootprint();
+                com.wrights.blueprint.Shapes.ExchangeForm form = com.wrights.WrightsClientConfig.exchangeForm();
+                if (form.line()) {
+                    com.wrights.WrightsClientConfig.setExchangeLineLength(
+                            com.wrights.WrightsClientConfig.exchangeLineLength() + step);
+                    com.wrights.WrightsClientConfig.enforceExchangeLineFootprint();
                 } else {
                     com.wrights.WrightsClientConfig.setShapeSize(
                             com.wrights.WrightsClientConfig.SHAPE_SIZE.get() + step);

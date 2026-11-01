@@ -125,10 +125,10 @@ final class ShapeMenuPanel {
         Shapes.Kind kind = exchangeMode
                 ? WrightsClientConfig.exchangeForm().kind()
                 : Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
-        boolean exchangeColumn = exchangeMode
-                && WrightsClientConfig.exchangeForm() == Shapes.ExchangeForm.COLUMN;
-        if (exchangeColumn) {
-            WrightsClientConfig.enforceExchangeColumnFootprint();
+        Shapes.ExchangeForm exchangeForm = exchangeMode ? WrightsClientConfig.exchangeForm() : null;
+        boolean exchangeLine = exchangeForm != null && exchangeForm.line();
+        if (exchangeLine) {
+            WrightsClientConfig.enforceExchangeLineFootprint();
         }
         int axis = WrightsClientConfig.SHAPE_PLANE.get();
         boolean ring = kind == Shapes.Kind.RING;
@@ -140,8 +140,17 @@ final class ShapeMenuPanel {
         thicknessY = -1;
         heightValueX = heightValueW = 0;
         thicknessValueX = thicknessValueW = 0;
-        // Column is always 1×1 — only Height is editable.
-        if (!exchangeColumn) {
+        // Pillar / Beam: only the run length is editable (1-block thick otherwise).
+        if (exchangeLine) {
+            boolean pillar = exchangeForm == Shapes.ExchangeForm.PILLAR;
+            drawField(graphics, mouseX, mouseY, x, y,
+                    pillar ? "menu.wrights.shape_height" : "menu.wrights.exchange_beam_length",
+                    pillar ? "menu.wrights.exchange_pillar_height_hint" : "menu.wrights.exchange_beam_length_hint");
+            y += 12;
+            heightY = y;
+            drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.exchangeLineLength(), SLIDER_HEIGHT);
+            y += 18;
+        } else {
             drawField(graphics, mouseX, mouseY, x, y, sizeLabel(kind, axis), sizeHint(kind, axis));
             y += 12;
             sizeY = y;
@@ -158,15 +167,13 @@ final class ShapeMenuPanel {
                 drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, thickness, SLIDER_THICKNESS);
                 y += 18;
             }
-        }
-        if (kind.usesHeight() || exchangeColumn) {
-            drawField(graphics, mouseX, mouseY, x, y,
-                    exchangeColumn ? "menu.wrights.shape_height" : alongLabel(kind, axis),
-                    exchangeColumn ? "menu.wrights.exchange_column_height_hint" : alongHint(kind, axis));
-            y += 12;
-            heightY = y;
-            drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_HEIGHT.get(), SLIDER_HEIGHT);
-            y += 18;
+            if (kind.usesHeight()) {
+                drawField(graphics, mouseX, mouseY, x, y, alongLabel(kind, axis), alongHint(kind, axis));
+                y += 12;
+                heightY = y;
+                drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_HEIGHT.get(), SLIDER_HEIGHT);
+                y += 18;
+            }
         }
         // Shape keeps Axis/Rotation. Exchange skips that whole Orientation block.
         if (!exchangeMode) {
@@ -319,7 +326,7 @@ final class ShapeMenuPanel {
         }
         if (heightY >= 0 && mouseY >= heightY && mouseY < heightY + 12 && mouseX >= sizeTrackX && mouseX < sizeTrackX + sizeW) {
             draggingSlider = SLIDER_HEIGHT;
-            WrightsClientConfig.setShapeHeight(sliderAt(mouseX, axisMax()));
+            setHeightDim(sliderAt(mouseX, axisMax()));
             return true;
         }
         for (Hit hit : hits) {
@@ -341,7 +348,7 @@ final class ShapeMenuPanel {
             return true;
         }
         if (draggingSlider == SLIDER_HEIGHT) {
-            WrightsClientConfig.setShapeHeight(sliderAt(mouseX, axisMax()));
+            setHeightDim(sliderAt(mouseX, axisMax()));
             return true;
         }
         if (!previewSpinning) {
@@ -430,7 +437,7 @@ final class ShapeMenuPanel {
         parsed = Mth.clamp(parsed, 1, axisMax());
         switch (slider) {
             case SLIDER_SIZE -> WrightsClientConfig.setShapeSize(parsed);
-            case SLIDER_HEIGHT -> WrightsClientConfig.setShapeHeight(parsed);
+            case SLIDER_HEIGHT -> setHeightDim(parsed);
             case SLIDER_THICKNESS -> WrightsClientConfig.setShapeThickness(parsed);
             default -> {
             }
@@ -440,10 +447,29 @@ final class ShapeMenuPanel {
 
     private int sliderValue(int slider) {
         return switch (slider) {
-            case SLIDER_HEIGHT -> WrightsClientConfig.SHAPE_HEIGHT.get();
+            case SLIDER_HEIGHT -> heightDim();
             case SLIDER_THICKNESS -> WrightsClientConfig.SHAPE_THICKNESS.get();
             default -> WrightsClientConfig.SHAPE_SIZE.get();
         };
+    }
+
+    private boolean exchangeLineForm() {
+        return exchangeMode && WrightsClientConfig.exchangeForm().line();
+    }
+
+    private int heightDim() {
+        return exchangeLineForm()
+                ? WrightsClientConfig.exchangeLineLength()
+                : WrightsClientConfig.SHAPE_HEIGHT.get();
+    }
+
+    private void setHeightDim(int value) {
+        if (exchangeLineForm()) {
+            WrightsClientConfig.setExchangeLineLength(value);
+            WrightsClientConfig.enforceExchangeLineFootprint();
+        } else {
+            WrightsClientConfig.setShapeHeight(value);
+        }
     }
 
     private boolean hitValue(int slider, double mouseX, double mouseY) {
@@ -750,7 +776,7 @@ final class ShapeMenuPanel {
     private void nudgeDim(int slider, int sign) {
         int step = WrightsUi.nudgeStep() * (sign < 0 ? -1 : 1);
         switch (slider) {
-            case SLIDER_HEIGHT -> WrightsClientConfig.setShapeHeight(WrightsClientConfig.SHAPE_HEIGHT.get() + step);
+            case SLIDER_HEIGHT -> setHeightDim(heightDim() + step);
             case SLIDER_THICKNESS -> WrightsClientConfig.setShapeThickness(WrightsClientConfig.SHAPE_THICKNESS.get() + step);
             default -> WrightsClientConfig.setShapeSize(WrightsClientConfig.SHAPE_SIZE.get() + step);
         }
@@ -1031,14 +1057,12 @@ final class ShapeMenuPanel {
         Shapes.Kind kind = exchangeMode
                 ? WrightsClientConfig.exchangeForm().kind()
                 : Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
-        boolean exchangeColumn = exchangeMode
-                && WrightsClientConfig.exchangeForm() == Shapes.ExchangeForm.COLUMN;
-        if (exchangeColumn) {
-            WrightsClientConfig.enforceExchangeColumnFootprint();
+        if (exchangeMode && WrightsClientConfig.exchangeForm().line()) {
+            WrightsClientConfig.enforceExchangeLineFootprint();
         }
-        int size = exchangeColumn ? 1 : Shapes.clampSize(WrightsClientConfig.SHAPE_SIZE.get());
+        int size = Shapes.clampSize(WrightsClientConfig.SHAPE_SIZE.get());
         int height = Shapes.clampHeight(WrightsClientConfig.SHAPE_HEIGHT.get());
-        int thickness = exchangeColumn ? 1 : Shapes.clampHeight(WrightsClientConfig.SHAPE_THICKNESS.get());
+        int thickness = Shapes.clampHeight(WrightsClientConfig.SHAPE_THICKNESS.get());
         boolean hollow = WrightsClientConfig.SHAPE_HOLLOW.get() && WrightsConfig.allowShapeHollow();
         int plane = WrightsClientConfig.SHAPE_PLANE.get();
         // Same absolute yaw as the in-world preview so we reuse SelectionRenderer's cache.

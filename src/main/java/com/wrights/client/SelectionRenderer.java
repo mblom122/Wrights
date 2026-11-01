@@ -159,13 +159,11 @@ public final class SelectionRenderer {
                 ? WrightsClientConfig.exchangeForm().kind()
                 : com.wrights.blueprint.Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
         if (exchange) {
-            WrightsClientConfig.enforceExchangeColumnFootprint();
+            WrightsClientConfig.enforceExchangeLineFootprint();
         }
-        boolean column = exchange
-                && WrightsClientConfig.exchangeForm() == com.wrights.blueprint.Shapes.ExchangeForm.COLUMN;
-        int size = column ? 1 : WrightsClientConfig.SHAPE_SIZE.get();
+        int size = WrightsClientConfig.SHAPE_SIZE.get();
         int height = WrightsClientConfig.SHAPE_HEIGHT.get();
-        int thickness = column ? 1 : WrightsClientConfig.SHAPE_THICKNESS.get();
+        int thickness = WrightsClientConfig.SHAPE_THICKNESS.get();
         boolean hollow = WrightsClientConfig.SHAPE_HOLLOW.get() && WrightsConfig.allowShapeHollow();
         int plane = WrightsClientConfig.SHAPE_PLANE.get();
         int yaw = com.wrights.blueprint.Shapes.clampYaw(WrightsClientConfig.SHAPE_YAW.get());

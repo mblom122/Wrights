@@ -281,8 +281,8 @@ public final class WrightsClientConfig {
             .comment("When true, Exchange breaks replaced blocks with silk touch and returns the drops.")
             .define("exchangeSilk", false);
     public static final ModConfigSpec.IntValue EXCHANGE_FORM = BUILDER
-            .comment("Exchange preset: 0 floor, 1 wall, 2 column, 3 circle, 4 rectangle, 5 square.")
-            .defineInRange("exchangeForm", 0, 0, 5);
+            .comment("Exchange preset: 0 floor, 1 wall, 2 pillar, 3 beam, 4 circle, 5 rectangle, 6 square.")
+            .defineInRange("exchangeForm", 0, 0, 6);
 
     static final ModConfigSpec SPEC = BUILDER.build();
 
@@ -1047,7 +1047,7 @@ public final class WrightsClientConfig {
 
     /**
      * Pick an Exchange preset and snap Kind / Axis / light defaults so Wall is vertical,
-     * Floor is flat, Column stands upright — no Orientation panel needed.
+     * Floor is flat, Pillar stands upright, Beam runs horizontal — no Orientation panel needed.
      */
     public static void applyExchangeForm(int formId, net.minecraft.world.entity.player.Player player) {
         com.wrights.blueprint.Shapes.ExchangeForm form = com.wrights.blueprint.Shapes.ExchangeForm.byId(formId);
@@ -1055,6 +1055,9 @@ public final class WrightsClientConfig {
         setShapeKind(form.kind().ordinal());
         setShapeYaw(0);
         setShapeHollow(false);
+        net.minecraft.core.Direction facing = player == null
+                ? net.minecraft.core.Direction.NORTH
+                : player.getDirection();
         switch (form) {
             case FLOOR -> {
                 setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
@@ -1063,9 +1066,6 @@ public final class WrightsClientConfig {
                 }
             }
             case WALL -> {
-                net.minecraft.core.Direction facing = player == null
-                        ? net.minecraft.core.Direction.NORTH
-                        : player.getDirection();
                 // Wall faces the player: plate stands in the plane across their look.
                 setShapePlane(facing.getAxis() == net.minecraft.core.Direction.Axis.X
                         ? com.wrights.blueprint.Shapes.AXIS_X
@@ -1074,12 +1074,25 @@ public final class WrightsClientConfig {
                     setShapeHeight(3);
                 }
             }
-            case COLUMN -> {
+            case PILLAR -> {
                 setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
                 setShapeSize(1);
                 setShapeThickness(1);
                 if (SHAPE_HEIGHT.get() < 3) {
                     setShapeHeight(5);
+                }
+            }
+            case BEAM -> {
+                // Horizontal 1-thick line across the player's look (perpendicular to facing).
+                setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
+                setShapeHeight(1);
+                int length = Math.max(3, Math.max(SHAPE_SIZE.get(), SHAPE_THICKNESS.get()));
+                if (facing.getAxis() == net.minecraft.core.Direction.Axis.X) {
+                    setShapeSize(1);
+                    setShapeThickness(length);
+                } else {
+                    setShapeSize(length);
+                    setShapeThickness(1);
                 }
             }
             case CIRCLE, SQUARE -> setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
@@ -1092,16 +1105,66 @@ public final class WrightsClientConfig {
         }
     }
 
-    /** Column is always a 1×1 footprint; keep Size/Depth locked when that form is active. */
-    public static void enforceExchangeColumnFootprint() {
-        if (exchangeForm() != com.wrights.blueprint.Shapes.ExchangeForm.COLUMN) {
+    /** Pillar stays 1×1; Beam stays 1 tall and 1 thick on the short axis. */
+    public static void enforceExchangeLineFootprint() {
+        com.wrights.blueprint.Shapes.ExchangeForm form = exchangeForm();
+        if (form == com.wrights.blueprint.Shapes.ExchangeForm.PILLAR) {
+            if (SHAPE_SIZE.get() != 1) {
+                setShapeSize(1);
+            }
+            if (SHAPE_THICKNESS.get() != 1) {
+                setShapeThickness(1);
+            }
             return;
         }
-        if (SHAPE_SIZE.get() != 1) {
-            setShapeSize(1);
+        if (form == com.wrights.blueprint.Shapes.ExchangeForm.BEAM) {
+            if (SHAPE_HEIGHT.get() != 1) {
+                setShapeHeight(1);
+            }
+            // Keep the short horizontal axis at 1; length lives on the other.
+            if (SHAPE_SIZE.get() == 1) {
+                if (SHAPE_THICKNESS.get() < 1) {
+                    setShapeThickness(1);
+                }
+            } else if (SHAPE_THICKNESS.get() == 1) {
+                if (SHAPE_SIZE.get() < 1) {
+                    setShapeSize(1);
+                }
+            } else {
+                // Recover a valid beam if both axes grew: keep the longer as length.
+                if (SHAPE_SIZE.get() >= SHAPE_THICKNESS.get()) {
+                    setShapeThickness(1);
+                } else {
+                    setShapeSize(1);
+                }
+            }
         }
-        if (SHAPE_THICKNESS.get() != 1) {
-            setShapeThickness(1);
+    }
+
+    /** Length of the active Exchange line form (pillar height or beam run). */
+    public static int exchangeLineLength() {
+        return switch (exchangeForm()) {
+            case PILLAR -> SHAPE_HEIGHT.get();
+            case BEAM -> Math.max(SHAPE_SIZE.get(), SHAPE_THICKNESS.get());
+            default -> SHAPE_SIZE.get();
+        };
+    }
+
+    public static void setExchangeLineLength(int length) {
+        int value = com.wrights.blueprint.Shapes.clampSize(length);
+        switch (exchangeForm()) {
+            case PILLAR -> setShapeHeight(value);
+            case BEAM -> {
+                if (SHAPE_SIZE.get() >= SHAPE_THICKNESS.get()) {
+                    setShapeSize(value);
+                    setShapeThickness(1);
+                } else {
+                    setShapeThickness(value);
+                    setShapeSize(1);
+                }
+                setShapeHeight(1);
+            }
+            default -> setShapeSize(value);
         }
     }
 

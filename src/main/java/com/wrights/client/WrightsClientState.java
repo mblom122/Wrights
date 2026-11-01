@@ -1788,6 +1788,7 @@ public final class WrightsClientState {
                 face = aim.getDirection();
             }
         }
+        WrightsClientConfig.enforceExchangeLineFootprint();
         pendingShape = new BlueprintPayloads.ShapePlace(
                 pos == null ? BlockPos.ZERO : pos,
                 face == null ? 0 : face.get3DDataValue(),
@@ -1795,13 +1796,9 @@ public final class WrightsClientState {
                 anchorSet,
                 anchorSet ? WrightsClientConfig.shapeAnchor() : BlockPos.ZERO,
                 WrightsClientConfig.exchangeForm().kind().ordinal(),
-                WrightsClientConfig.exchangeForm() == com.wrights.blueprint.Shapes.ExchangeForm.COLUMN
-                        ? 1
-                        : WrightsClientConfig.SHAPE_SIZE.get(),
+                WrightsClientConfig.SHAPE_SIZE.get(),
                 WrightsClientConfig.SHAPE_HEIGHT.get(),
-                WrightsClientConfig.exchangeForm() == com.wrights.blueprint.Shapes.ExchangeForm.COLUMN
-                        ? 1
-                        : WrightsClientConfig.SHAPE_THICKNESS.get(),
+                WrightsClientConfig.SHAPE_THICKNESS.get(),
                 WrightsClientConfig.SHAPE_PLANE.get(),
                 WrightsClientConfig.SHAPE_YAW.get(),
                 WrightsClientConfig.exchangePivot(),
@@ -2094,7 +2091,7 @@ public final class WrightsClientState {
     public static void selectExchangeTool() {
         selectBuildTool(false);
         exchangeAim = true;
-        // Re-apply the saved Exchange preset so Kind/Axis match Floor/Wall/Column.
+        // Re-apply the saved Exchange preset so Kind/Axis match Floor/Wall/Pillar/Beam.
         WrightsClientConfig.applyExchangeForm(WrightsClientConfig.EXCHANGE_FORM.get(), Minecraft.getInstance().player);
         // Default Void on so look-aim swaps solids instead of skipping every occupied cell.
         if (WrightsConfig.allowShapeVoid() && !WrightsClientConfig.SHAPE_VOID.get()) {
