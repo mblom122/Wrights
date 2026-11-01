@@ -1149,7 +1149,7 @@
   "message.wrights.shape_nowhere": "Nowhere left to place that shape",
   "message.wrights.shape_missing": "Not enough blocks for that shape",
   "message.wrights.shape_too_big": "That shape is too large",
-  "message.wrights.shape_too_many": "That shape is over %s cells (maxShapeCells). Use Hollow, shrink it, or raise maxShapeCells in wrights-server.toml (large values need more RAM).",
+  "message.wrights.shape_too_many": "That shape’s box is over %s blocks (maxBlocks). Shrink size/height or raise maxBlocks in wrights-server.toml.",
   "message.wrights.shape_failed": "Could not start the shape job",
   "message.wrights.shape_started": "Wrights will build %s blocks",
   "message.wrights.shape_far": "The shape anchor is too far away",

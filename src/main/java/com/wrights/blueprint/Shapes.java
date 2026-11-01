@@ -837,4 +837,270 @@ public final class Shapes {
     public static BlockPos lookCenter(BlockPos clicked, Direction face) {
         return lookCorner(clicked, face);
     }
+
+    /**
+     * World-space AABB after pinning {@code worldTarget} to the chosen pivot.
+     * No cell list — RFTools-style streaming uses this + {@link #containsWorld}.
+     */
+    public static Bounds pinnedBounds(
+            Kind kind,
+            BlockPos worldTarget,
+            int size,
+            int height,
+            int thickness,
+            boolean hollow,
+            int axis,
+            int rotation,
+            int pivot) {
+        Bounds local = bounds(kind, BlockPos.ZERO, size, height, thickness, hollow, axis, rotation);
+        BlockPos pin = pivotBlock(local.min(), local.max(), pivot);
+        int dx = worldTarget == null ? 0 : worldTarget.getX() - pin.getX();
+        int dy = worldTarget == null ? 0 : worldTarget.getY() - pin.getY();
+        int dz = worldTarget == null ? 0 : worldTarget.getZ() - pin.getZ();
+        return new Bounds(local.min().offset(dx, dy, dz), local.max().offset(dx, dy, dz));
+    }
+
+    /**
+     * Formula center in world space after the same pin used by {@link #blocksPinned}.
+     * Generators run at this center before axis/yaw (applied in membership via inverse orient).
+     */
+    public static BlockPos pinnedCenter(
+            Kind kind,
+            BlockPos worldTarget,
+            int size,
+            int height,
+            int thickness,
+            boolean hollow,
+            int axis,
+            int rotation,
+            int pivot) {
+        Bounds local = bounds(kind, BlockPos.ZERO, size, height, thickness, hollow, axis, rotation);
+        BlockPos pin = pivotBlock(local.min(), local.max(), pivot);
+        int dx = worldTarget == null ? 0 : worldTarget.getX() - pin.getX();
+        int dy = worldTarget == null ? 0 : worldTarget.getY() - pin.getY();
+        int dz = worldTarget == null ? 0 : worldTarget.getZ() - pin.getZ();
+        return new BlockPos(dx, dy, dz);
+    }
+
+    /** True when {@code world} is a cell of the pinned shape (no allocation). */
+    public static boolean containsWorld(
+            Kind kind,
+            BlockPos world,
+            BlockPos center,
+            int size,
+            int height,
+            int thickness,
+            boolean hollow,
+            int axis,
+            int rotation) {
+        if (kind == null || world == null || center == null) {
+            return false;
+        }
+        int wx = world.getX() - center.getX();
+        int wy = world.getY() - center.getY();
+        int wz = world.getZ() - center.getZ();
+        int yaw = clampYaw(rotation);
+        // Inverse of yaw (wx,wz) -> (wz, -wx).
+        for (int t = 0; t < yaw; t++) {
+            int nextX = -wz;
+            int nextZ = wx;
+            wx = nextX;
+            wz = nextZ;
+        }
+        int lx;
+        int ly;
+        int lz;
+        switch (clampPlane(axis)) {
+            case AXIS_Z -> { // forward (x,y,z)->(x,z,y)
+                lx = wx;
+                ly = wz;
+                lz = wy;
+            }
+            case AXIS_X -> { // forward (x,y,z)->(y,x,z)
+                lx = wy;
+                ly = wx;
+                lz = wz;
+            }
+            default -> {
+                lx = wx;
+                ly = wy;
+                lz = wz;
+            }
+        }
+        return containsLocal(kind, lx, ly, lz, size, height, thickness, hollow);
+    }
+
+    /** Membership in local Y-up space (same space as the private generators, before orient). */
+    static boolean containsLocal(Kind kind, int x, int y, int z, int size, int height, int thickness, boolean hollow) {
+        int r = clampSize(size);
+        int h = Math.max(1, clampHeight(height));
+        int band = Math.max(1, clampHeight(thickness));
+        return switch (kind) {
+            case CIRCLE -> inDiskDiameter(x, y, z, r, hollow);
+            case RING -> inRing(x, y, z, r, band, h, hollow);
+            case SQUARE -> inBox(x, y, z, r, Math.max(1, h), 1, hollow);
+            case BOX -> inBox(x, y, z, r, band, Math.max(1, h), hollow);
+            case SPHERE -> inSphere(x, y, z, r, hollow);
+            case CUBE -> inBox(x, y, z, r, r, r, hollow);
+            case CYLINDER -> inCylinder(x, y, z, r, h, hollow);
+            case DOME -> inDome(x, y, z, r, h, hollow);
+            case PYRAMID -> inPyramid(x, y, z, r, h, hollow);
+            case RECTANGLE -> inBox(x, y, z, r, r, 1, hollow);
+        };
+    }
+
+    private static boolean inDiskDiameter(int x, int y, int z, int diameter, boolean hollow) {
+        if (y != 0) {
+            return false;
+        }
+        int d = Math.max(1, diameter);
+        int a0 = -(d - 1) / 2;
+        int ia = x - a0;
+        int ib = z - a0;
+        if (ia < 0 || ia >= d || ib < 0 || ib >= d) {
+            return false;
+        }
+        double mid = (d - 1) * 0.5D;
+        double maxR2 = (d * 0.5D) * (d * 0.5D);
+        double dist2 = (ia - mid) * (ia - mid) + (ib - mid) * (ib - mid);
+        if (dist2 > maxR2 + 1.0E-6D) {
+            return false;
+        }
+        if (hollow && d > 2) {
+            double innerR2 = ((d - 2) * 0.5D) * ((d - 2) * 0.5D);
+            return !(dist2 < innerR2 - 1.0E-6D);
+        }
+        return true;
+    }
+
+    private static boolean inRing(int x, int y, int z, int radius, int thickness, int height, boolean hollow) {
+        int band = Mth.clamp(thickness, 1, radius);
+        int tall = Math.max(1, height);
+        if (tall <= 1) {
+            if (y != 0) {
+                return false;
+            }
+            int inner = Math.max(0, radius - band);
+            int d2 = x * x + z * z;
+            return d2 <= radius * radius && d2 >= inner * inner;
+        }
+        double rx = band * 0.5D;
+        double ry = tall * 0.5D;
+        double major = Math.max(rx, radius - rx);
+        int alongMax = (tall - 1) / 2;
+        int alongMin = -(tall / 2);
+        if (y < alongMin || y > alongMax) {
+            return false;
+        }
+        if (x < -radius || x > radius || z < -radius || z > radius) {
+            return false;
+        }
+        double dist = Math.sqrt((double) x * x + (double) z * z);
+        double da = dist - major;
+        double nx = da / rx;
+        double ny = y / ry;
+        double q = nx * nx + ny * ny;
+        if (q > 1.0D) {
+            return false;
+        }
+        if (hollow) {
+            double shell = Math.max(0.35D, 1.0D / Math.max(rx, ry));
+            return !(q < (1.0D - shell) * (1.0D - shell));
+        }
+        return true;
+    }
+
+    private static boolean inSphere(int x, int y, int z, int radius, boolean hollow) {
+        int d2 = x * x + y * y + z * z;
+        if (d2 > radius * radius) {
+            return false;
+        }
+        if (hollow) {
+            int inner = Math.max(0, radius - 1);
+            return d2 >= inner * inner;
+        }
+        return true;
+    }
+
+    private static boolean inBox(int x, int y, int z, int width, int depth, int height, boolean hollow) {
+        int w = Math.max(1, width);
+        int d = Math.max(1, depth);
+        int h = Math.max(1, height);
+        int x0 = -(w - 1) / 2;
+        int x1 = x0 + w - 1;
+        int z0 = -(d - 1) / 2;
+        int z1 = z0 + d - 1;
+        int top = h - 1;
+        if (x < x0 || x > x1 || y < 0 || y > top || z < z0 || z > z1) {
+            return false;
+        }
+        if (!hollow) {
+            return true;
+        }
+        return x == x0 || x == x1 || z == z0 || z == z1 || y == 0 || y == top;
+    }
+
+    private static boolean inCylinder(int x, int y, int z, int radius, int height, boolean hollow) {
+        int top = Math.max(0, height - 1);
+        if (y < 0 || y > top) {
+            return false;
+        }
+        int d2 = x * x + z * z;
+        if (d2 > radius * radius) {
+            return false;
+        }
+        if (!hollow) {
+            return true;
+        }
+        int inner = Math.max(0, radius - 1);
+        boolean shell = d2 >= inner * inner;
+        boolean cap = y == 0 || y == top;
+        if (shell) {
+            return true;
+        }
+        // Hollow keeps the rim on caps, not a filled lid.
+        return false;
+    }
+
+    private static boolean inDome(int x, int y, int z, int radius, int height, boolean hollow) {
+        int tall = Math.max(1, height);
+        if (y < 0 || y > tall) {
+            return false;
+        }
+        long rr = (long) radius * radius;
+        long hh = (long) tall * tall;
+        long ellipse = rr * hh;
+        long d = (long) x * x * hh + (long) z * z * hh + (long) y * y * rr;
+        if (d > ellipse) {
+            return false;
+        }
+        if (!hollow) {
+            return true;
+        }
+        int innerR = Math.max(0, radius - 1);
+        int innerH = Math.max(0, tall - 1);
+        if (innerR <= 0 || innerH <= 0) {
+            return true;
+        }
+        long innerLimit = (long) innerR * innerR * innerH * innerH;
+        long inner = (long) x * x * (long) innerH * innerH
+                + (long) z * z * (long) innerH * innerH
+                + (long) y * y * (long) innerR * innerR;
+        return inner >= innerLimit;
+    }
+
+    private static boolean inPyramid(int x, int y, int z, int radius, int height, boolean hollow) {
+        int top = Math.max(1, height);
+        if (y < 0 || y >= top) {
+            return false;
+        }
+        int layer = Math.max(0, radius - (radius * y) / top);
+        if (x < -layer || x > layer || z < -layer || z > layer) {
+            return false;
+        }
+        if (!hollow) {
+            return true;
+        }
+        return Math.abs(x) == layer || Math.abs(z) == layer || y == 0 || y == top - 1;
+    }
 }

@@ -27,7 +27,9 @@ import com.wrights.schematic.Schematic;
 public final class BuildJob {
     public enum Kind {
         COPY,
-        PASTE
+        PASTE,
+        /** RFTools-style: walk the AABB and test membership; never materialize every BlockPos. */
+        SHAPE
     }
 
     public enum Phase {
@@ -121,6 +123,15 @@ public final class BuildJob {
         return job;
     }
 
+    public static BuildJob shape(UUID owner, UUID controllerId, ResourceKey<Level> dimension, BlockPos min, BlockPos max) {
+        int width = Math.max(1, max.getX() - min.getX() + 1);
+        int height = Math.max(1, max.getY() - min.getY() + 1);
+        int depth = Math.max(1, max.getZ() - min.getZ() + 1);
+        long volume = (long) width * (long) height * (long) depth;
+        int total = volume > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) volume;
+        return new BuildJob(UUID.randomUUID(), owner, controllerId, Kind.SHAPE, dimension, min, max, total);
+    }
+
     public UUID id() {
         return id;
     }
@@ -200,6 +211,10 @@ public final class BuildJob {
     public int progressDone() {
         if (undoing) {
             return Math.max(0, undoTotal() - refundCount());
+        }
+        // Shape jobs scan an AABB; cursor is the real progress (most cells are not shape members).
+        if (kind == Kind.SHAPE) {
+            return Math.min(Math.max(0, cursor), Math.max(1, total));
         }
         int total = Math.max(1, this.total);
         long sum = (long) placed + (long) skipped;
@@ -583,21 +598,21 @@ public final class BuildJob {
     }
 
     public int boxSizeX() {
-        if (kind == Kind.COPY) {
+        if (kind == Kind.COPY || kind == Kind.SHAPE) {
             return Math.max(1, max.getX() - min.getX() + 1);
         }
         return clipX == Integer.MAX_VALUE ? 1 : clipX;
     }
 
     public int boxSizeY() {
-        if (kind == Kind.COPY) {
+        if (kind == Kind.COPY || kind == Kind.SHAPE) {
             return Math.max(1, max.getY() - min.getY() + 1);
         }
         return clipY == Integer.MAX_VALUE ? 1 : clipY;
     }
 
     public int boxSizeZ() {
-        if (kind == Kind.COPY) {
+        if (kind == Kind.COPY || kind == Kind.SHAPE) {
             return Math.max(1, max.getZ() - min.getZ() + 1);
         }
         return clipZ == Integer.MAX_VALUE ? 1 : clipZ;
@@ -754,7 +769,113 @@ public final class BuildJob {
     }
 
     public boolean canUndo() {
-        return finished && kind == Kind.PASTE && !refunds.isEmpty();
+        return finished && (kind == Kind.PASTE || kind == Kind.SHAPE) && !refunds.isEmpty();
+    }
+
+    // --- Shape stream (RFTools-style; no full cell list) ---
+    private int shapeKind;
+    private int shapeSize = 1;
+    private int shapeHeight = 1;
+    private int shapeThickness = 1;
+    private int shapeAxis;
+    private int shapeYaw;
+    private int shapePivot;
+    private boolean shapeHollow;
+    private BlockPos shapeCenter = BlockPos.ZERO;
+    private String shapeMaterials = "";
+    private int shapeFillMode;
+    private int shapeOrderBatch = 1;
+    private long shapeSeed;
+    private int shapeOrderIndex;
+
+    public void setShapeStream(
+            int kind,
+            int size,
+            int height,
+            int thickness,
+            int axis,
+            int yaw,
+            int pivot,
+            boolean hollow,
+            BlockPos center,
+            String materials,
+            int fillMode,
+            int orderBatch,
+            long seed) {
+        this.shapeKind = kind;
+        this.shapeSize = Math.max(1, size);
+        this.shapeHeight = Math.max(1, height);
+        this.shapeThickness = Math.max(1, thickness);
+        this.shapeAxis = axis;
+        this.shapeYaw = yaw;
+        this.shapePivot = pivot;
+        this.shapeHollow = hollow;
+        this.shapeCenter = center == null ? BlockPos.ZERO : center.immutable();
+        this.shapeMaterials = materials == null ? "" : materials;
+        this.shapeFillMode = fillMode;
+        this.shapeOrderBatch = Math.max(1, orderBatch);
+        this.shapeSeed = seed;
+        this.shapeOrderIndex = 0;
+    }
+
+    public int shapeKind() {
+        return shapeKind;
+    }
+
+    public int shapeSize() {
+        return shapeSize;
+    }
+
+    public int shapeHeight() {
+        return shapeHeight;
+    }
+
+    public int shapeThickness() {
+        return shapeThickness;
+    }
+
+    public int shapeAxis() {
+        return shapeAxis;
+    }
+
+    public int shapeYaw() {
+        return shapeYaw;
+    }
+
+    public int shapePivot() {
+        return shapePivot;
+    }
+
+    public boolean shapeHollow() {
+        return shapeHollow;
+    }
+
+    public BlockPos shapeCenter() {
+        return shapeCenter;
+    }
+
+    public String shapeMaterials() {
+        return shapeMaterials;
+    }
+
+    public int shapeFillMode() {
+        return shapeFillMode;
+    }
+
+    public int shapeOrderBatch() {
+        return shapeOrderBatch;
+    }
+
+    public long shapeSeed() {
+        return shapeSeed;
+    }
+
+    public int shapeOrderIndex() {
+        return shapeOrderIndex;
+    }
+
+    public void shapeOrderAdvance() {
+        shapeOrderIndex++;
     }
 
     public void recordPlaced(short x, short y, short z, BlockState state, boolean paid) {
@@ -1010,6 +1131,22 @@ public final class BuildJob {
                 tag.put("mineTool", mineTool.save(registries));
             }
         }
+        if (kind == Kind.SHAPE) {
+            tag.putInt("shapeKind", shapeKind);
+            tag.putInt("shapeSize", shapeSize);
+            tag.putInt("shapeHeight", shapeHeight);
+            tag.putInt("shapeThickness", shapeThickness);
+            tag.putInt("shapeAxis", shapeAxis);
+            tag.putInt("shapeYaw", shapeYaw);
+            tag.putInt("shapePivot", shapePivot);
+            tag.putBoolean("shapeHollow", shapeHollow);
+            tag.put("shapeCenter", NbtUtils.writeBlockPos(shapeCenter));
+            tag.putString("shapeMaterials", shapeMaterials == null ? "" : shapeMaterials);
+            tag.putInt("shapeFillMode", shapeFillMode);
+            tag.putInt("shapeOrderBatch", shapeOrderBatch);
+            tag.putLong("shapeSeed", shapeSeed);
+            tag.putInt("shapeOrderIndex", shapeOrderIndex);
+        }
         tag.putBoolean("copyFluids", copyFluids);
         tag.putBoolean("copyNbtBlocks", copyNbtBlocks);
         tag.putBoolean("copyNbtSettings", copyNbtSettings);
@@ -1174,6 +1311,22 @@ public final class BuildJob {
         job.mineVoid = tag.getBoolean("mineVoid");
         if (registries != null && tag.contains("mineTool")) {
             job.mineTool = ItemStack.parseOptional(registries, tag.getCompound("mineTool"));
+        }
+        if (job.kind == Kind.SHAPE || tag.contains("shapeKind")) {
+            job.shapeKind = tag.getInt("shapeKind");
+            job.shapeSize = Math.max(1, tag.getInt("shapeSize"));
+            job.shapeHeight = Math.max(1, tag.getInt("shapeHeight"));
+            job.shapeThickness = Math.max(1, tag.contains("shapeThickness") ? tag.getInt("shapeThickness") : 1);
+            job.shapeAxis = tag.getInt("shapeAxis");
+            job.shapeYaw = tag.getInt("shapeYaw");
+            job.shapePivot = tag.getInt("shapePivot");
+            job.shapeHollow = tag.getBoolean("shapeHollow");
+            job.shapeCenter = NbtUtils.readBlockPos(tag, "shapeCenter").orElse(BlockPos.ZERO);
+            job.shapeMaterials = tag.getString("shapeMaterials");
+            job.shapeFillMode = tag.getInt("shapeFillMode");
+            job.shapeOrderBatch = Math.max(1, tag.contains("shapeOrderBatch") ? tag.getInt("shapeOrderBatch") : 1);
+            job.shapeSeed = tag.getLong("shapeSeed");
+            job.shapeOrderIndex = Math.max(0, tag.getInt("shapeOrderIndex"));
         }
         job.copyFluids = tag.getBoolean("copyFluids");
         job.copyNbtBlocks = tag.getBoolean("copyNbtBlocks");
