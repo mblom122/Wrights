@@ -78,10 +78,18 @@ final class ShapeMenuPanel {
         y += 14;
         y = drawKinds(graphics, mouseX, mouseY, x, y, width);
         y += 4;
+        // Square was folded into Box (Cube) with height 1 — migrate old configs once.
+        if (WrightsClientConfig.SHAPE_KIND.get() == Shapes.Kind.SQUARE.ordinal()) {
+            WrightsClientConfig.setShapeKind(Shapes.Kind.CUBE.ordinal());
+            WrightsClientConfig.setShapeHeight(1);
+        }
         Shapes.Kind kind = Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
         boolean volume = kind.volume();
         boolean ring = kind == Shapes.Kind.RING;
-        drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_size", "menu.wrights.shape_size_hint");
+        boolean box = kind == Shapes.Kind.CUBE;
+        drawSection(graphics, mouseX, mouseY, x, y,
+                box ? "menu.wrights.shape_width" : "menu.wrights.shape_size",
+                box ? "menu.wrights.shape_width_hint" : "menu.wrights.shape_size_hint");
         y += 12;
         sizeY = y;
         sizeW = Math.max(40, width - 40);
@@ -103,9 +111,10 @@ final class ShapeMenuPanel {
             y += 18;
         }
         if (kind.usesHeight()) {
-            drawSection(graphics, mouseX, mouseY, x, y,
-                    "menu.wrights.shape_height",
-                    ring ? "menu.wrights.shape_ring_height_hint" : "menu.wrights.shape_height_hint");
+            String heightHint = ring ? "menu.wrights.shape_ring_height_hint"
+                    : box ? "menu.wrights.shape_box_height_hint"
+                    : "menu.wrights.shape_height_hint";
+            drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_height", heightHint);
             y += 12;
             heightY = y;
             int height = WrightsClientConfig.SHAPE_HEIGHT.get();
@@ -113,7 +122,9 @@ final class ShapeMenuPanel {
             graphics.drawString(font, Integer.toString(height), x + sizeW + 8, y, WrightsUi.TEXT, false);
             y += 18;
         }
-        if (!volume) {
+        // Flat shapes, and Box at height 1 (the old Square), can tip onto a wall plane.
+        boolean showPlane = !volume || (box && WrightsClientConfig.SHAPE_HEIGHT.get() <= 1);
+        if (showPlane) {
             drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_plane", "menu.wrights.shape_plane_hint");
             y += 12;
             y = drawTriple(graphics, mouseX, mouseY, x, y, width,
@@ -467,19 +478,29 @@ final class ShapeMenuPanel {
         previewW = Math.max(40, width - previewGap - gridW);
         int cardW = Math.max(36, (gridW - gap * (cols - 1)) / cols);
         int kind = WrightsClientConfig.SHAPE_KIND.get();
-        Shapes.Kind[] all = Shapes.Kind.values();
-        for (int i = 0; i < all.length; i++) {
+        if (kind == Shapes.Kind.SQUARE.ordinal()) {
+            kind = Shapes.Kind.CUBE.ordinal();
+        }
+        java.util.List<Shapes.Kind> shown = new java.util.ArrayList<>();
+        for (Shapes.Kind entry : Shapes.Kind.values()) {
+            if (entry.selectable()) {
+                shown.add(entry);
+            }
+        }
+        rows = Math.max(1, (shown.size() + cols - 1) / cols);
+        for (int i = 0; i < shown.size(); i++) {
+            Shapes.Kind entry = shown.get(i);
             int col = i % cols;
             int row = i / cols;
             int cx = x + col * (cardW + gap);
             int cy = y + row * rowH;
             int cw = col == cols - 1 ? x + gridW - cx : cardW;
-            boolean on = kind == i;
+            boolean on = kind == entry.ordinal();
             boolean hover = mouseX >= cx && mouseX < cx + cw && mouseY >= cy && mouseY < cy + 22;
             WrightsUi.choice(graphics, cx, cy, cw, 22, on, hover);
-            String label = font.plainSubstrByWidth(Component.translatable("menu.wrights.shape_kind_" + all[i].name().toLowerCase()).getString(), Math.max(8, cw - 10));
+            String label = font.plainSubstrByWidth(Component.translatable("menu.wrights.shape_kind_" + entry.name().toLowerCase()).getString(), Math.max(8, cw - 10));
             graphics.drawString(font, label, cx + 5, cy + 7, on ? WrightsUi.TEXT : WrightsUi.MUTED, false);
-            hits.add(new Hit(cx, cy, cw, 22, "kind", i));
+            hits.add(new Hit(cx, cy, cw, 22, "kind", entry.ordinal()));
         }
         int gridH = rows * rowH;
         int previewX = x + gridW + previewGap;

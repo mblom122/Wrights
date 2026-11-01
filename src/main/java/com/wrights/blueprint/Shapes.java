@@ -16,10 +16,11 @@ public final class Shapes {
     public enum Kind {
         CIRCLE(false, false),
         RING(false, true),
+        /** Legacy flat square — kept for saved configs; use {@link #CUBE} with height 1. */
         SQUARE(false, false),
         LINE(false, false),
         SPHERE(true, false),
-        CUBE(true, false),
+        CUBE(true, true),
         CYLINDER(true, true),
         DOME(true, true),
         PYRAMID(true, true);
@@ -36,9 +37,14 @@ public final class Shapes {
             return volume;
         }
 
-        /** True when the Height slider changes this shape (cylinder, pyramid, ring/torus). */
+        /** True when the Height slider changes this shape. */
         public boolean usesHeight() {
             return usesHeight;
+        }
+
+        /** False for legacy kinds hidden from the picker (Square is Box with height 1). */
+        public boolean selectable() {
+            return this != SQUARE;
         }
 
         public static Kind byId(int id) {
@@ -88,7 +94,7 @@ public final class Shapes {
     }
 
     /**
-     * @param height cylinder / pyramid / dome height; for rings, tube diameter of the torus (1 = flat)
+     * @param height box / cylinder / pyramid / dome height (box height 1 = flat square); for rings, tube diameter (1 = flat)
      * @param thickness ring / torus tube width in the ring plane; ignored by other kinds
      * @param yaw quarter-turns around Y through {@code center} (0–3)
      */
@@ -107,7 +113,14 @@ public final class Shapes {
             case SQUARE -> square(out, center, r, hollow, flat);
             case LINE -> line(out, center, r, flat);
             case SPHERE -> sphere(out, center, r, hollow);
-            case CUBE -> cube(out, center, r, hollow);
+            case CUBE -> {
+                // Height 1 is the old Square (plane chooses floor/wall). Taller is a rectangular box.
+                if (h <= 1) {
+                    square(out, center, r, hollow, flat);
+                } else {
+                    box(out, center, r, h, hollow);
+                }
+            }
             case CYLINDER -> cylinder(out, center, r, h, hollow);
             case DOME -> dome(out, center, r, h, hollow);
             case PYRAMID -> pyramid(out, center, r, h, hollow);
@@ -302,12 +315,14 @@ public final class Shapes {
         }
     }
 
-    private static void cube(List<BlockPos> out, BlockPos center, int radius, boolean hollow) {
+    /** Rectangular box: Size is half-width on X/Z, Height grows upward from the base. */
+    private static void box(List<BlockPos> out, BlockPos center, int radius, int height, boolean hollow) {
+        int top = Math.max(0, height - 1);
         for (int x = -radius; x <= radius; x++) {
-            for (int y = -radius; y <= radius; y++) {
+            for (int y = 0; y <= top; y++) {
                 for (int z = -radius; z <= radius; z++) {
-                    boolean edge = Math.abs(x) == radius || Math.abs(y) == radius || Math.abs(z) == radius;
-                    if (hollow && !edge) {
+                    boolean shell = Math.abs(x) == radius || Math.abs(z) == radius || y == 0 || y == top;
+                    if (hollow && !shell) {
                         continue;
                     }
                     out.add(center.offset(x, y, z));
