@@ -1058,7 +1058,7 @@ public final class WrightsClientConfig {
     }
 
     /**
-     * Encodes the looked-at (or pin) block as the exchange from-filter when Same as look is on.
+     * Encodes the looked-at (or pin) block as the exchange from-filter when Match look is on.
      * Empty string means any exchangeable solid.
      */
     public static String exchangeFromFilter(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pin) {
