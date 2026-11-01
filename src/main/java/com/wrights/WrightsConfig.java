@@ -41,9 +41,10 @@ public final class WrightsConfig {
 
     public static final ModConfigSpec.IntValue MAX_SHAPE_AXIS = BUILDER
             .comment(
-                    "Largest size, height, or thickness a Shape may use, in blocks.",
-                    "Separate from maxAxis (blueprints). Kept at or below maxAxis. Raising this can lag the server.")
-            .defineInRange("maxShapeAxis", 64, 1, 512);
+                    "Largest size, height, or thickness a Shape may use, in blocks (512 matches RFTools Builder).",
+                    "Separate from maxAxis (blueprints). Kept at or below maxAxis.",
+                    "Huge solid shapes are still capped by maxBlocks — preview uses a wire box when the cell list would be too large.")
+            .defineInRange("maxShapeAxis", 512, 1, 512);
 
     public static final ModConfigSpec.IntValue MAX_BLOCKS = BUILDER
             .comment(
@@ -395,9 +396,17 @@ public final class WrightsConfig {
      * Cap for shape size / height / thickness. Never above {@link #MAX_AXIS}.
      */
     public static int maxShapeAxis() {
-        int shape = Math.max(1, read(MAX_SHAPE_AXIS, 64));
+        int shape = Math.max(1, read(MAX_SHAPE_AXIS, 512));
         int axis = Math.max(1, read(MAX_AXIS, 512));
         return Math.min(shape, axis);
+    }
+
+    /**
+     * Soft cap for materializing shape cell lists on the client.
+     * Above this, Wrights draws the RFTools-style wire box only (no per-block ghost list).
+     */
+    public static int shapePreviewListCap() {
+        return Math.max(4_096, Math.min(65_536, previewSampleBudget() * 8));
     }
 
     public static boolean allowJobs() {

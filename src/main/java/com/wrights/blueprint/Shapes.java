@@ -17,9 +17,11 @@ public final class Shapes {
         CIRCLE(false, false),
         RING(true, true),
         SQUARE(false, false),
-        LINE(true, true),
+        /** Rectangular prism: Width × Depth × Height (full block counts). */
+        BOX(true, true),
         SPHERE(true, false),
-        CUBE(true, true),
+        /** Equal edge on all sides — only Size is used. */
+        CUBE(true, false),
         CYLINDER(true, true),
         DOME(true, true),
         PYRAMID(true, true);
@@ -78,13 +80,28 @@ public final class Shapes {
         return Math.floorMod(yaw, 4);
     }
 
+    /** Inclusive AABB for a shape centered on {@code center}, without allocating every cell. */
+    public record Bounds(BlockPos min, BlockPos max) {
+        public int sizeX() {
+            return max.getX() - min.getX() + 1;
+        }
+
+        public int sizeY() {
+            return max.getY() - min.getY() + 1;
+        }
+
+        public int sizeZ() {
+            return max.getZ() - min.getZ() + 1;
+        }
+    }
+
     /** World positions for one shape centered on {@code center}. */
     public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, boolean hollow, int axis) {
-        return blocks(kind, center, size, height, 1, hollow, axis, 0);
+        return blocks(kind, center, size, height, 1, hollow, axis, 0, Integer.MAX_VALUE);
     }
 
     public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, int thickness, boolean hollow, int axis) {
-        return blocks(kind, center, size, height, thickness, hollow, axis, 0);
+        return blocks(kind, center, size, height, thickness, hollow, axis, 0, Integer.MAX_VALUE);
     }
 
     /**
@@ -94,8 +111,26 @@ public final class Shapes {
      * @param rotation quarter-turns around world Y after axis remap (0–3), Ctrl+scroll in the world
      */
     public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, int thickness, boolean hollow, int axis, int rotation) {
-        List<BlockPos> out = new ArrayList<>();
-        if (center == null || kind == null) {
+        return blocks(kind, center, size, height, thickness, hollow, axis, rotation, Integer.MAX_VALUE);
+    }
+
+    /**
+     * Same as {@link #blocks(Kind, BlockPos, int, int, int, boolean, int, int)} but stops once
+     * {@code maxCells} positions are collected (RFTools-style: never allocate a multi-million list).
+     */
+    public static List<BlockPos> blocks(
+            Kind kind,
+            BlockPos center,
+            int size,
+            int height,
+            int thickness,
+            boolean hollow,
+            int axis,
+            int rotation,
+            int maxCells) {
+        int limit = maxCells <= 0 ? Integer.MAX_VALUE : maxCells;
+        List<BlockPos> out = new ArrayList<>(Math.min(1024, limit < Integer.MAX_VALUE ? limit : 1024));
+        if (center == null || kind == null || limit == 0) {
             return out;
         }
         int r = clampSize(size);
@@ -103,19 +138,193 @@ public final class Shapes {
         int band = clampHeight(thickness);
         // Always build Y-up / XZ cross-section, then orient with axis + rotation.
         switch (kind) {
-            case CIRCLE -> disk(out, center, r, hollow, AXIS_Y, false);
-            case RING -> ring(out, center, r, band, h, AXIS_Y, hollow);
-            case SQUARE -> square(out, center, r, hollow, AXIS_Y);
-            case LINE -> squareLine(out, center, r, band, h, hollow, AXIS_Y);
-            case SPHERE -> sphere(out, center, r, hollow);
+            case CIRCLE -> disk(out, center, r, hollow, AXIS_Y, false, limit);
+            case RING -> ring(out, center, r, band, h, AXIS_Y, hollow, limit);
+            case SQUARE -> square(out, center, r, hollow, AXIS_Y, limit);
             // Size / thickness / height are full block counts: Width × Depth × Height.
-            case CUBE -> box(out, center, r, band, Math.max(1, h), hollow);
-            case CYLINDER -> cylinder(out, center, r, h, hollow);
-            case DOME -> dome(out, center, r, h, hollow);
-            case PYRAMID -> pyramid(out, center, r, h, hollow);
+            case BOX -> box(out, center, r, band, Math.max(1, h), hollow, limit);
+            case SPHERE -> sphere(out, center, r, hollow, limit);
+            // Equal edge — Size alone sets Width = Depth = Height.
+            case CUBE -> box(out, center, r, r, r, hollow, limit);
+            case CYLINDER -> cylinder(out, center, r, h, hollow, limit);
+            case DOME -> dome(out, center, r, h, hollow, limit);
+            case PYRAMID -> pyramid(out, center, r, h, hollow, limit);
         }
         orient(out, center, clampPlane(axis), clampYaw(rotation));
         return out;
+    }
+
+    /**
+     * Upper bound on nested-loop visits for this shape (AABB volume). Used to skip materializing
+     * huge lists for preview — RFTools also avoids walking millions of cells just to draw a cue.
+     */
+    public static long scanVolume(Kind kind, int size, int height, int thickness) {
+        if (kind == null) {
+            return 0L;
+        }
+        int r = clampSize(size);
+        int h = Math.max(1, clampHeight(height));
+        int band = Math.max(1, clampHeight(thickness));
+        long diam = 2L * r + 1L;
+        return switch (kind) {
+            case CIRCLE, SQUARE -> diam * diam;
+            case RING -> {
+                int tall = Math.max(1, h);
+                long along = tall <= 1 ? 1L : (long) tall;
+                yield diam * diam * along;
+            }
+            case BOX -> (long) r * (long) band * (long) h;
+            case SPHERE -> diam * diam * diam;
+            case CUBE -> (long) r * (long) r * (long) r;
+            case CYLINDER, DOME -> diam * diam * (long) h;
+            case PYRAMID -> diam * diam * (long) h;
+        };
+    }
+
+    /** O(1) AABB for the shape at {@code center} after axis/yaw, without listing cells. */
+    public static Bounds bounds(Kind kind, BlockPos center, int size, int height, int thickness, boolean hollow, int axis, int rotation) {
+        if (center == null || kind == null) {
+            return new Bounds(BlockPos.ZERO, BlockPos.ZERO);
+        }
+        int r = clampSize(size);
+        int h = Math.max(1, clampHeight(height));
+        int band = Math.max(1, clampHeight(thickness));
+        int minX;
+        int minY;
+        int minZ;
+        int maxX;
+        int maxY;
+        int maxZ;
+        switch (kind) {
+            case CIRCLE, SQUARE -> {
+                minX = -r;
+                maxX = r;
+                minY = 0;
+                maxY = 0;
+                minZ = -r;
+                maxZ = r;
+            }
+            case RING -> {
+                minX = -r;
+                maxX = r;
+                minZ = -r;
+                maxZ = r;
+                if (h <= 1) {
+                    minY = 0;
+                    maxY = 0;
+                } else {
+                    minY = -(h / 2);
+                    maxY = (h - 1) / 2;
+                }
+            }
+            case BOX -> {
+                int x0 = -(r - 1) / 2;
+                int z0 = -(band - 1) / 2;
+                minX = x0;
+                maxX = x0 + r - 1;
+                minY = 0;
+                maxY = h - 1;
+                minZ = z0;
+                maxZ = z0 + band - 1;
+            }
+            case SPHERE -> {
+                minX = -r;
+                maxX = r;
+                minY = -r;
+                maxY = r;
+                minZ = -r;
+                maxZ = r;
+            }
+            case CUBE -> {
+                int x0 = -(r - 1) / 2;
+                minX = x0;
+                maxX = x0 + r - 1;
+                minY = 0;
+                maxY = r - 1;
+                minZ = x0;
+                maxZ = x0 + r - 1;
+            }
+            case CYLINDER, PYRAMID -> {
+                minX = -r;
+                maxX = r;
+                minY = 0;
+                maxY = h - 1;
+                minZ = -r;
+                maxZ = r;
+            }
+            case DOME -> {
+                minX = -r;
+                maxX = r;
+                minY = 0;
+                maxY = h;
+                minZ = -r;
+                maxZ = r;
+            }
+            default -> {
+                minX = maxX = minY = maxY = minZ = maxZ = 0;
+            }
+        }
+        int ax = clampPlane(axis);
+        int yaw = clampYaw(rotation);
+        int cx = center.getX();
+        int cy = center.getY();
+        int cz = center.getZ();
+        int outMinX = Integer.MAX_VALUE;
+        int outMinY = Integer.MAX_VALUE;
+        int outMinZ = Integer.MAX_VALUE;
+        int outMaxX = Integer.MIN_VALUE;
+        int outMaxY = Integer.MIN_VALUE;
+        int outMaxZ = Integer.MIN_VALUE;
+        int[] xs = {minX, maxX};
+        int[] ys = {minY, maxY};
+        int[] zs = {minZ, maxZ};
+        for (int x : xs) {
+            for (int y : ys) {
+                for (int z : zs) {
+                    int wx = x;
+                    int wy = y;
+                    int wz = z;
+                    switch (ax) {
+                        case AXIS_Z -> {
+                            wx = x;
+                            wy = z;
+                            wz = y;
+                        }
+                        case AXIS_X -> {
+                            wx = y;
+                            wy = x;
+                            wz = z;
+                        }
+                        default -> {
+                        }
+                    }
+                    for (int t = 0; t < yaw; t++) {
+                        int nextX = wz;
+                        int nextZ = -wx;
+                        wx = nextX;
+                        wz = nextZ;
+                    }
+                    int px = cx + wx;
+                    int py = cy + wy;
+                    int pz = cz + wz;
+                    outMinX = Math.min(outMinX, px);
+                    outMinY = Math.min(outMinY, py);
+                    outMinZ = Math.min(outMinZ, pz);
+                    outMaxX = Math.max(outMaxX, px);
+                    outMaxY = Math.max(outMaxY, py);
+                    outMaxZ = Math.max(outMaxZ, pz);
+                }
+            }
+        }
+        return new Bounds(new BlockPos(outMinX, outMinY, outMinZ), new BlockPos(outMaxX, outMaxY, outMaxZ));
+    }
+
+    private static boolean take(List<BlockPos> out, BlockPos pos, int limit) {
+        if (out.size() >= limit) {
+            return false;
+        }
+        out.add(pos);
+        return true;
     }
 
     /**
@@ -257,17 +466,27 @@ public final class Shapes {
             int axis,
             int rotation,
             int pivot) {
-        List<BlockPos> local = blocks(kind, BlockPos.ZERO, size, height, thickness, hollow, axis, rotation);
-        if (local.isEmpty() || worldTarget == null) {
-            return local;
-        }
-        BlockPos min = origin(local);
-        BlockPos max = extent(local);
-        BlockPos pin = pivotBlock(min, max, pivot);
-        int dx = worldTarget.getX() - pin.getX();
-        int dy = worldTarget.getY() - pin.getY();
-        int dz = worldTarget.getZ() - pin.getZ();
-        if (dx == 0 && dy == 0 && dz == 0) {
+        return blocksPinned(kind, worldTarget, size, height, thickness, hollow, axis, rotation, pivot, Integer.MAX_VALUE);
+    }
+
+    public static List<BlockPos> blocksPinned(
+            Kind kind,
+            BlockPos worldTarget,
+            int size,
+            int height,
+            int thickness,
+            boolean hollow,
+            int axis,
+            int rotation,
+            int pivot,
+            int maxCells) {
+        Bounds box = bounds(kind, BlockPos.ZERO, size, height, thickness, hollow, axis, rotation);
+        BlockPos pin = pivotBlock(box.min(), box.max(), pivot);
+        int dx = worldTarget == null ? 0 : worldTarget.getX() - pin.getX();
+        int dy = worldTarget == null ? 0 : worldTarget.getY() - pin.getY();
+        int dz = worldTarget == null ? 0 : worldTarget.getZ() - pin.getZ();
+        List<BlockPos> local = blocks(kind, BlockPos.ZERO, size, height, thickness, hollow, axis, rotation, maxCells);
+        if (local.isEmpty() || (dx == 0 && dy == 0 && dz == 0)) {
             return local;
         }
         List<BlockPos> out = new ArrayList<>(local.size());
@@ -312,7 +531,7 @@ public final class Shapes {
         return new BlockPos(minX, minY, minZ);
     }
 
-    private static void disk(List<BlockPos> out, BlockPos center, int radius, boolean hollow, int plane, boolean filledOnly) {
+    private static void disk(List<BlockPos> out, BlockPos center, int radius, boolean hollow, int plane, boolean filledOnly, int limit) {
         int r2 = radius * radius;
         int inner = hollow ? Math.max(0, radius - 1) : -1;
         int inner2 = inner * inner;
@@ -325,7 +544,9 @@ public final class Shapes {
                 if (hollow && !filledOnly && d2 < inner2) {
                     continue;
                 }
-                out.add(flat(center, a, b, plane));
+                if (!take(out, flat(center, a, b, plane), limit)) {
+                    return;
+                }
             }
         }
     }
@@ -335,7 +556,7 @@ public final class Shapes {
      * cross-section. {@code thickness} is the tube width in the ring plane; {@code height} is the
      * tube diameter along the plane normal.
      */
-    private static void ring(List<BlockPos> out, BlockPos center, int radius, int thickness, int height, int plane, boolean hollow) {
+    private static void ring(List<BlockPos> out, BlockPos center, int radius, int thickness, int height, int plane, boolean hollow, int limit) {
         int band = Mth.clamp(thickness, 1, radius);
         int tall = Math.max(1, height);
         if (tall <= 1) {
@@ -348,7 +569,9 @@ public final class Shapes {
                     if (d2 > r2 || d2 < inner2) {
                         continue;
                     }
-                    out.add(ringCell(center, a, b, 0, plane));
+                    if (!take(out, ringCell(center, a, b, 0, plane), limit)) {
+                        return;
+                    }
                 }
             }
             return;
@@ -375,7 +598,9 @@ public final class Shapes {
                     if (hollow && q < (1.0D - shell) * (1.0D - shell)) {
                         continue;
                     }
-                    out.add(ringCell(center, a, b, along, plane));
+                    if (!take(out, ringCell(center, a, b, along, plane), limit)) {
+                        return;
+                    }
                 }
             }
         }
@@ -390,62 +615,21 @@ public final class Shapes {
         };
     }
 
-    private static void square(List<BlockPos> out, BlockPos center, int radius, boolean hollow, int plane) {
+    private static void square(List<BlockPos> out, BlockPos center, int radius, boolean hollow, int plane, int limit) {
         for (int a = -radius; a <= radius; a++) {
             for (int b = -radius; b <= radius; b++) {
                 boolean edge = Math.abs(a) == radius || Math.abs(b) == radius;
                 if (hollow && !edge) {
                     continue;
                 }
-                out.add(flat(center, a, b, plane));
-            }
-        }
-    }
-
-    private static void line(List<BlockPos> out, BlockPos center, int radius, int plane) {
-        for (int i = -radius; i <= radius; i++) {
-            out.add(flat(center, i, 0, plane));
-        }
-    }
-
-    /**
-     * Rectangular beam: {@code length} is half-length along the plane’s main axis,
-     * {@code thickness} is width in the plane, {@code height} is the other cross-section size
-     * (on XZ, thickness is Z and height is Y).
-     */
-    private static void squareLine(List<BlockPos> out, BlockPos center, int length, int thickness, int height, boolean hollow, int plane) {
-        int half = Math.max(1, length);
-        int wide = Math.max(1, thickness);
-        int tall = Math.max(1, height);
-        int v0 = -(wide - 1) / 2;
-        int v1 = v0 + wide - 1;
-        int u0 = -(tall - 1) / 2;
-        int u1 = u0 + tall - 1;
-        for (int i = -half; i <= half; i++) {
-            for (int u = u0; u <= u1; u++) {
-                for (int v = v0; v <= v1; v++) {
-                    if (hollow && (wide > 2 || tall > 2)) {
-                        boolean shell = u == u0 || u == u1 || v == v0 || v == v1;
-                        if (!shell) {
-                            continue;
-                        }
-                    }
-                    out.add(beamCell(center, i, u, v, plane));
+                if (!take(out, flat(center, a, b, plane), limit)) {
+                    return;
                 }
             }
         }
     }
 
-    /** Beam along the plane’s main axis; {@code u}/{@code v} are the rectangular cross-section. */
-    private static BlockPos beamCell(BlockPos origin, int along, int u, int v, int plane) {
-        return switch (plane) {
-            case PLANE_XY -> origin.offset(along, u, v);
-            case PLANE_YZ -> origin.offset(v, along, u);
-            default -> origin.offset(along, u, v);
-        };
-    }
-
-    private static void sphere(List<BlockPos> out, BlockPos center, int radius, boolean hollow) {
+    private static void sphere(List<BlockPos> out, BlockPos center, int radius, boolean hollow, int limit) {
         int r2 = radius * radius;
         int inner = hollow ? Math.max(0, radius - 1) : -1;
         int inner2 = inner * inner;
@@ -459,7 +643,9 @@ public final class Shapes {
                     if (hollow && d2 < inner2) {
                         continue;
                     }
-                    out.add(center.offset(x, y, z));
+                    if (!take(out, center.offset(x, y, z), limit)) {
+                        return;
+                    }
                 }
             }
         }
@@ -469,7 +655,7 @@ public final class Shapes {
      * Rectangular box: {@code width}/{@code depth}/{@code height} are full block counts.
      * Centered on X/Z; grows upward on Y from the base (height 1 = flat plate).
      */
-    private static void box(List<BlockPos> out, BlockPos center, int width, int depth, int height, boolean hollow) {
+    private static void box(List<BlockPos> out, BlockPos center, int width, int depth, int height, boolean hollow, int limit) {
         int w = Math.max(1, width);
         int d = Math.max(1, depth);
         int h = Math.max(1, height);
@@ -485,13 +671,15 @@ public final class Shapes {
                     if (hollow && !shell) {
                         continue;
                     }
-                    out.add(center.offset(x, y, z));
+                    if (!take(out, center.offset(x, y, z), limit)) {
+                        return;
+                    }
                 }
             }
         }
     }
 
-    private static void cylinder(List<BlockPos> out, BlockPos center, int radius, int height, boolean hollow) {
+    private static void cylinder(List<BlockPos> out, BlockPos center, int radius, int height, boolean hollow, int limit) {
         int r2 = radius * radius;
         int inner = hollow ? Math.max(0, radius - 1) : -1;
         int inner2 = inner * inner;
@@ -512,18 +700,20 @@ public final class Shapes {
                         // Hollow keeps the rim on caps, not a filled lid.
                         continue;
                     }
-                    out.add(center.offset(x, y, z));
+                    if (!take(out, center.offset(x, y, z), limit)) {
+                        return;
+                    }
                 }
             }
         }
     }
 
     /** Hemisphere ellipsoid: Size is the floor radius, Height is how tall the dome rises. */
-    private static void dome(List<BlockPos> out, BlockPos center, int radius, int height, boolean hollow) {
+    private static void dome(List<BlockPos> out, BlockPos center, int radius, int height, boolean hollow, int limit) {
         int tall = Math.max(1, height);
         long rr = (long) radius * radius;
         long hh = (long) tall * tall;
-        long limit = rr * hh;
+        long ellipse = rr * hh;
         int innerR = hollow ? Math.max(0, radius - 1) : -1;
         int innerH = hollow ? Math.max(0, tall - 1) : -1;
         long innerLimit = hollow ? (long) innerR * innerR * innerH * innerH : -1L;
@@ -531,7 +721,7 @@ public final class Shapes {
             for (int y = 0; y <= tall; y++) {
                 for (int z = -radius; z <= radius; z++) {
                     long d = (long) x * x * hh + (long) z * z * hh + (long) y * y * rr;
-                    if (d > limit) {
+                    if (d > ellipse) {
                         continue;
                     }
                     if (hollow && innerR > 0 && innerH > 0) {
@@ -542,13 +732,15 @@ public final class Shapes {
                             continue;
                         }
                     }
-                    out.add(center.offset(x, y, z));
+                    if (!take(out, center.offset(x, y, z), limit)) {
+                        return;
+                    }
                 }
             }
         }
     }
 
-    private static void pyramid(List<BlockPos> out, BlockPos center, int radius, int height, boolean hollow) {
+    private static void pyramid(List<BlockPos> out, BlockPos center, int radius, int height, boolean hollow, int limit) {
         int top = Math.max(1, height);
         for (int y = 0; y < top; y++) {
             int layer = Math.max(0, radius - (radius * y) / top);
@@ -558,7 +750,9 @@ public final class Shapes {
                     if (hollow && !edge) {
                         continue;
                     }
-                    out.add(center.offset(x, y, z));
+                    if (!take(out, center.offset(x, y, z), limit)) {
+                        return;
+                    }
                 }
             }
         }
@@ -589,12 +783,9 @@ public final class Shapes {
         if (feet == null) {
             return BlockPos.ZERO;
         }
-        List<BlockPos> local = blocks(kind, BlockPos.ZERO, size, height, thickness, hollow, axis, rotation);
-        if (local.isEmpty()) {
-            return feet.below();
-        }
-        BlockPos min = origin(local);
-        BlockPos max = extent(local);
+        Bounds box = bounds(kind, BlockPos.ZERO, size, height, thickness, hollow, axis, rotation);
+        BlockPos min = box.min();
+        BlockPos max = box.max();
         BlockPos pin = pivotBlock(min, max, pivot);
         int topCenterX = (min.getX() + max.getX()) >> 1;
         int topCenterZ = (min.getZ() + max.getZ()) >> 1;

@@ -101,8 +101,7 @@ final class ShapeMenuPanel {
         Shapes.Kind kind = Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
         int axis = WrightsClientConfig.SHAPE_PLANE.get();
         boolean ring = kind == Shapes.Kind.RING;
-        boolean line = kind == Shapes.Kind.LINE;
-        boolean cube = kind == Shapes.Kind.CUBE;
+        boolean box = kind == Shapes.Kind.BOX;
         y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
                 "menu.wrights.shape_section_dimensions", "menu.wrights.shape_section_dimensions_hint", false);
         drawField(graphics, mouseX, mouseY, x, y, sizeLabel(kind, axis), sizeHint(kind, axis));
@@ -116,11 +115,11 @@ final class ShapeMenuPanel {
         y += 18;
         heightY = -1;
         thicknessY = -1;
-        if (ring || line || cube) {
+        // Ring band / Box depth — Cube is equal on all sides so it only needs Size.
+        if (ring || box) {
             drawField(graphics, mouseX, mouseY, x, y,
-                    cube ? "menu.wrights.shape_depth" : "menu.wrights.shape_thickness",
-                    cube ? "menu.wrights.shape_depth_hint"
-                            : line ? "menu.wrights.shape_line_thickness_hint" : "menu.wrights.shape_thickness_hint");
+                    box ? "menu.wrights.shape_depth" : "menu.wrights.shape_thickness",
+                    box ? "menu.wrights.shape_depth_hint" : "menu.wrights.shape_thickness_hint");
             y += 12;
             thicknessY = y;
             int thickness = Mth.clamp(WrightsClientConfig.SHAPE_THICKNESS.get(), 1, max);
@@ -317,21 +316,21 @@ final class ShapeMenuPanel {
     /** Primary size slider label — what SHAPE_SIZE actually builds for this kind. */
     private static String sizeLabel(Shapes.Kind kind, int axis) {
         return switch (kind) {
-            case LINE -> "menu.wrights.shape_length";
+            case BOX -> "menu.wrights.shape_width";
+            case CUBE -> "menu.wrights.shape_size";
             case CYLINDER, CIRCLE, SPHERE, DOME -> "menu.wrights.shape_radius";
-            case CUBE -> "menu.wrights.shape_width";
             default -> "menu.wrights.shape_size";
         };
     }
 
     private static String sizeHint(Shapes.Kind kind, int axis) {
         return switch (kind) {
-            case LINE -> "menu.wrights.shape_length_hint";
+            case BOX -> "menu.wrights.shape_width_hint";
+            case CUBE -> "menu.wrights.shape_cube_size_hint";
             case CYLINDER -> "menu.wrights.shape_cylinder_radius_hint";
             case CIRCLE -> "menu.wrights.shape_circle_radius_hint";
             case SPHERE -> "menu.wrights.shape_sphere_radius_hint";
             case DOME -> "menu.wrights.shape_dome_radius_hint";
-            case CUBE -> "menu.wrights.shape_width_hint";
             case PYRAMID -> "menu.wrights.shape_pyramid_size_hint";
             case RING -> "menu.wrights.shape_ring_size_hint";
             case SQUARE -> "menu.wrights.shape_square_size_hint";
@@ -340,11 +339,11 @@ final class ShapeMenuPanel {
     }
 
     /**
-     * Along-axis extent (SHAPE_HEIGHT). Cubes always say Height (W/D/H); other shapes rename
+     * Along-axis extent (SHAPE_HEIGHT). Box always says Height (W/D/H); other shapes rename
      * for the chosen Axis so Width/Height are not swapped when tipped onto X or Z.
      */
     private static String alongLabel(Shapes.Kind kind, int axis) {
-        if (kind == Shapes.Kind.CUBE) {
+        if (kind == Shapes.Kind.BOX) {
             return "menu.wrights.shape_height";
         }
         return switch (Shapes.clampPlane(axis)) {
@@ -359,10 +358,7 @@ final class ShapeMenuPanel {
         if (kind == Shapes.Kind.RING) {
             return a == Shapes.AXIS_Y ? "menu.wrights.shape_ring_height_hint" : "menu.wrights.shape_ring_along_hint";
         }
-        if (kind == Shapes.Kind.LINE) {
-            return a == Shapes.AXIS_Y ? "menu.wrights.shape_line_height_hint" : "menu.wrights.shape_line_along_hint";
-        }
-        if (kind == Shapes.Kind.CUBE) {
+        if (kind == Shapes.Kind.BOX) {
             return "menu.wrights.shape_box_height_hint";
         }
         if (kind == Shapes.Kind.CYLINDER) {
@@ -389,13 +385,7 @@ final class ShapeMenuPanel {
     private boolean apply(String id, int value) {
         return switch (id) {
             case "kind" -> {
-                Shapes.Kind previous = Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
                 WrightsClientConfig.setShapeKind(value);
-                Shapes.Kind next = Shapes.Kind.byId(value);
-                // Cube reuses thickness as Depth — copy Width so new cubes stay square until adjusted.
-                if (next == Shapes.Kind.CUBE && previous != Shapes.Kind.CUBE) {
-                    WrightsClientConfig.setShapeThickness(WrightsClientConfig.SHAPE_SIZE.get());
-                }
                 yield true;
             }
             case "plane" -> {

@@ -71,6 +71,8 @@ public final class SelectionRenderer {
     private static List<BlockPos> shapeLocal = List.of();
     private static BlockPos shapeLocalMin = BlockPos.ZERO;
     private static BlockPos shapeLocalMax = BlockPos.ZERO;
+    /** True when the cell list was skipped and only the AABB wire should be drawn. */
+    private static boolean shapeBoundsOnly;
 
     private SelectionRenderer() {
     }
@@ -161,9 +163,6 @@ public final class SelectionRenderer {
         int yaw = WrightsClientConfig.SHAPE_YAW.get();
         int pivot = WrightsClientConfig.SHAPE_PIVOT.get();
         ensureShapeLocal(kind, size, height, thickness, hollow, plane, yaw);
-        if (shapeLocal.isEmpty()) {
-            return;
-        }
         BlockPos pinLocal = com.wrights.blueprint.Shapes.pivotBlock(shapeLocalMin, shapeLocalMax, pivot);
         int ox = target.getX() - pinLocal.getX();
         int oy = target.getY() - pinLocal.getY();
@@ -172,12 +171,16 @@ public final class SelectionRenderer {
         BlockPos worldMax = shapeLocalMax.offset(ox, oy, oz);
         // Bounds are O(1). RFTools-style placement cue — always cheap even for huge volumes.
         drawShapeBounds(pose, buffers, camera, worldMin, worldMax, target);
+        if (shapeBoundsOnly || shapeLocal.isEmpty()) {
+            buffers.endBatch();
+            return;
+        }
 
         boolean voidBlocks = WrightsClientConfig.SHAPE_VOID.get() && WrightsConfig.allowShapeVoid();
         int budget = Math.max(1, previewBudget());
         int total = shapeLocal.size();
         // Keep only the nearest `budget` cells with a bounded max-heap — never allocate
-        // order/distance arrays the size of a 64³ shape (that was crashing the menu open).
+        // order/distance arrays the size of a huge shape (that was crashing the menu open).
         prepare(budget);
         double limit = rangeSqr();
         int filled = 0;
