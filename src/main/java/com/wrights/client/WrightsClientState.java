@@ -1974,12 +1974,22 @@ public final class WrightsClientState {
             return true;
         }
         WrightsClientConfig.enforceExchangeLineFootprint();
-        if (style == 1 || WrightsClientConfig.placePathStyle()) {
-            if (WrightsClientConfig.placePathStyle()) {
-                pos = placePathCell(minecraft.player);
-            } else {
-                pos = minecraft.player.blockPosition().below();
+        if (WrightsClientConfig.placePathStyle()) {
+            // Force-place fills every empty cell from the player out to the offset.
+            face = Direction.UP;
+            int placed = 0;
+            for (BlockPos at : placePathCells(minecraft.player)) {
+                BlockState state = minecraft.level.getBlockState(at);
+                if (!state.isAir() && !state.canBeReplaced()) {
+                    continue;
+                }
+                PacketDistributor.sendToServer(pathCellPlace(at));
+                placed++;
             }
+            return placed > 0;
+        }
+        if (style == 1) {
+            pos = minecraft.player.blockPosition().below();
             face = Direction.UP;
         } else if (pos == null || face == null) {
             BlockHitResult aim = shapeLookHit();
@@ -2019,45 +2029,40 @@ public final class WrightsClientState {
     }
 
     /**
-     * Path cell for Bridge / Stairs.
-     * Bridge: floor under feet, shifted forward.
-     * Stairs up: one step above that floor ahead (block at feet Y).
-     * Stairs down: one step below that floor ahead.
+     * Far end of the Bridge / Stairs path (for single-pin callers).
+     * Prefer {@link #placePathCells} when filling the whole path.
      */
     public static BlockPos placePathCell(Player player) {
-        Direction forward = player.getDirection();
-        int offset = WrightsClientConfig.placeBridgeOffset();
-        BlockPos ahead = player.blockPosition().relative(forward, offset);
-        if (WrightsClientConfig.placeStyle() == 3) {
-            return WrightsClientConfig.placeStairsUp() ? ahead : ahead.below(2);
-        }
-        return ahead.below();
+        java.util.List<BlockPos> cells = placePathCells(player);
+        return cells.isEmpty() ? player.blockPosition().below() : cells.get(cells.size() - 1);
     }
 
-    /** Place a single Bridge / Stairs path cell while the toggle is on. */
-    public static void tickBridge() {
-        if (!placeToolActive() || !bridgeActive || !WrightsClientConfig.placePathStyle()) {
-            return;
+    /**
+     * Every Bridge / Stairs cell from 1 block ahead through the path offset.
+     * Bridge: floor under each step ahead.
+     * Stairs up: rising steps (feet Y, then +1, …).
+     * Stairs down: descending steps under the floor ahead.
+     */
+    public static java.util.List<BlockPos> placePathCells(Player player) {
+        Direction forward = player.getDirection();
+        int offset = Math.max(1, WrightsClientConfig.placeBridgeOffset());
+        BlockPos feet = player.blockPosition();
+        boolean stairs = WrightsClientConfig.placeStyle() == 3;
+        boolean up = WrightsClientConfig.placeStairsUp();
+        java.util.ArrayList<BlockPos> cells = new java.util.ArrayList<>(offset);
+        for (int d = 1; d <= offset; d++) {
+            BlockPos ahead = feet.relative(forward, d);
+            if (stairs) {
+                cells.add(up ? ahead.above(d - 1) : ahead.below(d + 1));
+            } else {
+                cells.add(ahead.below());
+            }
         }
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.player == null || minecraft.level == null || !ControllerItem.isHeld(minecraft.player)) {
-            bridgeActive = false;
-            return;
-        }
-        if (bridgeCooldown > 0) {
-            bridgeCooldown--;
-            return;
-        }
-        if (WrightsClientConfig.shapeMaterials().isEmpty()) {
-            return;
-        }
-        BlockPos at = placePathCell(minecraft.player);
-        BlockState state = minecraft.level.getBlockState(at);
-        if (!state.isAir() && !state.canBeReplaced()) {
-            bridgeCooldown = 2;
-            return;
-        }
-        pendingShape = new BlueprintPayloads.ShapePlace(
+        return cells;
+    }
+
+    private static BlueprintPayloads.ShapePlace pathCellPlace(BlockPos at) {
+        return new BlueprintPayloads.ShapePlace(
                 at,
                 Direction.UP.get3DDataValue(),
                 false,
@@ -2081,8 +2086,35 @@ public final class WrightsClientState {
                 false,
                 "",
                 false);
-        PacketDistributor.sendToServer(pendingShape);
-        bridgeCooldown = 3;
+    }
+
+    /** Place every empty Bridge / Stairs cell from the player out to the offset while the toggle is on. */
+    public static void tickBridge() {
+        if (!placeToolActive() || !bridgeActive || !WrightsClientConfig.placePathStyle()) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || minecraft.level == null || !ControllerItem.isHeld(minecraft.player)) {
+            bridgeActive = false;
+            return;
+        }
+        if (bridgeCooldown > 0) {
+            bridgeCooldown--;
+            return;
+        }
+        if (WrightsClientConfig.shapeMaterials().isEmpty()) {
+            return;
+        }
+        int placed = 0;
+        for (BlockPos at : placePathCells(minecraft.player)) {
+            BlockState state = minecraft.level.getBlockState(at);
+            if (!state.isAir() && !state.canBeReplaced()) {
+                continue;
+            }
+            PacketDistributor.sendToServer(pathCellPlace(at));
+            placed++;
+        }
+        bridgeCooldown = placed > 0 ? 3 : 2;
     }
 
     public static boolean showStoredSettings() {

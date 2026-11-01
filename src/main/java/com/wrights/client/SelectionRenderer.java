@@ -174,21 +174,20 @@ public final class SelectionRenderer {
         if (formPresets) {
             WrightsClientConfig.enforceExchangeLineFootprint();
         }
-        // Bridge / Stairs always preview the single path cell under/ahead of the player.
+        // Bridge / Stairs preview every cell from the player out to the path offset.
         boolean path = place && WrightsClientConfig.placePathStyle();
-        int size = path ? 1 : WrightsClientConfig.SHAPE_SIZE.get();
-        int height = path ? 1 : WrightsClientConfig.SHAPE_HEIGHT.get();
-        int thickness = path ? 1 : WrightsClientConfig.SHAPE_THICKNESS.get();
         if (path) {
-            kind = com.wrights.blueprint.Shapes.Kind.RECTANGLE;
+            drawPlacePathGhosts(pose, buffers, camera, minecraft, materials);
+            return;
         }
+        int size = WrightsClientConfig.SHAPE_SIZE.get();
+        int height = WrightsClientConfig.SHAPE_HEIGHT.get();
+        int thickness = WrightsClientConfig.SHAPE_THICKNESS.get();
         boolean hollow = !place && WrightsClientConfig.SHAPE_HOLLOW.get() && WrightsConfig.allowShapeHollow();
         int plane = WrightsClientConfig.SHAPE_PLANE.get();
         int yaw = com.wrights.blueprint.Shapes.clampYaw(WrightsClientConfig.SHAPE_YAW.get());
         int pivot = formPresets
-                ? (path
-                        ? com.wrights.blueprint.Shapes.pivotId(0, 4)
-                        : WrightsClientConfig.exchangePivot())
+                ? WrightsClientConfig.exchangePivot()
                 : WrightsClientConfig.SHAPE_PIVOT.get();
         // Cache axis-only mesh; yaw orbits the pin in world space (same as placement).
         ensureShapeLocal(kind, size, height, thickness, hollow, plane, 0);
@@ -418,6 +417,71 @@ public final class SelectionRenderer {
             swap(root, largest);
             root = largest;
         }
+    }
+
+    /** Ghost every Bridge / Stairs cell from the player through the path offset. */
+    private static void drawPlacePathGhosts(
+            PoseStack pose,
+            MultiBufferSource.BufferSource buffers,
+            Vec3 camera,
+            Minecraft minecraft,
+            List<com.wrights.blueprint.ShapeMaterials.Entry> materials) {
+        if (minecraft.player == null || minecraft.level == null) {
+            return;
+        }
+        List<BlockPos> cells = WrightsClientState.placePathCells(minecraft.player);
+        if (cells.isEmpty()) {
+            return;
+        }
+        BlockPos min = cells.get(0);
+        BlockPos max = cells.get(0);
+        for (BlockPos cell : cells) {
+            min = new BlockPos(
+                    Math.min(min.getX(), cell.getX()),
+                    Math.min(min.getY(), cell.getY()),
+                    Math.min(min.getZ(), cell.getZ()));
+            max = new BlockPos(
+                    Math.max(max.getX(), cell.getX()),
+                    Math.max(max.getY(), cell.getY()),
+                    Math.max(max.getZ(), cell.getZ()));
+        }
+        drawShapeBounds(pose, buffers, camera, min, max, cells.get(cells.size() - 1));
+        if (shapeBoundsOnly) {
+            buffers.endBatch();
+            return;
+        }
+        java.util.ArrayList<BlockPos> open = new java.util.ArrayList<>(cells.size());
+        for (BlockPos cell : cells) {
+            BlockState world = minecraft.level.getBlockState(cell);
+            if (!world.isAir() && !world.canBeReplaced()) {
+                continue;
+            }
+            open.add(cell);
+        }
+        if (open.isEmpty()) {
+            buffers.endBatch();
+            return;
+        }
+        java.util.Random previewRandom = new java.util.Random(open.get(0).asLong() ^ materials.hashCode());
+        List<BlockState> planned = com.wrights.blueprint.ShapeMaterials.assign(
+                materials,
+                open.size(),
+                WrightsClientConfig.shapeFillMode(),
+                WrightsClientConfig.SHAPE_ORDER_BATCH.get(),
+                previewRandom,
+                true,
+                item -> Long.MAX_VALUE / 4L,
+                true);
+        BlockRenderDispatcher renderer = minecraft.getBlockRenderer();
+        for (int n = 0; n < open.size(); n++) {
+            BlockPos cell = open.get(n);
+            BlockState state = n < planned.size() ? planned.get(n) : null;
+            if (state == null || !ghostVisible(state)) {
+                continue;
+            }
+            drawGhost(pose, buffers, renderer, camera, cell.getX(), cell.getY(), cell.getZ(), state);
+        }
+        buffers.endBatch();
     }
 
     /** Wire AABB around the full shape plus a see-through pivot marker at the pin cell. */
