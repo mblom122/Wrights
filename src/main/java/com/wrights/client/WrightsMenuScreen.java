@@ -260,6 +260,7 @@ public class WrightsMenuScreen extends Screen {
     private int supplyOrderW;
     private int optionPlaceY;
     private int optionOffsetY;
+    private int optionShapeAirY;
     private int hudPlaceX;
     private int hudPlaceY;
     private int hudPlaceW;
@@ -271,6 +272,7 @@ public class WrightsMenuScreen extends Screen {
     private EditBox placeX;
     private EditBox placeY;
     private EditBox placeZ;
+    private EditBox shapeAirOffset;
     private boolean suppressOptions;
     private String searchText = "";
     private boolean applyingSearch;
@@ -404,6 +406,7 @@ public class WrightsMenuScreen extends Screen {
         placeX = offsetBox(0);
         placeY = offsetBox(1);
         placeZ = offsetBox(2);
+        shapeAirOffset = intOptionBox(0, 32, value -> WrightsClientConfig.setShapeAirOffset(value));
         unbindDigital = add(new WrightsButton(panelX + 140, panelY + panelH - 48, 120, 18,
                 Component.translatable("menu.wrights.digital_unbind"), button -> clearDigitalLink()));
         manage.addWidgets(manageHost);
@@ -613,6 +616,7 @@ public class WrightsMenuScreen extends Screen {
         placeX.visible = showOptions;
         placeY.visible = showOptions;
         placeZ.visible = showOptions;
+        shapeAirOffset.visible = showOptions;
         if (showOptions) {
             showPercent(wallPercent, WrightsClientConfig.WALL_TRANSPARENCY.get());
             showPercent(edgePercent, WrightsClientConfig.EDGE_OPACITY.get());
@@ -620,6 +624,7 @@ public class WrightsMenuScreen extends Screen {
             showOffset(placeX, WrightsClientConfig.PLACE_X.get());
             showOffset(placeY, WrightsClientConfig.PLACE_Y.get());
             showOffset(placeZ, WrightsClientConfig.PLACE_Z.get());
+            showOffset(shapeAirOffset, WrightsClientConfig.SHAPE_AIR_OFFSET.get());
             layoutOptions();
         }
         if (unbindDigital != null) {
@@ -669,6 +674,7 @@ public class WrightsMenuScreen extends Screen {
             placeX.visible = false;
             placeY.visible = false;
             placeZ.visible = false;
+            shapeAirOffset.visible = false;
             if (unbindDigital != null) {
                 unbindDigital.visible = false;
             }
@@ -1217,7 +1223,10 @@ public class WrightsMenuScreen extends Screen {
         placeField(placeX, x + 12, optionOffsetY);
         placeField(placeY, x + 82, optionOffsetY);
         placeField(placeZ, x + 152, optionOffsetY);
-        local += 36;
+        local += 22;
+        optionShapeAirY = optionY(local - 3);
+        placeField(shapeAirOffset, controls, optionShapeAirY);
+        local += 28;
         supplyHeadY = optionY(local);
         local += 18;
         Component playerFirst = Component.translatable("menu.wrights.supply_player_first");
@@ -1247,6 +1256,7 @@ public class WrightsMenuScreen extends Screen {
         showOptionBox(placeX);
         showOptionBox(placeY);
         showOptionBox(placeZ);
+        showOptionBox(shapeAirOffset);
         if (maxScroll > 0) {
             optionThumbH = Math.max(16, optionViewH * optionViewH / optionContentH);
             optionThumbY = optionViewY + (optionViewH - optionThumbH) * optionScroll / maxScroll;
@@ -1272,6 +1282,7 @@ public class WrightsMenuScreen extends Screen {
                 "menu.wrights.queue_jobs",
                 "menu.wrights.port_order",
                 "menu.wrights.open_build_menu",
+                "menu.wrights.shape_air_offset",
                 "menu.wrights.supply_order"
         };
         int widest = 0;
@@ -1374,6 +1385,11 @@ public class WrightsMenuScreen extends Screen {
         graphics.drawString(this.font, "X", x, optionOffsetY + 3, WrightsUi.MUTED, false);
         graphics.drawString(this.font, "Y", x + 70, optionOffsetY + 3, WrightsUi.MUTED, false);
         graphics.drawString(this.font, "Z", x + 140, optionOffsetY + 3, WrightsUi.MUTED, false);
+        Component shapeAirLabel = Component.translatable("menu.wrights.shape_air_offset");
+        graphics.drawString(this.font, shapeAirLabel, x, optionShapeAirY + 3, WrightsUi.MUTED, false);
+        int shapeAirBoxX = shapeAirOffset.getX();
+        drawOptionHelp(graphics, mouseX, mouseY, x, optionShapeAirY + 3, shapeAirLabel, shapeAirBoxX, shapeAirBoxX + shapeAirOffset.getWidth(),
+                Component.translatable("menu.wrights.shape_air_offset_hint"));
         drawOptionSection(graphics, x, supplyHeadY, "menu.wrights.section_supply", lineEnd);
         boolean playerFirst = WrightsClientConfig.SUPPLY_PLAYER_FIRST.get();
         Component supplyLabel = Component.translatable("menu.wrights.supply_order");
@@ -2911,6 +2927,24 @@ public class WrightsMenuScreen extends Screen {
         box.setMaxLength(3);
         box.setFilter(text -> text.matches("-?\\d{0,2}"));
         box.setResponder(value -> applyOffset(axis, value));
+        addRenderableWidget(box);
+        return box;
+    }
+
+    private EditBox intOptionBox(int min, int max, java.util.function.IntConsumer apply) {
+        EditBox box = new EditBox(this.font, 0, 0, 36, 14, Component.empty());
+        box.setMaxLength(2);
+        box.setFilter(text -> text.matches("\\d{0,2}"));
+        box.setResponder(value -> {
+            if (suppressOptions || value.isEmpty()) {
+                return;
+            }
+            try {
+                apply.accept(Mth.clamp(Integer.parseInt(value), min, max));
+            } catch (NumberFormatException ignored) {
+                return;
+            }
+        });
         addRenderableWidget(box);
         return box;
     }

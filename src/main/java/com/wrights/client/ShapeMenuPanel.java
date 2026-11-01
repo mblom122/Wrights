@@ -181,10 +181,12 @@ final class ShapeMenuPanel {
             } else {
                 y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_LOOK_LOCK.get(),
                         "menu.wrights.shape_look_lock", "menu.wrights.shape_look_lock_hint", "look_lock");
+                y = drawAirOffset(graphics, mouseX, mouseY, x, y, leftW);
             }
         } else {
             y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_LOOK_LOCK.get(),
                     "menu.wrights.shape_look_lock", "menu.wrights.shape_look_lock_hint", "look_lock");
+            y = drawAirOffset(graphics, mouseX, mouseY, x, y, leftW);
         }
         drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_pivot", "menu.wrights.shape_pivot_hint");
         y += 12;
@@ -424,6 +426,14 @@ final class ShapeMenuPanel {
                 }
                 yield true;
             }
+            case "air_up" -> {
+                WrightsClientConfig.setShapeAirOffset(WrightsClientConfig.SHAPE_AIR_OFFSET.get() + 1);
+                yield true;
+            }
+            case "air_down" -> {
+                WrightsClientConfig.setShapeAirOffset(WrightsClientConfig.SHAPE_AIR_OFFSET.get() - 1);
+                yield true;
+            }
             case "under_me" -> {
                 if (WrightsConfig.allowShapeAnchor()) {
                     setAnchorUnderPlayer();
@@ -582,6 +592,20 @@ final class ShapeMenuPanel {
         }
         WrightsClientConfig.setShapeMaterials(next);
         selectedMaterial = Math.min(selectedMaterial, next.size() - 1);
+    }
+
+    private int drawAirOffset(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width) {
+        drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_air_offset", "menu.wrights.shape_air_offset_hint");
+        y += 12;
+        int value = WrightsClientConfig.SHAPE_AIR_OFFSET.get();
+        int controls = x + width;
+        controls = drawMini(graphics, mouseX, mouseY, controls - 16, y + 1, 16, "+", "air_up", 0, value < 32) - 2;
+        String label = Integer.toString(value);
+        int valueW = Math.max(18, font.width(label) + 6);
+        graphics.drawCenteredString(font, label, controls - valueW / 2, y + 4, WrightsUi.COPPER);
+        controls -= valueW + 2;
+        drawMini(graphics, mouseX, mouseY, controls - 16, y + 1, 16, "-", "air_down", 0, value > 0);
+        return y + 20;
     }
 
     private int drawMaterials(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width) {

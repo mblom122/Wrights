@@ -2550,16 +2550,33 @@ public final class WrightsClientState {
         if (player == null) {
             return null;
         }
-        BlockPos place = fallbackAnchor(player);
-        // lookCorner(place.below(), UP) == place — that cell is the shape box min corner
+        BlockPos place = shapeAirAnchor(player);
+        // lookCorner(place.below(), UP) == place — that cell is where the shape pivot pins
         return new BlockHitResult(Vec3.atCenterOf(place), Direction.UP, place.below(), false);
     }
 
+    /**
+     * Air aim for shapes: in front of the player by {@link WrightsClientConfig#SHAPE_AIR_OFFSET}
+     * so the preview sits clear of the flight path. Side/up still follow the general build offset.
+     */
+    public static BlockPos shapeAirAnchor(Player player) {
+        return offsetFromPlayer(
+                player,
+                WrightsClientConfig.SHAPE_AIR_OFFSET.get(),
+                WrightsClientConfig.PLACE_X.get(),
+                WrightsClientConfig.PLACE_Y.get());
+    }
+
     public static BlockPos fallbackAnchor(Player player) {
+        return offsetFromPlayer(
+                player,
+                WrightsClientConfig.PLACE_Z.get(),
+                WrightsClientConfig.PLACE_X.get(),
+                WrightsClientConfig.PLACE_Y.get());
+    }
+
+    private static BlockPos offsetFromPlayer(Player player, int forward, int side, int up) {
         Direction facing = player.getDirection();
-        int forward = WrightsClientConfig.PLACE_Z.get();
-        int side = WrightsClientConfig.PLACE_X.get();
-        int up = WrightsClientConfig.PLACE_Y.get();
         BlockPos pos = player.blockPosition();
         if (forward > 0) {
             pos = pos.relative(facing, forward);

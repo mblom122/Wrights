@@ -239,6 +239,9 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.BooleanValue SHAPE_LOOK_LOCK = BUILDER
             .comment("In look mode: when true, right-click locks the snap first and a second right-click builds. When false, right-click builds immediately.")
             .define("shapeLookLock", false);
+    public static final ModConfigSpec.IntValue SHAPE_AIR_OFFSET = BUILDER
+            .comment("Blocks in front of you when a shape aims at air (no block under the crosshair). Keeps the preview clear of your view while flying.")
+            .defineInRange("shapeAirOffset", 2, 0, 32);
     public static final ModConfigSpec.IntValue SHAPE_PIVOT = BUILDER
             .comment("Which point on the shape AABB pins to the look/anchor cell. face*9+slot (0–53) or 54 = whole-shape center.")
             .defineInRange("shapePivot", com.wrights.blueprint.Shapes.PIVOT_CENTER, 0, com.wrights.blueprint.Shapes.PIVOT_CENTER);
@@ -866,6 +869,11 @@ public final class WrightsClientConfig {
 
     public static void setShapeLookLock(boolean lookLock) {
         SHAPE_LOOK_LOCK.set(lookLock);
+        save();
+    }
+
+    public static void setShapeAirOffset(int blocks) {
+        SHAPE_AIR_OFFSET.set(clamp(blocks, 0, 32));
         save();
     }
 
