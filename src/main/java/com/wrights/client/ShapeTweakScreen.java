@@ -30,6 +30,8 @@ public class ShapeTweakScreen extends Screen {
     private int thicknessY = -1;
     private int placeLabelY = -1;
     private int placeChoicesY = -1;
+    private int matchLabelY = -1;
+    private int matchChoicesY = -1;
     private int valueX;
     private int valueW;
     private Component tip;
@@ -55,6 +57,9 @@ public class ShapeTweakScreen extends Screen {
         labelW = Math.max(labelW, this.font.width(Component.translatable("screen.wrights.shape_tweak_length")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("screen.wrights.shape_tweak_depth")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.shape_place")));
+        if (exchange) {
+            labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.exchange_match")));
+        }
         int rowInner = labelW + 4 + stepW + 2 + fieldW + 2 + stepW;
         Component done = Component.translatable("screen.wrights.done");
         Component edit = Component.translatable("screen.wrights.shape_tweak_edit_point");
@@ -75,6 +80,7 @@ public class ShapeTweakScreen extends Screen {
                 + (showThickness ? 1 : 0)
                 + 1 // Build at label
                 + 1 // Build at choices
+                + (exchange ? 2 : 0) // Match label + Same/Any
                 + (showLookLock ? 2 : 0) // lock label + Off/On
                 + 1; // buttons
         panelH = PAD + 12 + GAP + rows * (ROW + GAP) + PAD;
@@ -88,7 +94,7 @@ public class ShapeTweakScreen extends Screen {
         int plusX = valueX + fieldW + 2;
         int y = panelY + PAD + 12 + GAP;
 
-        sizeY = alongY = thicknessY = placeLabelY = placeChoicesY = -1;
+        sizeY = alongY = thicknessY = placeLabelY = placeChoicesY = matchLabelY = matchChoicesY = -1;
         if (showSize) {
             sizeY = y;
             step(minusX, y, "-", () -> nudgeSize(-1));
@@ -112,6 +118,12 @@ public class ShapeTweakScreen extends Screen {
         y += ROW + GAP;
         placeChoicesY = y;
         y += ROW + GAP;
+        if (exchange) {
+            matchLabelY = y;
+            y += ROW + GAP;
+            matchChoicesY = y;
+            y += ROW + GAP;
+        }
         if (showLookLock) {
             y += ROW + GAP; // lock label
             y += ROW + GAP; // Off / On
@@ -180,6 +192,18 @@ public class ShapeTweakScreen extends Screen {
                     !useAnchor, "menu.wrights.shape_place_look");
             drawChoice(graphics, mouseX, mouseY, choiceX + choiceW + GAP, placeChoicesY,
                     panelW - PAD * 2 - choiceW - GAP, useAnchor, "menu.wrights.shape_place_anchor");
+        }
+
+        if (exchange && matchLabelY >= 0 && matchChoicesY >= 0) {
+            graphics.drawString(this.font, Component.translatable("menu.wrights.exchange_match"),
+                    panelX + PAD, matchLabelY + 3, WrightsUi.MUTED, false);
+            int choiceX = panelX + PAD;
+            int choiceW = (panelW - PAD * 2 - GAP) / 2;
+            boolean same = WrightsClientConfig.exchangeSameOnly();
+            drawChoice(graphics, mouseX, mouseY, choiceX, matchChoicesY, choiceW,
+                    same, "menu.wrights.exchange_match_same");
+            drawChoice(graphics, mouseX, mouseY, choiceX + choiceW + GAP, matchChoicesY,
+                    panelW - PAD * 2 - choiceW - GAP, !same, "menu.wrights.exchange_match_any");
         }
 
         if (!exchange && anchors && !useAnchor && placeChoicesY >= 0) {
@@ -254,6 +278,17 @@ public class ShapeTweakScreen extends Screen {
             WrightsClientState.clearShapeLookSnap();
             rebuild();
             return true;
+        }
+        if (exchange && matchChoicesY >= 0) {
+            if (hit(mouseX, mouseY, choiceX, matchChoicesY, choiceW, ROW)) {
+                WrightsClientConfig.setExchangeSameOnly(true);
+                return true;
+            }
+            if (hit(mouseX, mouseY, choiceX + choiceW + GAP, matchChoicesY,
+                    panelW - PAD * 2 - choiceW - GAP, ROW)) {
+                WrightsClientConfig.setExchangeSameOnly(false);
+                return true;
+            }
         }
         if (!exchange && anchors && !useAnchor) {
             int lockChoicesY = placeChoicesY + ROW + GAP + ROW + GAP;

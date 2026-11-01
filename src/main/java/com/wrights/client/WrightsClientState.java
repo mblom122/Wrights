@@ -1793,8 +1793,14 @@ public final class WrightsClientState {
             }
         }
         WrightsClientConfig.enforceExchangeLineFootprint();
+        BlockPos pin = pos == null ? BlockPos.ZERO : pos;
+        String from = WrightsClientConfig.exchangeFromFilter(minecraft.level, pin);
+        if (WrightsClientConfig.exchangeSameOnly() && (from == null || from.isBlank())) {
+            minecraft.player.displayClientMessage(Component.translatable("message.wrights.exchange_same_look"), true);
+            return false;
+        }
         pendingShape = new BlueprintPayloads.ShapePlace(
-                pos == null ? BlockPos.ZERO : pos,
+                pin,
                 face == null ? 0 : face.get3DDataValue(),
                 useAnchor,
                 anchorSet,
@@ -1815,7 +1821,7 @@ public final class WrightsClientState {
                 WrightsClientConfig.SHAPE_MATERIALS.get(),
                 WrightsClientConfig.SHAPE_SUPPLY.get(),
                 true,
-                "",
+                from == null ? "" : from,
                 WrightsClientConfig.exchangeSilk());
         PacketDistributor.sendToServer(pendingShape);
         if (lookPinned) {

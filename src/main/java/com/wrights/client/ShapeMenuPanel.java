@@ -266,6 +266,14 @@ final class ShapeMenuPanel {
             y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_HOLLOW.get(), "menu.wrights.shape_hollow", "menu.wrights.shape_hollow_hint", "hollow");
         }
         if (exchangeMode) {
+            drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.exchange_match", "menu.wrights.exchange_match_hint");
+            y += 12;
+            y = drawPair(graphics, mouseX, mouseY, x, y, leftW,
+                    !WrightsClientConfig.exchangeSameOnly(),
+                    "menu.wrights.exchange_match_same",
+                    "menu.wrights.exchange_match_any",
+                    "exchange_match");
+            y += 4;
             y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.exchangeSilk(),
                     "menu.wrights.exchange_silk", "menu.wrights.exchange_silk_hint", "exchange_silk");
         }
@@ -675,6 +683,12 @@ final class ShapeMenuPanel {
             case "void" -> {
                 if (WrightsConfig.allowShapeVoid()) {
                     WrightsClientConfig.setShapeVoid(!WrightsClientConfig.SHAPE_VOID.get());
+                }
+                yield true;
+            }
+            case "exchange_match" -> {
+                if (exchangeMode) {
+                    WrightsClientConfig.setExchangeSameOnly(value == 0);
                 }
                 yield true;
             }

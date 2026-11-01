@@ -280,6 +280,9 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.BooleanValue EXCHANGE_SILK = BUILDER
             .comment("When true, Exchange breaks replaced blocks with silk touch and returns the drops.")
             .define("exchangeSilk", false);
+    public static final ModConfigSpec.BooleanValue EXCHANGE_SAME_ONLY = BUILDER
+            .comment("When true, Exchange only replaces the block type you are looking at. When false, any exchangeable solid in the volume.")
+            .define("exchangeSameOnly", true);
     public static final ModConfigSpec.IntValue EXCHANGE_FORM = BUILDER
             .comment("Exchange preset: 0 floor, 1 wall, 2 pillar, 3 beam, 4 circle. Legacy 5/6 (rectangle/square) map to floor.")
             .defineInRange("exchangeForm", 0, 0, 6);
@@ -1043,6 +1046,40 @@ public final class WrightsClientConfig {
     public static void setExchangeSilk(boolean silk) {
         EXCHANGE_SILK.set(silk);
         save();
+    }
+
+    public static boolean exchangeSameOnly() {
+        return EXCHANGE_SAME_ONLY.get();
+    }
+
+    public static void setExchangeSameOnly(boolean sameOnly) {
+        EXCHANGE_SAME_ONLY.set(sameOnly);
+        save();
+    }
+
+    /**
+     * Encodes the looked-at (or pin) block as the exchange from-filter when Same as look is on.
+     * Empty string means any exchangeable solid.
+     */
+    public static String exchangeFromFilter(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pin) {
+        if (!exchangeSameOnly()) {
+            return "";
+        }
+        net.minecraft.core.BlockPos sample = pin;
+        net.minecraft.world.phys.BlockHitResult aim = com.wrights.client.WrightsClientState.shapeLookHit();
+        if (aim != null) {
+            sample = aim.getBlockPos();
+        }
+        if (level == null || sample == null) {
+            return "";
+        }
+        net.minecraft.world.level.block.state.BlockState state = level.getBlockState(sample);
+        net.minecraft.world.item.Item item = state.getBlock().asItem();
+        if (!(item instanceof net.minecraft.world.item.BlockItem)) {
+            return "";
+        }
+        return com.wrights.blueprint.ShapeMaterials.encode(
+                java.util.List.of(new com.wrights.blueprint.ShapeMaterials.Entry(item, 1)));
     }
 
     public static com.wrights.blueprint.Shapes.ExchangeForm exchangeForm() {

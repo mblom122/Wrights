@@ -197,6 +197,19 @@ public final class SelectionRenderer {
         int tx = target.getX();
         int ty = target.getY();
         int tz = target.getZ();
+        // Same-as-look: only ghost cells matching the aimed (or pin) block type.
+        net.minecraft.world.item.Item matchItem = null;
+        if (exchange && WrightsClientConfig.exchangeSameOnly()) {
+            BlockPos sample = target;
+            BlockHitResult aim = WrightsClientState.shapeLookHit();
+            if (aim != null) {
+                sample = aim.getBlockPos();
+            }
+            net.minecraft.world.item.Item item = minecraft.level.getBlockState(sample).getBlock().asItem();
+            if (item instanceof net.minecraft.world.item.BlockItem) {
+                matchItem = item;
+            }
+        }
         for (int i = 0; i < total; i++) {
             BlockPos local = shapeLocal.get(i);
             int rx = local.getX() - pinX;
@@ -226,6 +239,11 @@ public final class SelectionRenderer {
                 }
                 if (!com.wrights.util.BlockFilters.canExchange(minecraft.level, cursor, world)) {
                     continue;
+                }
+                if (WrightsClientConfig.exchangeSameOnly()) {
+                    if (matchItem == null || world.getBlock().asItem() != matchItem) {
+                        continue;
+                    }
                 }
             } else if (!voidBlocks && !world.isAir()) {
                 continue;
