@@ -152,13 +152,15 @@ public final class WrightsHud {
         } else if (WrightsClientState.mode == WrightsClientState.Mode.NONE) {
             line = Component.translatable("hud.wrights.task_ready_sub");
         }
-        // Timed help under the mode title. Live Info look / Jobs aim / bind / saving stay visible.
-        boolean keepDetail = persistentModeDetail(look);
-        if (!showHelp && !keepDetail) {
-            line = null;
+        // Helper tips (sub/note + explain lines) only for 5s after mode/submode change — all modes.
+        // Live status lines (shape size, job progress, Info look) stay after the tip fades.
+        if (!showHelp) {
             sub = null;
             note = null;
-            offset = null;
+            if (!liveStatusDetail(line, look)) {
+                line = null;
+                offset = null;
+            }
         }
         GuiGraphics graphics = event.getGuiGraphics();
         int taskWidth = minecraft.font.width(task) + 16;
@@ -340,14 +342,25 @@ public final class WrightsHud {
         StringBuilder key = new StringBuilder(mode.name());
         if (mode == WrightsClientState.Mode.CAPTURE || mode == WrightsClientState.Mode.SAVING) {
             key.append('|').append(WrightsClientState.captureStyle.name());
+            // Re-show tips when capture step changes (first corner → second → box ready).
+            int step = WrightsClientState.cornerA == null ? 0 : WrightsClientState.cornerB == null ? 1 : 2;
+            key.append('|').append(step);
+            key.append('|').append(WrightsClientState.boxDragging).append('|').append(WrightsClientState.moveGrabbed);
         } else if (mode == WrightsClientState.Mode.BUILD) {
             if (WrightsClientState.exchangeToolActive()) {
                 key.append("|exchange|").append(WrightsClientConfig.exchangeForm().name());
             } else if (WrightsClientState.shapeToolActive()) {
                 key.append("|shape|").append(WrightsClientConfig.SHAPE_KIND.get());
+                key.append('|').append(WrightsClientConfig.SHAPE_USE_ANCHOR.get());
+                key.append('|').append(WrightsClientConfig.SHAPE_LOOK_LOCK.get());
+                key.append('|').append(WrightsClientState.shapeLookSnapActive());
             } else if (WrightsClientState.mirrorToolActive()) {
                 key.append("|mirror|").append(WrightsClientConfig.mirrorBlocks());
-            } else if (WrightsClientState.bindSupply) {
+                String dim = Minecraft.getInstance().level == null
+                        ? ""
+                        : Minecraft.getInstance().level.dimension().location().toString();
+                key.append('|').append(WrightsClientConfig.mirrorPlaced(dim));
+            } else if (WrightsClientState.bindSupply || WrightsClientState.bindPort != null) {
                 key.append("|bind");
             } else {
                 key.append("|blueprint|").append(WrightsClientState.buildId == null ? "" : WrightsClientState.buildId.toString());
@@ -356,18 +369,36 @@ public final class WrightsHud {
         return key.toString();
     }
 
-    /** Details that should stay after the timed help fades (live status, not mode tips). */
-    private static boolean persistentModeDetail(List<Component> look) {
+    /**
+     * True when {@code line} / Info look is live status that should remain after the 5s tip fades.
+     * Pure explain tips (capture how-to, manage/info/link blurbs, pick-blueprint) are not live.
+     */
+    private static boolean liveStatusDetail(Component line, List<Component> look) {
         if (!look.isEmpty()) {
-            return true;
-        }
-        if (WrightsClientState.bindPort != null || WrightsClientState.bindSupply) {
             return true;
         }
         if (WrightsClientState.mode == WrightsClientState.Mode.SAVING) {
             return true;
         }
-        return WrightsClientState.mode == WrightsClientState.Mode.JOBS && WrightsClientState.jobAimed() != null;
+        if (WrightsClientState.mode == WrightsClientState.Mode.JOBS && WrightsClientState.jobAimed() != null) {
+            return true;
+        }
+        if (WrightsClientState.mode == WrightsClientState.Mode.BUILD) {
+            if (WrightsClientState.exchangeToolActive()
+                    || WrightsClientState.shapeToolActive()
+                    || WrightsClientState.mirrorToolActive()) {
+                return line != null;
+            }
+            if (WrightsClientState.bindSupply || WrightsClientState.bindPort != null) {
+                return false;
+            }
+            // Armed blueprint name line is status; "pick a blueprint" is a tip.
+            return WrightsClientState.buildId != null && line != null;
+        }
+        if (WrightsClientState.mode == WrightsClientState.Mode.CAPTURE && WrightsClientState.hasBox()) {
+            return line != null;
+        }
+        return false;
     }
 
     private static Component taskLine() {
