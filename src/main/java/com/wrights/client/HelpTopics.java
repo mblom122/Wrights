@@ -1,7 +1,7 @@
 package com.wrights.client;
 
 /**
- * Help topics for the Options help book. Content lives in lang under {@code help.wrights.*}.
+ * Help topics for the Help menu. Content lives in lang under {@code help.wrights.*}.
  * Line kinds: {@code H} heading, {@code P} body, {@code K} key chips (pipe-separated), {@code T} tip.
  */
 public final class HelpTopics {

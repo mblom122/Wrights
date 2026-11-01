@@ -38,6 +38,7 @@ public class WrightsMenuScreen extends Screen {
     private static final int PAGE_OPTIONS = 2;
     private static final int PAGE_INFO = 3;
     private static final int PAGE_MANAGE = 4;
+    private static final int PAGE_HELP = 5;
     private static final int PORT_ROWS = 8;
     private static int savedPage = PAGE_BUILDING;
     private static int savedScroll;
@@ -131,6 +132,8 @@ public class WrightsMenuScreen extends Screen {
     private int dropLineY = -1;
     private boolean options;
     private boolean infoPage;
+    private boolean helpPage;
+    private final HelpPanel helpPanel = new HelpPanel();
     private WrightsButton bindInventory;
     private WrightsButton unbindDigital;
     private int infoScroll;
@@ -239,10 +242,6 @@ public class WrightsMenuScreen extends Screen {
     private int optionThumbH;
     private boolean optionDragging;
     private int optionDragGrab;
-    private int helpHeadY;
-    private int helpButtonX;
-    private int helpButtonY;
-    private int helpButtonW;
     private int hologramHeadY;
     private int buildHeadY;
     private int supplyHeadY;
@@ -295,17 +294,20 @@ public class WrightsMenuScreen extends Screen {
             options = false;
             infoPage = false;
             managePage = false;
+            helpPage = false;
         } else if (WrightsClientState.mode == WrightsClientState.Mode.MANAGE) {
             managePage = true;
             jobsPage = false;
             options = false;
             infoPage = false;
+            helpPage = false;
         } else if (WrightsClientState.mode == WrightsClientState.Mode.INFO
                 || WrightsClientState.mode == WrightsClientState.Mode.LINK) {
             infoPage = true;
             managePage = false;
             jobsPage = false;
             options = false;
+            helpPage = false;
         } else if (WrightsClientState.mode == WrightsClientState.Mode.BUILD
                 || WrightsClientState.mode == WrightsClientState.Mode.CAPTURE
                 || WrightsClientState.mode == WrightsClientState.Mode.SAVING) {
@@ -313,6 +315,7 @@ public class WrightsMenuScreen extends Screen {
             options = false;
             infoPage = false;
             managePage = false;
+            helpPage = false;
             if (WrightsClientState.exchangeAim && WrightsConfig.allowExchange()) {
                 exchangePage = true;
                 shapePage = false;
@@ -343,7 +346,8 @@ public class WrightsMenuScreen extends Screen {
             options = savedPage == PAGE_OPTIONS;
             infoPage = savedPage == PAGE_INFO;
             managePage = savedPage == PAGE_MANAGE;
-            boolean building = !jobsPage && !options && !infoPage && !managePage;
+            helpPage = savedPage == PAGE_HELP;
+            boolean building = !jobsPage && !options && !infoPage && !managePage && !helpPage;
             exchangePage = building && savedExchange && WrightsConfig.allowExchange();
             shapePage = building && !exchangePage && savedShape && WrightsConfig.allowShape();
             mirrorPage = building && !exchangePage && !shapePage && savedMirror && WrightsConfig.allowMirror();
@@ -447,7 +451,7 @@ public class WrightsMenuScreen extends Screen {
 
     @Override
     public void removed() {
-        savedPage = managePage ? PAGE_MANAGE : jobsPage ? PAGE_JOBS : options ? PAGE_OPTIONS : infoPage ? PAGE_INFO : PAGE_BUILDING;
+        savedPage = helpPage ? PAGE_HELP : managePage ? PAGE_MANAGE : jobsPage ? PAGE_JOBS : options ? PAGE_OPTIONS : infoPage ? PAGE_INFO : PAGE_BUILDING;
         if (savedPage == PAGE_BUILDING) {
             savedMirror = mirrorPage;
             savedShape = shapePage;
@@ -581,7 +585,7 @@ public class WrightsMenuScreen extends Screen {
             suggestRename = false;
         }
         boolean capture = WrightsClientState.mode == WrightsClientState.Mode.CAPTURE;
-        boolean building = !options && !jobsPage && !infoPage && !managePage && !mirrorPage && !shapePage && !exchangePage;
+        boolean building = !options && !jobsPage && !infoPage && !managePage && !helpPage && !mirrorPage && !shapePage && !exchangePage;
         placeClose(building);
         search.setX(listX);
         search.setY(searchY);
@@ -743,14 +747,14 @@ public class WrightsMenuScreen extends Screen {
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         WrightsUi.scrim(graphics, this.width, this.height);
         WrightsUi.panel(graphics, panelX, panelY, panelW, panelH);
-        if ((mirrorPage || shapePage || exchangePage) && !options && !jobsPage && !infoPage && !managePage) {
+        if ((mirrorPage || shapePage || exchangePage) && !options && !jobsPage && !infoPage && !managePage && !helpPage) {
             int x = listX - 2;
             int width = panelX + panelW - 12 - x;
             int top = panelY + 34;
             WrightsUi.inset(graphics, x, top, width, wideCardBottom() - top);
             return;
         }
-        if (options || jobsPage || infoPage || managePage) {
+        if (options || jobsPage || infoPage || managePage || helpPage) {
             int x = listX - 2;
             int width = panelX + panelW - 12 - x;
             int top = jobsPage ? jobsInsetY() : panelY + 34;
@@ -776,7 +780,7 @@ public class WrightsMenuScreen extends Screen {
                 manage.layoutChrome(manageHost);
             }
         }
-        boolean blueprints = !options && !jobsPage && !infoPage && !managePage && !mirrorPage && !shapePage && !exchangePage;
+        boolean blueprints = !options && !jobsPage && !infoPage && !managePage && !helpPage && !mirrorPage && !shapePage && !exchangePage;
         if (blueprints) {
             BlueprintList.Row row = selectedRow();
             syncDetailScrollLayout(true, row != null && !row.folder() && marked.size() <= 1);
@@ -805,9 +809,17 @@ public class WrightsMenuScreen extends Screen {
             drawTask(graphics, Component.translatable("menu.wrights.info"), infoPage, false, taskInfoY());
         }
         drawTask(graphics, Component.translatable("menu.wrights.options"), options, false, taskOptionsY());
+        drawTask(graphics, Component.translatable("menu.wrights.help"), helpPage, false, taskHelpY());
         graphics.disableScissor();
         WrightsUi.scrollBar(graphics, panelX + 118, navTop, navH, navScroll, navContentH());
-        if (options) {
+        if (helpPage) {
+            int hx = listX - 2;
+            int hy = panelY + 38;
+            int hw = panelX + panelW - 16 - hx;
+            int hh = panelH - 76;
+            helpPanel.layout(hx, hy, hw, hh, this.font);
+            helpPanel.render(graphics, this.font, mouseX, mouseY);
+        } else if (options) {
             renderOptions(graphics, mouseX, mouseY);
         } else if (infoPage) {
             if (System.currentTimeMillis() - WrightsClientState.digitalInfoAt > 2000L) {
@@ -881,7 +893,7 @@ public class WrightsMenuScreen extends Screen {
         int bannerW = Math.min(cardW - 8, Math.round(textW * scale) + 24);
         int bannerH = Math.round(10 * scale) + 14;
         int bannerX = cardX + (cardW - bannerW) / 2;
-        int bannerY = jobsPage || managePage || options || infoPage || mirrorPage || shapePage || exchangePage
+        int bannerY = jobsPage || managePage || options || infoPage || helpPage || mirrorPage || shapePage || exchangePage
                 ? jobsInsetY() + 4
                 : panelY + 8;
         int fill = flash ? 0xF0481018 : 0xE0321018;
@@ -1207,18 +1219,11 @@ public class WrightsMenuScreen extends Screen {
         int x = optionViewX + 10;
         int controls = optionControlsX(x);
         int local = 2;
-        helpHeadY = optionY(local);
-        local += 16;
-        Component openHelp = Component.translatable("help.wrights.open");
-        helpButtonW = Math.max(88, this.font.width(openHelp) + 16);
-        helpButtonX = controls;
-        helpButtonY = optionY(local - 3);
-        local += 28;
         hologramHeadY = optionY(local);
         // Keep the hologram sample clear of the color swatches on the left.
         optionPreviewX = optionViewX + optionViewW - 16 - 48;
         optionPreviewY = optionY(local);
-        local += 32;
+        local = 34;
         wallSwatchY = optionY(local - 2);
         local += 20;
         int sliderW = Mth.clamp(optionViewX + optionViewW - 18 - controls - 42, 48, 120);
@@ -1380,13 +1385,6 @@ public class WrightsMenuScreen extends Screen {
         optionTip = null;
         graphics.enableScissor(optionViewX, optionViewY, optionViewX + optionViewW - 6, optionViewY + optionViewH);
         int lineEnd = optionViewX + optionViewW - 16;
-        drawOptionSection(graphics, x, helpHeadY, "menu.wrights.section_help", lineEnd);
-        Component openHelp = Component.translatable("help.wrights.open");
-        boolean helpHover = mouseX >= helpButtonX && mouseX < helpButtonX + helpButtonW && mouseY >= helpButtonY && mouseY < helpButtonY + 16;
-        WrightsUi.choice(graphics, helpButtonX, helpButtonY, helpButtonW, 16, true, helpHover);
-        graphics.drawCenteredString(this.font, openHelp, helpButtonX + helpButtonW / 2, helpButtonY + 4, WrightsUi.TEXT);
-        drawOptionHelp(graphics, mouseX, mouseY, x, helpButtonY + 3, openHelp, helpButtonX, helpButtonX + helpButtonW,
-                Component.translatable("help.wrights.open_hint"));
         drawOptionSection(graphics, x, hologramHeadY, "menu.wrights.section_hologram", optionPreviewX - 8);
         int preview = (Math.round(WrightsClientConfig.wallAlpha() * 255.0F) << 24) | WrightsClientConfig.wallRgb();
         graphics.fill(optionPreviewX, optionPreviewY, optionPreviewX + 48, optionPreviewY + 28, preview);
@@ -1565,7 +1563,7 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private boolean buildingPage() {
-        return !options && !jobsPage && !infoPage && !managePage;
+        return !options && !jobsPage && !infoPage && !managePage && !helpPage;
     }
 
     private void rememberStrip() {
@@ -1739,7 +1737,11 @@ public class WrightsMenuScreen extends Screen {
         return mainTaskY(4);
     }
 
-    /** Jobs, manage, mining, info, options, packed under whatever building left behind. */
+    private int taskHelpY() {
+        return mainTaskY(5);
+    }
+
+    /** Jobs, manage, mining, info, options, help — packed under whatever building left behind. */
     private int mainTaskY(int slot) {
         int y = WrightsConfig.showBuilding() ? (buildingPage() ? subsBottom() : 26) : 0;
         boolean[] show = {
@@ -1747,6 +1749,7 @@ public class WrightsMenuScreen extends Screen {
                 WrightsConfig.allowManage(),
                 true,
                 WrightsConfig.allowInfo(),
+                true,
                 true
         };
         for (int i = 0; i < show.length; i++) {
@@ -1778,7 +1781,10 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private int navContentH() {
-        int last = taskOptionsY();
+        int last = taskHelpY();
+        if (last < 0) {
+            last = taskOptionsY();
+        }
         if (last < 0) {
             last = taskInfoY();
         }
@@ -2688,6 +2694,7 @@ public class WrightsMenuScreen extends Screen {
             options = false;
             jobsPage = false;
             infoPage = false;
+            helpPage = false;
             if (!stay) {
                 exchangePage = savedExchange && WrightsConfig.allowExchange();
                 shapePage = !exchangePage && savedShape && WrightsConfig.allowShape();
@@ -2702,6 +2709,7 @@ public class WrightsMenuScreen extends Screen {
             options = false;
             jobsPage = true;
             infoPage = false;
+            helpPage = false;
             setFocused(null);
             refresh();
             PacketDistributor.sendToServer(new BlueprintPayloads.PlacedPortsAsk());
@@ -2712,6 +2720,7 @@ public class WrightsMenuScreen extends Screen {
             options = false;
             jobsPage = false;
             infoPage = false;
+            helpPage = false;
             if (!managePage) {
                 manageTab = 0;
             }
@@ -2729,6 +2738,7 @@ public class WrightsMenuScreen extends Screen {
             options = false;
             jobsPage = false;
             infoPage = true;
+            helpPage = false;
             setFocused(null);
             requestDigitalInfo();
             refresh();
@@ -2740,8 +2750,29 @@ public class WrightsMenuScreen extends Screen {
             options = true;
             jobsPage = false;
             infoPage = false;
+            helpPage = false;
             setFocused(null);
             refresh();
+            return true;
+        }
+        if (button == 0 && hitTask(mouseX, mouseY, taskHelpY())) {
+            rememberStrip();
+            leaveManage();
+            options = false;
+            jobsPage = false;
+            infoPage = false;
+            helpPage = true;
+            setFocused(null);
+            refresh();
+            return true;
+        }
+        if (helpPage) {
+            if (button == 0 && closeButton != null && closeButton.visible && closeButton.isMouseOver(mouseX, mouseY)) {
+                return super.mouseClicked(mouseX, mouseY, button);
+            }
+            if (helpPanel.mouseClicked(mouseX, mouseY, button, this.font)) {
+                return true;
+            }
             return true;
         }
         if (managePage) {
@@ -2782,10 +2813,6 @@ public class WrightsMenuScreen extends Screen {
             }
             if (insideOptionView(mouseX, mouseY)) {
                 if (overOptionHelp(mouseX, mouseY)) {
-                    return true;
-                }
-                if (mouseX >= helpButtonX && mouseX < helpButtonX + helpButtonW && mouseY >= helpButtonY && mouseY < helpButtonY + 16) {
-                    this.minecraft.setScreen(new HelpScreen(this));
                     return true;
                 }
                 if (pickSwatch(mouseX, mouseY, wallSwatchY, 0) || pickSwatch(mouseX, mouseY, edgeSwatchY, 1) || pickSwatch(mouseX, mouseY, queueEdgeSwatchY, 2) || pickSwatch(mouseX, mouseY, placeEdgeSwatchY, 3)) {
@@ -2951,6 +2978,9 @@ public class WrightsMenuScreen extends Screen {
                 return true;
             }
         }
+        if (helpPage && helpPanel.mouseDragged(mouseY, button)) {
+            return true;
+        }
         if (optionDragging && button == 0) {
             int max = Math.max(0, optionContentH - optionViewH);
             int travel = Math.max(1, optionViewH - optionThumbH);
@@ -2978,6 +3008,9 @@ public class WrightsMenuScreen extends Screen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (helpPage && helpPanel.mouseReleased(button)) {
+            return true;
+        }
         if (button == 0 && (shapePage || exchangePage) && shapePanel != null && shapePanel.mouseReleased()) {
             return true;
         }
@@ -4078,6 +4111,9 @@ public class WrightsMenuScreen extends Screen {
             navScroll = Mth.clamp(navScroll - (int) Math.signum(scrollY) * 22, 0, Math.max(0, navContentH() - navViewH()));
             return true;
         }
+        if (helpPage && helpPanel.mouseScrolled(mouseX, mouseY, scrollY)) {
+            return true;
+        }
         if (infoPage) {
             infoScroll = Mth.clamp(infoScroll - (int) Math.signum(scrollY), 0, infoMaxScroll);
             savedInfoScroll = infoScroll;
@@ -4132,7 +4168,7 @@ public class WrightsMenuScreen extends Screen {
         if ((shapePage || exchangePage) && shapePanel != null && shapePanel.mouseScrolled(mouseX, mouseY, scrollY)) {
             return true;
         }
-        if (!options && !jobsPage && !infoPage && !managePage && !mirrorPage && !shapePage && !exchangePage && insideDetailBody(mouseX, mouseY)) {
+        if (!options && !jobsPage && !infoPage && !managePage && !helpPage && !mirrorPage && !shapePage && !exchangePage && insideDetailBody(mouseX, mouseY)) {
             int max = Math.max(0, detailContentH - detailBodyH);
             int next = Mth.clamp(detailScroll - (int) Math.signum(scrollY) * 16, 0, max);
             if (next != detailScroll) {

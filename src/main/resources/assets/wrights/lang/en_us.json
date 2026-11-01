@@ -175,6 +175,7 @@
   "menu.wrights.info_unbound_note": "Bind a network to see what it is holding and what it can craft.",
   "menu.wrights.info_offline_note": "This network is offline. Stock comes back when it does.",
   "menu.wrights.options": "Options",
+  "menu.wrights.help": "Help",
   "menu.wrights.options_title": "Selection box",
   "menu.wrights.section_hologram": "Hologram",
   "menu.wrights.section_building": "Building",

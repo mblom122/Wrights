@@ -3,25 +3,23 @@ package com.wrights.client;
 import java.util.ArrayList;
 import java.util.List;
 
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 
 /**
- * Options help book: left topic list, right scrollable guide with headings, body, and key chips.
+ * In-menu help guide: topic list on the left of the content pane, scrollable page on the right.
  */
-public class HelpScreen extends Screen {
-    private static final int NAV_W = 148;
+public final class HelpPanel {
+    private static final int NAV_W = 132;
     private static final int ROW = 20;
-    private static final int PAD = 14;
 
-    private final Screen parent;
-    private int panelX;
-    private int panelY;
-    private int panelW;
-    private int panelH;
+    private int areaX;
+    private int areaY;
+    private int areaW;
+    private int areaH;
     private int navX;
     private int navY;
     private int navH;
@@ -39,45 +37,23 @@ public class HelpScreen extends Screen {
     private int dragGrab;
     private final List<LaidLine> laid = new ArrayList<>();
 
-    public HelpScreen(Screen parent) {
-        super(Component.translatable("help.wrights.title"));
-        this.parent = parent;
-    }
-
-    @Override
-    protected void init() {
-        panelW = WrightsUi.fitW(740, this.width);
-        panelH = WrightsUi.fitH(380, this.height);
-        panelX = WrightsUi.centerX(panelW, this.width);
-        panelY = WrightsUi.centerY(panelH, this.height);
-        navX = panelX + PAD;
-        navY = panelY + 36;
-        navH = panelH - 72;
-        bodyX = navX + NAV_W + 10;
+    public void layout(int x, int y, int width, int height, Font font) {
+        areaX = x;
+        areaY = y;
+        areaW = width;
+        areaH = height;
+        navX = x;
+        navY = y + 22;
+        navH = Math.max(24, height - 22);
+        bodyX = navX + NAV_W + 8;
         bodyY = navY;
-        bodyW = panelX + panelW - PAD - bodyX;
+        bodyW = Math.max(40, x + width - bodyX);
         bodyH = navH;
         topic = Mth.clamp(topic, 0, HelpTopics.TOPICS.length - 1);
-        rebuildBody();
-        int closeW = Math.max(72, this.font.width(Component.translatable("menu.wrights.close")) + 16);
-        addRenderableWidget(new WrightsButton(
-                panelX + panelW - PAD - closeW,
-                panelY + panelH - 28,
-                closeW,
-                16,
-                Component.translatable("menu.wrights.close"),
-                button -> onClose()));
-        int backW = Math.max(72, this.font.width(Component.translatable("help.wrights.back")) + 16);
-        addRenderableWidget(new WrightsButton(
-                panelX + PAD,
-                panelY + panelH - 28,
-                backW,
-                16,
-                Component.translatable("help.wrights.back"),
-                button -> onClose()));
+        rebuildBody(font);
     }
 
-    private void rebuildBody() {
+    private void rebuildBody(Font font) {
         laid.clear();
         HelpTopics.Topic current = HelpTopics.TOPICS[topic];
         int y = 0;
@@ -85,7 +61,7 @@ public class HelpScreen extends Screen {
         laid.add(LaidLine.key("TITLE", current.navKey(), y, 0));
         y += 16;
         Component lead = Component.translatable("help.wrights." + current.id() + ".lead");
-        for (FormattedCharSequence part : this.font.split(lead, textW)) {
+        for (FormattedCharSequence part : font.split(lead, textW)) {
             laid.add(LaidLine.seq("LEAD", part, y, 0));
             y += 11;
         }
@@ -98,14 +74,14 @@ public class HelpScreen extends Screen {
                 continue;
             }
             if ("K".equals(line.kind())) {
-                y = layKeys(line.text(), y, textW);
+                y = layKeys(font, line.text(), y, textW);
                 y += 6;
                 continue;
             }
             if ("T".equals(line.kind())) {
                 y += 2;
                 Component tip = Component.translatable(line.text());
-                for (FormattedCharSequence part : this.font.split(tip, Math.max(40, textW - 12))) {
+                for (FormattedCharSequence part : font.split(tip, Math.max(40, textW - 12))) {
                     laid.add(LaidLine.seq("T", part, y, 0));
                     y += 11;
                 }
@@ -113,7 +89,7 @@ public class HelpScreen extends Screen {
                 continue;
             }
             Component body = Component.translatable(line.text());
-            for (FormattedCharSequence part : this.font.split(body, textW)) {
+            for (FormattedCharSequence part : font.split(body, textW)) {
                 laid.add(LaidLine.seq("P", part, y, 0));
                 y += 11;
             }
@@ -124,7 +100,7 @@ public class HelpScreen extends Screen {
         updateThumb();
     }
 
-    private int layKeys(String raw, int y, int textW) {
+    private int layKeys(Font font, String raw, int y, int textW) {
         String[] parts = raw.split("\\|");
         int x = 0;
         int rowH = 16;
@@ -133,7 +109,7 @@ public class HelpScreen extends Screen {
             if (label.isEmpty()) {
                 continue;
             }
-            int chipW = this.font.width(label) + 10;
+            int chipW = font.width(label) + 10;
             if (x > 0 && x + chipW > textW) {
                 x = 0;
                 y += rowH + 4;
@@ -164,25 +140,16 @@ public class HelpScreen extends Screen {
         thumbY = bodyY + bodyScroll * travel / max;
     }
 
-    @Override
-    public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        WrightsUi.scrim(graphics, this.width, this.height);
-        WrightsUi.panel(graphics, panelX, panelY, panelW, panelH);
-        // Soft inset for the guide page.
-        WrightsUi.inset(graphics, bodyX - 4, bodyY - 4, bodyW + 8, bodyH + 8);
+    public void render(GuiGraphics graphics, Font font, int mouseX, int mouseY) {
+        graphics.drawString(font, Component.translatable("help.wrights.title"), areaX, areaY, WrightsUi.COPPER, false);
+        graphics.drawString(font, font.plainSubstrByWidth(Component.translatable("help.wrights.subtitle").getString(), areaW),
+                areaX, areaY + 11, WrightsUi.MUTED, false);
+
         WrightsUi.inset(graphics, navX - 2, navY - 2, NAV_W + 4, navH + 4);
-    }
+        WrightsUi.inset(graphics, bodyX - 4, bodyY - 4, bodyW + 8, bodyH + 4);
 
-    @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
-        graphics.drawString(this.font, this.title, panelX + PAD, panelY + 10, WrightsUi.COPPER, false);
-        Component sub = Component.translatable("help.wrights.subtitle");
-        graphics.drawString(this.font, this.font.plainSubstrByWidth(sub.getString(), panelW - 28),
-                panelX + PAD, panelY + 22, WrightsUi.MUTED, false);
-
-        drawNav(graphics, mouseX, mouseY);
-        drawBody(graphics);
+        drawNav(graphics, font, mouseX, mouseY);
+        drawBody(graphics, font);
         if (maxBodyScroll() > 0) {
             int barX = bodyX + bodyW - 3;
             graphics.fill(barX, bodyY, barX + 2, bodyY + bodyH, 0xFF1A2836);
@@ -190,7 +157,7 @@ public class HelpScreen extends Screen {
         }
     }
 
-    private void drawNav(GuiGraphics graphics, int mouseX, int mouseY) {
+    private void drawNav(GuiGraphics graphics, Font font, int mouseX, int mouseY) {
         graphics.enableScissor(navX, navY, navX + NAV_W, navY + navH);
         for (int i = 0; i < HelpTopics.TOPICS.length; i++) {
             int y = navY + i * ROW - navScroll;
@@ -202,7 +169,7 @@ public class HelpScreen extends Screen {
             WrightsUi.rail(graphics, navX, y, NAV_W, ROW - 2, on, on ? WrightsUi.TEAL : WrightsUi.COPPER);
             Component label = Component.translatable(HelpTopics.TOPICS[i].navKey());
             int color = on ? WrightsUi.TEXT : (hover ? WrightsUi.TEXT : WrightsUi.MUTED);
-            graphics.drawString(this.font, this.font.plainSubstrByWidth(label.getString(), NAV_W - 14),
+            graphics.drawString(font, font.plainSubstrByWidth(label.getString(), NAV_W - 14),
                     navX + 8, y + 5, color, false);
         }
         graphics.disableScissor();
@@ -211,7 +178,7 @@ public class HelpScreen extends Screen {
         }
     }
 
-    private void drawBody(GuiGraphics graphics) {
+    private void drawBody(GuiGraphics graphics, Font font) {
         graphics.enableScissor(bodyX, bodyY, bodyX + bodyW - 6, bodyY + bodyH);
         for (LaidLine line : laid) {
             int y = bodyY + line.y() - bodyScroll;
@@ -221,27 +188,27 @@ public class HelpScreen extends Screen {
             switch (line.kind()) {
                 case "TITLE" -> {
                     Component title = Component.translatable(line.key());
-                    graphics.drawString(this.font, title, bodyX, y, WrightsUi.TEXT, false);
-                    graphics.fill(bodyX, y + 12, bodyX + Math.min(bodyW - 10, this.font.width(title) + 8), y + 13, WrightsUi.COPPER_DIM);
+                    graphics.drawString(font, title, bodyX, y, WrightsUi.TEXT, false);
+                    graphics.fill(bodyX, y + 12, bodyX + Math.min(bodyW - 10, font.width(title) + 8), y + 13, WrightsUi.COPPER_DIM);
                 }
-                case "LEAD" -> graphics.drawString(this.font, line.sequence(), bodyX, y, WrightsUi.MUTED);
+                case "LEAD" -> graphics.drawString(font, line.sequence(), bodyX, y, WrightsUi.MUTED);
                 case "H" -> {
                     Component heading = Component.translatable(line.key());
                     WrightsUi.status(graphics, bodyX, y - 1, bodyW - 8, 14, WrightsUi.COPPER);
-                    graphics.drawString(this.font, heading, bodyX + 8, y + 2, WrightsUi.COPPER, false);
+                    graphics.drawString(font, heading, bodyX + 8, y + 2, WrightsUi.COPPER, false);
                 }
-                case "P" -> graphics.drawString(this.font, line.sequence(), bodyX, y, WrightsUi.TEXT);
+                case "P" -> graphics.drawString(font, line.sequence(), bodyX, y, WrightsUi.TEXT);
                 case "T" -> {
                     graphics.fill(bodyX, y - 1, bodyX + 2, y + 10, WrightsUi.BLUE);
-                    graphics.drawString(this.font, line.sequence(), bodyX + 6, y, WrightsUi.BLUE);
+                    graphics.drawString(font, line.sequence(), bodyX + 6, y, WrightsUi.BLUE);
                 }
                 case "K" -> {
-                    int chipW = this.font.width(line.key()) + 10;
+                    int chipW = font.width(line.key()) + 10;
                     int x = bodyX + line.x();
                     graphics.fill(x, y, x + chipW, y + 14, 0xFF152029);
                     WrightsUi.border(graphics, x, y, chipW, 14, 0xFF3A4C5C);
                     graphics.fill(x, y, x + chipW, y + 1, WrightsUi.COPPER_DIM);
-                    graphics.drawCenteredString(this.font, line.key(), x + chipW / 2, y + 3, WrightsUi.SIZE);
+                    graphics.drawCenteredString(font, line.key(), x + chipW / 2, y + 3, WrightsUi.SIZE);
                 }
                 default -> {
                 }
@@ -250,14 +217,13 @@ public class HelpScreen extends Screen {
         graphics.disableScissor();
     }
 
-    @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(double mouseX, double mouseY, int button, Font font) {
         if (button == 0 && mouseX >= navX && mouseX < navX + NAV_W && mouseY >= navY && mouseY < navY + navH) {
             int index = (int) ((mouseY - navY + navScroll) / ROW);
             if (index >= 0 && index < HelpTopics.TOPICS.length) {
                 topic = index;
                 bodyScroll = 0;
-                rebuildBody();
+                rebuildBody(font);
                 return true;
             }
         }
@@ -268,19 +234,18 @@ public class HelpScreen extends Screen {
             dragGrab = (int) mouseY - thumbY;
             return true;
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return mouseX >= areaX && mouseX < areaX + areaW && mouseY >= areaY && mouseY < areaY + areaH;
     }
 
-    @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (button == 0) {
+    public boolean mouseReleased(int button) {
+        if (button == 0 && dragging) {
             dragging = false;
+            return true;
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return false;
     }
 
-    @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+    public boolean mouseDragged(double mouseY, int button) {
         if (dragging && button == 0) {
             int max = maxBodyScroll();
             int travel = Math.max(1, bodyH - thumbH);
@@ -289,11 +254,10 @@ public class HelpScreen extends Screen {
             updateThumb();
             return true;
         }
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+        return false;
     }
 
-    @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollY) {
         int step = (int) Math.signum(scrollY) * -12;
         if (mouseX >= navX && mouseX < navX + NAV_W && mouseY >= navY && mouseY < navY + navH) {
             navScroll = Mth.clamp(navScroll + step, 0, maxNavScroll());
@@ -304,20 +268,6 @@ public class HelpScreen extends Screen {
             updateThumb();
             return true;
         }
-        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
-    }
-
-    @Override
-    public void onClose() {
-        if (this.minecraft != null && parent != null) {
-            this.minecraft.setScreen(parent);
-            return;
-        }
-        super.onClose();
-    }
-
-    @Override
-    public boolean isPauseScreen() {
         return false;
     }
 
