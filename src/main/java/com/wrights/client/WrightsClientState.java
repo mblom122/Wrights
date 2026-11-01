@@ -1524,6 +1524,7 @@ public final class WrightsClientState {
                 WrightsClientConfig.SHAPE_HEIGHT.get(),
                 WrightsClientConfig.SHAPE_PLANE.get(),
                 WrightsClientConfig.SHAPE_HOLLOW.get(),
+                WrightsClientConfig.SHAPE_FLIP_VERTICAL.get(),
                 WrightsClientConfig.SHAPE_REPLACE.get(),
                 WrightsClientConfig.SHAPE_VOID.get(),
                 force,

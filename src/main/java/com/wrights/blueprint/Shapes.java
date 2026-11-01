@@ -63,6 +63,11 @@ public final class Shapes {
 
     /** World positions for one shape centered on {@code center}. */
     public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, boolean hollow, int plane) {
+        return blocks(kind, center, size, height, hollow, plane, false);
+    }
+
+    /** World positions for one shape centered on {@code center}. When {@code flipVertical}, mirrors on Y through the center. */
+    public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, boolean hollow, int plane, boolean flipVertical) {
         List<BlockPos> out = new ArrayList<>();
         if (center == null || kind == null) {
             return out;
@@ -80,6 +85,13 @@ public final class Shapes {
             case CYLINDER -> cylinder(out, center, r, h, hollow);
             case DOME -> dome(out, center, r, hollow);
             case PYRAMID -> pyramid(out, center, r, h, hollow);
+        }
+        if (flipVertical) {
+            int cy = center.getY();
+            for (int i = 0; i < out.size(); i++) {
+                BlockPos pos = out.get(i);
+                out.set(i, new BlockPos(pos.getX(), cy - (pos.getY() - cy), pos.getZ()));
+            }
         }
         return out;
     }

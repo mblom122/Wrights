@@ -47,6 +47,7 @@ public final class ShapeLaunch {
         int height = Shapes.clampHeight(payload.height());
         int plane = Shapes.clampPlane(payload.plane());
         boolean hollow = payload.hollow();
+        boolean flipVertical = payload.flipVertical();
         boolean replace = payload.replace() && WrightsConfig.allowShapeReplace();
         boolean voidBlocks = payload.voidBlocks() && WrightsConfig.allowVoidBlocks();
         List<Integer> order = ShapeSupply.parse(payload.supplyOrder());
@@ -74,7 +75,7 @@ public final class ShapeLaunch {
             }
             center = Shapes.lookCenter(clicked, face);
         }
-        List<BlockPos> worlds = Shapes.blocks(kind, center, size, height, hollow, plane);
+        List<BlockPos> worlds = Shapes.blocks(kind, center, size, height, hollow, plane, flipVertical);
         if (worlds.isEmpty()) {
             Messages.actionBar(player, "message.wrights.shape_empty");
             return;

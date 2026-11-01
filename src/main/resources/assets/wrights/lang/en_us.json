@@ -914,6 +914,8 @@
   "menu.wrights.shape_place_anchor": "On anchor",
   "menu.wrights.shape_hollow": "Hollow",
   "menu.wrights.shape_hollow_hint": "Only the shell is built. Leave off for a solid fill.",
+  "menu.wrights.shape_flip": "Flip vertical",
+  "menu.wrights.shape_flip_hint": "Mirror the shape up/down through its center. Domes become bowls, pyramids point down.",
   "menu.wrights.shape_randomize": "Randomize hotbar",
   "menu.wrights.shape_randomize_hint": "Each block is picked at random from block items on your action bar.",
   "menu.wrights.shape_replace": "Replace blocks",

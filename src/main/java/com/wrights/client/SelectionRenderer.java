@@ -149,7 +149,8 @@ public final class SelectionRenderer {
                 WrightsClientConfig.SHAPE_SIZE.get(),
                 WrightsClientConfig.SHAPE_HEIGHT.get(),
                 WrightsClientConfig.SHAPE_HOLLOW.get(),
-                WrightsClientConfig.SHAPE_PLANE.get());
+                WrightsClientConfig.SHAPE_PLANE.get(),
+                WrightsClientConfig.SHAPE_FLIP_VERTICAL.get());
         boolean replace = WrightsClientConfig.SHAPE_REPLACE.get() && WrightsConfig.allowShapeReplace();
         List<BlockPos> ready = new java.util.ArrayList<>();
         for (BlockPos world : worlds) {

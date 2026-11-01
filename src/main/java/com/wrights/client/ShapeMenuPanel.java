@@ -119,10 +119,13 @@ final class ShapeMenuPanel {
         int col = (width - 6) / 2;
         int right = x + col + 6;
         y = drawToggle(graphics, mouseX, mouseY, x, y, col, WrightsClientConfig.SHAPE_HOLLOW.get(), "menu.wrights.shape_hollow", "menu.wrights.shape_hollow_hint", "hollow");
+        drawToggle(graphics, mouseX, mouseY, right, y - 16, col, WrightsClientConfig.SHAPE_FLIP_VERTICAL.get(), "menu.wrights.shape_flip", "menu.wrights.shape_flip_hint", "flip");
         if (WrightsConfig.allowShapeReplace()) {
-            drawToggle(graphics, mouseX, mouseY, right, y - 16, col, WrightsClientConfig.SHAPE_REPLACE.get(), "menu.wrights.shape_replace", "menu.wrights.shape_replace_hint", "replace");
-        }
-        if (WrightsConfig.allowVoidBlocks()) {
+            y = drawToggle(graphics, mouseX, mouseY, x, y, col, WrightsClientConfig.SHAPE_REPLACE.get(), "menu.wrights.shape_replace", "menu.wrights.shape_replace_hint", "replace");
+            if (WrightsConfig.allowVoidBlocks()) {
+                drawToggle(graphics, mouseX, mouseY, right, y - 16, col, WrightsClientConfig.SHAPE_VOID.get(), "menu.wrights.shape_void", "menu.wrights.shape_void_hint", "void");
+            }
+        } else if (WrightsConfig.allowVoidBlocks()) {
             y = drawToggle(graphics, mouseX, mouseY, x, y, width, WrightsClientConfig.SHAPE_VOID.get(), "menu.wrights.shape_void", "menu.wrights.shape_void_hint", "void");
         }
         y += 6;
@@ -209,6 +212,10 @@ final class ShapeMenuPanel {
             }
             case "hollow" -> {
                 WrightsClientConfig.setShapeHollow(!WrightsClientConfig.SHAPE_HOLLOW.get());
+                yield true;
+            }
+            case "flip" -> {
+                WrightsClientConfig.setShapeFlipVertical(!WrightsClientConfig.SHAPE_FLIP_VERTICAL.get());
                 yield true;
             }
             case "replace" -> {
@@ -435,6 +442,7 @@ final class ShapeMenuPanel {
         int size = Math.min(10, WrightsClientConfig.SHAPE_SIZE.get());
         int height = Math.min(10, WrightsClientConfig.SHAPE_HEIGHT.get());
         boolean hollow = WrightsClientConfig.SHAPE_HOLLOW.get();
+        boolean flip = WrightsClientConfig.SHAPE_FLIP_VERTICAL.get();
         int plane = WrightsClientConfig.SHAPE_PLANE.get();
         BlockState fill = previewFill();
         long key = (((long) kind.ordinal() & 0xF) << 48)
@@ -442,12 +450,13 @@ final class ShapeMenuPanel {
                 | (((long) height & 0x3F) << 36)
                 | (((long) plane & 0x3) << 34)
                 | ((hollow ? 1L : 0L) << 33)
-                | (Integer.toUnsignedLong(Block.getId(fill)) & 0x1FFFFFFFFL);
+                | ((flip ? 1L : 0L) << 32)
+                | (Integer.toUnsignedLong(Block.getId(fill)) & 0xFFFFFFFFL);
         if (key == previewKey) {
             return;
         }
         previewKey = key;
-        List<BlockPos> worlds = Shapes.blocks(kind, BlockPos.ZERO, size, height, hollow, plane);
+        List<BlockPos> worlds = Shapes.blocks(kind, BlockPos.ZERO, size, height, hollow, plane, flip);
         if (worlds.isEmpty()) {
             previewGhosts = List.of();
             previewSizeX = previewSizeY = previewSizeZ = 1;
