@@ -221,7 +221,7 @@ public class PlacementScreen extends Screen implements JeiPreview {
         saveButton = new WrightsButton(controlsX + side + half + 4, foot, rightHalf, footBtn, Component.translatable("screen.wrights.save_changes"), button -> saveBlueprint());
         addRenderableWidget(saveButton);
         int actionY = foot + footBtn + 2;
-        addRenderableWidget(new WrightsButton(controlsX + side, actionY, half, footBtn, Component.translatable("screen.wrights.back"), button -> onClose()));
+        addRenderableWidget(new WrightsButton(controlsX + side, actionY, half, footBtn, Component.translatable("screen.wrights.cancel"), button -> onClose()));
         // Confirm closes with the chosen settings; right-click in the world starts the job.
         buildButton = new WrightsButton(controlsX + side + half + 4, actionY, rightHalf, footBtn, Component.translatable("screen.wrights.confirm"), button -> confirm());
         addRenderableWidget(buildButton);
