@@ -241,7 +241,7 @@ public final class WrightsClientConfig {
             .define("shapeLookLock", false);
     public static final ModConfigSpec.IntValue SHAPE_AIR_OFFSET = BUILDER
             .comment("Blocks in front of you when a shape aims at air (no block under the crosshair). Keeps the preview clear of your view while flying.")
-            .defineInRange("shapeAirOffset", 2, 0, 32);
+            .defineInRange("shapeAirOffset", 3, 0, 32);
     public static final ModConfigSpec.IntValue SHAPE_PIVOT = BUILDER
             .comment("Which point on the shape AABB pins to the look/anchor cell. face*9+slot (0–53) or 54 = whole-shape center.")
             .defineInRange("shapePivot", com.wrights.blueprint.Shapes.PIVOT_CENTER, 0, com.wrights.blueprint.Shapes.PIVOT_CENTER);
