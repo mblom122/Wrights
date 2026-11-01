@@ -158,7 +158,7 @@ public final class SelectionRenderer {
         int thickness = WrightsClientConfig.SHAPE_THICKNESS.get();
         boolean hollow = WrightsClientConfig.SHAPE_HOLLOW.get() && WrightsConfig.allowShapeHollow();
         int plane = WrightsClientConfig.SHAPE_PLANE.get();
-        int yaw = WrightsClientConfig.SHAPE_YAW.get();
+        int yaw = WrightsClientConfig.shapeYawWorld(minecraft.player);
         int pivot = WrightsClientConfig.SHAPE_PIVOT.get();
         ensureShapeLocal(kind, size, height, thickness, hollow, plane, yaw);
         if (shapeLocal.isEmpty()) {

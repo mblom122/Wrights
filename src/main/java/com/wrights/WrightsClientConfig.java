@@ -220,7 +220,7 @@ public final class WrightsClientConfig {
             .comment("Shape height axis. 0 = Y upright, 1 = Z, 2 = X.")
             .defineInRange("shapePlane", 0, 0, 2);
     public static final ModConfigSpec.IntValue SHAPE_YAW = BUILDER
-            .comment("Quarter-turns around world Y after axis remap (0–3). Ctrl+scroll in the world.")
+            .comment("Player-relative quarter-turns around up (0–3): 0 = toward your facing, then 90° CW. Ctrl+scroll dials the four sides.")
             .defineInRange("shapeYaw", 0, 0, 3);
     public static final ModConfigSpec.BooleanValue SHAPE_HOLLOW = BUILDER
             .define("shapeHollow", false);
@@ -817,6 +817,22 @@ public final class WrightsClientConfig {
     public static void setShapeYaw(int yaw) {
         SHAPE_YAW.set(com.wrights.blueprint.Shapes.clampYaw(yaw));
         save();
+    }
+
+    /** Stored rotation: offset from the player’s facing (0 = toward you look). */
+    public static int shapeYawRelative() {
+        return com.wrights.blueprint.Shapes.clampYaw(SHAPE_YAW.get());
+    }
+
+    /**
+     * World yaw for ghosts and builds: relative offset plus the player’s horizontal facing,
+     * so Ctrl+scroll dials the shape’s four sides around the player.
+     */
+    public static int shapeYawWorld(net.minecraft.world.entity.player.Player player) {
+        net.minecraft.core.Direction facing = player == null
+                ? net.minecraft.core.Direction.SOUTH
+                : player.getDirection();
+        return com.wrights.blueprint.Shapes.worldYaw(facing, SHAPE_YAW.get());
     }
 
     public static void setShapeHollow(boolean hollow) {

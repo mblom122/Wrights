@@ -130,7 +130,7 @@ final class ShapeMenuPanel {
             graphics.drawString(font, Integer.toString(height), x + sizeW + 8, y, WrightsUi.TEXT, false);
             y += 18;
         }
-        // Axis = height direction; Rotation = yaw around world up (also Ctrl+scroll).
+        // Axis = height direction; Rotation = player-relative yaw (also Ctrl+scroll).
         y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
                 "menu.wrights.shape_section_orientation", "menu.wrights.shape_section_orientation_hint", false);
         drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_axis", "menu.wrights.shape_axis_hint");
@@ -145,7 +145,7 @@ final class ShapeMenuPanel {
         drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_rotation", "menu.wrights.shape_rotation_hint");
         y += 12;
         y = drawQuad(graphics, mouseX, mouseY, x, y, leftW,
-                Shapes.clampYaw(WrightsClientConfig.SHAPE_YAW.get()),
+                WrightsClientConfig.shapeYawRelative(),
                 "menu.wrights.shape_rot_0",
                 "menu.wrights.shape_rot_90",
                 "menu.wrights.shape_rot_180",
@@ -541,7 +541,7 @@ final class ShapeMenuPanel {
                 WrightsClientConfig.SHAPE_THICKNESS.get(),
                 WrightsClientConfig.SHAPE_HOLLOW.get(),
                 WrightsClientConfig.SHAPE_PLANE.get(),
-                WrightsClientConfig.SHAPE_YAW.get(),
+                WrightsClientConfig.shapeYawWorld(minecraft.player),
                 WrightsClientConfig.SHAPE_PIVOT.get());
         WrightsClientState.setShapeAnchor(anchor);
         WrightsClientConfig.setShapeUseAnchor(true);

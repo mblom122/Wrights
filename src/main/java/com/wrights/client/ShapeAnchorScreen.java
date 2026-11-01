@@ -220,7 +220,7 @@ public class ShapeAnchorScreen extends Screen {
                 WrightsClientConfig.SHAPE_THICKNESS.get(),
                 WrightsClientConfig.SHAPE_HOLLOW.get(),
                 WrightsClientConfig.SHAPE_PLANE.get(),
-                WrightsClientConfig.SHAPE_YAW.get(),
+                WrightsClientConfig.shapeYawWorld(this.minecraft != null ? this.minecraft.player : null),
                 WrightsClientConfig.SHAPE_PIVOT.get());
         apply(pos);
     }
