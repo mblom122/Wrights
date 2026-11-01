@@ -259,7 +259,7 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.ConfigValue<String> SHAPE_DIM = BUILDER
             .define("shapeDim", "");
     public static final ModConfigSpec.ConfigValue<String> SHAPE_SUPPLY = BUILDER
-            .comment("Priority list for shape materials. 0 main, 1 offhand, 2 action bar, 3 inventory, 4 bound chest, 5 digital.")
+            .comment("Priority list for materials. 0 main, 1 offhand, 2 hotbar, 3 inventory, 4 bound chest, 5 digital. Default keeps main/offhand last.")
             .define("shapeSupply", com.wrights.blueprint.ShapeSupply.DEFAULT_ORDER);
     public static final ModConfigSpec.ConfigValue<String> SHAPE_MATERIALS = BUILDER
             .comment("Weighted blocks used by Shape mode. Format id=weight;id=weight. At least one is required.")
@@ -872,7 +872,13 @@ public final class WrightsClientConfig {
     }
 
     public static java.util.List<Integer> shapeSupplyOrder() {
-        return com.wrights.blueprint.ShapeSupply.parse(SHAPE_SUPPLY.get());
+        String raw = SHAPE_SUPPLY.get();
+        // Migrate the old main-first default once so Mirror/Shape pick up hands-last.
+        if (com.wrights.blueprint.ShapeSupply.LEGACY_DEFAULT_ORDER.equals(raw)) {
+            setShapeSupplyOrder(com.wrights.blueprint.ShapeSupply.parse(com.wrights.blueprint.ShapeSupply.DEFAULT_ORDER));
+            return com.wrights.blueprint.ShapeSupply.parse(com.wrights.blueprint.ShapeSupply.DEFAULT_ORDER);
+        }
+        return com.wrights.blueprint.ShapeSupply.parse(raw);
     }
 
     public static void setShapeSupplyOrder(java.util.List<Integer> order) {

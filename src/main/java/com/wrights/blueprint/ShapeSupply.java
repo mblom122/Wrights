@@ -32,7 +32,12 @@ public final class ShapeSupply {
     public static final int DIGITAL = 5;
     public static final int COUNT = 6;
 
-    public static final String DEFAULT_ORDER = "0,1,2,3,4,5";
+    /** Hotbar → inventory → chest → digital → main → offhand. Hands last so held tools stay put. */
+    public static final String DEFAULT_ORDER = "2,3,4,5,0,1";
+    /** Previous default; still recognized so installs migrate to {@link #DEFAULT_ORDER}. */
+    public static final String LEGACY_DEFAULT_ORDER = "0,1,2,3,4,5";
+    /** Bound chest first, then the same player order with hands last. */
+    public static final String CHEST_FIRST_ORDER = "4,2,3,5,0,1";
 
     private ShapeSupply() {
     }

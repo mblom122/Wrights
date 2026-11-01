@@ -1977,7 +1977,7 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record MirrorPlace(BlockPos pos, int face, double x, double y, double z, boolean mirror, BlockPos anchor, int anchorFace, int pattern, boolean shapes, boolean enabled, boolean copyNbt, boolean copySettings, boolean copyAll, boolean replace, int axes) implements CustomPacketPayload {
+    public record MirrorPlace(BlockPos pos, int face, double x, double y, double z, boolean mirror, BlockPos anchor, int anchorFace, int pattern, boolean shapes, boolean enabled, boolean copyNbt, boolean copySettings, boolean copyAll, boolean replace, int axes, String supplyOrder) implements CustomPacketPayload {
         public static final Type<MirrorPlace> TYPE = payloadType("mirror_place");
         public static final StreamCodec<RegistryFriendlyByteBuf, MirrorPlace> STREAM_CODEC = StreamCodec.of((buf, value) -> value.write(buf), MirrorPlace::read);
 
@@ -1998,10 +1998,11 @@ public final class BlueprintPayloads {
             buf.writeBoolean(copyAll);
             buf.writeBoolean(replace);
             buf.writeVarInt(axes);
+            buf.writeUtf(supplyOrder == null || supplyOrder.isBlank() ? com.wrights.blueprint.ShapeSupply.DEFAULT_ORDER : supplyOrder, 64);
         }
 
         public static MirrorPlace read(RegistryFriendlyByteBuf buf) {
-            return new MirrorPlace(buf.readBlockPos(), buf.readVarInt(), buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readBoolean(), buf.readBlockPos(), buf.readVarInt(), buf.readVarInt(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readVarInt());
+            return new MirrorPlace(buf.readBlockPos(), buf.readVarInt(), buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readBoolean(), buf.readBlockPos(), buf.readVarInt(), buf.readVarInt(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readVarInt(), buf.readUtf(64));
         }
 
         @Override

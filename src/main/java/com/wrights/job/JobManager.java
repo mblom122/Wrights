@@ -700,7 +700,7 @@ public final class JobManager {
 
     public static boolean startBlueprintBuild(ServerPlayer player, UUID schematicId, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean supplyPlayerFirst, boolean queue, boolean deferSupplies, boolean placeNbt, boolean placeSettings, boolean placeAll) {
         return startBlueprintBuild(player, schematicId, origin, sizeX, sizeY, sizeZ, drones, placeFluids, voidBlocks, voidFluids, voidNbt,
-                supplyPlayerFirst ? com.wrights.blueprint.ShapeSupply.DEFAULT_ORDER : "4,0,1,2,3,5",
+                supplyPlayerFirst ? com.wrights.blueprint.ShapeSupply.DEFAULT_ORDER : com.wrights.blueprint.ShapeSupply.CHEST_FIRST_ORDER,
                 queue, deferSupplies, placeNbt, placeSettings, placeAll);
     }
 

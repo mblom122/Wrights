@@ -451,7 +451,8 @@ public final class WrightsInput {
                     com.wrights.WrightsClientConfig.COPY_NBT_SETTINGS.get(),
                     com.wrights.WrightsClientConfig.COPY_NBT_ALL.get(),
                     com.wrights.WrightsClientConfig.mirrorReplace(),
-                    com.wrights.WrightsClientConfig.MIRROR_AXES.get()));
+                    com.wrights.WrightsClientConfig.MIRROR_AXES.get(),
+                    com.wrights.blueprint.ShapeSupply.encode(com.wrights.WrightsClientConfig.shapeSupplyOrder())));
             return;
         }
         if (WrightsClientState.buildId == null) {

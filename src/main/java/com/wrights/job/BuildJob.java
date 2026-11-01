@@ -1371,7 +1371,7 @@ public final class BuildJob {
             job.setSupplyOrder(tag.getString("supplyOrder"));
         } else if (!job.supplyPlayerFirst) {
             // Legacy chest-first jobs: bound chest before player slots, then digital.
-            job.setSupplyOrder("4,0,1,2,3,5");
+            job.setSupplyOrder(com.wrights.blueprint.ShapeSupply.CHEST_FIRST_ORDER);
         }
         if (tag.contains("anchor")) {
             job.anchor = NbtUtils.readBlockPos(tag, "anchor").orElse(null);

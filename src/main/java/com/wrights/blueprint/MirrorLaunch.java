@@ -155,7 +155,10 @@ public final class MirrorLaunch {
             }
             ready.add(copy);
         }
-        int started = startUnited(player, ready, 0, false, replace, replace, replace, ShapeSupply.DEFAULT_ORDER, true, false, copyNbt, settings, all);
+        String order = payload.supplyOrder() == null || payload.supplyOrder().isBlank()
+                ? ShapeSupply.DEFAULT_ORDER
+                : ShapeSupply.encode(ShapeSupply.parse(payload.supplyOrder()));
+        int started = startUnited(player, ready, 0, false, replace, replace, replace, order, true, false, copyNbt, settings, all);
         if (started > 0) {
             Messages.actionBar(player, "message.wrights.mirror_started", started);
         }
