@@ -96,13 +96,12 @@ public final class HudAnchor {
     }
 
     /**
-     * Left/right sit above the hotbar so Shift/Ctrl menus clear the action-bar text.
-     * Other spots match hint/toast placement.
+     * Left/right sit on the bottom edge beside the hotbar. Other spots match hint/toast placement.
      */
     public static int modeY(int screen, int size) {
         int spot = modeSpot();
         if (spot == LEFT || spot == RIGHT) {
-            return Mth.clamp(screen - HOTBAR_CLEARANCE - size, 2, Math.max(2, screen - size - 2));
+            return Mth.clamp(screen - size - 2, 2, Math.max(2, screen - size - 2));
         }
         return y(spot, WrightsClientConfig.HUD_MODE_Y.get(), screen, size);
     }
