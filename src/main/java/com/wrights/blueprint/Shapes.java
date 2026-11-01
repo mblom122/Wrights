@@ -109,7 +109,7 @@ public final class Shapes {
 
     /**
      * @param height box / cylinder / pyramid / dome height (box height 1 = flat plate); for rings, tube diameter (1 = flat)
-     * @param thickness ring band width; line beam width; cube half-depth on local Z
+     * @param thickness ring band width; line beam width; cube full depth in blocks on local Z
      * @param axis height axis: {@link #AXIS_Y}, {@link #AXIS_Z}, or {@link #AXIS_X}
      * @param rotation quarter-turns around world Y after axis remap (0–3), Ctrl+scroll in the world
      */
@@ -128,7 +128,7 @@ public final class Shapes {
             case SQUARE -> square(out, center, r, hollow, AXIS_Y);
             case LINE -> squareLine(out, center, r, band, h, hollow, AXIS_Y);
             case SPHERE -> sphere(out, center, r, hollow);
-            // Size = half-width (X), thickness = half-depth (Z), height = full tallness (Y).
+            // Size / thickness / height are full block counts: Width × Depth × Height.
             case CUBE -> box(out, center, r, band, Math.max(1, h), hollow);
             case CYLINDER -> cylinder(out, center, r, h, hollow);
             case DOME -> dome(out, center, r, h, hollow);
@@ -486,17 +486,22 @@ public final class Shapes {
     }
 
     /**
-     * Rectangular box: {@code halfX}/{@code halfZ} are half-extents on local X/Z,
-     * {@code height} is full block count upward from the base (1 = flat plate).
+     * Rectangular box: {@code width}/{@code depth}/{@code height} are full block counts.
+     * Centered on X/Z; grows upward on Y from the base (height 1 = flat plate).
      */
-    private static void box(List<BlockPos> out, BlockPos center, int halfX, int halfZ, int height, boolean hollow) {
-        int rx = Math.max(0, halfX);
-        int rz = Math.max(0, halfZ);
-        int top = Math.max(0, height - 1);
-        for (int x = -rx; x <= rx; x++) {
+    private static void box(List<BlockPos> out, BlockPos center, int width, int depth, int height, boolean hollow) {
+        int w = Math.max(1, width);
+        int d = Math.max(1, depth);
+        int h = Math.max(1, height);
+        int x0 = -(w - 1) / 2;
+        int x1 = x0 + w - 1;
+        int z0 = -(d - 1) / 2;
+        int z1 = z0 + d - 1;
+        int top = h - 1;
+        for (int x = x0; x <= x1; x++) {
             for (int y = 0; y <= top; y++) {
-                for (int z = -rz; z <= rz; z++) {
-                    boolean shell = Math.abs(x) == rx || Math.abs(z) == rz || y == 0 || y == top;
+                for (int z = z0; z <= z1; z++) {
+                    boolean shell = x == x0 || x == x1 || z == z0 || z == z1 || y == 0 || y == top;
                     if (hollow && !shell) {
                         continue;
                     }

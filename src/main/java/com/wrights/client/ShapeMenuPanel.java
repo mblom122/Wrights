@@ -129,7 +129,7 @@ final class ShapeMenuPanel {
             y += 18;
         }
         if (kind.usesHeight()) {
-            drawField(graphics, mouseX, mouseY, x, y, alongLabel(axis), alongHint(kind, axis));
+            drawField(graphics, mouseX, mouseY, x, y, alongLabel(kind, axis), alongHint(kind, axis));
             y += 12;
             heightY = y;
             int height = WrightsClientConfig.SHAPE_HEIGHT.get();
@@ -340,10 +340,13 @@ final class ShapeMenuPanel {
     }
 
     /**
-     * Along-axis extent (SHAPE_HEIGHT). Named for the chosen Axis so Width/Height are not swapped
-     * when the shape is tipped onto X or Z.
+     * Along-axis extent (SHAPE_HEIGHT). Cubes always say Height (W/D/H); other shapes rename
+     * for the chosen Axis so Width/Height are not swapped when tipped onto X or Z.
      */
-    private static String alongLabel(int axis) {
+    private static String alongLabel(Shapes.Kind kind, int axis) {
+        if (kind == Shapes.Kind.CUBE) {
+            return "menu.wrights.shape_height";
+        }
         return switch (Shapes.clampPlane(axis)) {
             case Shapes.AXIS_X -> "menu.wrights.shape_along_x";
             case Shapes.AXIS_Z -> "menu.wrights.shape_along_z";
@@ -360,11 +363,7 @@ final class ShapeMenuPanel {
             return a == Shapes.AXIS_Y ? "menu.wrights.shape_line_height_hint" : "menu.wrights.shape_line_along_hint";
         }
         if (kind == Shapes.Kind.CUBE) {
-            return switch (a) {
-                case Shapes.AXIS_X -> "menu.wrights.shape_box_along_x_hint";
-                case Shapes.AXIS_Z -> "menu.wrights.shape_box_along_z_hint";
-                default -> "menu.wrights.shape_box_height_hint";
-            };
+            return "menu.wrights.shape_box_height_hint";
         }
         if (kind == Shapes.Kind.CYLINDER) {
             return switch (a) {
