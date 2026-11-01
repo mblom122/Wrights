@@ -33,9 +33,9 @@ public class ShapeLookSnapScreen extends Screen {
 
     @Override
     protected void init() {
-        // Title, XYZ, then Confirm/Cancel/Clear with the same GAP above and below the values.
-        panelW = WrightsUi.fitW(220, this.width);
-        panelH = PAD + 12 + GAP + ROW * 3 + GAP * 2 + GAP + ROW + PAD;
+        // Left: XYZ. Right: Clear / Cancel / Confirm stacked top-to-bottom on the same rows.
+        panelW = WrightsUi.fitW(236, this.width);
+        panelH = PAD + 12 + GAP + ROW * 3 + GAP * 2 + PAD;
         panelH = WrightsUi.fitH(panelH, this.height);
         panelX = WrightsUi.centerX(panelW, this.width);
         panelY = WrightsUi.centerY(panelH, this.height);
@@ -55,37 +55,36 @@ public class ShapeLookSnapScreen extends Screen {
         int row0 = panelY + PAD + 12 + GAP;
         int row1 = row0 + ROW + GAP;
         int row2 = row1 + ROW + GAP;
-        int btnY = row2 + ROW + GAP;
-        int fieldX = panelX + 34;
-        int fieldW = 52;
+        int fieldX = panelX + 22;
+        int fieldW = 48;
         int plusX = fieldX + fieldW + 2;
+        int actionX = plusX + 16 + 6;
+        int actionW = panelX + panelW - PAD - actionX;
 
         xBox = number(fieldX, row0, fieldW);
         yBox = number(fieldX, row1, fieldW);
         zBox = number(fieldX, row2, fieldW);
-        step(panelX + 18, row0, "-", () -> nudge(-1, 0, 0));
+        step(panelX + 8, row0, "-", () -> nudge(-1, 0, 0));
         step(plusX, row0, "+", () -> nudge(1, 0, 0));
-        step(panelX + 18, row1, "-", () -> nudge(0, -1, 0));
+        step(panelX + 8, row1, "-", () -> nudge(0, -1, 0));
         step(plusX, row1, "+", () -> nudge(0, 1, 0));
-        step(panelX + 18, row2, "-", () -> nudge(0, 0, -1));
+        step(panelX + 8, row2, "-", () -> nudge(0, 0, -1));
         step(plusX, row2, "+", () -> nudge(0, 0, 1));
 
-        int btnGap = 4;
-        int btnW = (panelW - PAD * 2 - btnGap * 2) / 3;
         addRenderableWidget(new WrightsButton(
-                panelX + PAD, btnY, btnW, ROW,
-                Component.translatable("screen.wrights.confirm"),
-                button -> confirm()));
+                actionX, row0, actionW, ROW,
+                Component.translatable("screen.wrights.shape_look_snap_clear"),
+                button -> clearSnap(),
+                true));
         addRenderableWidget(new WrightsButton(
-                panelX + PAD + btnW + btnGap, btnY, btnW, ROW,
+                actionX, row1, actionW, ROW,
                 Component.translatable("screen.wrights.cancel"),
                 button -> cancel(),
                 true));
         addRenderableWidget(new WrightsButton(
-                panelX + PAD + (btnW + btnGap) * 2, btnY, btnW, ROW,
-                Component.translatable("screen.wrights.shape_look_snap_clear"),
-                button -> clearSnap(),
-                true));
+                actionX, row2, actionW, ROW,
+                Component.translatable("screen.wrights.confirm"),
+                button -> confirm()));
 
         suppress = true;
         set(xBox, original.getX());
