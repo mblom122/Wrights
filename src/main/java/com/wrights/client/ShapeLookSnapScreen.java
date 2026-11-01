@@ -103,9 +103,13 @@ public class ShapeLookSnapScreen extends Screen {
 
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        // Light veil so the live shape preview stays readable while nudging the snap.
+        // Light veil + translucent panel so the live shape preview stays readable underneath.
         graphics.fill(0, 0, this.width, this.height, 0x66060C14);
-        WrightsUi.panel(graphics, panelX, panelY, panelW, panelH);
+        graphics.fill(panelX + 3, panelY + 4, panelX + panelW + 3, panelY + panelH + 4, 0x33000000);
+        graphics.fill(panelX, panelY, panelX + panelW, panelY + panelH, 0xB0101822);
+        WrightsUi.border(graphics, panelX, panelY, panelW, panelH, 0xFF31404E);
+        graphics.fill(panelX, panelY, panelX + 2, panelY + panelH, WrightsUi.COPPER);
+        graphics.fill(panelX + 2, panelY, panelX + panelW, panelY + 1, WrightsUi.COPPER_DIM);
     }
 
     @Override
