@@ -232,9 +232,18 @@ public class DroneEntity extends Entity {
     }
 
     public void setWorkStatus(ItemStack current, ItemStack next, int waitReason) {
-        this.entityData.set(CURRENT_BLOCK, current == null || current.isEmpty() ? ItemStack.EMPTY : current.copyWithCount(1));
-        this.entityData.set(NEXT_BLOCK, next == null || next.isEmpty() ? ItemStack.EMPTY : next.copyWithCount(1));
-        this.entityData.set(WAIT_REASON, waitReason);
+        ItemStack cur = current == null || current.isEmpty() ? ItemStack.EMPTY : current.copyWithCount(1);
+        ItemStack nxt = next == null || next.isEmpty() ? ItemStack.EMPTY : next.copyWithCount(1);
+        // Only dirty synched data when something actually changed — avoids per-tick client snaps.
+        if (waitReason != this.entityData.get(WAIT_REASON)) {
+            this.entityData.set(WAIT_REASON, waitReason);
+        }
+        if (!ItemStack.isSameItemSameComponents(cur, this.entityData.get(CURRENT_BLOCK))) {
+            this.entityData.set(CURRENT_BLOCK, cur);
+        }
+        if (!ItemStack.isSameItemSameComponents(nxt, this.entityData.get(NEXT_BLOCK))) {
+            this.entityData.set(NEXT_BLOCK, nxt);
+        }
     }
 
     public void clearWorkStatus() {

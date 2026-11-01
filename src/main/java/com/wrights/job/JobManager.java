@@ -3399,6 +3399,10 @@ public final class JobManager {
             drone.setWorkStatus(ItemStack.EMPTY, ItemStack.EMPTY, reason);
             return;
         }
+        // Hover text does not need per-tick updates; skip the schematic scan most ticks.
+        if (reason == drone.waitReason() && (level.getGameTime() + Math.max(0, hand.lane)) % 5L != 0L) {
+            return;
+        }
         int[] targets = peekHandTargets(level, schematic, job, hand);
         ItemStack current = stackFor(schematic, targets[0]);
         ItemStack next = stackFor(schematic, targets[1]);
@@ -3412,12 +3416,14 @@ public final class JobManager {
     private static int[] peekHandTargets(ServerLevel level, Schematic schematic, BuildJob job, BuildJob.Hand hand) {
         int current = -1;
         int next = -1;
+        // Compute once — calling countOpen inside the loop was O(n²) on large blueprints and hitching flight.
+        boolean ownShareEmpty = countOpen(level, schematic, job, hand) == 0;
         for (int i = 0; i < schematic.blockCount(); i++) {
             Schematic.Entry entry = schematic.entry(i);
             if (job.outsideClip(entry) || satisfied(level, job, entry)) {
                 continue;
             }
-            if (!ownsEntry(job, hand, entry) && countOpen(level, schematic, job, hand) > 0) {
+            if (!ownShareEmpty && !ownsEntry(job, hand, entry)) {
                 continue;
             }
             if (falling(level, schematic, job, entry) != Falling.READY) {
@@ -3608,8 +3614,11 @@ public final class JobManager {
         }
         boolean busy = false;
         int going = 0;
-        for (BuildJob.Hand hand : job.hands()) {
-            if (hand.idle && countOpen(level, schematic, job, hand) == 0) {
+        int[] open = new int[job.hands().size()];
+        for (int i = 0; i < job.hands().size(); i++) {
+            BuildJob.Hand hand = job.hands().get(i);
+            open[i] = countOpen(level, schematic, job, hand);
+            if (hand.idle && open[i] == 0) {
                 going++;
             } else if (!hand.idle) {
                 busy = true;
@@ -3619,8 +3628,9 @@ public final class JobManager {
             return;
         }
         int slot = 0;
-        for (BuildJob.Hand hand : job.hands()) {
-            if (!hand.idle || countOpen(level, schematic, job, hand) > 0 || hand.entityId == null) {
+        for (int i = 0; i < job.hands().size(); i++) {
+            BuildJob.Hand hand = job.hands().get(i);
+            if (!hand.idle || open[i] > 0 || hand.entityId == null) {
                 continue;
             }
             recall(level, player, hand.entityId, slot++, going, hand.homePort);
@@ -3744,7 +3754,15 @@ public final class JobManager {
     }
 
     private static boolean isOpenCell(ServerLevel level, Schematic schematic, BuildJob job, Schematic.Entry entry) {
-        if (job.outsideClip(entry) || satisfied(level, job, entry)) {
+        if (job.outsideClip(entry) || skippedContent(job, entry)) {
+            return false;
+        }
+        // Settled / matching world cells are done — skip the heavier survival checks.
+        if (job.isSettled(entry.x(), entry.y(), entry.z())) {
+            return false;
+        }
+        BlockPos pos = job.min().offset(entry.x(), entry.y(), entry.z());
+        if (level.isLoaded(pos) && level.getBlockState(pos).equals(entry.state())) {
             return false;
         }
         return falling(level, schematic, job, entry) != Falling.SKIP;
