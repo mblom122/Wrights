@@ -34,6 +34,8 @@ final class ShapeMenuPanel {
     private int viewH;
     private int contentH;
     private int scroll;
+    private int previewX;
+    private int previewW;
     private int sizeY = -1;
     private int heightY = -1;
     private int thicknessY = -1;
@@ -67,16 +69,22 @@ final class ShapeMenuPanel {
         tip = null;
         hoveredStack = ItemStack.EMPTY;
         this.host = host;
-        bodyX = x;
-        bodyW = width;
         viewTop = top;
         viewH = Math.max(40, bottom - top);
+        // Fixed preview on the right; only the left options column scrolls.
+        int gap = 8;
+        previewW = Mth.clamp((width - gap) * 2 / 5, 110, Math.max(110, width / 2));
+        int leftW = Math.max(140, width - gap - previewW);
+        previewW = Math.max(96, width - gap - leftW);
+        previewX = x + leftW + gap;
+        bodyX = x;
+        bodyW = leftW;
         scroll = Mth.clamp(scroll, 0, Math.max(0, contentH - viewH));
-        graphics.enableScissor(x - 4, viewTop, x + width + 4, viewTop + viewH);
+        graphics.enableScissor(x - 4, viewTop, x + leftW + 2, viewTop + viewH);
         int y = viewTop - scroll;
         graphics.drawString(font, Component.translatable("menu.wrights.shape_title"), x, y, WrightsUi.COPPER, false);
         y += 14;
-        y = drawKinds(graphics, mouseX, mouseY, x, y, width);
+        y = drawKinds(graphics, mouseX, mouseY, x, y, leftW);
         y += 4;
         Shapes.Kind kind = Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
         int axis = WrightsClientConfig.SHAPE_PLANE.get();
@@ -85,7 +93,7 @@ final class ShapeMenuPanel {
         drawSection(graphics, mouseX, mouseY, x, y, sizeLabel(kind, axis), sizeHint(kind, axis));
         y += 12;
         sizeY = y;
-        sizeW = Math.max(40, width - 40);
+        sizeW = Math.max(40, leftW - 40);
         int size = WrightsClientConfig.SHAPE_SIZE.get();
         int max = axisMax();
         drawSlider(graphics, x, y, sizeW, size - 1, Math.max(1, max - 1));
@@ -113,10 +121,10 @@ final class ShapeMenuPanel {
             graphics.drawString(font, Integer.toString(height), x + sizeW + 8, y, WrightsUi.TEXT, false);
             y += 18;
         }
-        // Axis = height direction; Rotation = quarter-turns around that axis (also Ctrl+scroll).
+        // Axis = height direction; Rotation = yaw around world up (also Ctrl+scroll).
         drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_axis", "menu.wrights.shape_axis_hint");
         y += 12;
-        y = drawTriple(graphics, mouseX, mouseY, x, y, width,
+        y = drawTriple(graphics, mouseX, mouseY, x, y, leftW,
                 WrightsClientConfig.SHAPE_PLANE.get(),
                 "menu.wrights.shape_axis_y",
                 "menu.wrights.shape_axis_z",
@@ -125,7 +133,7 @@ final class ShapeMenuPanel {
         y += 4;
         drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_rotation", "menu.wrights.shape_rotation_hint");
         y += 12;
-        y = drawQuad(graphics, mouseX, mouseY, x, y, width,
+        y = drawQuad(graphics, mouseX, mouseY, x, y, leftW,
                 Shapes.clampYaw(WrightsClientConfig.SHAPE_YAW.get()),
                 "menu.wrights.shape_rot_0",
                 "menu.wrights.shape_rot_90",
@@ -137,7 +145,7 @@ final class ShapeMenuPanel {
         y += 12;
         boolean useAnchor = WrightsConfig.allowShapeAnchor() && WrightsClientConfig.SHAPE_USE_ANCHOR.get();
         if (WrightsConfig.allowShapeAnchor()) {
-            y = drawPair(graphics, mouseX, mouseY, x, y, width,
+            y = drawPair(graphics, mouseX, mouseY, x, y, leftW,
                     WrightsClientConfig.SHAPE_USE_ANCHOR.get(),
                     "menu.wrights.shape_place_look",
                     "menu.wrights.shape_place_anchor",
@@ -146,39 +154,41 @@ final class ShapeMenuPanel {
             if (useAnchor) {
                 drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_under_me", "menu.wrights.shape_under_me_hint");
                 y += 12;
-                boolean underHover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 18;
-                WrightsUi.choice(graphics, x, y, width, 18, false, underHover);
-                graphics.drawCenteredString(font, Component.translatable("menu.wrights.shape_under_me_btn"), x + width / 2, y + 5, WrightsUi.TEXT);
-                hits.add(new Hit(x, y, width, 18, "under_me", 0));
+                boolean underHover = mouseX >= x && mouseX < x + leftW && mouseY >= y && mouseY < y + 18;
+                WrightsUi.choice(graphics, x, y, leftW, 18, false, underHover);
+                graphics.drawCenteredString(font, Component.translatable("menu.wrights.shape_under_me_btn"), x + leftW / 2, y + 5, WrightsUi.TEXT);
+                hits.add(new Hit(x, y, leftW, 18, "under_me", 0));
                 y += 22;
             }
         }
         if (WrightsConfig.allowShapeHollow()) {
-            y = drawToggle(graphics, mouseX, mouseY, x, y, width, WrightsClientConfig.SHAPE_HOLLOW.get(), "menu.wrights.shape_hollow", "menu.wrights.shape_hollow_hint", "hollow");
+            y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_HOLLOW.get(), "menu.wrights.shape_hollow", "menu.wrights.shape_hollow_hint", "hollow");
         }
         if (WrightsConfig.allowShapeVoid()) {
-            y = drawToggle(graphics, mouseX, mouseY, x, y, width, WrightsClientConfig.SHAPE_VOID.get(), "menu.wrights.shape_void", "menu.wrights.shape_void_hint", "void");
+            y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_VOID.get(), "menu.wrights.shape_void", "menu.wrights.shape_void_hint", "void");
         }
         y += 6;
         if (WrightsConfig.allowShapeAnchor()) {
             drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_anchor_section", "menu.wrights.shape_anchor_section_hint");
             y += 12;
-            y = drawStatus(graphics, mouseX, mouseY, x, y, width);
+            y = drawStatus(graphics, mouseX, mouseY, x, y, leftW);
             y += 8;
         }
-        y = drawMaterials(graphics, mouseX, mouseY, x, y, width);
+        y = drawMaterials(graphics, mouseX, mouseY, x, y, leftW);
         y += 8;
         drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_priority", "menu.wrights.shape_priority_hint");
         y += 12;
-        y = drawPriority(graphics, mouseX, mouseY, x, y, width);
+        y = drawPriority(graphics, mouseX, mouseY, x, y, leftW);
         contentH = y - (viewTop - scroll) + 8;
         graphics.disableScissor();
         if (contentH > viewH) {
-            WrightsUi.scrollBar(graphics, x + width - 2, viewTop, viewH, scroll, contentH);
+            WrightsUi.scrollBar(graphics, x + leftW - 2, viewTop, viewH, scroll, contentH);
         }
+        drawShapePreview(graphics, previewX, viewTop, previewW, viewH);
     }
 
     boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        // Scroll only over the left options column — preview stays fixed.
         if (mouseX < bodyX - 4 || mouseX > bodyX + bodyW + 4 || mouseY < viewTop || mouseY > viewTop + viewH) {
             return false;
         }
@@ -582,11 +592,7 @@ final class ShapeMenuPanel {
         int rowH = 26;
         int labelH = 12;
         int sectionGap = 6;
-        int previewGap = 8;
-        int previewW = Math.max(40, (width - previewGap) * 2 / 5);
-        int gridW = Math.max(72, width - previewGap - previewW);
-        previewW = Math.max(40, width - previewGap - gridW);
-        int cardW = Math.max(36, (gridW - gap * (cols - 1)) / cols);
+        int cardW = Math.max(36, (width - gap * (cols - 1)) / cols);
         java.util.List<Shapes.Kind> flat = new java.util.ArrayList<>();
         java.util.List<Shapes.Kind> volume = new java.util.ArrayList<>();
         for (Shapes.Kind entry : Shapes.Kind.values()) {
@@ -599,17 +605,14 @@ final class ShapeMenuPanel {
         int flatRows = Math.max(1, (flat.size() + cols - 1) / cols);
         int volumeRows = Math.max(1, (volume.size() + cols - 1) / cols);
         int gridH = labelH + flatRows * rowH + sectionGap + labelH + volumeRows * rowH;
-        int previewX = x + gridW + previewGap;
-        previewW = Math.min(previewW, Math.max(0, x + width - previewX));
         int cursor = y;
         graphics.drawString(font, Component.translatable("menu.wrights.shape_kind_2d"), x, cursor, WrightsUi.MUTED, false);
         cursor += labelH;
-        cursor = drawKindGrid(graphics, mouseX, mouseY, x, cursor, gridW, cardW, gap, cols, rowH, flat);
+        cursor = drawKindGrid(graphics, mouseX, mouseY, x, cursor, width, cardW, gap, cols, rowH, flat);
         cursor += sectionGap;
         graphics.drawString(font, Component.translatable("menu.wrights.shape_kind_3d"), x, cursor, WrightsUi.MUTED, false);
         cursor += labelH;
-        drawKindGrid(graphics, mouseX, mouseY, x, cursor, gridW, cardW, gap, cols, rowH, volume);
-        drawShapePreview(graphics, previewX, y, previewW, gridH);
+        drawKindGrid(graphics, mouseX, mouseY, x, cursor, width, cardW, gap, cols, rowH, volume);
         return y + gridH;
     }
 
