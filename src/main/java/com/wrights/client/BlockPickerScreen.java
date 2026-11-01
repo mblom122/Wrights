@@ -237,6 +237,9 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
         Choice hovered = null;
         if (shown.isEmpty()) {
             graphics.drawCenteredString(this.font, Component.translatable("screen.wrights.picker_empty"), panelX + panelW / 2, listY + 8, WrightsUi.MUTED);
+            if (tab == Tab.RECENT || tab == Tab.INVENTORY) {
+                graphics.drawCenteredString(this.font, Component.translatable("screen.wrights.picker_empty_try_all"), panelX + panelW / 2, listY + 22, WrightsUi.MUTED);
+            }
         } else {
             int start = scroll * COLS;
             for (int i = 0; i < rows * COLS && start + i < shown.size(); i++) {

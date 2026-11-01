@@ -446,6 +446,7 @@
   "screen.wrights.picker_inventory": "Inventory",
   "screen.wrights.picker_all": "All",
   "screen.wrights.picker_empty": "No blocks",
+  "screen.wrights.picker_empty_try_all": "Try the All tab",
   "screen.wrights.placement": "Placement",
   "screen.wrights.lock": "Lock in place",
   "screen.wrights.rotate_short": "Turn",
