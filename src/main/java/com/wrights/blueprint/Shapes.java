@@ -55,25 +55,33 @@ public final class Shapes {
     /**
      * Exchange presets. Each picks a Kind and Axis so Wall/Floor/Pillar/Beam are oriented
      * without the Shape orientation controls.
+     * Floor / Wall are plates: equal-sides uses a single Size; otherwise Width × Height.
      * Pillar = vertical 1×1 post; Beam = horizontal 1-thick line across your look.
-     * Rectangle = width×height plate; Square = equal size only.
+     * Legacy ids 5 (rectangle) and 6 (square) map to {@link #FLOOR}.
      */
     public enum ExchangeForm {
         FLOOR,
         WALL,
         PILLAR,
         BEAM,
-        CIRCLE,
-        RECTANGLE,
-        SQUARE;
+        CIRCLE;
 
         public Kind kind() {
+            return kind(false);
+        }
+
+        /** {@code equalSides} only affects Floor/Wall plates. */
+        public Kind kind(boolean equalSides) {
             return switch (this) {
-                case FLOOR, WALL, RECTANGLE -> Kind.SQUARE;
+                case FLOOR, WALL -> equalSides ? Kind.RECTANGLE : Kind.SQUARE;
                 case PILLAR, BEAM -> Kind.BOX;
                 case CIRCLE -> Kind.CIRCLE;
-                case SQUARE -> Kind.RECTANGLE;
             };
+        }
+
+        /** True for Floor / Wall — plates that can lock Width = Height. */
+        public boolean plate() {
+            return this == FLOOR || this == WALL;
         }
 
         /** True for the 1-block-thick line forms (vertical pillar / horizontal beam). */
@@ -82,6 +90,10 @@ public final class Shapes {
         }
 
         public static ExchangeForm byId(int id) {
+            // Old rectangle (5) / square (6) presets are Floor now.
+            if (id == 5 || id == 6) {
+                return FLOOR;
+            }
             ExchangeForm[] all = values();
             return all[Mth.clamp(id, 0, all.length - 1)];
         }
@@ -91,9 +103,9 @@ public final class Shapes {
         }
     }
 
-    /** Resolve Exchange's configured form to a Kind. */
+    /** Resolve Exchange's configured form to a Kind (plates default to Width×Height). */
     public static Kind exchangeKind(int formId) {
-        return ExchangeForm.byId(formId).kind();
+        return ExchangeForm.byId(formId).kind(false);
     }
 
     /**

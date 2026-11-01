@@ -123,12 +123,17 @@ final class ShapeMenuPanel {
                 !exchangeMode);
         y = drawKinds(graphics, mouseX, mouseY, x, y, leftW);
         Shapes.Kind kind = exchangeMode
-                ? WrightsClientConfig.exchangeForm().kind()
+                ? WrightsClientConfig.exchangeKind()
                 : Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
         Shapes.ExchangeForm exchangeForm = exchangeMode ? WrightsClientConfig.exchangeForm() : null;
         boolean exchangeLine = exchangeForm != null && exchangeForm.line();
+        boolean exchangePlate = exchangeForm != null && exchangeForm.plate();
         if (exchangeLine) {
             WrightsClientConfig.enforceExchangeLineFootprint();
+        }
+        if (exchangePlate) {
+            WrightsClientConfig.syncExchangeEqualDims();
+            kind = WrightsClientConfig.exchangeKind();
         }
         int axis = WrightsClientConfig.SHAPE_PLANE.get();
         boolean ring = kind == Shapes.Kind.RING;
@@ -151,6 +156,11 @@ final class ShapeMenuPanel {
             drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.exchangeLineLength(), SLIDER_HEIGHT);
             y += 18;
         } else {
+            if (exchangePlate) {
+                boolean equal = WrightsClientConfig.exchangeEqualSides();
+                y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, equal,
+                        "menu.wrights.exchange_equal", "menu.wrights.exchange_equal_hint", "exchange_equal");
+            }
             drawField(graphics, mouseX, mouseY, x, y, sizeLabel(kind, axis), sizeHint(kind, axis));
             y += 12;
             sizeY = y;
@@ -642,6 +652,17 @@ final class ShapeMenuPanel {
                 }
                 yield true;
             }
+            case "exchange_equal" -> {
+                if (exchangeMode) {
+                    Shapes.ExchangeForm form = WrightsClientConfig.exchangeForm();
+                    if (form == Shapes.ExchangeForm.FLOOR) {
+                        WrightsClientConfig.setExchangeFloorEqual(!WrightsClientConfig.exchangeFloorEqual());
+                    } else if (form == Shapes.ExchangeForm.WALL) {
+                        WrightsClientConfig.setExchangeWallEqual(!WrightsClientConfig.exchangeWallEqual());
+                    }
+                }
+                yield true;
+            }
             case "hollow" -> {
                 if (WrightsConfig.allowShapeHollow()) {
                     WrightsClientConfig.setShapeHollow(!WrightsClientConfig.SHAPE_HOLLOW.get());
@@ -789,7 +810,7 @@ final class ShapeMenuPanel {
             return;
         }
         Shapes.Kind kind = exchangeMode
-                ? WrightsClientConfig.exchangeForm().kind()
+                ? WrightsClientConfig.exchangeKind()
                 : Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
         int pivot = exchangeMode ? WrightsClientConfig.exchangePivot() : WrightsClientConfig.SHAPE_PIVOT.get();
         BlockPos anchor = Shapes.anchorStandingOnTop(
@@ -1055,10 +1076,14 @@ final class ShapeMenuPanel {
 
     private void refreshShapePreview() {
         Shapes.Kind kind = exchangeMode
-                ? WrightsClientConfig.exchangeForm().kind()
+                ? WrightsClientConfig.exchangeKind()
                 : Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
         if (exchangeMode && WrightsClientConfig.exchangeForm().line()) {
             WrightsClientConfig.enforceExchangeLineFootprint();
+        }
+        if (exchangeMode && WrightsClientConfig.exchangeForm().plate()) {
+            WrightsClientConfig.syncExchangeEqualDims();
+            kind = WrightsClientConfig.exchangeKind();
         }
         int size = Shapes.clampSize(WrightsClientConfig.SHAPE_SIZE.get());
         int height = Shapes.clampHeight(WrightsClientConfig.SHAPE_HEIGHT.get());
@@ -1244,7 +1269,8 @@ final class ShapeMenuPanel {
             WrightsUi.choice(graphics, cx, cy, cell, cell, on, hover);
             String mark = switch (slot) {
                 case 4 -> "●";
-                case 1, 3, 5, 7 -> "─";
+                case 1, 7 -> "─";
+                case 3, 5 -> "|";
                 default -> "·";
             };
             graphics.drawCenteredString(font, mark, cx + cell / 2, cy + cell / 2 - 4, on ? WrightsUi.TEXT : WrightsUi.MUTED);

@@ -281,8 +281,14 @@ public final class WrightsClientConfig {
             .comment("When true, Exchange breaks replaced blocks with silk touch and returns the drops.")
             .define("exchangeSilk", false);
     public static final ModConfigSpec.IntValue EXCHANGE_FORM = BUILDER
-            .comment("Exchange preset: 0 floor, 1 wall, 2 pillar, 3 beam, 4 circle, 5 rectangle, 6 square.")
+            .comment("Exchange preset: 0 floor, 1 wall, 2 pillar, 3 beam, 4 circle. Legacy 5/6 (rectangle/square) map to floor.")
             .defineInRange("exchangeForm", 0, 0, 6);
+    public static final ModConfigSpec.BooleanValue EXCHANGE_FLOOR_EQUAL = BUILDER
+            .comment("When true, Floor uses one Size for both sides. When false, Width and Height are separate.")
+            .define("exchangeFloorEqual", false);
+    public static final ModConfigSpec.BooleanValue EXCHANGE_WALL_EQUAL = BUILDER
+            .comment("When true, Wall uses one Size for both sides. When false, Width and Height are separate.")
+            .define("exchangeWallEqual", false);
 
     static final ModConfigSpec SPEC = BUILDER.build();
 
@@ -829,6 +835,9 @@ public final class WrightsClientConfig {
 
     public static void setShapeSize(int size) {
         SHAPE_SIZE.set(com.wrights.blueprint.Shapes.clampSize(size));
+        if (exchangeEqualSides()) {
+            SHAPE_HEIGHT.set(SHAPE_SIZE.get());
+        }
         save();
     }
 
@@ -1040,9 +1049,53 @@ public final class WrightsClientConfig {
         return com.wrights.blueprint.Shapes.ExchangeForm.byId(EXCHANGE_FORM.get());
     }
 
+    public static boolean exchangeFloorEqual() {
+        return EXCHANGE_FLOOR_EQUAL.get();
+    }
+
+    public static boolean exchangeWallEqual() {
+        return EXCHANGE_WALL_EQUAL.get();
+    }
+
+    public static boolean exchangeEqualSides() {
+        return switch (exchangeForm()) {
+            case FLOOR -> exchangeFloorEqual();
+            case WALL -> exchangeWallEqual();
+            default -> false;
+        };
+    }
+
+    public static void setExchangeFloorEqual(boolean equal) {
+        EXCHANGE_FLOOR_EQUAL.set(equal);
+        if (equal) {
+            setShapeHeight(SHAPE_SIZE.get());
+        }
+        save();
+        refreshExchangeKind();
+    }
+
+    public static void setExchangeWallEqual(boolean equal) {
+        EXCHANGE_WALL_EQUAL.set(equal);
+        if (equal) {
+            setShapeHeight(SHAPE_SIZE.get());
+        }
+        save();
+        refreshExchangeKind();
+    }
+
     public static void setExchangeForm(int form) {
         EXCHANGE_FORM.set(com.wrights.blueprint.Shapes.ExchangeForm.byId(form).ordinal());
         save();
+    }
+
+    /** Kind for the active Exchange form, including Floor/Wall equal-sides. */
+    public static com.wrights.blueprint.Shapes.Kind exchangeKind() {
+        com.wrights.blueprint.Shapes.ExchangeForm form = exchangeForm();
+        return form.kind(exchangeEqualSides());
+    }
+
+    private static void refreshExchangeKind() {
+        setShapeKind(exchangeKind().ordinal());
     }
 
     /**
@@ -1052,7 +1105,14 @@ public final class WrightsClientConfig {
     public static void applyExchangeForm(int formId, net.minecraft.world.entity.player.Player player) {
         com.wrights.blueprint.Shapes.ExchangeForm form = com.wrights.blueprint.Shapes.ExchangeForm.byId(formId);
         setExchangeForm(form.ordinal());
-        setShapeKind(form.kind().ordinal());
+        // Legacy rectangle/square → Floor, with equal sides on for old Square.
+        if (formId == 6) {
+            EXCHANGE_FLOOR_EQUAL.set(true);
+            setShapeHeight(SHAPE_SIZE.get());
+        } else if (formId == 5) {
+            EXCHANGE_FLOOR_EQUAL.set(false);
+        }
+        setShapeKind(exchangeKind().ordinal());
         setShapeYaw(0);
         setShapeHollow(false);
         net.minecraft.core.Direction facing = player == null
@@ -1064,6 +1124,7 @@ public final class WrightsClientConfig {
                 if (SHAPE_HEIGHT.get() < 1) {
                     setShapeHeight(1);
                 }
+                syncExchangeEqualDims();
             }
             case WALL -> {
                 // Wall faces the player: plate stands in the plane across their look.
@@ -1073,6 +1134,7 @@ public final class WrightsClientConfig {
                 if (SHAPE_HEIGHT.get() < 2) {
                     setShapeHeight(3);
                 }
+                syncExchangeEqualDims();
             }
             case PILLAR -> {
                 setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
@@ -1095,13 +1157,14 @@ public final class WrightsClientConfig {
                     setShapeThickness(1);
                 }
             }
-            case CIRCLE, SQUARE -> setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
-            case RECTANGLE -> {
-                setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
-                if (SHAPE_HEIGHT.get() < 1) {
-                    setShapeHeight(1);
-                }
-            }
+            case CIRCLE -> setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
+        }
+    }
+
+    /** Keep Height = Size while Floor/Wall equal-sides is on. */
+    public static void syncExchangeEqualDims() {
+        if (exchangeEqualSides() && SHAPE_HEIGHT.get() != SHAPE_SIZE.get()) {
+            setShapeHeight(SHAPE_SIZE.get());
         }
     }
 

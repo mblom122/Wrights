@@ -1795,7 +1795,7 @@ public final class WrightsClientState {
                 useAnchor,
                 anchorSet,
                 anchorSet ? WrightsClientConfig.shapeAnchor() : BlockPos.ZERO,
-                WrightsClientConfig.exchangeForm().kind().ordinal(),
+                WrightsClientConfig.exchangeKind().ordinal(),
                 WrightsClientConfig.SHAPE_SIZE.get(),
                 WrightsClientConfig.SHAPE_HEIGHT.get(),
                 WrightsClientConfig.SHAPE_THICKNESS.get(),

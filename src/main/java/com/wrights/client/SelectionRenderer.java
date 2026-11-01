@@ -156,7 +156,7 @@ public final class SelectionRenderer {
         }
         boolean exchange = WrightsClientState.exchangeToolActive();
         com.wrights.blueprint.Shapes.Kind kind = exchange
-                ? WrightsClientConfig.exchangeForm().kind()
+                ? WrightsClientConfig.exchangeKind()
                 : com.wrights.blueprint.Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
         if (exchange) {
             WrightsClientConfig.enforceExchangeLineFootprint();
