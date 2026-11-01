@@ -244,6 +244,10 @@ public final class WrightsInput {
             event.setCanceled(true);
             event.setUseBlock(TriState.FALSE);
             event.setUseItem(TriState.FALSE);
+            if (menuChord(event.getEntity())) {
+                openToolMenu();
+                return;
+            }
             boundThisClick = true;
             com.wrights.storage.DigitalLink.Kind kind = com.wrights.storage.DigitalNetworks.bindKindAt(event.getLevel(), event.getPos());
             if (kind == com.wrights.storage.DigitalLink.Kind.RS) {
@@ -261,6 +265,11 @@ public final class WrightsInput {
             event.setCanceled(true);
             event.setUseBlock(TriState.FALSE);
             event.setUseItem(TriState.FALSE);
+            // Ctrl+Shift = capture tweak menu / Building page. Shift alone = second corner etc.
+            if (menuChord(event.getEntity())) {
+                openCaptureMenu();
+                return;
+            }
             WrightsClientState.onCaptureClick(event.getPos(), event.getEntity().isShiftKeyDown());
             return;
         }
@@ -279,7 +288,11 @@ public final class WrightsInput {
             event.setCanceled(true);
             event.setUseBlock(TriState.FALSE);
             event.setUseItem(TriState.FALSE);
-            openAimedJob();
+            if (menuChord(event.getEntity())) {
+                openToolMenu();
+            } else {
+                openAimedJob();
+            }
             return;
         }
         if (menuMode() && Minecraft.getInstance().screen == null) {
@@ -313,6 +326,10 @@ public final class WrightsInput {
         }
         if (com.wrights.blueprint.BlueprintClientFlags.capture) {
             event.setCanceled(true);
+            if (menuChord(event.getEntity())) {
+                openCaptureMenu();
+                return;
+            }
             if (!(Minecraft.getInstance().hitResult instanceof net.minecraft.world.phys.BlockHitResult hit)
                     || hit.getType() != net.minecraft.world.phys.HitResult.Type.BLOCK) {
                 WrightsClientState.onCaptureClick(null, event.getEntity().isShiftKeyDown());
@@ -329,7 +346,9 @@ public final class WrightsInput {
         }
         if (WrightsClientState.mode == WrightsClientState.Mode.JOBS && Minecraft.getInstance().screen == null) {
             event.setCanceled(true);
-            if (WrightsClientState.jobAimed() != null) {
+            if (menuChord(event.getEntity())) {
+                openToolMenu();
+            } else if (WrightsClientState.jobAimed() != null) {
                 openAimedJob();
             } else {
                 openToolMenu();
@@ -342,6 +361,7 @@ public final class WrightsInput {
                 return;
             }
             if (WrightsClientState.mode == WrightsClientState.Mode.LINK
+                    && !menuChord(event.getEntity())
                     && Minecraft.getInstance().hitResult instanceof net.minecraft.world.phys.BlockHitResult hit
                     && hit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK) {
                 return;
@@ -354,6 +374,29 @@ public final class WrightsInput {
         return WrightsClientState.mode == WrightsClientState.Mode.MANAGE
                 || WrightsClientState.mode == WrightsClientState.Mode.INFO
                 || WrightsClientState.mode == WrightsClientState.Mode.LINK;
+    }
+
+    /**
+     * Shared controller chords:
+     * Ctrl+right-click = set / clear that mode’s anchor,
+     * Shift+right-click = mode special action (second corner, pick From block, …),
+     * Ctrl+Shift+right-click = that mode’s special menu (or the controller page for it),
+     * Alt+right-click = undo last finished build.
+     */
+    private static boolean controlHeld() {
+        Minecraft minecraft = Minecraft.getInstance();
+        return InputConstants.isKeyDown(minecraft.getWindow().getWindow(), GLFW.GLFW_KEY_LEFT_CONTROL)
+                || InputConstants.isKeyDown(minecraft.getWindow().getWindow(), GLFW.GLFW_KEY_RIGHT_CONTROL);
+    }
+
+    private static boolean altHeld() {
+        Minecraft minecraft = Minecraft.getInstance();
+        return InputConstants.isKeyDown(minecraft.getWindow().getWindow(), GLFW.GLFW_KEY_LEFT_ALT)
+                || InputConstants.isKeyDown(minecraft.getWindow().getWindow(), GLFW.GLFW_KEY_RIGHT_ALT);
+    }
+
+    private static boolean menuChord(net.minecraft.world.entity.player.Player player) {
+        return player.isShiftKeyDown() && controlHeld();
     }
 
     private static void openToolMenu() {
@@ -379,7 +422,8 @@ public final class WrightsInput {
             return;
         }
         if (WrightsClientState.bindSupply) {
-            if (player.isShiftKeyDown()) {
+            // Ctrl+Shift = bind menu. Plain = bind chest / clear air.
+            if (menuChord(player)) {
                 Minecraft.getInstance().setScreen(new SupplyBindScreen());
                 return;
             }
@@ -395,13 +439,17 @@ public final class WrightsInput {
             return;
         }
         if (WrightsClientState.buildId == null) {
-            Minecraft.getInstance().setScreen(new WrightsMenuScreen());
-            net.neoforged.neoforge.network.PacketDistributor.sendToServer(
-                    new BlueprintPayloads.LibraryRequest(WrightsClientState.libraryGlobal));
+            openToolMenu();
             return;
         }
-        if (player.isShiftKeyDown()) {
+        // Ctrl+Shift = place / tweak menu.
+        if (menuChord(player)) {
             Minecraft.getInstance().setScreen(new PlacementScreen());
+            return;
+        }
+        // Ctrl = pin the build anchor where you look (stop follow).
+        if (controlHeld()) {
+            pinBuildAnchor(player, pos);
             return;
         }
         if (com.wrights.WrightsClientConfig.BUILD_MENU.get()) {
@@ -411,8 +459,29 @@ public final class WrightsInput {
         WrightsClientState.tryBuild();
     }
 
+    private static void pinBuildAnchor(net.minecraft.world.entity.player.Player player, BlockPos clicked) {
+        BlockPos target = WrightsClientState.lookTarget();
+        if (target == null) {
+            target = clicked;
+        }
+        if (target == null) {
+            player.displayClientMessage(Component.translatable("message.wrights.build_anchor_look"), true);
+            return;
+        }
+        WrightsClientState.follow = false;
+        WrightsClientState.anchor = target.immutable();
+        player.displayClientMessage(
+                Component.translatable("message.wrights.build_anchor_set", target.getX(), target.getY(), target.getZ()),
+                true);
+    }
+
     private static void useMirrorClick(net.minecraft.world.entity.player.Player player, BlockPos pos, Direction face, BlockHitResult hit) {
-        if (player.isShiftKeyDown()) {
+        // Ctrl+Shift = Mirror page. Ctrl = set / clear mirror anchor.
+        if (menuChord(player)) {
+            openToolMenu();
+            return;
+        }
+        if (controlHeld()) {
             if (pos != null && face != null) {
                 WrightsClientState.setMirrorAnchor(pos, face);
                 player.displayClientMessage(Component.translatable("message.wrights.mirror_set", Component.translatable(mirrorAxisKey(face.getAxis()))), true);
@@ -460,9 +529,7 @@ public final class WrightsInput {
             return;
         }
         if (WrightsClientState.buildId == null) {
-            Minecraft.getInstance().setScreen(new WrightsMenuScreen());
-            net.neoforged.neoforge.network.PacketDistributor.sendToServer(
-                    new BlueprintPayloads.LibraryRequest(WrightsClientState.libraryGlobal));
+            openToolMenu();
             return;
         }
         WrightsClientState.tryBuild();
@@ -487,13 +554,9 @@ public final class WrightsInput {
         }
     }
 
+    /** Alt+right-click undoes the last finished build (Ctrl+Shift is the mode menu). */
     private static boolean undoChord(net.minecraft.world.entity.player.Player player) {
-        if (!player.isShiftKeyDown()) {
-            return false;
-        }
-        Minecraft minecraft = Minecraft.getInstance();
-        return InputConstants.isKeyDown(minecraft.getWindow().getWindow(), GLFW.GLFW_KEY_LEFT_CONTROL)
-                || InputConstants.isKeyDown(minecraft.getWindow().getWindow(), GLFW.GLFW_KEY_RIGHT_CONTROL);
+        return altHeld() && !player.isShiftKeyDown() && !controlHeld();
     }
 
     /** Most recent finished paste that can still be undone (job list is newest-finished first). */
@@ -573,27 +636,32 @@ public final class WrightsInput {
         }
     }
 
+    private static void openCaptureMenu() {
+        if (WrightsClientState.hasBox()) {
+            Minecraft.getInstance().setScreen(new BlueprintAdjustScreen());
+            return;
+        }
+        openToolMenu();
+    }
+
     private static void useShapeClick(net.minecraft.world.entity.player.Player player, BlockPos pos, Direction face) {
         if (!com.wrights.WrightsConfig.allowShape()) {
             player.displayClientMessage(Component.translatable("message.wrights.feature_off"), true);
             return;
         }
+        // Ctrl+Shift = look-snap / world-anchor editor.
+        if (menuChord(player)) {
+            openShapeSpecialMenu(player);
+            return;
+        }
+        // Ctrl = set world anchor (and switch Look → On anchor). Air clears.
+        if (controlHeld()) {
+            setShapeWorldAnchor(player, pos);
+            return;
+        }
         boolean lookMode = !com.wrights.WrightsClientConfig.SHAPE_USE_ANCHOR.get()
                 || !com.wrights.WrightsConfig.allowShapeAnchor();
         if (lookMode) {
-            if (player.isShiftKeyDown()) {
-                // Shift opens the anchor-point editor (locks at current aim first if needed).
-                if (!WrightsClientState.shapeLookSnapActive()) {
-                    BlockHitResult aim = WrightsClientState.shapeLookHit();
-                    if (aim == null) {
-                        player.displayClientMessage(Component.translatable("message.wrights.shape_look"), true);
-                        return;
-                    }
-                    WrightsClientState.lockShapeLookSnap(aim.getBlockPos(), aim.getDirection());
-                }
-                Minecraft.getInstance().setScreen(new ShapeLookSnapScreen());
-                return;
-            }
             boolean lockFirst = com.wrights.WrightsClientConfig.SHAPE_LOOK_LOCK.get();
             if (lockFirst && !WrightsClientState.shapeLookSnapActive()) {
                 BlockHitResult aim = WrightsClientState.shapeLookHit();
@@ -620,26 +688,60 @@ public final class WrightsInput {
             }
             return;
         }
-        if (player.isShiftKeyDown()) {
-            // On-anchor mode: shift sets or clears the world shape anchor.
-            BlockHitResult aim = WrightsClientState.lookHit();
-            BlockPos at = aim != null ? aim.getBlockPos() : pos;
-            if (at != null) {
-                WrightsClientState.setShapeAnchor(at);
-                player.displayClientMessage(Component.translatable("message.wrights.shape_set", at.getX(), at.getY(), at.getZ()), true);
-            } else {
-                com.wrights.WrightsClientConfig.clearShapeAnchor();
-                player.displayClientMessage(Component.translatable("message.wrights.shape_cleared"), true);
-            }
-            return;
-        }
         WrightsClientState.tryShape(false, pos, face);
     }
 
-    /** Same look/anchor flow as Shape, but starts an Exchange job. Shift picks the From block. */
+    /** Ctrl+right-click: pin the shared shape/exchange world anchor and prefer On-anchor place. */
+    private static void setShapeWorldAnchor(net.minecraft.world.entity.player.Player player, BlockPos clicked) {
+        if (!com.wrights.WrightsConfig.allowShapeAnchor()) {
+            player.displayClientMessage(Component.translatable("message.wrights.feature_off"), true);
+            return;
+        }
+        BlockHitResult aim = WrightsClientState.lookHit();
+        BlockPos at = aim != null ? aim.getBlockPos() : clicked;
+        if (at != null) {
+            WrightsClientState.setShapeAnchor(at);
+            com.wrights.WrightsClientConfig.setShapeUseAnchor(true);
+            WrightsClientState.clearShapeLookSnap();
+            player.displayClientMessage(
+                    Component.translatable("message.wrights.shape_set", at.getX(), at.getY(), at.getZ()),
+                    true);
+            return;
+        }
+        com.wrights.WrightsClientConfig.clearShapeAnchor();
+        player.displayClientMessage(Component.translatable("message.wrights.shape_cleared"), true);
+    }
+
+    private static void openShapeSpecialMenu(net.minecraft.world.entity.player.Player player) {
+        boolean lookMode = !com.wrights.WrightsClientConfig.SHAPE_USE_ANCHOR.get()
+                || !com.wrights.WrightsConfig.allowShapeAnchor();
+        if (lookMode) {
+            if (!WrightsClientState.shapeLookSnapActive()) {
+                BlockHitResult aim = WrightsClientState.shapeLookHit();
+                if (aim == null) {
+                    player.displayClientMessage(Component.translatable("message.wrights.shape_look"), true);
+                    return;
+                }
+                WrightsClientState.lockShapeLookSnap(aim.getBlockPos(), aim.getDirection());
+            }
+            Minecraft.getInstance().setScreen(new ShapeLookSnapScreen());
+            return;
+        }
+        Minecraft.getInstance().setScreen(new ShapeAnchorScreen(null));
+    }
+
+    /** Same look/anchor flow as Shape. Shift picks From. Ctrl+Shift opens Exchange options. */
     private static void useExchangeClick(net.minecraft.world.entity.player.Player player, BlockPos pos, Direction face) {
         if (!com.wrights.WrightsConfig.allowExchange()) {
             player.displayClientMessage(Component.translatable("message.wrights.feature_off"), true);
+            return;
+        }
+        if (menuChord(player)) {
+            openToolMenu();
+            return;
+        }
+        if (controlHeld()) {
+            setShapeWorldAnchor(player, pos);
             return;
         }
         if (player.isShiftKeyDown()) {
