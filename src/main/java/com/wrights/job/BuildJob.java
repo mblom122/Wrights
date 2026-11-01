@@ -769,24 +769,26 @@ public final class BuildJob {
     /**
      * True once this cell was placed or skipped. Later world changes (a cactus popping off, a player
      * breaking the block) must not make the job try that schematic cell again.
+     * <p>
+     * Must stay O(1): crew scans call this for every unfinished cell many times per tick. Walking
+     * {@link #refunds} here made large jobs slow down as more blocks were placed.
      */
     public boolean isSettled(short x, short y, short z) {
-        long key = BlockPos.asLong(Short.toUnsignedInt(x), Short.toUnsignedInt(y), Short.toUnsignedInt(z));
-        if (settledGhosts.contains(key)) {
-            return true;
-        }
-        for (Refund refund : refunds) {
-            if (refund.x() == x && refund.y() == y && refund.z() == z) {
-                return true;
-            }
-        }
-        return false;
+        return settledGhosts.contains(
+                BlockPos.asLong(Short.toUnsignedInt(x), Short.toUnsignedInt(y), Short.toUnsignedInt(z)));
     }
 
     public void collectSettledGhosts(Set<Long> into) {
         into.addAll(settledGhosts);
+    }
+
+    /** Ensure every refund cell is marked settled (covers older saves that only stored refunds). */
+    private void syncSettledFromRefunds() {
         for (Refund refund : refunds) {
-            into.add(BlockPos.asLong(Short.toUnsignedInt(refund.x()), Short.toUnsignedInt(refund.y()), Short.toUnsignedInt(refund.z())));
+            settledGhosts.add(BlockPos.asLong(
+                    Short.toUnsignedInt(refund.x()),
+                    Short.toUnsignedInt(refund.y()),
+                    Short.toUnsignedInt(refund.z())));
         }
     }
 
@@ -1216,6 +1218,7 @@ public final class BuildJob {
         for (int i = 0; i < refundList.size(); i++) {
             job.refunds.add(Refund.load(refundList.getCompound(i), blocks));
         }
+        job.syncSettledFromRefunds();
         ListTag list = tag.getList("partial", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) {
             job.partial.add(Schematic.Entry.load(list.getCompound(i), blocks));
