@@ -347,13 +347,18 @@ final class ShapeMenuPanel {
                 boolean hover = mouseX >= cx && mouseX < cx + CHIP && mouseY >= cy && mouseY < cy + CHIP;
                 WrightsUi.slot(graphics, cx, cy, on || hover ? WrightsUi.COPPER : 0xFF31404E);
                 ItemStack stack = entries.get(i).item().getDefaultInstance();
-                graphics.renderItem(stack, cx + 2, cy + 2);
+                graphics.renderItem(stack, cx + 1, cy + 1);
                 String badge = mode == ShapeMaterials.FillMode.RANDOM
                         ? Integer.toString(entries.get(i).weight())
                         : Integer.toString(i + 1);
-                int wx = cx + CHIP - 1 - font.width(badge);
-                graphics.fill(wx - 1, cy + CHIP - 9, cx + CHIP - 1, cy + CHIP - 1, 0xAA101820);
-                graphics.drawString(font, badge, wx, cy + CHIP - 9, WrightsUi.COPPER, false);
+                int wx = cx + 17 - font.width(badge);
+                int by = cy + 10;
+                // Item icons draw above normal text; lift the count like inventory stack sizes.
+                graphics.pose().pushPose();
+                graphics.pose().translate(0.0F, 0.0F, 200.0F);
+                graphics.fill(wx - 1, by - 1, cx + 17, by + 8, 0xC0101820);
+                graphics.drawString(font, badge, wx, by, WrightsUi.COPPER, false);
+                graphics.pose().popPose();
                 hits.add(new Hit(cx, cy, CHIP, CHIP, "mat_select", i));
                 if (hover) {
                     hoveredStack = stack;
