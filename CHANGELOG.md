@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.1.7
+
+### Features
+- Shape build mode under Mirror: pick a kind, materials, and hollow option, then place with look aim or an anchor.
+- Weighted shape materials with Random, Priority, and Order fills, a batch picker, and a spinning preview that shows mixed fills.
+- Shape Anchor section with a Change screen, live nearby-block preview, look-mode snap lock, and Set under me.
+- Selectable AABB pivot for look and anchor placement, with frame and pivot drawn in the menu and in the world.
+- Square (Width×Height), Box (Width×Depth×Height), equal-Size Cube and Rectangle, Circle by diameter, and rings that can grow into a torus.
+- Split shape Plane into Axis and Rotation for every kind; rotate holograms with Ctrl+scroll in the world (relative to facing / around the pin like blueprints).
+- RFTools-scale shape boxes (default max axis 512 / maxBlocks 512³) with streaming placement — no full BlockPos list at launch.
+- Configurable shape air-snap offset (Options) so look-at-air previews sit clear of the player.
+- −/+ beside each shape dimension slider; hold-drag the track; click the value to type. Shared Ctrl/Shift/Alt step scale on all +/- controls.
+- Undo the last finished build with Ctrl+Shift+right-click.
+- Rotate build templates with Ctrl+scroll; hold Ctrl for resize and rotate help.
+- Drag plain blocks from JEI onto shape Pick blocks.
+- Server caps and feature toggles for Shape builds.
+
+### Changes
+- Shape menu preview stays fixed on the right; only the options column scrolls. Size and block count sit above the sample (Preview / size / blocks, blue size text).
+- Height slider only appears for shapes that use it; slider labels follow the kind and Axis.
+- Look-mode shapes pin to the chosen AABB pivot; Void blocks replaces the old Replace / Clear first pair and also clears fluids.
+- Line became Box; Cube is a single equal Size again (width/depth/height labels when a prism needs them).
+- Remember controller mode and build sub-tool across world rejoin.
+- Job time left freezes while paused or stalled and keeps the last estimate.
+- Shared copper pivot marker for shape, build, and mirror anchors.
+- Fit menus to the window at high GUI scale; short screens scroll place/edit and New blueprint overflow.
+- Jobs list nests Working and Finished scrolling; Manage list gets a border and scrollbar.
+- Jobs and Manage mutate actions stay disabled without a controller; Add stays off when nothing can be added.
+- Restrict shape Pick blocks to plain non-NBT cubes; Confirm renames the old Add action; material weights cap at 999.
+- Format block counts with thousand separators; section headers versus field labels are standardized.
+- Large shapes and blueprints sample or wire-box preview instead of freezing the client.
+
+### Fixes
+- Shape builds no longer OutOfMemory on huge solids; cells stream like RFTools instead of materializing millions of BlockPos.
+- Jobs card buttons no longer ignore clicks on large Waiting builds; the hold-controller warning draws on top of the Jobs card.
+- Large jobs stay responsive: settled-cell checks are O(1), and crew scans plus holograms are capped.
+- Shape ring thickness stays independent of size; tipped shapes yaw around world up so tips swing N/E/S/W.
+- Shape pivot “Middle of shape” no longer overlaps Done; Anchor point layout and live preview are tightened.
+- Info stock tooltips no longer cover the rows; Mirror no longer overlaps Close; Materials sits on the Build/Close row when the detail card is short.
+- Shape menu no longer crashes on B; preview frame vertical edges and mesh alignment are fixed.
+- Nearest-to-player ghosts stay cheap; million-block shape ghosts are no longer rebuilt every frame.
+
 ## 0.1.6
 
 ### Building
