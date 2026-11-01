@@ -21,7 +21,7 @@ public final class Shapes {
         SPHERE(true, false),
         CUBE(true, false),
         CYLINDER(true, true),
-        DOME(true, false),
+        DOME(true, true),
         PYRAMID(true, true);
 
         private final boolean volume;
@@ -68,21 +68,31 @@ public final class Shapes {
         return Mth.clamp(plane, 0, 2);
     }
 
+    /** Quarter-turns around Y: 0–3. */
+    public static int clampYaw(int yaw) {
+        return Math.floorMod(yaw, 4);
+    }
+
     /** World positions for one shape centered on {@code center}. */
     public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, boolean hollow, int plane) {
-        return blocks(kind, center, size, height, 1, hollow, plane, false);
+        return blocks(kind, center, size, height, 1, hollow, plane, false, 0);
     }
 
     /** World positions for one shape centered on {@code center}. When {@code flipVertical}, mirrors on Y through the center. */
     public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, boolean hollow, int plane, boolean flipVertical) {
-        return blocks(kind, center, size, height, 1, hollow, plane, flipVertical);
+        return blocks(kind, center, size, height, 1, hollow, plane, flipVertical, 0);
+    }
+
+    public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, int thickness, boolean hollow, int plane, boolean flipVertical) {
+        return blocks(kind, center, size, height, thickness, hollow, plane, flipVertical, 0);
     }
 
     /**
-     * @param height cylinder / pyramid height; for rings, tube diameter of the torus (1 = flat)
+     * @param height cylinder / pyramid / dome height; for rings, tube diameter of the torus (1 = flat)
      * @param thickness ring / torus tube width in the ring plane; ignored by other kinds
+     * @param yaw quarter-turns around Y through {@code center} (0–3)
      */
-    public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, int thickness, boolean hollow, int plane, boolean flipVertical) {
+    public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, int thickness, boolean hollow, int plane, boolean flipVertical, int yaw) {
         List<BlockPos> out = new ArrayList<>();
         if (center == null || kind == null) {
             return out;
@@ -99,7 +109,7 @@ public final class Shapes {
             case SPHERE -> sphere(out, center, r, hollow);
             case CUBE -> cube(out, center, r, hollow);
             case CYLINDER -> cylinder(out, center, r, h, hollow);
-            case DOME -> dome(out, center, r, hollow);
+            case DOME -> dome(out, center, r, h, hollow);
             case PYRAMID -> pyramid(out, center, r, h, hollow);
         }
         if (flipVertical) {
@@ -107,6 +117,23 @@ public final class Shapes {
             for (int i = 0; i < out.size(); i++) {
                 BlockPos pos = out.get(i);
                 out.set(i, new BlockPos(pos.getX(), cy - (pos.getY() - cy), pos.getZ()));
+            }
+        }
+        int turns = clampYaw(yaw);
+        if (turns != 0) {
+            int cx = center.getX();
+            int cz = center.getZ();
+            for (int i = 0; i < out.size(); i++) {
+                BlockPos pos = out.get(i);
+                int dx = pos.getX() - cx;
+                int dz = pos.getZ() - cz;
+                for (int t = 0; t < turns; t++) {
+                    int nextX = dz;
+                    int nextZ = -dx;
+                    dx = nextX;
+                    dz = nextZ;
+                }
+                out.set(i, new BlockPos(cx + dx, pos.getY(), cz + dz));
             }
         }
         return out;
@@ -117,11 +144,15 @@ public final class Shapes {
      * Used by “where I look” placement so the aim cell is the bottom corner of the box, not the center.
      */
     public static List<BlockPos> blocksFromCorner(Kind kind, BlockPos corner, int size, int height, boolean hollow, int plane, boolean flipVertical) {
-        return blocksFromCorner(kind, corner, size, height, 1, hollow, plane, flipVertical);
+        return blocksFromCorner(kind, corner, size, height, 1, hollow, plane, flipVertical, 0);
     }
 
     public static List<BlockPos> blocksFromCorner(Kind kind, BlockPos corner, int size, int height, int thickness, boolean hollow, int plane, boolean flipVertical) {
-        List<BlockPos> local = blocks(kind, BlockPos.ZERO, size, height, thickness, hollow, plane, flipVertical);
+        return blocksFromCorner(kind, corner, size, height, thickness, hollow, plane, flipVertical, 0);
+    }
+
+    public static List<BlockPos> blocksFromCorner(Kind kind, BlockPos corner, int size, int height, int thickness, boolean hollow, int plane, boolean flipVertical, int yaw) {
+        List<BlockPos> local = blocks(kind, BlockPos.ZERO, size, height, thickness, hollow, plane, flipVertical, yaw);
         if (local.isEmpty() || corner == null) {
             return local;
         }
@@ -312,19 +343,29 @@ public final class Shapes {
         }
     }
 
-    private static void dome(List<BlockPos> out, BlockPos center, int radius, boolean hollow) {
-        int r2 = radius * radius;
-        int inner = hollow ? Math.max(0, radius - 1) : -1;
-        int inner2 = inner * inner;
+    /** Hemisphere ellipsoid: Size is the floor radius, Height is how tall the dome rises. */
+    private static void dome(List<BlockPos> out, BlockPos center, int radius, int height, boolean hollow) {
+        int tall = Math.max(1, height);
+        long rr = (long) radius * radius;
+        long hh = (long) tall * tall;
+        long limit = rr * hh;
+        int innerR = hollow ? Math.max(0, radius - 1) : -1;
+        int innerH = hollow ? Math.max(0, tall - 1) : -1;
+        long innerLimit = hollow ? (long) innerR * innerR * innerH * innerH : -1L;
         for (int x = -radius; x <= radius; x++) {
-            for (int y = 0; y <= radius; y++) {
+            for (int y = 0; y <= tall; y++) {
                 for (int z = -radius; z <= radius; z++) {
-                    int d2 = x * x + y * y + z * z;
-                    if (d2 > r2) {
+                    long d = (long) x * x * hh + (long) z * z * hh + (long) y * y * rr;
+                    if (d > limit) {
                         continue;
                     }
-                    if (hollow && d2 < inner2) {
-                        continue;
+                    if (hollow && innerR > 0 && innerH > 0) {
+                        long inner = (long) x * x * (long) innerH * innerH
+                                + (long) z * z * (long) innerH * innerH
+                                + (long) y * y * (long) innerR * innerR;
+                        if (inner < innerLimit) {
+                            continue;
+                        }
                     }
                     out.add(center.offset(x, y, z));
                 }

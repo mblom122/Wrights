@@ -216,6 +216,9 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.IntValue SHAPE_PLANE = BUILDER
             .comment("Flat-shape plane. 0 XZ, 1 XY, 2 YZ.")
             .defineInRange("shapePlane", 0, 0, 2);
+    public static final ModConfigSpec.IntValue SHAPE_YAW = BUILDER
+            .comment("Quarter-turns of the shape around Y (0–3). Used by volume shapes and Ctrl+scroll.")
+            .defineInRange("shapeYaw", 0, 0, 3);
     public static final ModConfigSpec.BooleanValue SHAPE_HOLLOW = BUILDER
             .define("shapeHollow", false);
     public static final ModConfigSpec.BooleanValue SHAPE_FLIP_VERTICAL = BUILDER
@@ -799,6 +802,11 @@ public final class WrightsClientConfig {
 
     public static void setShapePlane(int plane) {
         SHAPE_PLANE.set(com.wrights.blueprint.Shapes.clampPlane(plane));
+        save();
+    }
+
+    public static void setShapeYaw(int yaw) {
+        SHAPE_YAW.set(com.wrights.blueprint.Shapes.clampYaw(yaw));
         save();
     }
 

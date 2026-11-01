@@ -520,12 +520,33 @@ public final class WrightsInput {
             return;
         }
         if (control) {
+            // Shape tool: Ctrl+scroll tips flat/ring shapes onto the next plane (floor ↔ walls).
+            if (WrightsClientState.shapeToolActive() && com.wrights.WrightsConfig.allowShape()) {
+                com.wrights.blueprint.Shapes.Kind kind =
+                        com.wrights.blueprint.Shapes.Kind.byId(com.wrights.WrightsClientConfig.SHAPE_KIND.get());
+                if (!kind.volume()) {
+                    int plane = com.wrights.WrightsClientConfig.SHAPE_PLANE.get();
+                    int next = event.getScrollDeltaY() > 0.0D
+                            ? (plane + 1) % 3
+                            : Math.floorMod(plane - 1, 3);
+                    com.wrights.WrightsClientConfig.setShapePlane(next);
+                    event.setCanceled(true);
+                    return;
+                }
+                // Volume shapes: yaw the whole box 90° around Y (same idea as templates).
+                int yaw = com.wrights.WrightsClientConfig.SHAPE_YAW.get();
+                int nextYaw = event.getScrollDeltaY() > 0.0D
+                        ? (yaw + 1) & 3
+                        : (yaw + 3) & 3;
+                com.wrights.WrightsClientConfig.setShapeYaw(nextYaw);
+                event.setCanceled(true);
+                return;
+            }
             // Build with a template: Ctrl+scroll rotates 90° (up = clockwise, down = anti-clockwise).
             if (WrightsClientState.mode == WrightsClientState.Mode.BUILD
                     && WrightsClientState.buildId != null
                     && !WrightsClientState.bindSupply
-                    && !(WrightsClientState.mirrorToolActive() && com.wrights.WrightsClientConfig.mirrorBlocks())
-                    && !WrightsClientState.shapeToolActive()) {
+                    && !(WrightsClientState.mirrorToolActive() && com.wrights.WrightsClientConfig.mirrorBlocks())) {
                 var op = event.getScrollDeltaY() > 0.0D
                         ? com.wrights.blueprint.BlueprintTransforms.Op.ROTATE
                         : com.wrights.blueprint.BlueprintTransforms.Op.ROTATE_CCW;

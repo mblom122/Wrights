@@ -508,15 +508,16 @@ final class ShapeMenuPanel {
         boolean hollow = WrightsClientConfig.SHAPE_HOLLOW.get();
         boolean flip = WrightsClientConfig.SHAPE_FLIP_VERTICAL.get();
         int plane = WrightsClientConfig.SHAPE_PLANE.get();
+        int yaw = Shapes.clampYaw(WrightsClientConfig.SHAPE_YAW.get());
         List<ShapeMaterials.Entry> materials = WrightsClientConfig.shapeMaterials();
         ShapeMaterials.FillMode mode = WrightsClientConfig.shapeFillMode();
         int batch = WrightsClientConfig.SHAPE_ORDER_BATCH.get();
-        long key = previewMaterialsKey(kind, size, height, thickness, plane, hollow, flip, materials, mode, batch);
+        long key = previewMaterialsKey(kind, size, height, thickness, plane, yaw, hollow, flip, materials, mode, batch);
         if (key == previewKey) {
             return;
         }
         previewKey = key;
-        List<BlockPos> worlds = Shapes.blocks(kind, BlockPos.ZERO, size, height, thickness, hollow, plane, flip);
+        List<BlockPos> worlds = Shapes.blocks(kind, BlockPos.ZERO, size, height, thickness, hollow, plane, flip, yaw);
         if (worlds.isEmpty()) {
             previewGhosts = List.of();
             previewSizeX = previewSizeY = previewSizeZ = 1;
@@ -580,6 +581,7 @@ final class ShapeMenuPanel {
             int height,
             int thickness,
             int plane,
+            int yaw,
             boolean hollow,
             boolean flip,
             List<ShapeMaterials.Entry> materials,
@@ -591,6 +593,7 @@ final class ShapeMenuPanel {
         key = key * 31L + height;
         key = key * 31L + thickness;
         key = key * 31L + plane;
+        key = key * 31L + yaw;
         key = key * 31L + (hollow ? 1 : 0);
         key = key * 31L + (flip ? 1 : 0);
         key = key * 31L + (mode == null ? 0 : mode.ordinal());

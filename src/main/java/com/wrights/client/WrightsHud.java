@@ -234,6 +234,9 @@ public final class WrightsHud {
         if (WrightsClientState.mode == WrightsClientState.Mode.CAPTURE && WrightsClientState.hasBox()) {
             return CtrlHelp.RESIZE;
         }
+        if (WrightsClientState.shapeToolActive() && WrightsConfig.allowShape()) {
+            return CtrlHelp.ROTATE;
+        }
         if (WrightsClientState.mode == WrightsClientState.Mode.BUILD
                 && WrightsClientState.buildId != null
                 && !WrightsClientState.bindSupply
@@ -245,10 +248,14 @@ public final class WrightsHud {
 
     private static void drawCtrlHelp(GuiGraphics graphics, Minecraft minecraft) {
         CtrlHelp kind = ctrlHelpKind();
+        boolean shapeRotate = kind == CtrlHelp.ROTATE && WrightsClientState.shapeToolActive();
         Component title = Component.translatable(kind == CtrlHelp.ROTATE ? "hud.wrights.ctrl_rotate_title" : "hud.wrights.ctrl_resize_title");
         Component up = Component.translatable(kind == CtrlHelp.ROTATE ? "hud.wrights.ctrl_rotate_up" : "hud.wrights.ctrl_resize_up");
         Component down = Component.translatable(kind == CtrlHelp.ROTATE ? "hud.wrights.ctrl_rotate_down" : "hud.wrights.ctrl_resize_down");
-        Component tip = Component.translatable(kind == CtrlHelp.ROTATE ? "hud.wrights.ctrl_rotate_tip" : "hud.wrights.ctrl_resize_tip");
+        Component tip = Component.translatable(
+                kind == CtrlHelp.ROTATE
+                        ? (shapeRotate ? "hud.wrights.ctrl_rotate_shape_tip" : "hud.wrights.ctrl_rotate_tip")
+                        : "hud.wrights.ctrl_resize_tip");
         Component how = Component.translatable("hud.wrights.ctrl_how");
         int width = 220;
         width = Math.max(width, minecraft.font.width(title) + 28);
