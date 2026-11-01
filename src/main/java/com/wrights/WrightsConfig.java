@@ -42,14 +42,14 @@ public final class WrightsConfig {
     public static final ModConfigSpec.IntValue MAX_SHAPE_AXIS = BUILDER
             .comment(
                     "Largest size, height, or thickness a Shape may use, in blocks (512 matches RFTools Builder).",
-                    "Separate from maxAxis (blueprints). Kept at or below maxAxis.",
-                    "Huge solid shapes are still capped by maxBlocks — preview uses a wire box when the cell list would be too large.")
-            .defineInRange("maxShapeAxis", 512, 1, 512);
+                    "Separate from maxAxis (blueprints). Effective cap is min(maxShapeAxis, maxAxis).",
+                    "Huge solid shapes are still capped by maxBlocks — preview uses a wire box when over shapePreviewListCap.")
+            .defineInRange("maxShapeAxis", 512, 1, 4096);
 
     public static final ModConfigSpec.IntValue MAX_BLOCKS = BUILDER
             .comment(
-                    "Largest selection volume, in blocks. Air counts toward this cap. 100000 matches Building Gadgets.",
-                    "A larger volume uses more memory and can lag the server while it is copied or built.")
+                    "Largest volume, in blocks, for blueprints and Shape builds. Air counts toward this cap.",
+                    "100000 matches Building Gadgets. Raise for bigger solid shapes; raising uses more memory and can lag the server.")
             .defineInRange("maxBlocks", 100_000, 1, 16_777_216);
 
     public static final ModConfigSpec.IntValue BLOCKS_PER_TICK = BUILDER
@@ -99,6 +99,13 @@ public final class WrightsConfig {
                     "Blueprint blocks farther than this many blocks are not drawn in the world.",
                     "Raising this can lag the client.")
             .defineInRange("ghostRange", 48, 8, 512);
+
+    public static final ModConfigSpec.IntValue SHAPE_PREVIEW_LIST_CAP = BUILDER
+            .comment(
+                    "Most shape cells the client may materialize for ghost previews.",
+                    "Above this, Shape mode draws only the wire box (RFTools-style). 0 uses ghostBudget-derived default.",
+                    "Raising this can lag the client on large shapes.")
+            .defineInRange("shapePreviewListCap", 0, 0, 1_000_000);
 
     public static final ModConfigSpec.BooleanValue REQUIRE_CHUNKS_LOADED = BUILDER
             .comment("While true, a job waits for the chunk to load. While false, unloaded positions are skipped.")
@@ -406,6 +413,10 @@ public final class WrightsConfig {
      * Above this, Wrights draws the RFTools-style wire box only (no per-block ghost list).
      */
     public static int shapePreviewListCap() {
+        int configured = read(SHAPE_PREVIEW_LIST_CAP, 0);
+        if (configured > 0) {
+            return configured;
+        }
         return Math.max(4_096, Math.min(65_536, previewSampleBudget() * 8));
     }
 

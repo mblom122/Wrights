@@ -209,13 +209,13 @@ public final class WrightsClientConfig {
             .defineInRange("shapeKind", 0, 0, 8);
     public static final ModConfigSpec.IntValue SHAPE_SIZE = BUILDER
             .comment("Radius or half-width of the shape. Server maxShapeAxis still caps the real build.")
-            .defineInRange("shapeSize", 4, 1, 512);
+            .defineInRange("shapeSize", 4, 1, 4096);
     public static final ModConfigSpec.IntValue SHAPE_HEIGHT = BUILDER
             .comment("Height for cylinders, pyramids, and ring/donut extrusion. Server maxShapeAxis still caps the real build.")
-            .defineInRange("shapeHeight", 6, 1, 512);
+            .defineInRange("shapeHeight", 6, 1, 4096);
     public static final ModConfigSpec.IntValue SHAPE_THICKNESS = BUILDER
             .comment("Ring band / line width, or cube depth in blocks on local Z. Server maxShapeAxis still caps the real build.")
-            .defineInRange("shapeThickness", 1, 1, 512);
+            .defineInRange("shapeThickness", 1, 1, 4096);
     public static final ModConfigSpec.IntValue SHAPE_PLANE = BUILDER
             .comment("Shape height axis. 0 = Y upright, 1 = Z, 2 = X.")
             .defineInRange("shapePlane", 0, 0, 2);
