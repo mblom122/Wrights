@@ -258,7 +258,7 @@ final class ShapeMenuPanel {
             }
             case "mat_pick" -> {
                 if (host != null) {
-                    BlockPickerScreen.openBlocks(host, this::addMaterial);
+                    BlockPickerScreen.openBlocks(host, this::addMaterials);
                 }
                 yield true;
             }
@@ -307,11 +307,16 @@ final class ShapeMenuPanel {
         };
     }
 
-    private void addMaterial(BlockState state) {
-        if (state == null || state.isAir()) {
+    private void addMaterials(List<BlockState> states) {
+        if (states == null || states.isEmpty()) {
             return;
         }
-        WrightsClientConfig.shapeMaterialAdd(state.getBlock().asItem());
+        for (BlockState state : states) {
+            if (state == null || state.isAir()) {
+                continue;
+            }
+            WrightsClientConfig.shapeMaterialAdd(state.getBlock().asItem());
+        }
         selectedMaterial = Math.max(0, WrightsClientConfig.shapeMaterials().size() - 1);
     }
 
