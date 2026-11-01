@@ -1027,24 +1027,6 @@ public final class JobManager {
             publishShapeDroneStatus(level, job, null, DroneEntity.WAIT_PAUSED);
             return;
         }
-        if (job.queued()) {
-            topUpQueued(player, library, job);
-            if (!job.hasCrew() && !instant(player)) {
-                job.setWaitKind(shortOnItems(player, library, job) ? BuildJob.WAIT_ITEMS : BuildJob.WAIT_NONE);
-                return;
-            }
-        }
-        if (holdWithoutDrones(player, library, job)) {
-            job.setWaitKind(BuildJob.WAIT_NONE);
-            return;
-        }
-        if (!inReach(player, library, job)) {
-            job.setWaitKind(BuildJob.WAIT_NONE);
-            return;
-        }
-        if (job.waitKind() != BuildJob.WAIT_ITEMS) {
-            job.workedTick();
-        }
         java.util.List<com.wrights.blueprint.ShapeMaterials.Entry> materials =
                 com.wrights.blueprint.ShapeMaterials.parse(job.shapeMaterials());
         java.util.List<com.wrights.blueprint.ShapeMaterials.Entry> usable = new java.util.ArrayList<>();
@@ -1064,13 +1046,6 @@ public final class JobManager {
                 com.wrights.blueprint.ShapeMaterials.FillMode.byId(job.shapeFillMode());
         java.util.Random random = new java.util.Random(job.shapeSeed() ^ (((long) job.cursor()) << 1));
         boolean fast = instant(player);
-        int scanBudget = Math.max(1, WrightsConfig.COPY_POSITIONS_PER_TICK.getAsInt());
-        int placeBudget = fast ? Math.min(8192, scanBudget) : Math.max(1, WrightsConfig.BLOCKS_PER_TICK.getAsInt());
-        int scanned = 0;
-        int placed = 0;
-        DroneEntity drone = null;
-        BlockState statusState = null;
-        int statusWait = DroneEntity.WAIT_NONE;
         com.wrights.blueprint.Shapes.Kind shapeKind = com.wrights.blueprint.Shapes.Kind.byId(job.shapeKind());
         BlockPos shapePinLocal = com.wrights.blueprint.Shapes.pinLocal(
                 shapeKind,
@@ -1080,6 +1055,44 @@ public final class JobManager {
                 job.shapeHollow(),
                 job.shapeAxis(),
                 job.shapePivot());
+        // Stalled Shape/Exchange: wait at home until Replace-with / materials are available again.
+        if (job.waitKind() == BuildJob.WAIT_ITEMS && !fast) {
+            BlockState owed = shapeOwedState(level, job, usable, fillMode, random, shapeKind, shapePinLocal);
+            if (owed != null && !shapeCanPay(player, level, job, owed)) {
+                if (job.droneId() != null) {
+                    publishShapeDroneStatus(level, job, owed, DroneEntity.WAIT_ITEMS);
+                    parkSolo(level, player, job);
+                }
+                library.setDirty();
+                return;
+            }
+            job.setWaitKind(BuildJob.WAIT_NONE);
+            job.setQueued(false);
+        }
+        if (job.queued()) {
+            topUpQueued(player, library, job);
+            if (!job.hasCrew() && !instant(player) && job.droneId() == null) {
+                return;
+            }
+        }
+        if (holdWithoutDrones(player, library, job)) {
+            job.setWaitKind(BuildJob.WAIT_NONE);
+            return;
+        }
+        if (!inReach(player, library, job)) {
+            job.setWaitKind(BuildJob.WAIT_NONE);
+            return;
+        }
+        if (job.waitKind() != BuildJob.WAIT_ITEMS) {
+            job.workedTick();
+        }
+        int scanBudget = Math.max(1, WrightsConfig.COPY_POSITIONS_PER_TICK.getAsInt());
+        int placeBudget = fast ? Math.min(8192, scanBudget) : Math.max(1, WrightsConfig.BLOCKS_PER_TICK.getAsInt());
+        int scanned = 0;
+        int placed = 0;
+        DroneEntity drone = null;
+        BlockState statusState = null;
+        int statusWait = DroneEntity.WAIT_NONE;
         while (job.cursor() < job.total() && scanned < scanBudget && placed < placeBudget) {
             BlockPos pos = job.scanPos();
             if (!com.wrights.blueprint.Shapes.containsWorld(
@@ -1212,18 +1225,111 @@ public final class JobManager {
                 publishShapeDroneStatus(level, job, statusState, statusWait);
             }
         }
+        // Out of materials: send the wright home with its carry (same as blueprint stall).
+        if (job.waitKind() == BuildJob.WAIT_ITEMS && !fast) {
+            parkSolo(level, player, job);
+            job.setQueued(true);
+            job.setCrewQuota(Math.max(1, job.crewQuota()));
+        }
         library.setDirty();
         if (job.cursor() >= job.total()) {
             finishPaste(server, library, player, job);
         }
     }
 
+    /** Next Shape/Exchange cell that still needs a payment block, or null when nothing is left. */
+    private static BlockState shapeOwedState(
+            ServerLevel level,
+            BuildJob job,
+            java.util.List<com.wrights.blueprint.ShapeMaterials.Entry> usable,
+            com.wrights.blueprint.ShapeMaterials.FillMode fillMode,
+            java.util.Random random,
+            com.wrights.blueprint.Shapes.Kind shapeKind,
+            BlockPos shapePinLocal) {
+        int width = job.boxSizeX();
+        int height = job.boxSizeY();
+        int orderIndex = job.shapeOrderIndex();
+        int scanCap = Math.max(1, WrightsConfig.COPY_POSITIONS_PER_TICK.getAsInt() * 4);
+        for (int i = 0; i < scanCap && job.cursor() + i < job.total(); i++) {
+            int at = job.cursor() + i;
+            int x = job.min().getX() + (at % width);
+            int y = job.min().getY() + ((at / width) % height);
+            int z = job.min().getZ() + (at / (width * height));
+            BlockPos pos = new BlockPos(x, y, z);
+            if (!com.wrights.blueprint.Shapes.containsWorld(
+                    shapeKind,
+                    pos,
+                    job.shapeCenter(),
+                    shapePinLocal,
+                    job.shapeSize(),
+                    job.shapeHeight(),
+                    job.shapeThickness(),
+                    job.shapeHollow(),
+                    job.shapeAxis(),
+                    job.shapeYaw())) {
+                continue;
+            }
+            if (level.isOutsideBuildHeight(pos) || !com.wrights.blueprint.BoxEdits.inWorld(pos) || !level.isLoaded(pos)) {
+                continue;
+            }
+            BlockState current = level.getBlockState(pos);
+            if (job.exchangeJob()) {
+                if (!exchangeMatches(level, pos, current, job.exchangeFrom())) {
+                    continue;
+                }
+            } else if (!job.voidBlocks() && !current.isAir() && !current.canBeReplaced()) {
+                continue;
+            }
+            return shapeStateAt(job, usable, fillMode, random, orderIndex, at);
+        }
+        return null;
+    }
+
+    private static BlockState shapeStateAt(
+            BuildJob job,
+            java.util.List<com.wrights.blueprint.ShapeMaterials.Entry> usable,
+            com.wrights.blueprint.ShapeMaterials.FillMode fillMode,
+            java.util.Random random,
+            int orderIndex,
+            int cursor) {
+        if (usable == null || usable.isEmpty()) {
+            return null;
+        }
+        return switch (fillMode == null ? com.wrights.blueprint.ShapeMaterials.FillMode.RANDOM : fillMode) {
+            case ORDER -> {
+                int batch = Math.max(1, job.shapeOrderBatch());
+                int index = (orderIndex / batch) % usable.size();
+                yield usable.get(index).state();
+            }
+            case PRIORITY -> usable.get(0).state();
+            case RANDOM -> {
+                java.util.Random local = new java.util.Random(job.shapeSeed() ^ (((long) cursor) << 1));
+                yield com.wrights.blueprint.ShapeMaterials.pick(usable, local);
+            }
+        };
+    }
+
+    private static boolean shapeCanPay(ServerPlayer player, ServerLevel level, BuildJob job, BlockState state) {
+        if (state == null || freePlace(player)) {
+            return true;
+        }
+        Item payment = BlockFilters.payment(state);
+        if (payment == null) {
+            return true;
+        }
+        Schematic.Entry entry = new Schematic.Entry((short) 0, (short) 0, (short) 0, state, false);
+        return hasPlaceCosts(player, level, job, null, entry);
+    }
+
     /** Push Shape/Exchange current block + wait reason onto the assigned wright for Jade / info look. */
     private static void publishShapeDroneStatus(ServerLevel level, BuildJob job, BlockState state, int waitReason) {
-        if (level == null || job == null || job.crewUnits().isEmpty()) {
+        if (level == null || job == null) {
             return;
         }
-        UUID id = job.crewUnits().get(0);
+        UUID id = job.droneId();
+        if (id == null && !job.crewUnits().isEmpty()) {
+            id = job.crewUnits().get(0);
+        }
         if (id == null || !(level.getEntity(id) instanceof DroneEntity drone) || !drone.isAlive()) {
             return;
         }
@@ -5083,9 +5189,11 @@ public final class JobManager {
             suspendFall = FallingBlock.isFree(level.getBlockState(below));
         }
         if (clearFirst) {
-            if (job.exchangeJob() && job.exchangeSilk()) {
-                ItemStack silk = silkTouchPick(level.getServer());
-                com.wrights.blueprint.MirrorLaunch.harvest(player, level, pos, silk, false);
+            if (job.exchangeJob()) {
+                // Same as Mirror mine: harvest into the player and show the drop on the wright.
+                ItemStack tool = job.exchangeSilk() ? silkTouchPick(level.getServer()) : ItemStack.EMPTY;
+                ItemStack carried = com.wrights.blueprint.MirrorLaunch.harvest(player, level, pos, tool, false);
+                showCarry(level, job, hand, carried);
             } else {
                 voidCell(level, pos);
             }
