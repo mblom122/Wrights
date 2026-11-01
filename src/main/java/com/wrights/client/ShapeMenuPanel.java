@@ -83,10 +83,12 @@ final class ShapeMenuPanel {
         boolean ring = kind == Shapes.Kind.RING;
         boolean box = kind == Shapes.Kind.CUBE;
         boolean cylinder = kind == Shapes.Kind.CYLINDER;
+        boolean line = kind == Shapes.Kind.LINE;
         boolean widthShape = box || cylinder;
         drawSection(graphics, mouseX, mouseY, x, y,
-                widthShape ? "menu.wrights.shape_width" : "menu.wrights.shape_size",
-                cylinder ? "menu.wrights.shape_cylinder_width_hint"
+                line ? "menu.wrights.shape_length" : widthShape ? "menu.wrights.shape_width" : "menu.wrights.shape_size",
+                line ? "menu.wrights.shape_length_hint"
+                        : cylinder ? "menu.wrights.shape_cylinder_width_hint"
                         : box ? "menu.wrights.shape_width_hint"
                         : "menu.wrights.shape_size_hint");
         y += 12;
@@ -99,11 +101,12 @@ final class ShapeMenuPanel {
         y += 18;
         heightY = -1;
         thicknessY = -1;
-        if (ring) {
-            drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_thickness", "menu.wrights.shape_thickness_hint");
+        if (ring || line) {
+            drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_thickness",
+                    line ? "menu.wrights.shape_line_thickness_hint" : "menu.wrights.shape_thickness_hint");
             y += 12;
             thicknessY = y;
-            int thicknessMax = Math.max(1, size);
+            int thicknessMax = line ? max : Math.max(1, size);
             int thickness = Math.min(WrightsClientConfig.SHAPE_THICKNESS.get(), thicknessMax);
             drawSlider(graphics, x, y, sizeW, thickness - 1, Math.max(1, thicknessMax - 1));
             graphics.drawString(font, Integer.toString(thickness), x + sizeW + 8, y, WrightsUi.TEXT, false);
@@ -122,10 +125,8 @@ final class ShapeMenuPanel {
             graphics.drawString(font, Integer.toString(height), x + sizeW + 8, y, WrightsUi.TEXT, false);
             y += 18;
         }
-        // Flat shapes tip with Plane. Box/Cylinder keep Plane only for their flat/line shortcuts.
-        boolean showPlane = !volume
-                || (box && WrightsClientConfig.SHAPE_HEIGHT.get() <= 1)
-                || (cylinder && size <= 1);
+        // Flat shapes tip with Plane. Box at height 1 keeps Plane for the flat-square shortcut.
+        boolean showPlane = !volume || (box && WrightsClientConfig.SHAPE_HEIGHT.get() <= 1);
         if (showPlane) {
             drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_plane", "menu.wrights.shape_plane_hint");
             y += 12;

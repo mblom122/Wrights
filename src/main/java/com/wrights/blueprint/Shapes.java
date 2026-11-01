@@ -88,9 +88,8 @@ public final class Shapes {
     }
 
     /**
-     * @param height box / cylinder / pyramid / dome height (box height 1 = flat square); for rings, tube diameter (1 = flat).
-     *               Cylinder width 1 uses height as the line length.
-     * @param thickness ring / torus tube width in the ring plane; ignored by other kinds
+     * @param height box / cylinder / pyramid / dome height (box height 1 = flat square); for rings, tube diameter (1 = flat)
+     * @param thickness ring band width; for lines, square cross-section side length (1 = single-block line)
      * @param yaw quarter-turns around Y through {@code center} (0–3)
      */
     public static List<BlockPos> blocks(Kind kind, BlockPos center, int size, int height, int thickness, boolean hollow, int plane, boolean flipVertical, int yaw) {
@@ -106,7 +105,7 @@ public final class Shapes {
             case CIRCLE -> disk(out, center, r, hollow, flat, false);
             case RING -> ring(out, center, r, band, h, flat, hollow);
             case SQUARE -> square(out, center, r, hollow, flat);
-            case LINE -> line(out, center, r, flat);
+            case LINE -> squareLine(out, center, r, band, hollow, flat);
             case SPHERE -> sphere(out, center, r, hollow);
             case CUBE -> {
                 // Height 1 is the old Square (plane chooses floor/wall). Taller is a rectangular box.
@@ -116,15 +115,7 @@ public final class Shapes {
                     box(out, center, r, h, hollow);
                 }
             }
-            case CYLINDER -> {
-                // Width 1 = single-block line (old Line). Width 2 = radius 1, and so on.
-                int rad = Math.max(0, r - 1);
-                if (rad == 0) {
-                    lineSegment(out, center, h, flat);
-                } else {
-                    cylinder(out, center, rad, h, hollow);
-                }
-            }
+            case CYLINDER -> cylinder(out, center, r, h, hollow);
             case DOME -> dome(out, center, r, h, hollow);
             case PYRAMID -> pyramid(out, center, r, h, hollow);
         }
@@ -298,12 +289,37 @@ public final class Shapes {
         }
     }
 
-    /** One-block-thick run of {@code length} blocks along the plane’s main axis, from the origin outward. */
-    private static void lineSegment(List<BlockPos> out, BlockPos origin, int length, int plane) {
-        int top = Math.max(0, length - 1);
-        for (int i = 0; i <= top; i++) {
-            out.add(flat(origin, i, 0, plane));
+    /**
+     * Squared beam: {@code length} is half-length along the plane’s main axis (same as old Size),
+     * {@code thickness} is the square cross-section in blocks (1 = a single-block line).
+     */
+    private static void squareLine(List<BlockPos> out, BlockPos center, int length, int thickness, boolean hollow, int plane) {
+        int half = Math.max(1, length);
+        int side = Math.max(1, thickness);
+        int t0 = -(side - 1) / 2;
+        int t1 = t0 + side - 1;
+        for (int i = -half; i <= half; i++) {
+            for (int u = t0; u <= t1; u++) {
+                for (int v = t0; v <= t1; v++) {
+                    if (hollow && side > 2) {
+                        boolean shell = u == t0 || u == t1 || v == t0 || v == t1;
+                        if (!shell) {
+                            continue;
+                        }
+                    }
+                    out.add(beamCell(center, i, u, v, plane));
+                }
+            }
         }
+    }
+
+    /** Beam along the plane’s main axis; {@code u}/{@code v} are the square cross-section. */
+    private static BlockPos beamCell(BlockPos origin, int along, int u, int v, int plane) {
+        return switch (plane) {
+            case PLANE_XY -> origin.offset(along, u, v);
+            case PLANE_YZ -> origin.offset(v, along, u);
+            default -> origin.offset(along, u, v);
+        };
     }
 
     private static void sphere(List<BlockPos> out, BlockPos center, int radius, boolean hollow) {
