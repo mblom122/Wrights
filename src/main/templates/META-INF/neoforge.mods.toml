@@ -134,6 +134,14 @@ Wrights copy a build and place it again. Mark a structure, save a blueprint, and
     ordering="AFTER"
     side="BOTH"
 
+# Framed Blocks is optional. Copied camo skins (and glow / reinforce / intangible) cost their items on paste.
+[[dependencies.${mod_id}]]
+    modId="framedblocks"
+    type="optional"
+    versionRange="[10.0,)"
+    ordering="AFTER"
+    side="BOTH"
+
 # Features are specific properties of the game environment, that you may want to declare you require. This example declares
 # that your mod requires GL version 3.2 or higher. Other features will be added. They are side aware so declaring this won't
 # stop your mod loading on the server for example.

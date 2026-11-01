@@ -1552,10 +1552,19 @@ public final class JobManager {
         if (!fluid.isEmpty()) {
             clearFluidSpread(level, pos, fluid.getType(), job);
         }
-        Item item = BlockFilters.payment(refund.state());
-        if (refund.paid() && item != null) {
-            giveBack(level, player, job, item);
-            job.returnedOne();
+        if (refund.paid()) {
+            Item item = BlockFilters.payment(refund.state());
+            if (item != null) {
+                giveBack(level, player, job, item);
+                job.returnedOne();
+            }
+            for (int extraId : refund.extras()) {
+                Item extra = Item.byId(extraId);
+                if (extra != null && extra != Items.AIR) {
+                    giveBack(level, player, job, extra);
+                    job.returnedOne();
+                }
+            }
         }
     }
 
@@ -3662,8 +3671,46 @@ public final class JobManager {
         if (job.mining() || entry.secondary() || freePlace(player)) {
             return true;
         }
-        Item payment = com.wrights.util.BlockFilters.payment(entry.state());
-        return payment == null || hasItem(player, level, job, hand, payment);
+        return hasPlaceCosts(player, level, job, hand, entry);
+    }
+
+    /** True when inventory / chest / digital can cover the block and any NBT extras for this cell. */
+    private static boolean hasPlaceCosts(ServerPlayer player, ServerLevel level, BuildJob job, BuildJob.Hand hand, Schematic.Entry entry) {
+        for (java.util.Map.Entry<Item, Integer> cost : placeCostCounts(player, job, entry).entrySet()) {
+            if (!hasAmount(player, level, job, hand, cost.getKey(), cost.getValue())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Block item plus any NBT extras (Framed Blocks camo, …) that this place will apply, tallied by item. */
+    private static java.util.LinkedHashMap<Item, Integer> placeCostCounts(ServerPlayer player, BuildJob job, Schematic.Entry entry) {
+        java.util.LinkedHashMap<Item, Integer> costs = new java.util.LinkedHashMap<>();
+        Item payment = BlockFilters.payment(entry.state());
+        if (payment != null) {
+            costs.merge(payment, 1, Integer::sum);
+        }
+        if (willApplyExtras(player, job, entry)) {
+            for (Item extra : com.wrights.util.BlockExtras.of(entry)) {
+                costs.merge(extra, 1, Integer::sum);
+            }
+        }
+        return costs;
+    }
+
+    /** True when pasted NBT (settings or full) will restore camo / machine config on this cell. */
+    private static boolean willApplyExtras(@javax.annotation.Nullable ServerPlayer player, BuildJob job, Schematic.Entry entry) {
+        if (entry == null || entry.nbt() == null || entry.secondary()) {
+            return false;
+        }
+        boolean full = job.placeAll() && entry.nbtFull() && WrightsConfig.copyAll() && player != null && creative(player);
+        if (full) {
+            return true;
+        }
+        return job.placeSettings()
+                && WrightsConfig.copySettings()
+                && WrightsConfig.settingsAllowed(entry.state().getBlock());
     }
 
     private enum Falling {
@@ -4775,6 +4822,9 @@ public final class JobManager {
         }
         BlockState state = entry.state();
         Item payment = BlockFilters.payment(state);
+        java.util.List<Item> extras = willApplyExtras(player, job, entry)
+                ? com.wrights.util.BlockExtras.of(entry)
+                : java.util.List.of();
         BlockState existing = level.getBlockState(pos);
         if (existing.equals(state)) {
             applyEntryNbt(level, player, job, pos, entry);
@@ -4806,8 +4856,8 @@ public final class JobManager {
         } else if (level.isLoaded(pos.below()) && !state.canSurvive(level, pos)) {
             // Wrong floor, or cactus against a neighbor — do not place (and do not retry forever).
             return skipCell(player, job, entry);
-        } else if (!freePlace(player) && payment != null) {
-            if (!hasItem(player, level, job, hand, payment)) {
+        } else if (!freePlace(player) && (payment != null || !extras.isEmpty())) {
+            if (!hasPlaceCosts(player, level, job, hand, entry)) {
                 return PlaceResult.WAIT;
             }
         }
@@ -4844,13 +4894,24 @@ public final class JobManager {
         if (suspendFall) {
             job.noteHungFall(pos.immutable());
         }
-        boolean paid = !entry.secondary() && !freePlace(player) && payment != null;
+        boolean paid = !entry.secondary() && !freePlace(player) && (payment != null || !extras.isEmpty());
+        int[] extraIds = BuildJob.Refund.NO_EXTRAS;
         if (paid) {
-            consumeItem(player, level, job, hand, payment);
+            if (payment != null) {
+                consumeItem(player, level, job, hand, payment);
+            }
+            if (!extras.isEmpty()) {
+                extraIds = new int[extras.size()];
+                for (int i = 0; i < extras.size(); i++) {
+                    Item extra = extras.get(i);
+                    consumeItem(player, level, job, hand, extra);
+                    extraIds[i] = Item.getId(extra);
+                }
+            }
         }
         boolean first = !job.isSettled(entry.x(), entry.y(), entry.z());
         applyEntryNbt(level, player, job, pos, entry);
-        job.recordPlaced(entry.x(), entry.y(), entry.z(), after, paid);
+        job.recordPlaced(entry.x(), entry.y(), entry.z(), after, paid, extraIds);
         clearPlacedGhost(player, job, entry);
         if (!quiet) {
             level.gameEvent(player, GameEvent.BLOCK_PLACE, pos);
@@ -5054,7 +5115,7 @@ public final class JobManager {
     }
 
     private static boolean hasItem(ServerPlayer player, ServerLevel level, BuildJob job, Item item) {
-        return hasItem(player, level, job, null, item);
+        return hasAmount(player, level, job, null, item, 1);
     }
 
     /**
@@ -5062,13 +5123,31 @@ public final class JobManager {
      * boundary, and the shared digital store.
      */
     private static boolean hasItem(ServerPlayer player, ServerLevel level, BuildJob job, BuildJob.Hand hand, Item item) {
-        com.wrights.storage.DigitalLink link = com.wrights.storage.ItemSource.linkOf(player);
-        if (hand != null && hand.homePort != null) {
-            return com.wrights.storage.ItemSource.hasForPort(player, level, item, portChest(level, hand.homePort), link);
+        return hasAmount(player, level, job, hand, item, 1);
+    }
+
+    /** Enough stock for {@code amount}, or a craft request for the shortfall when the network can make it. */
+    private static boolean hasAmount(ServerPlayer player, ServerLevel level, BuildJob job, BuildJob.Hand hand, Item item, int amount) {
+        if (item == null || amount <= 0 || player.getAbilities().instabuild) {
+            return true;
         }
-        Container container = supply(level, player, job);
-        boolean playerFirst = job.supplyPos() == null || job.supplyPlayerFirst();
-        return com.wrights.storage.ItemSource.hasForJob(player, level, item, container, playerFirst, link);
+        com.wrights.storage.DigitalLink link = com.wrights.storage.ItemSource.linkOf(player);
+        long have;
+        if (hand != null && hand.homePort != null) {
+            have = com.wrights.storage.ItemSource.jobSupplyCount(player, level, portChest(level, hand.homePort), link, item);
+        } else {
+            have = player.getInventory().countItem(item);
+            Container container = supply(level, player, job);
+            have += com.wrights.storage.ItemSource.jobSupplyCount(player, level, container, link, item);
+        }
+        if (have >= amount) {
+            return true;
+        }
+        long missing = amount - have;
+        if (com.wrights.storage.DigitalNetworks.craftable(level, link, item)) {
+            com.wrights.storage.DigitalNetworks.requestCraft(player, level, link, item, missing);
+        }
+        return false;
     }
 
     private static void consumeItem(ServerPlayer player, ServerLevel level, BuildJob job, Item item) {
@@ -5223,6 +5302,12 @@ public final class JobManager {
             Item item = BlockFilters.payment(refund.state());
             if (item != null) {
                 paid.add(item);
+            }
+            for (int extraId : refund.extras()) {
+                Item extra = Item.byId(extraId);
+                if (extra != null && extra != Items.AIR) {
+                    paid.add(extra);
+                }
             }
         }
         if (paid.isEmpty()) {
@@ -5880,13 +5965,23 @@ public final class JobManager {
                 owed.open = true;
                 continue;
             }
-            Item payment = com.wrights.util.BlockFilters.payment(entry.state());
-            if (payment == null) {
+            Item payment = BlockFilters.payment(entry.state());
+            if (payment == null && com.wrights.util.BlockExtras.of(entry).isEmpty()) {
                 owed.open = true;
                 continue;
             }
-            if (owed.items.size() < 64 && !owed.items.contains(payment)) {
+            if (payment != null && owed.items.size() < 64 && !owed.items.contains(payment)) {
                 owed.items.add(payment);
+            }
+            if (willApplyExtras(null, job, entry)) {
+                for (Item extra : com.wrights.util.BlockExtras.of(entry)) {
+                    if (owed.items.size() >= 64) {
+                        break;
+                    }
+                    if (!owed.items.contains(extra)) {
+                        owed.items.add(extra);
+                    }
+                }
             }
         }
         return owed;

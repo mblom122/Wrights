@@ -157,6 +157,7 @@ dependencies {
     localRuntime "maven.modrinth:ae2:${ae2_version}"
     localRuntime "maven.modrinth:guideme:${guideme_version}"
     localRuntime "maven.modrinth:mekanism:${mekanism_version}"
+    compileOnly "maven.modrinth:framedblocks:${framedblocks_version}"
     localRuntime "maven.modrinth:framedblocks:${framedblocks_version}"
     compileOnly "maven.modrinth:refined-storage:${rs_version}"
 

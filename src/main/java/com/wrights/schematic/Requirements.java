@@ -47,10 +47,13 @@ public final class Requirements {
                 continue;
             }
             Item item = BlockFilters.payment(entry.state());
-            if (item == null) {
-                continue;
+            if (item != null) {
+                counts.merge(item, 1, Integer::sum);
             }
-            counts.merge(item, 1, Integer::sum);
+            // Camo skins and other NBT-held extras (Framed Blocks, …).
+            for (Item extra : com.wrights.util.BlockExtras.of(entry)) {
+                counts.merge(extra, 1, Integer::sum);
+            }
         }
         List<Cost> costs = new ArrayList<>(counts.size());
         for (Map.Entry<Item, Integer> entry : counts.entrySet()) {

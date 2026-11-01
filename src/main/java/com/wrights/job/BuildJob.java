@@ -879,7 +879,11 @@ public final class BuildJob {
     }
 
     public void recordPlaced(short x, short y, short z, BlockState state, boolean paid) {
-        refunds.add(new Refund(x, y, z, state, paid));
+        recordPlaced(x, y, z, state, paid, Refund.NO_EXTRAS);
+    }
+
+    public void recordPlaced(short x, short y, short z, BlockState state, boolean paid, int[] extras) {
+        refunds.add(new Refund(x, y, z, state, paid, paid ? extras : Refund.NO_EXTRAS));
         settleGhost(x, y, z);
     }
 
@@ -1438,7 +1442,17 @@ public final class BuildJob {
         public final List<Slice> slices = new ArrayList<>();
     }
 
-    public record Refund(short x, short y, short z, BlockState state, boolean paid) {
+    public record Refund(short x, short y, short z, BlockState state, boolean paid, int[] extras) {
+        public static final int[] NO_EXTRAS = new int[0];
+
+        public Refund(short x, short y, short z, BlockState state, boolean paid) {
+            this(x, y, z, state, paid, NO_EXTRAS);
+        }
+
+        public Refund {
+            extras = extras == null || extras.length == 0 ? NO_EXTRAS : extras.clone();
+        }
+
         public CompoundTag save() {
             CompoundTag tag = new CompoundTag();
             tag.putShort("x", x);
@@ -1446,12 +1460,16 @@ public final class BuildJob {
             tag.putShort("z", z);
             tag.putBoolean("paid", paid);
             tag.put("state", NbtUtils.writeBlockState(state));
+            if (extras.length > 0) {
+                tag.putIntArray("extras", extras);
+            }
             return tag;
         }
 
         public static Refund load(CompoundTag tag, HolderGetter<Block> blocks) {
             BlockState state = NbtUtils.readBlockState(blocks, tag.getCompound("state"));
-            return new Refund(tag.getShort("x"), tag.getShort("y"), tag.getShort("z"), state, tag.getBoolean("paid"));
+            int[] extras = tag.contains("extras") ? tag.getIntArray("extras") : NO_EXTRAS;
+            return new Refund(tag.getShort("x"), tag.getShort("y"), tag.getShort("z"), state, tag.getBoolean("paid"), extras);
         }
     }
 }
