@@ -79,17 +79,10 @@ final class ShapeMenuPanel {
         y = drawKinds(graphics, mouseX, mouseY, x, y, width);
         y += 4;
         Shapes.Kind kind = Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
+        int axis = WrightsClientConfig.SHAPE_PLANE.get();
         boolean ring = kind == Shapes.Kind.RING;
-        boolean box = kind == Shapes.Kind.CUBE;
-        boolean cylinder = kind == Shapes.Kind.CYLINDER;
         boolean line = kind == Shapes.Kind.LINE;
-        boolean widthShape = box || cylinder;
-        drawSection(graphics, mouseX, mouseY, x, y,
-                line ? "menu.wrights.shape_length" : widthShape ? "menu.wrights.shape_width" : "menu.wrights.shape_size",
-                line ? "menu.wrights.shape_length_hint"
-                        : cylinder ? "menu.wrights.shape_cylinder_width_hint"
-                        : box ? "menu.wrights.shape_width_hint"
-                        : "menu.wrights.shape_size_hint");
+        drawSection(graphics, mouseX, mouseY, x, y, sizeLabel(kind, axis), sizeHint(kind, axis));
         y += 12;
         sizeY = y;
         sizeW = Math.max(40, width - 40);
@@ -112,12 +105,7 @@ final class ShapeMenuPanel {
             y += 18;
         }
         if (kind.usesHeight()) {
-            String heightHint = ring ? "menu.wrights.shape_ring_height_hint"
-                    : line ? "menu.wrights.shape_line_height_hint"
-                    : box ? "menu.wrights.shape_box_height_hint"
-                    : cylinder ? "menu.wrights.shape_cylinder_height_hint"
-                    : "menu.wrights.shape_height_hint";
-            drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_height", heightHint);
+            drawSection(graphics, mouseX, mouseY, x, y, alongLabel(axis), alongHint(kind, axis));
             y += 12;
             heightY = y;
             int height = WrightsClientConfig.SHAPE_HEIGHT.get();
@@ -249,6 +237,78 @@ final class ShapeMenuPanel {
 
     private static int axisMax() {
         return WrightsConfig.maxShapeAxis();
+    }
+
+    /** Primary size slider label — what SHAPE_SIZE actually builds for this kind. */
+    private static String sizeLabel(Shapes.Kind kind, int axis) {
+        return switch (kind) {
+            case LINE -> "menu.wrights.shape_length";
+            case CYLINDER, CIRCLE, SPHERE, DOME -> "menu.wrights.shape_radius";
+            // Box base is only "Width" when Axis is Y (XZ footprint). Otherwise call it Size
+            // so it does not clash with along-axis "Width (X)".
+            case CUBE -> Shapes.clampPlane(axis) == Shapes.AXIS_Y
+                    ? "menu.wrights.shape_width"
+                    : "menu.wrights.shape_size";
+            default -> "menu.wrights.shape_size";
+        };
+    }
+
+    private static String sizeHint(Shapes.Kind kind, int axis) {
+        return switch (kind) {
+            case LINE -> "menu.wrights.shape_length_hint";
+            case CYLINDER -> "menu.wrights.shape_cylinder_radius_hint";
+            case CIRCLE -> "menu.wrights.shape_circle_radius_hint";
+            case SPHERE -> "menu.wrights.shape_sphere_radius_hint";
+            case DOME -> "menu.wrights.shape_dome_radius_hint";
+            case CUBE -> Shapes.clampPlane(axis) == Shapes.AXIS_Y
+                    ? "menu.wrights.shape_width_hint"
+                    : "menu.wrights.shape_box_size_hint";
+            case PYRAMID -> "menu.wrights.shape_pyramid_size_hint";
+            case RING -> "menu.wrights.shape_ring_size_hint";
+            case SQUARE -> "menu.wrights.shape_square_size_hint";
+            default -> "menu.wrights.shape_size_hint";
+        };
+    }
+
+    /**
+     * Along-axis extent (SHAPE_HEIGHT). Named for the chosen Axis so Width/Height are not swapped
+     * when the shape is tipped onto X or Z.
+     */
+    private static String alongLabel(int axis) {
+        return switch (Shapes.clampPlane(axis)) {
+            case Shapes.AXIS_X -> "menu.wrights.shape_along_x";
+            case Shapes.AXIS_Z -> "menu.wrights.shape_along_z";
+            default -> "menu.wrights.shape_height";
+        };
+    }
+
+    private static String alongHint(Shapes.Kind kind, int axis) {
+        int a = Shapes.clampPlane(axis);
+        if (kind == Shapes.Kind.RING) {
+            return a == Shapes.AXIS_Y ? "menu.wrights.shape_ring_height_hint" : "menu.wrights.shape_ring_along_hint";
+        }
+        if (kind == Shapes.Kind.LINE) {
+            return a == Shapes.AXIS_Y ? "menu.wrights.shape_line_height_hint" : "menu.wrights.shape_line_along_hint";
+        }
+        if (kind == Shapes.Kind.CUBE) {
+            return switch (a) {
+                case Shapes.AXIS_X -> "menu.wrights.shape_box_along_x_hint";
+                case Shapes.AXIS_Z -> "menu.wrights.shape_box_along_z_hint";
+                default -> "menu.wrights.shape_box_height_hint";
+            };
+        }
+        if (kind == Shapes.Kind.CYLINDER) {
+            return switch (a) {
+                case Shapes.AXIS_X -> "menu.wrights.shape_cylinder_along_x_hint";
+                case Shapes.AXIS_Z -> "menu.wrights.shape_cylinder_along_z_hint";
+                default -> "menu.wrights.shape_cylinder_height_hint";
+            };
+        }
+        return switch (a) {
+            case Shapes.AXIS_X -> "menu.wrights.shape_along_x_hint";
+            case Shapes.AXIS_Z -> "menu.wrights.shape_along_z_hint";
+            default -> "menu.wrights.shape_height_hint";
+        };
     }
 
     /** Map a click on the shared slider track to 1..maxInclusive. */
