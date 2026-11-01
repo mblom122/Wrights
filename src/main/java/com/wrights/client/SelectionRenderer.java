@@ -176,6 +176,7 @@ public final class SelectionRenderer {
             return;
         }
 
+        boolean exchange = WrightsClientState.exchangeToolActive();
         boolean voidBlocks = WrightsClientConfig.SHAPE_VOID.get() && WrightsConfig.allowShapeVoid();
         int budget = Math.max(1, previewBudget());
         int total = shapeLocal.size();
@@ -212,7 +213,16 @@ public final class SelectionRenderer {
             if (distance > limit) {
                 continue;
             }
-            if (!voidBlocks && !minecraft.level.getBlockState(cursor.set(wx, wy, wz)).isAir()) {
+            BlockState world = minecraft.level.getBlockState(cursor.set(wx, wy, wz));
+            if (exchange) {
+                // Ghosts mark solids Exchange will actually hit (void off → none if occupied stay).
+                if (!voidBlocks) {
+                    continue;
+                }
+                if (!com.wrights.util.BlockFilters.canExchange(minecraft.level, cursor, world)) {
+                    continue;
+                }
+            } else if (!voidBlocks && !world.isAir()) {
                 continue;
             }
             if (filled < budget) {

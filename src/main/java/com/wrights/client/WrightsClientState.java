@@ -1631,13 +1631,17 @@ public final class WrightsClientState {
         return shapeLookSnapLocked && shapeLookSnapPos != null;
     }
 
-    /** Pin look-mode preview to the look-corner of this clicked block/face. */
+    /** Pin look-mode preview to the look-corner (Shape) or the aimed cell (Exchange). */
     public static void lockShapeLookSnap(BlockPos clicked, Direction face) {
         if (clicked == null) {
             return;
         }
         Direction side = face == null ? Direction.UP : face;
-        setShapeLookSnapTarget(com.wrights.blueprint.Shapes.lookCorner(clicked, side));
+        // Exchange swaps the aimed solids; Shape places into the adjacent cell.
+        BlockPos pin = exchangeToolActive()
+                ? clicked.immutable()
+                : com.wrights.blueprint.Shapes.lookCorner(clicked, side);
+        setShapeLookSnapTarget(pin);
         shapeLookSnapFace = side;
     }
 
@@ -1664,6 +1668,10 @@ public final class WrightsClientState {
         BlockHitResult hit = shapeLookHit();
         if (hit == null) {
             return null;
+        }
+        // Exchange: pin on the aimed block. Shape: pin in the adjacent place cell.
+        if (exchangeToolActive()) {
+            return hit.getBlockPos();
         }
         return com.wrights.blueprint.Shapes.lookCorner(hit.getBlockPos(), hit.getDirection());
     }
@@ -2085,6 +2093,10 @@ public final class WrightsClientState {
         // Exchange is 2D-only — drop a leftover volume kind from Shape mode.
         if (com.wrights.blueprint.Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get()).volume()) {
             WrightsClientConfig.setShapeKind(com.wrights.blueprint.Shapes.Kind.CIRCLE.ordinal());
+        }
+        // Default Void on so look-aim swaps solids instead of skipping every occupied cell.
+        if (WrightsConfig.allowShapeVoid() && !WrightsClientConfig.SHAPE_VOID.get()) {
+            WrightsClientConfig.setShapeVoid(true);
         }
         rememberMode();
     }

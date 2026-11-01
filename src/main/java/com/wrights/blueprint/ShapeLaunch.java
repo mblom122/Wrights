@@ -81,7 +81,8 @@ public final class ShapeLaunch {
                 Messages.actionBar(player, "message.wrights.place_out_of_range");
                 return;
             }
-            target = payload.lookPinned()
+            // Exchange pins on the aimed solid; Shape places into the adjacent cell unless already pinned.
+            target = payload.lookPinned() || exchange
                     ? clicked.immutable()
                     : Shapes.lookCorner(clicked, Direction.from3DDataValue(Mth.clamp(payload.face(), 0, 5)));
         }

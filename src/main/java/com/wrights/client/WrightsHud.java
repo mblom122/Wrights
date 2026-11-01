@@ -285,7 +285,19 @@ public final class WrightsHud {
             return Component.translatable("hud.wrights.task_new", Component.translatable(styleKey(WrightsClientState.captureStyle)));
         }
         if (WrightsClientState.mode == WrightsClientState.Mode.BUILD) {
-            return Component.translatable("hud.wrights.task_build_tool", Component.translatable(WrightsClientState.bindSupply ? "hud.wrights.tool_bind" : "hud.wrights.tool_build"));
+            String tool;
+            if (WrightsClientState.exchangeToolActive()) {
+                tool = "hud.wrights.tool_exchange";
+            } else if (WrightsClientState.shapeToolActive()) {
+                tool = "hud.wrights.tool_shape";
+            } else if (WrightsClientState.mirrorToolActive()) {
+                tool = "hud.wrights.tool_mirror";
+            } else if (WrightsClientState.bindSupply) {
+                tool = "hud.wrights.tool_bind";
+            } else {
+                tool = "hud.wrights.tool_build";
+            }
+            return Component.translatable("hud.wrights.task_build_tool", Component.translatable(tool));
         }
         if (WrightsClientState.mode == WrightsClientState.Mode.JOBS) {
             return Component.translatable("hud.wrights.task_jobs");

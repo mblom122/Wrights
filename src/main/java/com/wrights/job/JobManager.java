@@ -1909,7 +1909,18 @@ public final class JobManager {
     private static Component jobTitle(MinecraftServer server, SchematicLibrary library, BuildJob job, String taskKey) {
         Schematic schematic = job.schematicId() == null || library == null ? null : library.schematic(job.schematicId()).orElse(null);
         boolean mirror = job.mining() || (schematic != null && schematic.ephemeral() && com.wrights.blueprint.Mirror.marksBlocks(schematic.name()));
-        String mode = mirror ? "hud.wrights.tool_mirror" : (job.kind() == BuildJob.Kind.COPY ? "hud.wrights.tool_new" : "hud.wrights.tool_build");
+        String mode;
+        if (job.exchangeJob()) {
+            mode = "hud.wrights.tool_exchange";
+        } else if (job.kind() == BuildJob.Kind.SHAPE) {
+            mode = "hud.wrights.tool_shape";
+        } else if (mirror) {
+            mode = "hud.wrights.tool_mirror";
+        } else if (job.kind() == BuildJob.Kind.COPY) {
+            mode = "hud.wrights.tool_new";
+        } else {
+            mode = "hud.wrights.tool_build";
+        }
         String subject = subjectName(job, schematic);
         boolean blockPlace = mirror && subject.isEmpty() && !job.mining();
         String task = taskKey;
@@ -1969,7 +1980,8 @@ public final class JobManager {
 
     private static String subjectName(BuildJob job, Schematic schematic) {
         String name = job.blueprintName();
-        if (name != null && (name.equals("Mirror - Mine") || name.equals("Build") || name.equals("Saving") || name.equals("Blueprint"))) {
+        if (name != null && (name.equals("Mirror - Mine") || name.equals("Build") || name.equals("Saving")
+                || name.equals("Blueprint") || name.equals("Exchange") || name.equals("Shape"))) {
             name = null;
         }
         if ((name == null || name.isBlank()) && schematic != null) {
