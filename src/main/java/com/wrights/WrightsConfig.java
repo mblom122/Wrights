@@ -16,7 +16,8 @@ public final class WrightsConfig {
 
     public static final ModConfigSpec.IntValue MAX_WRIGHTS_PER_JOB = BUILDER
             .comment(
-                    "Most wrights one job may use at once.",
+                    "Most wrights one job may use at once (blueprints, Shape, Mirror).",
+                    "Exchange and Place may use twice this many.",
                     "Each working wright is an entity. Raising this can lag the server.")
             .defineInRange("maxWrightsPerJob", 10, 1, 512);
 
@@ -284,6 +285,24 @@ public final class WrightsConfig {
 
     public static int maxWrightsPerJob() {
         return read(MAX_WRIGHTS_PER_JOB, 10);
+    }
+
+    /**
+     * Per-job wright cap. Exchange and Place may use twice {@link #maxWrightsPerJob()}.
+     */
+    public static int maxWrightsPerJob(boolean exchangeOrPlace) {
+        int base = maxWrightsPerJob();
+        if (!exchangeOrPlace) {
+            return base;
+        }
+        return Math.min(1024, base * 2);
+    }
+
+    public static int maxWrightsPerJob(com.wrights.job.BuildJob job) {
+        if (job == null) {
+            return maxWrightsPerJob();
+        }
+        return maxWrightsPerJob(job.exchangeJob() || job.placeTool());
     }
 
     public static int maxWrightsCarried() {

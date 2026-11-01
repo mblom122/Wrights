@@ -409,13 +409,20 @@ public final class WrightsClientConfig {
 
     public static void setDroneCount(int count) {
         DRONE_MAX.set(false);
-        DRONE_COUNT.set(clamp(count, 1, Math.min(512, WrightsConfig.maxWrightsPerJob())));
+        DRONE_COUNT.set(clamp(count, 1, Math.min(1024, WrightsConfig.maxWrightsPerJob(true))));
         save();
     }
 
-    /** The amount a new job asks for. Max in the options sets this to the job cap. */
+    /** The amount a new blueprint / Shape job asks for. Max in the options sets this to the job cap. */
     public static int droneCount() {
-        int cap = Math.min(512, WrightsConfig.maxWrightsPerJob());
+        return droneCountFor(false);
+    }
+
+    /**
+     * Wrights to send. Exchange / Place use a doubled server cap when {@code boosted} is true.
+     */
+    public static int droneCountFor(boolean boosted) {
+        int cap = Math.min(1024, WrightsConfig.maxWrightsPerJob(boosted));
         if (DRONE_MAX.get()) {
             return cap;
         }
@@ -542,11 +549,15 @@ public final class WrightsClientConfig {
     }
 
     public static int deployTarget(int freeDrones, int blocks) {
+        return deployTarget(freeDrones, blocks, false);
+    }
+
+    public static int deployTarget(int freeDrones, int blocks, boolean exchangeOrPlace) {
         if (freeDrones <= 0 || blocks <= 0) {
             return 0;
         }
-        int wanted = droneCount();
-        return Math.max(1, Math.min(wanted, Math.min(freeDrones, Math.min(blocks, WrightsConfig.maxWrightsPerJob()))));
+        int wanted = droneCountFor(exchangeOrPlace);
+        return Math.max(1, Math.min(wanted, Math.min(freeDrones, Math.min(blocks, WrightsConfig.maxWrightsPerJob(exchangeOrPlace)))));
     }
 
     public static void save() {

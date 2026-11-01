@@ -743,7 +743,7 @@ public final class JobManager {
         job.setSupplyOrder(supplyOrder);
         if (queue && !instant(player) && freeUnits(player, library, job, 1).isEmpty()) {
             int blocks = placeableBlocks(schematic, job);
-            int room = Math.min(Math.max(0, blocks), WrightsConfig.maxWrightsPerJob());
+            int room = Math.min(Math.max(0, blocks), WrightsConfig.maxWrightsPerJob(job));
             int wanted = drones > 0 ? Math.min(drones, room) : room;
             if (wanted <= 0) {
                 Messages.actionBar(player, "message.wrights.drone_block_cap", 0);
@@ -816,7 +816,7 @@ public final class JobManager {
         job.setAnchor(anchor == null ? origin : anchor);
         if (!instant(player) && freeUnits(player, library, job, 1).isEmpty()) {
             int blocks = Math.max(1, schematic.blockCount());
-            int room = Math.min(blocks, WrightsConfig.maxWrightsPerJob());
+            int room = Math.min(blocks, WrightsConfig.maxWrightsPerJob(job));
             job.setCrewQuota(room);
             job.setQueued(true);
             library.addJob(job);
@@ -961,7 +961,7 @@ public final class JobManager {
             boolean deferSupplies,
             boolean exchange,
             String exchangeFrom) {
-        return startShapeBuild(player, min, max, center, kind, size, height, thickness, axis, yaw, pivot, hollow, voidBlocks, materials, fillMode, orderBatch, seed, supplyOrder, deferSupplies, exchange, exchangeFrom, false);
+        return startShapeBuild(player, min, max, center, kind, size, height, thickness, axis, yaw, pivot, hollow, voidBlocks, materials, fillMode, orderBatch, seed, supplyOrder, deferSupplies, exchange, exchangeFrom, false, 0, false);
     }
 
     public static boolean startShapeBuild(
@@ -987,6 +987,34 @@ public final class JobManager {
             boolean exchange,
             String exchangeFrom,
             boolean exchangeSilk) {
+        return startShapeBuild(player, min, max, center, kind, size, height, thickness, axis, yaw, pivot, hollow, voidBlocks, materials, fillMode, orderBatch, seed, supplyOrder, deferSupplies, exchange, exchangeFrom, exchangeSilk, 0, false);
+    }
+
+    public static boolean startShapeBuild(
+            ServerPlayer player,
+            BlockPos min,
+            BlockPos max,
+            BlockPos center,
+            int kind,
+            int size,
+            int height,
+            int thickness,
+            int axis,
+            int yaw,
+            int pivot,
+            boolean hollow,
+            boolean voidBlocks,
+            String materials,
+            int fillMode,
+            int orderBatch,
+            long seed,
+            String supplyOrder,
+            boolean deferSupplies,
+            boolean exchange,
+            String exchangeFrom,
+            boolean exchangeSilk,
+            int drones,
+            boolean placeTool) {
         if (player == null || min == null || max == null) {
             return false;
         }
@@ -1000,6 +1028,7 @@ public final class JobManager {
         }
         BuildJob job = BuildJob.shape(player.getUUID(), player.getUUID(), player.level().dimension(), min, max);
         job.setShapeStream(kind, size, height, thickness, axis, yaw, pivot, hollow, center, materials, fillMode, orderBatch, seed, exchange, exchangeFrom, exchangeSilk);
+        job.setPlaceTool(placeTool && !exchange);
         // Exchange always swaps; Void only controls whether replaced blocks are returned.
         job.setPasteOptions(false, voidBlocks, voidBlocks, false, false, false, false);
         job.setClip(job.boxSizeX(), job.boxSizeY(), job.boxSizeZ());
@@ -1008,40 +1037,85 @@ public final class JobManager {
         com.wrights.blueprint.BlueprintSessions.BlueprintSession session = com.wrights.blueprint.BlueprintSessions.get(player);
         job.setSupply(session.supplyPos(), session.supplyDimension());
         job.setSupplyOrder(supplyOrder);
+        int cap = WrightsConfig.maxWrightsPerJob(job);
+        int room = Math.min(Math.max(1, job.total()), cap);
+        int wanted = drones > 0 ? Math.min(drones, room) : room;
+        wanted = Math.max(1, wanted);
         if (deferSupplies && !instant(player)) {
             job.setDeferSupplies(true);
             job.setQueued(true);
-            job.setCrewQuota(1);
+            job.setCrewQuota(wanted);
         }
         if (!instant(player) && freeUnits(player, library, job, 1).isEmpty() && !job.deferSupplies()) {
-            job.setCrewQuota(1);
+            job.setCrewQuota(wanted);
             job.setQueued(true);
             library.addJob(job);
             if (player.level() instanceof ServerLevel queuedLevel) {
                 attachExchangeHologram(player, library, queuedLevel, job);
             }
-            Messages.actionBar(player, "message.wrights.queued", 1);
+            Messages.actionBar(player, "message.wrights.queued", wanted);
             BlueprintNetwork.syncJobs(player);
             return true;
+        }
+        if (!instant(player) && !job.deferSupplies() && !assignShapeCrew(player, job, wanted)) {
+            return false;
         }
         library.addJob(job);
         if (job.deferSupplies()) {
             if (player.level() instanceof ServerLevel deferredLevel) {
                 attachExchangeHologram(player, library, deferredLevel, job);
             }
-            Messages.actionBar(player, "message.wrights.queued", 1);
+            Messages.actionBar(player, "message.wrights.queued", Math.max(1, job.crewQuota()));
             BlueprintNetwork.syncJobs(player);
             return true;
         }
         if (player.level() instanceof ServerLevel level) {
             attachExchangeHologram(player, library, level, job);
             if (!instant(player)) {
-                ensureDrone(level, player, job, min);
+                if (job.hasCrew()) {
+                    for (BuildJob.Hand hand : job.hands()) {
+                        ensureHand(level, player, job, hand, min);
+                    }
+                } else {
+                    ensureDrone(level, player, job, min);
+                }
             }
         }
         launched(player, job);
         BlueprintNetwork.syncJobs(player);
         return true;
+    }
+
+    /** Assign up to {@code requested} free wrights to a streaming Shape / Exchange / Place job. */
+    private static boolean assignShapeCrew(ServerPlayer player, BuildJob job, int requested) {
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        bindCrewIds(player, library);
+        int cap = WrightsConfig.maxWrightsPerJob(job);
+        int room = Math.min(Math.max(1, job.total()), cap);
+        int wanted = Math.max(1, Math.min(requested > 0 ? requested : room, room));
+        List<WrightHomes.FreeWright> units = freeUnits(player, library, job, wanted);
+        if (units.isEmpty()) {
+            tellNoCrew(player, job, false);
+            if (crewGap(player, job) != CrewGap.NONE_AVAILABLE) {
+                glowClosestPort(player, player.getServer().getLevel(job.dimension()), job.min());
+            }
+            return false;
+        }
+        List<Integer> speeds = new ArrayList<>();
+        List<UUID> ids = new ArrayList<>();
+        for (WrightHomes.FreeWright unit : units) {
+            releaseHomeWaiter(player, library, unit.unit().id(), job.id());
+            speeds.add(WrightTier.clamp(unit.unit().speed()));
+            ids.add(unit.unit().id());
+        }
+        job.setCrew(speeds, job.boxSizeX(), job.boxSizeY(), job.boxSizeZ());
+        job.setCrewUnits(ids);
+        for (int i = 0; i < job.hands().size() && i < units.size(); i++) {
+            job.hands().get(i).homePort = units.get(i).homePort();
+            job.hands().get(i).cursor = i;
+        }
+        job.setCrewQuota(ids.size());
+        return job.hasCrew();
     }
 
     /**
@@ -1251,8 +1325,11 @@ public final class JobManager {
         if (job.waitKind() != BuildJob.WAIT_ITEMS) {
             job.workedTick();
         }
+        int crewN = job.hasCrew() ? Math.max(1, job.hands().size()) : 1;
         int scanBudget = Math.max(1, WrightsConfig.COPY_POSITIONS_PER_TICK.getAsInt());
-        int placeBudget = fast ? Math.min(8192, scanBudget) : Math.max(1, WrightsConfig.BLOCKS_PER_TICK.getAsInt());
+        int placeBudget = fast
+                ? Math.min(8192, scanBudget)
+                : Math.max(1, WrightsConfig.BLOCKS_PER_TICK.getAsInt()) * crewN;
         int scanned = 0;
         int placed = 0;
         DroneEntity drone = null;
@@ -1322,7 +1399,36 @@ public final class JobManager {
             }
             statusState = state;
             if (!fast) {
-                if (drone == null) {
+                Vec3 hover = Vec3.atCenterOf(pos).add(0.0D, 0.9D, 0.0D);
+                drone = null;
+                if (job.hasCrew() && crewN > 1) {
+                    boolean someoneFlying = false;
+                    for (int h = 0; h < crewN; h++) {
+                        int idx = (placed + h) % crewN;
+                        BuildJob.Hand hand = job.hands().get(idx);
+                        DroneEntity candidate = ensureHand(level, player, job, hand, pos);
+                        if (candidate == null) {
+                            continue;
+                        }
+                        if (candidate.distanceToSqr(hover) <= DRONE_REACH_SQR) {
+                            drone = candidate;
+                            break;
+                        }
+                        double step = candidate.distanceToSqr(hover) > 64.0D ? 0.85D : 0.4D;
+                        candidate.moveToward(hover, step);
+                        hand.lastPos = candidate.blockPosition();
+                        candidate.setWorkStatus(BlockFilters.icon(state), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
+                        someoneFlying = true;
+                    }
+                    if (drone == null) {
+                        if (!someoneFlying && job.tickMessage()) {
+                            noteChunk(player, library, job);
+                        }
+                        job.setWaitKind(BuildJob.WAIT_NONE);
+                        library.setDirty();
+                        return;
+                    }
+                } else {
                     drone = ensureDrone(level, player, job, pos);
                     if (drone == null) {
                         if (job.tickMessage()) {
@@ -1330,16 +1436,15 @@ public final class JobManager {
                         }
                         return;
                     }
-                }
-                Vec3 hover = Vec3.atCenterOf(pos).add(0.0D, 0.9D, 0.0D);
-                if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
-                    double step = drone.distanceToSqr(hover) > 64.0D ? 0.85D : 0.4D;
-                    drone.moveToward(hover, step);
-                    job.setLastDronePos(drone.blockPosition());
-                    job.setWaitKind(BuildJob.WAIT_NONE);
-                    drone.setWorkStatus(BlockFilters.icon(state), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
-                    library.setDirty();
-                    return;
+                    if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
+                        double step = drone.distanceToSqr(hover) > 64.0D ? 0.85D : 0.4D;
+                        drone.moveToward(hover, step);
+                        job.setLastDronePos(drone.blockPosition());
+                        job.setWaitKind(BuildJob.WAIT_NONE);
+                        drone.setWorkStatus(BlockFilters.icon(state), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
+                        library.setDirty();
+                        return;
+                    }
                 }
             }
             int dx = pos.getX() - job.min().getX();
@@ -2675,7 +2780,7 @@ public final class JobManager {
             }
             if (current.isEmpty() && job.crewUnits().isEmpty() && !job.queued() && !(job.paused() && job.crewQuota() > 0)) {
                 int need = job.hasCrew() ? job.hands().size() : (instant(player) ? 0 : 1);
-                int jobCap = WrightsConfig.maxWrightsPerJob();
+                int jobCap = WrightsConfig.maxWrightsPerJob(job);
                 for (WrightHomes.FreeWright free : freeUnits(player, library, job, need)) {
                     if (current.size() >= need || current.size() >= jobCap) {
                         break;
@@ -2689,7 +2794,7 @@ public final class JobManager {
                 dirty |= detachCrew(player, job);
                 continue;
             }
-            int jobCap = WrightsConfig.maxWrightsPerJob();
+            int jobCap = WrightsConfig.maxWrightsPerJob(job);
             if (current.size() > jobCap) {
                 current.subList(jobCap, current.size()).clear();
             }
@@ -2786,8 +2891,8 @@ public final class JobManager {
             BlueprintNetwork.syncJobs(player);
             return;
         }
-        if (add && !job.crewUnits().contains(unitId) && job.crewUnits().size() >= WrightsConfig.maxWrightsPerJob()) {
-            Messages.actionBar(player, "message.wrights.job_wright_cap", WrightsConfig.maxWrightsPerJob());
+        if (add && !job.crewUnits().contains(unitId) && job.crewUnits().size() >= WrightsConfig.maxWrightsPerJob(job)) {
+            Messages.actionBar(player, "message.wrights.job_wright_cap", WrightsConfig.maxWrightsPerJob(job));
             BlueprintNetwork.syncJobs(player);
             return;
         }
@@ -2850,8 +2955,8 @@ public final class JobManager {
         }
         if (target != null && (source == null || !source.id().equals(target.id()))
                 && !target.crewUnits().contains(unitId)
-                && target.crewUnits().size() >= WrightsConfig.maxWrightsPerJob()) {
-            Messages.actionBar(player, "message.wrights.job_wright_cap", WrightsConfig.maxWrightsPerJob());
+                && target.crewUnits().size() >= WrightsConfig.maxWrightsPerJob(target)) {
+            Messages.actionBar(player, "message.wrights.job_wright_cap", WrightsConfig.maxWrightsPerJob(target));
             BlueprintNetwork.syncJobs(player);
             return;
         }
@@ -3170,7 +3275,7 @@ public final class JobManager {
         }
         Schematic schematic = job.schematicId() == null ? null : library.schematic(job.schematicId()).orElse(null);
         int room = placeableBlocks(schematic, job);
-        int limit = Math.min(room, WrightsConfig.maxWrightsPerJob());
+        int limit = Math.min(room, WrightsConfig.maxWrightsPerJob(job));
         if (kept.size() > limit) {
             if (kept.size() > room) {
                 Messages.actionBar(player, "message.wrights.drone_block_cap", Math.max(0, room));
@@ -3312,7 +3417,7 @@ public final class JobManager {
         if (room <= 0) {
             return false;
         }
-        int wanted = Math.min(quota, Math.min(room, WrightsConfig.maxWrightsPerJob()));
+        int wanted = Math.min(quota, Math.min(room, WrightsConfig.maxWrightsPerJob(job)));
         List<UUID> ids = pickResume(player, library, job, wanted);
         if (ids.isEmpty()) {
             return false;
@@ -3484,7 +3589,7 @@ public final class JobManager {
             Messages.actionBar(player, "message.wrights.drone_block_cap", 0);
             return false;
         }
-        int room = Math.min(blocks, WrightsConfig.maxWrightsPerJob());
+        int room = Math.min(blocks, WrightsConfig.maxWrightsPerJob(job));
         int wanted = requested > 0 ? Math.min(requested, room) : room;
         List<WrightHomes.FreeWright> units = freeUnits(player, library, job, wanted);
         if (units.isEmpty()) {
@@ -6403,12 +6508,12 @@ public final class JobManager {
     }
 
     private static BuildJob lendTarget(MinecraftServer server, SchematicLibrary library, ServerPlayer player, BuildJob source, BuildJob.Hand hand) {
-        int cap = WrightsConfig.maxWrightsPerJob();
         BuildJob best = null;
         for (BuildJob job : library.jobsFor(player.getUUID())) {
             if (job == source || job.finished() || job.undoing() || job.kind() != BuildJob.Kind.PASTE) {
                 continue;
             }
+            int cap = WrightsConfig.maxWrightsPerJob(job);
             if (job.crewUnits().size() >= cap || !coversJob(player, job, hand.homePort)) {
                 continue;
             }

@@ -1512,8 +1512,9 @@ public final class WrightsClientState {
         if (free <= 0) {
             return 0;
         }
-        int ceiling = Math.min(blocks, WrightsConfig.maxWrightsPerJob());
-        return Math.min(Math.max(1, WrightsClientConfig.droneCount()), Math.min(free, ceiling));
+        boolean boosted = exchangeToolActive() || placeToolActive();
+        int ceiling = Math.min(blocks, WrightsConfig.maxWrightsPerJob(boosted));
+        return Math.min(Math.max(1, WrightsClientConfig.droneCountFor(boosted)), Math.min(free, ceiling));
     }
 
     /** Wrights that can leave a worn port or a nearby placed wrightport. */
@@ -1558,7 +1559,8 @@ public final class WrightsClientState {
         if (blocks <= 0) {
             return 0;
         }
-        int ceiling = Math.min(blocks, WrightsConfig.maxWrightsPerJob());
+        boolean boosted = exchangeToolActive() || placeToolActive();
+        int ceiling = Math.min(blocks, WrightsConfig.maxWrightsPerJob(boosted));
         int freeCap = deployCap();
         return freeCap > 0 ? freeCap : ceiling;
     }
@@ -1847,6 +1849,8 @@ public final class WrightsClientState {
                 WrightsClientConfig.SHAPE_SUPPLY.get(),
                 false,
                 "",
+                false,
+                WrightsClientConfig.droneCountFor(false),
                 false);
         PacketDistributor.sendToServer(pendingShape);
         if (lookPinned) {
@@ -1924,7 +1928,9 @@ public final class WrightsClientState {
                 WrightsClientConfig.SHAPE_SUPPLY.get(),
                 true,
                 from == null ? "" : from,
-                WrightsClientConfig.exchangeSilk());
+                WrightsClientConfig.exchangeSilk(),
+                WrightsClientConfig.droneCountFor(true),
+                false);
         PacketDistributor.sendToServer(pendingShape);
         if (lookPinned) {
             clearShapeLookSnap();
@@ -2060,7 +2066,9 @@ public final class WrightsClientState {
                 WrightsClientConfig.SHAPE_SUPPLY.get(),
                 false,
                 "",
-                false);
+                false,
+                WrightsClientConfig.droneCountFor(true),
+                true);
         PacketDistributor.sendToServer(pendingShape);
         return true;
     }
@@ -2166,7 +2174,9 @@ public final class WrightsClientState {
                 WrightsClientConfig.SHAPE_SUPPLY.get(),
                 false,
                 "",
-                false);
+                false,
+                1,
+                true);
     }
 
     /** Place every empty Bridge / Stairs cell from the player out to the offset while the toggle is on. */

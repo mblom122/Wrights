@@ -169,6 +169,8 @@ public final class ShapeLaunch {
         }
         // Build anyway starts with what you have; when stock runs out the wright goes home and waits.
         boolean deferSupplies = false;
+        int drones = Math.max(0, payload.drones());
+        boolean placeTool = !exchange && payload.placeTool();
         boolean ok = JobManager.startShapeBuild(
                 player,
                 min,
@@ -191,7 +193,9 @@ public final class ShapeLaunch {
                 deferSupplies,
                 exchange,
                 fromMaterials,
-                silk);
+                silk,
+                drones,
+                placeTool);
         if (!ok) {
             Messages.actionBar(player, exchange ? "message.wrights.exchange_failed" : "message.wrights.shape_failed");
             return;

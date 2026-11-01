@@ -839,6 +839,8 @@ public final class BuildJob {
     private String exchangeFrom = "";
     /** When true, Exchange silk-touches replaced blocks instead of voiding them. */
     private boolean exchangeSilk;
+    /** Place tool job (not Shape / Exchange) — may use the doubled wright cap. */
+    private boolean placeTool;
     private int shapeFillMode;
     private int shapeOrderBatch = 1;
     private long shapeSeed;
@@ -926,6 +928,14 @@ public final class BuildJob {
 
     public boolean exchangeSilk() {
         return exchangeSilk;
+    }
+
+    public boolean placeTool() {
+        return placeTool;
+    }
+
+    public void setPlaceTool(boolean placeTool) {
+        this.placeTool = placeTool;
     }
 
     public int shapeKind() {
@@ -1269,6 +1279,7 @@ public final class BuildJob {
             tag.putBoolean("exchange", exchange);
             tag.putString("exchangeFrom", exchangeFrom == null ? "" : exchangeFrom);
             tag.putBoolean("exchangeSilk", exchangeSilk);
+            tag.putBoolean("placeTool", placeTool);
             tag.putInt("shapeFillMode", shapeFillMode);
             tag.putInt("shapeOrderBatch", shapeOrderBatch);
             tag.putLong("shapeSeed", shapeSeed);
@@ -1460,6 +1471,7 @@ public final class BuildJob {
             job.exchange = tag.getBoolean("exchange");
             job.exchangeFrom = tag.contains("exchangeFrom") ? tag.getString("exchangeFrom") : "";
             job.exchangeSilk = job.exchange && tag.getBoolean("exchangeSilk");
+            job.placeTool = tag.getBoolean("placeTool");
             job.shapeFillMode = tag.getInt("shapeFillMode");
             job.shapeOrderBatch = Math.max(1, tag.contains("shapeOrderBatch") ? tag.getInt("shapeOrderBatch") : 1);
             job.shapeSeed = tag.getLong("shapeSeed");

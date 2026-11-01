@@ -1295,7 +1295,7 @@ public class WrightsMenuScreen extends Screen {
         droneY = optionY(local - 3);
         droneMinusX = controls;
         dronePlusX = droneMinusX + 36;
-        Component maxLabel = Component.translatable("menu.wrights.drone_max", WrightsConfig.maxWrightsPerJob());
+        Component maxLabel = Component.translatable("menu.wrights.drone_max", WrightsConfig.maxWrightsPerJob(true));
         droneW = this.font.width(maxLabel) + 12;
         droneX = dronePlusX + 22;
         local += 24;
@@ -1458,13 +1458,16 @@ public class WrightsMenuScreen extends Screen {
         graphics.drawString(this.font, droneLabel, x, droneY + 3, WrightsUi.MUTED, false);
         WrightsUi.choice(graphics, droneMinusX, droneY, 16, 16, false, false);
         graphics.drawCenteredString(this.font, "-", droneMinusX + 8, droneY + 4, WrightsUi.TEXT);
-        String count = Integer.toString(WrightsClientConfig.droneCount());
+        int droneCap = WrightsConfig.maxWrightsPerJob(true);
+        String count = Integer.toString(WrightsClientConfig.DRONE_MAX.get()
+                ? WrightsConfig.maxWrightsPerJob()
+                : WrightsClientConfig.droneCount());
         graphics.drawCenteredString(this.font, count, droneMinusX + 26, droneY + 4, WrightsUi.TEXT);
         WrightsUi.choice(graphics, dronePlusX, droneY, 16, 16, false, false);
         graphics.drawCenteredString(this.font, "+", dronePlusX + 8, droneY + 4, WrightsUi.TEXT);
-        boolean atMax = WrightsClientConfig.droneCount() >= WrightsConfig.maxWrightsPerJob();
+        boolean atMax = WrightsClientConfig.DRONE_MAX.get();
         WrightsUi.choice(graphics, droneX, droneY, droneW, 16, atMax, false);
-        graphics.drawCenteredString(this.font, Component.translatable("menu.wrights.drone_max", WrightsConfig.maxWrightsPerJob()), droneX + droneW / 2, droneY + 4, WrightsUi.TEXT);
+        graphics.drawCenteredString(this.font, Component.translatable("menu.wrights.drone_max", droneCap), droneX + droneW / 2, droneY + 4, WrightsUi.TEXT);
         drawOptionHelp(graphics, mouseX, mouseY, x, droneY + 3, droneLabel, droneMinusX, droneX + droneW, Component.translatable("menu.wrights.drone_fixed_hint"));
         boolean queueJobs = WrightsClientConfig.QUEUE_JOBS.get();
         Component queueLabel = Component.translatable("menu.wrights.queue_jobs");
@@ -2934,7 +2937,7 @@ public class WrightsMenuScreen extends Screen {
                 if (mouseY >= droneY && mouseY < droneY + 16) {
                     if (mouseX >= droneX && mouseX < droneX + droneW) {
                         WrightsClientState.deployChosen = false;
-                        WrightsClientConfig.setDroneCount(WrightsConfig.maxWrightsPerJob());
+                        WrightsClientConfig.setDroneMax(true);
                         WrightsClientState.applyDeploy();
                         return true;
                     }
@@ -2946,7 +2949,11 @@ public class WrightsMenuScreen extends Screen {
                     }
                     if (step != 0) {
                         WrightsClientState.deployChosen = false;
-                        WrightsClientConfig.setDroneCount(WrightsClientState.stepped(WrightsClientConfig.droneCount(), step, 1, WrightsConfig.maxWrightsPerJob()));
+                        int droneCap = WrightsConfig.maxWrightsPerJob(true);
+                        int current = WrightsClientConfig.DRONE_MAX.get()
+                                ? WrightsConfig.maxWrightsPerJob()
+                                : WrightsClientConfig.droneCount();
+                        WrightsClientConfig.setDroneCount(WrightsClientState.stepped(current, step, 1, droneCap));
                         WrightsClientState.applyDeploy();
                         return true;
                     }
