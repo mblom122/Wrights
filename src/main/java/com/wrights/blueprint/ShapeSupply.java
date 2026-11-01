@@ -19,8 +19,9 @@ import com.wrights.item.ControllerItem;
 import com.wrights.storage.ItemSource;
 
 /**
- * Shared ordered material sources for Shape, blueprint place, and Options.
- * Default order is main hand → offhand → action bar → inventory → bound chest → digital storage.
+ * Shared ordered material sources for Shape, blueprint place, Mirror, and Options.
+ * Default order is main hand → offhand → hotbar → inventory → bound chest → digital storage.
+ * Main hand is only the selected slot; hotbar is the other eight hotbar slots.
  */
 public final class ShapeSupply {
     public static final int MAIN_HAND = 0;
@@ -187,13 +188,22 @@ public final class ShapeSupply {
             return Long.MAX_VALUE / 4L;
         }
         long total = 0L;
-        boolean countedPlayer = false;
+        Inventory inv = player.getInventory();
         for (int source : order == null ? parse(DEFAULT_ORDER) : order) {
             switch (clamp(source)) {
-                case MAIN_HAND, OFFHAND, ACTION_BAR, INVENTORY -> {
-                    if (!countedPlayer) {
-                        total += ItemSource.playerCount(player, item);
-                        countedPlayer = true;
+                case MAIN_HAND -> total += countSlot(inv, inv.selected, item);
+                case OFFHAND -> total += countSlot(inv, Inventory.SLOT_OFFHAND, item);
+                case ACTION_BAR -> {
+                    for (int slot = 0; slot < 9; slot++) {
+                        if (slot == inv.selected) {
+                            continue; // Selected is Main hand only.
+                        }
+                        total += countSlot(inv, slot, item);
+                    }
+                }
+                case INVENTORY -> {
+                    for (int slot = 9; slot < inv.items.size(); slot++) {
+                        total += countSlot(inv, slot, item);
                     }
                 }
                 case BOUND_CHEST -> {
@@ -214,6 +224,9 @@ public final class ShapeSupply {
     /**
      * Takes one item using the shared priority list. Player slots are searched in order;
      * chest and digital follow when listed.
+     * <p>
+     * Main hand is only the selected slot. Action bar is the other hotbar slots (never the
+     * selected one). Inventory is backpack only — never falls back into main/off/hotbar.
      */
     public static boolean takeOne(ServerPlayer player, Item item, List<Integer> order) {
         return takeOne(player, item, order, null);
@@ -236,12 +249,15 @@ public final class ShapeSupply {
                     }
                 }
                 case OFFHAND -> {
-                    if (shrinkSlot(inv, 40, item)) {
+                    if (shrinkSlot(inv, Inventory.SLOT_OFFHAND, item)) {
                         return true;
                     }
                 }
                 case ACTION_BAR -> {
                     for (int slot = 0; slot < 9; slot++) {
+                        if (slot == inv.selected) {
+                            continue; // Selected is Main hand only.
+                        }
                         if (shrinkSlot(inv, slot, item)) {
                             return true;
                         }
@@ -249,15 +265,6 @@ public final class ShapeSupply {
                 }
                 case INVENTORY -> {
                     for (int slot = 9; slot < inv.items.size(); slot++) {
-                        if (shrinkSlot(inv, slot, item)) {
-                            return true;
-                        }
-                    }
-                    // Also allow remaining player slots if earlier sources were removed.
-                    for (int slot = 0; slot < inv.getContainerSize(); slot++) {
-                        if (slot == Inventory.SLOT_OFFHAND) {
-                            continue;
-                        }
                         if (shrinkSlot(inv, slot, item)) {
                             return true;
                         }
@@ -346,11 +353,26 @@ public final class ShapeSupply {
         }
     }
 
+    /** Other hotbar slots only — selected belongs to {@link #MAIN_HAND}. */
     private static void collectHotbar(Player player, List<BlockState> out) {
         Inventory inv = player.getInventory();
         for (int slot = 0; slot < 9; slot++) {
+            if (slot == inv.selected) {
+                continue;
+            }
             addBlock(inv.getItem(slot), out, Integer.MAX_VALUE);
         }
+    }
+
+    private static long countSlot(Inventory inv, int slot, Item item) {
+        if (slot < 0 || slot >= inv.getContainerSize() || item == null) {
+            return 0L;
+        }
+        ItemStack stack = inv.getItem(slot);
+        if (!stack.is(item) || stack.getItem() instanceof ControllerItem) {
+            return 0L;
+        }
+        return stack.getCount();
     }
 
     private static void addBlock(ItemStack stack, List<BlockState> out, int limit) {
