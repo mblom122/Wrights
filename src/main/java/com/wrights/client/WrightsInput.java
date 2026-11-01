@@ -523,9 +523,13 @@ public final class WrightsInput {
             return;
         }
         if (control) {
-            // Shape tool: Ctrl+scroll rotates 90° around the look/anchor pin (same as blueprints).
-            // Scroll up = clockwise so the AABB swings around the pin.
+            // Shape tool: Ctrl+scroll yaws the whole footprint around the look/anchor pin.
+            // Scroll up = clockwise so the AABB orbits that cell (needs a corner/edge pivot).
             if (WrightsClientState.shapeToolActive() && com.wrights.WrightsConfig.allowShape()) {
+                // Center pivot spins a cube in place — move to the bottom min corner so scroll orbits the box.
+                if (com.wrights.WrightsClientConfig.SHAPE_PIVOT.get() == com.wrights.blueprint.Shapes.PIVOT_CENTER) {
+                    com.wrights.WrightsClientConfig.setShapePivot(com.wrights.blueprint.Shapes.pivotId(0, 0));
+                }
                 int yaw = com.wrights.WrightsClientConfig.SHAPE_YAW.get();
                 int nextYaw = event.getScrollDeltaY() > 0.0D
                         ? (yaw + 3) & 3

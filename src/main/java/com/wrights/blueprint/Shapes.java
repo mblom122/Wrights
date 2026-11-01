@@ -484,7 +484,8 @@ public final class Shapes {
 
     /**
      * World positions with the chosen AABB pivot pinned to {@code worldTarget}.
-     * Used by both look-at and on-anchor placement.
+     * Axis tips the shape first; {@code rotation} then yaws the whole footprint around the pin
+     * (Ctrl+scroll), so the bounding box orbits that cell like a blueprint anchor.
      */
     public static List<BlockPos> blocksPinned(
             Kind kind,
@@ -510,20 +511,63 @@ public final class Shapes {
             int rotation,
             int pivot,
             int maxCells) {
-        Bounds box = bounds(kind, BlockPos.ZERO, size, height, thickness, hollow, axis, rotation);
-        BlockPos pin = pivotBlock(box.min(), box.max(), pivot);
-        int dx = worldTarget == null ? 0 : worldTarget.getX() - pin.getX();
-        int dy = worldTarget == null ? 0 : worldTarget.getY() - pin.getY();
-        int dz = worldTarget == null ? 0 : worldTarget.getZ() - pin.getZ();
-        List<BlockPos> local = blocks(kind, BlockPos.ZERO, size, height, thickness, hollow, axis, rotation, maxCells);
-        if (local.isEmpty() || (dx == 0 && dy == 0 && dz == 0)) {
+        // Build axis-only (yaw 0), pin, then orbit yaw around the pin — not around the center.
+        List<BlockPos> local = blocks(kind, BlockPos.ZERO, size, height, thickness, hollow, axis, 0, maxCells);
+        if (local.isEmpty()) {
             return local;
         }
-        // Offset in place — a second ArrayList of millions of BlockPos OOMs the heap.
+        Bounds box = bounds(kind, BlockPos.ZERO, size, height, thickness, hollow, axis, 0);
+        BlockPos pinLocal = pivotBlock(box.min(), box.max(), pivot);
+        int yaw = clampYaw(rotation);
+        int px = worldTarget == null ? 0 : worldTarget.getX();
+        int py = worldTarget == null ? 0 : worldTarget.getY();
+        int pz = worldTarget == null ? 0 : worldTarget.getZ();
         for (int i = 0; i < local.size(); i++) {
-            local.set(i, local.get(i).offset(dx, dy, dz));
+            BlockPos cell = local.get(i);
+            int rx = cell.getX() - pinLocal.getX();
+            int ry = cell.getY() - pinLocal.getY();
+            int rz = cell.getZ() - pinLocal.getZ();
+            long turned = yawAroundY(rx, rz, yaw);
+            local.set(i, new BlockPos(px + turnedX(turned), py + ry, pz + turnedZ(turned)));
         }
         return local;
+    }
+
+    /** Pack xz after {@link #yawAroundY} — high 32 = x, low 32 = z. */
+    private static int turnedX(long packed) {
+        return (int) (packed >> 32);
+    }
+
+    private static int turnedZ(long packed) {
+        return (int) packed;
+    }
+
+    /** Quarter-turns of (x,z) around Y. Positive yaw matches {@link #orient} (x,z)→(z,-x). */
+    private static long yawAroundY(int x, int z, int yaw) {
+        int wx = x;
+        int wz = z;
+        int turns = clampYaw(yaw);
+        for (int t = 0; t < turns; t++) {
+            int nextX = wz;
+            int nextZ = -wx;
+            wx = nextX;
+            wz = nextZ;
+        }
+        return (((long) wx) << 32) | (wz & 0xFFFFFFFFL);
+    }
+
+    /** Inverse of {@link #yawAroundY}. */
+    private static long yawAroundYInverse(int x, int z, int yaw) {
+        int wx = x;
+        int wz = z;
+        int turns = clampYaw(yaw);
+        for (int t = 0; t < turns; t++) {
+            int nextX = -wz;
+            int nextZ = wx;
+            wx = nextX;
+            wz = nextZ;
+        }
+        return (((long) wx) << 32) | (wz & 0xFFFFFFFFL);
     }
 
     /** @deprecated prefer {@link #blocksPinned} with a pivot */
@@ -808,17 +852,42 @@ public final class Shapes {
         if (feet == null) {
             return BlockPos.ZERO;
         }
-        Bounds box = bounds(kind, BlockPos.ZERO, size, height, thickness, hollow, axis, rotation);
-        BlockPos min = box.min();
-        BlockPos max = box.max();
-        BlockPos pin = pivotBlock(min, max, pivot);
-        int topCenterX = (min.getX() + max.getX()) >> 1;
-        int topCenterZ = (min.getZ() + max.getZ()) >> 1;
-        // Place so the chosen pivot lands on the returned anchor, and the top sits under the player's feet.
+        // Same pin-orbit as placement: yaw swings the box around the anchor, then we solve for
+        // the anchor that puts the finished top-center under the player's feet.
+        Bounds local = bounds(kind, BlockPos.ZERO, size, height, thickness, hollow, axis, 0);
+        BlockPos pinLocal = pivotBlock(local.min(), local.max(), pivot);
+        int yaw = clampYaw(rotation);
+        int outMinX = Integer.MAX_VALUE;
+        int outMinY = Integer.MAX_VALUE;
+        int outMinZ = Integer.MAX_VALUE;
+        int outMaxX = Integer.MIN_VALUE;
+        int outMaxY = Integer.MIN_VALUE;
+        int outMaxZ = Integer.MIN_VALUE;
+        int[] xs = {local.min().getX(), local.max().getX()};
+        int[] ys = {local.min().getY(), local.max().getY()};
+        int[] zs = {local.min().getZ(), local.max().getZ()};
+        for (int x : xs) {
+            for (int y : ys) {
+                for (int z : zs) {
+                    long turned = yawAroundY(x - pinLocal.getX(), z - pinLocal.getZ(), yaw);
+                    int rx = turnedX(turned);
+                    int ry = y - pinLocal.getY();
+                    int rz = turnedZ(turned);
+                    outMinX = Math.min(outMinX, rx);
+                    outMinY = Math.min(outMinY, ry);
+                    outMinZ = Math.min(outMinZ, rz);
+                    outMaxX = Math.max(outMaxX, rx);
+                    outMaxY = Math.max(outMaxY, ry);
+                    outMaxZ = Math.max(outMaxZ, rz);
+                }
+            }
+        }
+        int topCenterX = (outMinX + outMaxX) >> 1;
+        int topCenterZ = (outMinZ + outMaxZ) >> 1;
         return new BlockPos(
-                feet.getX() - (topCenterX - pin.getX()),
-                feet.getY() - 1 - (max.getY() - pin.getY()),
-                feet.getZ() - (topCenterZ - pin.getZ()));
+                feet.getX() - topCenterX,
+                feet.getY() - 1 - outMaxY,
+                feet.getZ() - topCenterZ);
     }
 
     /**
@@ -839,8 +908,8 @@ public final class Shapes {
     }
 
     /**
-     * World-space AABB after pinning {@code worldTarget} to the chosen pivot.
-     * No cell list — streaming placement uses this + {@link #containsWorld}.
+     * World-space AABB after pinning {@code worldTarget} to the chosen pivot, then yawing
+     * around that pin. No cell list — streaming placement uses this + {@link #containsWorld}.
      */
     public static Bounds pinnedBounds(
             Kind kind,
@@ -852,17 +921,43 @@ public final class Shapes {
             int axis,
             int rotation,
             int pivot) {
-        Bounds local = bounds(kind, BlockPos.ZERO, size, height, thickness, hollow, axis, rotation);
-        BlockPos pin = pivotBlock(local.min(), local.max(), pivot);
-        int dx = worldTarget == null ? 0 : worldTarget.getX() - pin.getX();
-        int dy = worldTarget == null ? 0 : worldTarget.getY() - pin.getY();
-        int dz = worldTarget == null ? 0 : worldTarget.getZ() - pin.getZ();
-        return new Bounds(local.min().offset(dx, dy, dz), local.max().offset(dx, dy, dz));
+        Bounds local = bounds(kind, BlockPos.ZERO, size, height, thickness, hollow, axis, 0);
+        BlockPos pinLocal = pivotBlock(local.min(), local.max(), pivot);
+        int yaw = clampYaw(rotation);
+        int px = worldTarget == null ? 0 : worldTarget.getX();
+        int py = worldTarget == null ? 0 : worldTarget.getY();
+        int pz = worldTarget == null ? 0 : worldTarget.getZ();
+        int outMinX = Integer.MAX_VALUE;
+        int outMinY = Integer.MAX_VALUE;
+        int outMinZ = Integer.MAX_VALUE;
+        int outMaxX = Integer.MIN_VALUE;
+        int outMaxY = Integer.MIN_VALUE;
+        int outMaxZ = Integer.MIN_VALUE;
+        int[] xs = {local.min().getX(), local.max().getX()};
+        int[] ys = {local.min().getY(), local.max().getY()};
+        int[] zs = {local.min().getZ(), local.max().getZ()};
+        for (int x : xs) {
+            for (int y : ys) {
+                for (int z : zs) {
+                    long turned = yawAroundY(x - pinLocal.getX(), z - pinLocal.getZ(), yaw);
+                    int wx = px + turnedX(turned);
+                    int wy = py + (y - pinLocal.getY());
+                    int wz = pz + turnedZ(turned);
+                    outMinX = Math.min(outMinX, wx);
+                    outMinY = Math.min(outMinY, wy);
+                    outMinZ = Math.min(outMinZ, wz);
+                    outMaxX = Math.max(outMaxX, wx);
+                    outMaxY = Math.max(outMaxY, wy);
+                    outMaxZ = Math.max(outMaxZ, wz);
+                }
+            }
+        }
+        return new Bounds(new BlockPos(outMinX, outMinY, outMinZ), new BlockPos(outMaxX, outMaxY, outMaxZ));
     }
 
     /**
-     * Formula center in world space after the same pin used by {@link #blocksPinned}.
-     * Generators run at this center before axis/yaw (applied in membership via inverse orient).
+     * World position of the local formula origin after pin (yaw 0). Membership applies yaw
+     * around the pin ({@code center + pinLocal}) via {@link #containsWorld}.
      */
     public static BlockPos pinnedCenter(
             Kind kind,
@@ -874,15 +969,98 @@ public final class Shapes {
             int axis,
             int rotation,
             int pivot) {
-        Bounds local = bounds(kind, BlockPos.ZERO, size, height, thickness, hollow, axis, rotation);
-        BlockPos pin = pivotBlock(local.min(), local.max(), pivot);
-        int dx = worldTarget == null ? 0 : worldTarget.getX() - pin.getX();
-        int dy = worldTarget == null ? 0 : worldTarget.getY() - pin.getY();
-        int dz = worldTarget == null ? 0 : worldTarget.getZ() - pin.getZ();
+        Bounds local = bounds(kind, BlockPos.ZERO, size, height, thickness, hollow, axis, 0);
+        BlockPos pinLocal = pivotBlock(local.min(), local.max(), pivot);
+        int dx = worldTarget == null ? 0 : worldTarget.getX() - pinLocal.getX();
+        int dy = worldTarget == null ? 0 : worldTarget.getY() - pinLocal.getY();
+        int dz = worldTarget == null ? 0 : worldTarget.getZ() - pinLocal.getZ();
         return new BlockPos(dx, dy, dz);
     }
 
-    /** True when {@code world} is a cell of the pinned shape (no allocation). */
+    /**
+     * True when {@code world} is a cell of the pinned shape (no allocation).
+     * {@code center} is {@link #pinnedCenter}; yaw orbits the pin, not the formula origin.
+     */
+    public static boolean containsWorld(
+            Kind kind,
+            BlockPos world,
+            BlockPos center,
+            int size,
+            int height,
+            int thickness,
+            boolean hollow,
+            int axis,
+            int rotation,
+            int pivot) {
+        if (kind == null || world == null || center == null) {
+            return false;
+        }
+        Bounds local = bounds(kind, BlockPos.ZERO, size, height, thickness, hollow, axis, 0);
+        return containsWorld(kind, world, center, pivotBlock(local.min(), local.max(), pivot), size, height, thickness, hollow, axis, rotation);
+    }
+
+    /**
+     * Hot-path membership when {@code pinLocal} is already known (avoid recomputing bounds each cell).
+     */
+    public static boolean containsWorld(
+            Kind kind,
+            BlockPos world,
+            BlockPos center,
+            BlockPos pinLocal,
+            int size,
+            int height,
+            int thickness,
+            boolean hollow,
+            int axis,
+            int rotation) {
+        if (kind == null || world == null || center == null || pinLocal == null) {
+            return false;
+        }
+        int pinX = center.getX() + pinLocal.getX();
+        int pinY = center.getY() + pinLocal.getY();
+        int pinZ = center.getZ() + pinLocal.getZ();
+        long unyaw = yawAroundYInverse(world.getX() - pinX, world.getZ() - pinZ, rotation);
+        int ax = turnedX(unyaw) + pinLocal.getX();
+        int ay = (world.getY() - pinY) + pinLocal.getY();
+        int az = turnedZ(unyaw) + pinLocal.getZ();
+        int lx;
+        int ly;
+        int lz;
+        switch (clampPlane(axis)) {
+            case AXIS_Z -> { // forward (x,y,z)->(x,z,y)
+                lx = ax;
+                ly = az;
+                lz = ay;
+            }
+            case AXIS_X -> { // forward (x,y,z)->(y,x,z)
+                lx = ay;
+                ly = ax;
+                lz = az;
+            }
+            default -> {
+                lx = ax;
+                ly = ay;
+                lz = az;
+            }
+        }
+        return containsLocal(kind, lx, ly, lz, size, height, thickness, hollow);
+    }
+
+    /** Local pivot cell for axis-only (yaw 0) bounds — cache this for streaming membership. */
+    public static BlockPos pinLocal(
+            Kind kind,
+            int size,
+            int height,
+            int thickness,
+            boolean hollow,
+            int axis,
+            int pivot) {
+        Bounds local = bounds(kind, BlockPos.ZERO, size, height, thickness, hollow, axis, 0);
+        return pivotBlock(local.min(), local.max(), pivot);
+    }
+
+    /** @deprecated prefer {@link #containsWorld} with pivot */
+    @Deprecated
     public static boolean containsWorld(
             Kind kind,
             BlockPos world,
@@ -893,41 +1071,7 @@ public final class Shapes {
             boolean hollow,
             int axis,
             int rotation) {
-        if (kind == null || world == null || center == null) {
-            return false;
-        }
-        int wx = world.getX() - center.getX();
-        int wy = world.getY() - center.getY();
-        int wz = world.getZ() - center.getZ();
-        int yaw = clampYaw(rotation);
-        // Inverse of yaw (wx,wz) -> (wz, -wx).
-        for (int t = 0; t < yaw; t++) {
-            int nextX = -wz;
-            int nextZ = wx;
-            wx = nextX;
-            wz = nextZ;
-        }
-        int lx;
-        int ly;
-        int lz;
-        switch (clampPlane(axis)) {
-            case AXIS_Z -> { // forward (x,y,z)->(x,z,y)
-                lx = wx;
-                ly = wz;
-                lz = wy;
-            }
-            case AXIS_X -> { // forward (x,y,z)->(y,x,z)
-                lx = wy;
-                ly = wx;
-                lz = wz;
-            }
-            default -> {
-                lx = wx;
-                ly = wy;
-                lz = wz;
-            }
-        }
-        return containsLocal(kind, lx, ly, lz, size, height, thickness, hollow);
+        return containsWorld(kind, world, center, size, height, thickness, hollow, axis, rotation, PIVOT_CENTER);
     }
 
     /** Membership in local Y-up space (same space as the private generators, before orient). */

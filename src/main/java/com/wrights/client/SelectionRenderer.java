@@ -160,17 +160,15 @@ public final class SelectionRenderer {
         int thickness = WrightsClientConfig.SHAPE_THICKNESS.get();
         boolean hollow = WrightsClientConfig.SHAPE_HOLLOW.get() && WrightsConfig.allowShapeHollow();
         int plane = WrightsClientConfig.SHAPE_PLANE.get();
-        int yaw = WrightsClientConfig.SHAPE_YAW.get();
+        int yaw = com.wrights.blueprint.Shapes.clampYaw(WrightsClientConfig.SHAPE_YAW.get());
         int pivot = WrightsClientConfig.SHAPE_PIVOT.get();
-        ensureShapeLocal(kind, size, height, thickness, hollow, plane, yaw);
+        // Cache axis-only mesh; yaw orbits the pin in world space (same as placement).
+        ensureShapeLocal(kind, size, height, thickness, hollow, plane, 0);
         BlockPos pinLocal = com.wrights.blueprint.Shapes.pivotBlock(shapeLocalMin, shapeLocalMax, pivot);
-        int ox = target.getX() - pinLocal.getX();
-        int oy = target.getY() - pinLocal.getY();
-        int oz = target.getZ() - pinLocal.getZ();
-        BlockPos worldMin = shapeLocalMin.offset(ox, oy, oz);
-        BlockPos worldMax = shapeLocalMax.offset(ox, oy, oz);
+        com.wrights.blueprint.Shapes.Bounds worldBox = com.wrights.blueprint.Shapes.pinnedBounds(
+                kind, target, size, height, thickness, hollow, plane, yaw, pivot);
         // Bounds are O(1). Wire-box placement cue — always cheap even for huge volumes.
-        drawShapeBounds(pose, buffers, camera, worldMin, worldMax, target);
+        drawShapeBounds(pose, buffers, camera, worldBox.min(), worldBox.max(), target);
         if (shapeBoundsOnly || shapeLocal.isEmpty()) {
             buffers.endBatch();
             return;
@@ -185,11 +183,26 @@ public final class SelectionRenderer {
         double limit = rangeSqr();
         int filled = 0;
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        int pinX = pinLocal.getX();
+        int pinY = pinLocal.getY();
+        int pinZ = pinLocal.getZ();
+        int tx = target.getX();
+        int ty = target.getY();
+        int tz = target.getZ();
         for (int i = 0; i < total; i++) {
             BlockPos local = shapeLocal.get(i);
-            int wx = local.getX() + ox;
-            int wy = local.getY() + oy;
-            int wz = local.getZ() + oz;
+            int rx = local.getX() - pinX;
+            int ry = local.getY() - pinY;
+            int rz = local.getZ() - pinZ;
+            for (int t = 0; t < yaw; t++) {
+                int nextX = rz;
+                int nextZ = -rx;
+                rx = nextX;
+                rz = nextZ;
+            }
+            int wx = tx + rx;
+            int wy = ty + ry;
+            int wz = tz + rz;
             double dx = wx + 0.5D - camera.x;
             double dy = wy + 0.5D - camera.y;
             double dz = wz + 0.5D - camera.z;
@@ -230,9 +243,18 @@ public final class SelectionRenderer {
         BlockRenderDispatcher renderer = minecraft.getBlockRenderer();
         for (int n = 0; n < keep; n++) {
             BlockPos local = shapeLocal.get(order[n]);
-            int wx = local.getX() + ox;
-            int wy = local.getY() + oy;
-            int wz = local.getZ() + oz;
+            int rx = local.getX() - pinX;
+            int ry = local.getY() - pinY;
+            int rz = local.getZ() - pinZ;
+            for (int t = 0; t < yaw; t++) {
+                int nextX = rz;
+                int nextZ = -rx;
+                rx = nextX;
+                rz = nextZ;
+            }
+            int wx = tx + rx;
+            int wy = ty + ry;
+            int wz = tz + rz;
             BlockState state = n < planned.size() ? planned.get(n) : null;
             if (state == null || !ghostVisible(state)) {
                 continue;

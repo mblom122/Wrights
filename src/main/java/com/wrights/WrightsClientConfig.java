@@ -220,7 +220,7 @@ public final class WrightsClientConfig {
             .comment("Shape height axis. 0 = Y upright, 1 = Z, 2 = X.")
             .defineInRange("shapePlane", 0, 0, 2);
     public static final ModConfigSpec.IntValue SHAPE_YAW = BUILDER
-            .comment("Quarter-turns around world Y (0–3). Ctrl+scroll rotates the shape around the look/anchor pin like blueprints.")
+            .comment("Quarter-turns around world Y (0–3). Ctrl+scroll yaws the whole footprint around the look/anchor pin so the bounding box orbits that cell.")
             .defineInRange("shapeYaw", 0, 0, 3);
     public static final ModConfigSpec.BooleanValue SHAPE_HOLLOW = BUILDER
             .define("shapeHollow", false);
@@ -243,8 +243,8 @@ public final class WrightsClientConfig {
             .comment("Blocks in front of you when a shape aims at air (no block under the crosshair). Keeps the preview clear of your view while flying.")
             .defineInRange("shapeAirOffset", 3, 0, 32);
     public static final ModConfigSpec.IntValue SHAPE_PIVOT = BUILDER
-            .comment("Which point on the shape AABB pins to the look/anchor cell. face*9+slot (0–53) or 54 = whole-shape center.")
-            .defineInRange("shapePivot", com.wrights.blueprint.Shapes.PIVOT_CENTER, 0, com.wrights.blueprint.Shapes.PIVOT_CENTER);
+            .comment("Which point on the shape AABB pins to the look/anchor cell. Default is the bottom min corner so Ctrl+scroll swings the box around you; 54 = whole-shape center.")
+            .defineInRange("shapePivot", com.wrights.blueprint.Shapes.pivotId(0, 0), 0, com.wrights.blueprint.Shapes.PIVOT_CENTER);
     public static final ModConfigSpec.BooleanValue SHAPE_VOID = BUILDER
             .comment("When true, Wrights void the existing block at each placement cell before placing, like blueprints.")
             .define("shapeVoid", false);

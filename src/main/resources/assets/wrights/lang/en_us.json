@@ -970,7 +970,7 @@
   "menu.wrights.shape_axis_z": "Z",
   "menu.wrights.shape_axis_x": "X",
   "menu.wrights.shape_rotation": "Rotation",
-  "menu.wrights.shape_rotation_hint": "Turns the shape 90° around world up. The look or anchor pin stays put, so the bounding box swings around that point — same as Ctrl+scroll on a blueprint.",
+  "menu.wrights.shape_rotation_hint": "Turns the whole footprint 90° around the look or anchor pin (same as Ctrl+scroll). With a corner pivot the box orbits that cell through the four sides; a center pivot spins in place.",
   "menu.wrights.shape_rot_0": "0°",
   "menu.wrights.shape_rot_90": "90°",
   "menu.wrights.shape_rot_180": "180°",

@@ -979,12 +979,22 @@ public final class JobManager {
         int scanned = 0;
         int placed = 0;
         DroneEntity drone = null;
+        com.wrights.blueprint.Shapes.Kind shapeKind = com.wrights.blueprint.Shapes.Kind.byId(job.shapeKind());
+        BlockPos shapePinLocal = com.wrights.blueprint.Shapes.pinLocal(
+                shapeKind,
+                job.shapeSize(),
+                job.shapeHeight(),
+                job.shapeThickness(),
+                job.shapeHollow(),
+                job.shapeAxis(),
+                job.shapePivot());
         while (job.cursor() < job.total() && scanned < scanBudget && placed < placeBudget) {
             BlockPos pos = job.scanPos();
             if (!com.wrights.blueprint.Shapes.containsWorld(
-                    com.wrights.blueprint.Shapes.Kind.byId(job.shapeKind()),
+                    shapeKind,
                     pos,
                     job.shapeCenter(),
+                    shapePinLocal,
                     job.shapeSize(),
                     job.shapeHeight(),
                     job.shapeThickness(),
