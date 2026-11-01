@@ -28,6 +28,11 @@ import net.minecraft.core.Direction;
 
 @EventBusSubscriber(modid = WrightsMod.MOD_ID, value = Dist.CLIENT)
 public final class WrightsHud {
+    /** Short help under the mode title — only for the first seconds after a mode/submode change. */
+    private static final long MODE_HELP_MS = 5000L;
+    private static String modeHelpKey = "";
+    private static long modeHelpUntilMs;
+
     private WrightsHud() {
     }
 
@@ -48,6 +53,7 @@ public final class WrightsHud {
         Component offset = mirrorOffset(minecraft);
         List<Component> look = List.of();
         Component task = taskLine();
+        boolean showHelp = refreshModeHelp();
         if (WrightsClientState.bindPort != null) {
             line = Component.translatable("hud.wrights.port_chest");
             sub = Component.translatable("hud.wrights.port_chest_sub");
@@ -146,6 +152,14 @@ public final class WrightsHud {
         } else if (WrightsClientState.mode == WrightsClientState.Mode.NONE) {
             line = Component.translatable("hud.wrights.task_ready_sub");
         }
+        // Timed help under the mode title. Live Info look / Jobs aim / bind / saving stay visible.
+        boolean keepDetail = persistentModeDetail(look);
+        if (!showHelp && !keepDetail) {
+            line = null;
+            sub = null;
+            note = null;
+            offset = null;
+        }
         GuiGraphics graphics = event.getGuiGraphics();
         int taskWidth = minecraft.font.width(task) + 16;
         int detailWidth = 0;
@@ -172,47 +186,45 @@ public final class WrightsHud {
             int rows = 1 + (sub == null ? 0 : 1) + (note == null || hideNote ? 0 : 1) + (offset == null ? 0 : 1);
             detailHeight = 6 + rows * 12;
         }
-        int stackWidth = Math.max(taskWidth, detailWidth);
-        int stackHeight = 14 + (detailHeight == 0 ? 0 : 4 + detailHeight);
-        int stackX = HudAnchor.hintX(graphics.guiWidth(), stackWidth);
-        int stackY = HudAnchor.hintY(graphics.guiHeight(), stackHeight);
-        int center = stackX + stackWidth / 2;
-        int taskX = center - taskWidth / 2;
-        graphics.fill(taskX, stackY, taskX + taskWidth, stackY + 14, 0xC0101822);
-        graphics.fill(taskX, stackY, taskX + 2, stackY + 14, WrightsUi.COPPER);
-        graphics.drawString(minecraft.font, task, taskX + 8, stackY + 3, WrightsUi.COPPER, false);
+        // Mode title stays centered just above the hotbar; timed help stacks above it.
+        int taskH = 14;
+        int taskX = HudAnchor.aboveHotbarX(graphics.guiWidth(), taskWidth);
+        int taskY = HudAnchor.aboveHotbarY(graphics.guiHeight(), taskH);
+        graphics.fill(taskX, taskY, taskX + taskWidth, taskY + taskH, 0xC0101822);
+        graphics.fill(taskX, taskY, taskX + 2, taskY + taskH, WrightsUi.COPPER);
+        graphics.drawString(minecraft.font, task, taskX + 8, taskY + 3, WrightsUi.COPPER, false);
         if (line == null && look.isEmpty() && !showModes(minecraft) && !showMainModes(minecraft) && !showCtrlHelp(minecraft)) {
             return;
         }
-        if (!look.isEmpty()) {
-            int top = stackY + 18;
-            int x = center - detailWidth / 2;
+        if (!look.isEmpty() || line != null) {
+            int top = taskY - 4 - detailHeight;
+            int x = HudAnchor.aboveHotbarX(graphics.guiWidth(), detailWidth);
+            if (top < 2) {
+                top = 2;
+            }
             graphics.fill(x, top, x + detailWidth, top + detailHeight, 0xC0101822);
             graphics.fill(x, top, x + 2, top + detailHeight, WrightsUi.COPPER);
             int textY = top + 4;
-            for (int i = 0; i < look.size(); i++) {
-                graphics.drawString(minecraft.font, look.get(i), x + 8, textY, i == 0 ? WrightsUi.TEXT : WrightsUi.MUTED, false);
-                textY += 12;
-            }
-        } else if (line != null) {
-            int top = stackY + 18;
-            int x = center - detailWidth / 2;
-            graphics.fill(x, top, x + detailWidth, top + detailHeight, 0xC0101822);
-            graphics.fill(x, top, x + 2, top + detailHeight, WrightsUi.COPPER);
-            int textY = top + 4;
-            graphics.drawString(minecraft.font, line, x + 8, textY, WrightsUi.TEXT, false);
-            if (sub != null) {
-                textY += 12;
-                graphics.drawString(minecraft.font, sub, x + 8, textY, WrightsUi.MUTED, false);
-            }
-            // Hide the one-line Ctrl tip while the full Ctrl hold panel is open.
-            if (note != null && !showCtrlHelp(minecraft)) {
-                textY += 12;
-                graphics.drawString(minecraft.font, note, x + 8, textY, 0xFFF0C14A, false);
-            }
-            if (offset != null) {
-                textY += 12;
-                graphics.drawString(minecraft.font, offset, x + 8, textY, WrightsUi.TEAL, false);
+            if (!look.isEmpty()) {
+                for (int i = 0; i < look.size(); i++) {
+                    graphics.drawString(minecraft.font, look.get(i), x + 8, textY, i == 0 ? WrightsUi.TEXT : WrightsUi.MUTED, false);
+                    textY += 12;
+                }
+            } else {
+                graphics.drawString(minecraft.font, line, x + 8, textY, WrightsUi.TEXT, false);
+                if (sub != null) {
+                    textY += 12;
+                    graphics.drawString(minecraft.font, sub, x + 8, textY, WrightsUi.MUTED, false);
+                }
+                // Hide the one-line Ctrl tip while the full Ctrl hold panel is open.
+                if (note != null && !showCtrlHelp(minecraft)) {
+                    textY += 12;
+                    graphics.drawString(minecraft.font, note, x + 8, textY, 0xFFF0C14A, false);
+                }
+                if (offset != null) {
+                    textY += 12;
+                    graphics.drawString(minecraft.font, offset, x + 8, textY, WrightsUi.TEAL, false);
+                }
             }
         }
         if (showMainModes(minecraft)) {
@@ -302,6 +314,55 @@ public final class WrightsHud {
         graphics.drawString(minecraft.font, up, x + 14, y + 24, 0xFFFFFFFF, false);
         graphics.drawString(minecraft.font, down, x + 14, y + 42, WrightsUi.MUTED, false);
         graphics.drawString(minecraft.font, tip, x + 12, y + 62, 0xFFF0C14A, false);
+    }
+
+    /**
+     * Restart the 5s help window when mode or submode changes.
+     * @return true while the under-mode help tooltip should still show
+     */
+    private static boolean refreshModeHelp() {
+        String key = modeHelpFingerprint();
+        long now = System.currentTimeMillis();
+        if (!key.equals(modeHelpKey)) {
+            modeHelpKey = key;
+            modeHelpUntilMs = now + MODE_HELP_MS;
+        }
+        return now < modeHelpUntilMs;
+    }
+
+    private static String modeHelpFingerprint() {
+        WrightsClientState.Mode mode = WrightsClientState.mode;
+        StringBuilder key = new StringBuilder(mode.name());
+        if (mode == WrightsClientState.Mode.CAPTURE || mode == WrightsClientState.Mode.SAVING) {
+            key.append('|').append(WrightsClientState.captureStyle.name());
+        } else if (mode == WrightsClientState.Mode.BUILD) {
+            if (WrightsClientState.exchangeToolActive()) {
+                key.append("|exchange|").append(WrightsClientConfig.exchangeForm().name());
+            } else if (WrightsClientState.shapeToolActive()) {
+                key.append("|shape|").append(WrightsClientConfig.SHAPE_KIND.get());
+            } else if (WrightsClientState.mirrorToolActive()) {
+                key.append("|mirror|").append(WrightsClientConfig.mirrorBlocks());
+            } else if (WrightsClientState.bindSupply) {
+                key.append("|bind");
+            } else {
+                key.append("|blueprint|").append(WrightsClientState.buildId == null ? "" : WrightsClientState.buildId.toString());
+            }
+        }
+        return key.toString();
+    }
+
+    /** Details that should stay after the timed help fades (live status, not mode tips). */
+    private static boolean persistentModeDetail(List<Component> look) {
+        if (!look.isEmpty()) {
+            return true;
+        }
+        if (WrightsClientState.bindPort != null || WrightsClientState.bindSupply) {
+            return true;
+        }
+        if (WrightsClientState.mode == WrightsClientState.Mode.SAVING) {
+            return true;
+        }
+        return WrightsClientState.mode == WrightsClientState.Mode.JOBS && WrightsClientState.jobAimed() != null;
     }
 
     private static Component taskLine() {

@@ -32,6 +32,21 @@ public final class HudAnchor {
         return hotbarLeft(screen) + HOTBAR_WIDTH;
     }
 
+    /** Top edge of the vanilla hotbar strip ({@code screenHeight - 22}). */
+    public static int hotbarTop(int screen) {
+        return screen - 22;
+    }
+
+    /** Y so {@code size} sits flush above the hotbar with a small gap. */
+    public static int aboveHotbarY(int screen, int size) {
+        return Mth.clamp(hotbarTop(screen) - HOTBAR_GAP - size, 2, Math.max(2, screen - size - 2));
+    }
+
+    /** Horizontal center over the hotbar. */
+    public static int aboveHotbarX(int screen, int size) {
+        return Mth.clamp(hotbarLeft(screen) + (HOTBAR_WIDTH - size) / 2, 2, Math.max(2, screen - size - 2));
+    }
+
     public static int hintSpot() {
         return Mth.clamp(WrightsClientConfig.HUD_HINT.get(), TOP, CUSTOM);
     }
