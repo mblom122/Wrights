@@ -1399,28 +1399,57 @@ public final class WrightsClientState {
 
     /** Manage-add fly-ins still in the air. Manage stays closed until this hits zero. */
     public static int dockWaitRemaining;
+    private static int dockReopenHome;
+    private static int dockReopenKind;
+    private static int dockReopenIndex;
 
     public static boolean dockWaiting() {
         return dockWaitRemaining > 0;
     }
 
-    public static void dockWait(int remaining) {
-        int next = Math.max(0, remaining);
-        boolean started = next > 0 && dockWaitRemaining <= 0;
-        dockWaitRemaining = next;
-        if (next <= 0) {
+    public static void dockWait(com.wrights.network.BlueprintPayloads.DockWait payload) {
+        if (payload == null) {
             return;
         }
+        int next = Math.max(0, payload.remaining());
+        if (next > 0) {
+            dockReopenHome = payload.home();
+            dockReopenKind = payload.kind();
+            dockReopenIndex = payload.index();
+        }
+        dockWaitRemaining = next;
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.screen instanceof WrightsMenuScreen || minecraft.screen instanceof WrightportScreen) {
-            minecraft.setScreen(null);
-        }
-        if (started && minecraft.player != null) {
-            // Keep the controller out of Manage so reopening the menu does not jump back there mid-dock.
-            if (mode == Mode.MANAGE) {
-                enterJobs();
+        if (next > 0) {
+            if (minecraft.screen instanceof WrightsMenuScreen || minecraft.screen instanceof WrightportScreen) {
+                minecraft.setScreen(null);
             }
+            return;
         }
+        reopenManageAfterDock(minecraft);
+    }
+
+    private static void reopenManageAfterDock(Minecraft minecraft) {
+        if (minecraft == null || minecraft.player == null) {
+            dockReopenHome = 0;
+            return;
+        }
+        int home = dockReopenHome;
+        dockReopenHome = 0;
+        if (home == 2) {
+            // Server opens the placed wrightport menu with DockWait(0).
+            return;
+        }
+        if (home != 1) {
+            return;
+        }
+        leaveCapture();
+        mode = Mode.MANAGE;
+        clearBuildAims();
+        updateFlags();
+        minecraft.setScreen(new WrightsMenuScreen());
+        PacketDistributor.sendToServer(new BlueprintPayloads.LibraryRequest(libraryGlobal));
+        PacketDistributor.sendToServer(new BlueprintPayloads.PlacedPortsAsk());
+        PacketDistributor.sendToServer(new BlueprintPayloads.PortHold(dockReopenKind, dockReopenIndex, true));
     }
 
     public static void applyDeploy() {

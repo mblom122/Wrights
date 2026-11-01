@@ -15,6 +15,7 @@ import net.minecraft.server.level.ServerPlayer;
 
 import net.neoforged.neoforge.network.PacketDistributor;
 
+import com.wrights.block.WrightportBlockEntity;
 import com.wrights.entity.DroneEntity;
 import com.wrights.entity.ModEntities;
 import com.wrights.network.BlueprintPayloads;
@@ -25,6 +26,7 @@ import com.wrights.network.BlueprintPayloads;
  */
 public final class HangarDock {
     private static final Map<UUID, Set<UUID>> PENDING = new HashMap<>();
+    private static final Map<UUID, CraftDeliveries.Hangar> TARGETS = new HashMap<>();
 
     private HangarDock() {
     }
@@ -43,16 +45,18 @@ public final class HangarDock {
             if (level == null || hangar.pos() == null || !level.isLoaded(hangar.pos())) {
                 return;
             }
-            spawn(player, level, hangar.pos(), tiers);
+            spawn(player, level, hangar, hangar.pos(), tiers);
             return;
         }
         if (!(player.level() instanceof ServerLevel level)) {
             return;
         }
-        spawn(player, level, null, tiers);
+        spawn(player, level, hangar, null, tiers);
     }
 
-    private static void spawn(ServerPlayer player, ServerLevel level, @Nullable BlockPos port, List<Integer> tiers) {
+    private static void spawn(ServerPlayer player, ServerLevel level, CraftDeliveries.Hangar hangar,
+            @Nullable BlockPos port, List<Integer> tiers) {
+        TARGETS.put(player.getUUID(), hangar);
         Set<UUID> pending = PENDING.computeIfAbsent(player.getUUID(), id -> new LinkedHashSet<>());
         int count = tiers.size();
         for (int i = 0; i < count; i++) {
@@ -65,7 +69,7 @@ public final class HangarDock {
         sync(player, pending.size());
     }
 
-    /** A manage-add fly-in finished (or was cancelled). Unlocks Manage when none remain. */
+    /** A manage-add fly-in finished (or was cancelled). Reopens Manage when none remain. */
     public static void arrived(ServerLevel level, UUID owner, UUID drone) {
         if (level == null || owner == null || drone == null) {
             return;
@@ -81,10 +85,45 @@ public final class HangarDock {
         ServerPlayer player = level.getServer().getPlayerList().getPlayer(owner);
         if (player != null) {
             sync(player, left);
+        } else if (left == 0) {
+            TARGETS.remove(owner);
         }
     }
 
     private static void sync(ServerPlayer player, int remaining) {
-        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.DockWait(Math.max(0, remaining)));
+        CraftDeliveries.Hangar hangar = TARGETS.get(player.getUUID());
+        int left = Math.max(0, remaining);
+        PacketDistributor.sendToPlayer(player, encode(left, hangar));
+        if (left > 0) {
+            return;
+        }
+        TARGETS.remove(player.getUUID());
+        // Next tick so the client clears dock-wait before the menu packet arrives.
+        if (hangar != null && hangar.placed()) {
+            CraftDeliveries.Hangar target = hangar;
+            player.getServer().execute(() -> reopenPlaced(player, target));
+        }
+    }
+
+    private static BlueprintPayloads.DockWait encode(int remaining, @Nullable CraftDeliveries.Hangar hangar) {
+        if (hangar != null && hangar.placed() && hangar.pos() != null && hangar.dimension() != null) {
+            return new BlueprintPayloads.DockWait(remaining, 2, -1, -1,
+                    hangar.dimension().location().toString(), hangar.pos());
+        }
+        if (hangar != null && !hangar.placed()) {
+            return new BlueprintPayloads.DockWait(remaining, 1, hangar.kind(), hangar.index(), "", BlockPos.ZERO);
+        }
+        return new BlueprintPayloads.DockWait(remaining, 0, -1, -1, "", BlockPos.ZERO);
+    }
+
+    private static void reopenPlaced(ServerPlayer player, CraftDeliveries.Hangar hangar) {
+        if (player == null || hangar == null || hangar.pos() == null || hangar.dimension() == null || !player.isAlive()) {
+            return;
+        }
+        ServerLevel level = player.getServer().getLevel(hangar.dimension());
+        if (level == null || !(level.getBlockEntity(hangar.pos()) instanceof WrightportBlockEntity port)) {
+            return;
+        }
+        player.openMenu(port, buffer -> buffer.writeBlockPos(hangar.pos()));
     }
 }

@@ -1004,16 +1004,36 @@ public final class BlueprintPayloads {
         }
     }
 
-    /** Remaining manage-add fly-ins still docking. Zero unlocks the Manage menu again. */
-    public record DockWait(int remaining) implements CustomPacketPayload {
+    /**
+     * Remaining manage-add fly-ins still docking.
+     * {@code home}: 0 unknown, 1 personal port, 2 placed wrightport.
+     * Zero remaining reopens Manage for that home.
+     */
+    public record DockWait(int remaining, int home, int kind, int index, String dimension, BlockPos pos) implements CustomPacketPayload {
         public static final Type<DockWait> TYPE = payloadType("dock_wait");
         public static final StreamCodec<RegistryFriendlyByteBuf, DockWait> STREAM_CODEC = StreamCodec.of(
-                (buf, value) -> buf.writeVarInt(value.remaining),
-                buf -> new DockWait(buf.readVarInt()));
+                (buf, value) -> {
+                    buf.writeVarInt(value.remaining);
+                    buf.writeByte(value.home);
+                    buf.writeVarInt(value.kind);
+                    buf.writeVarInt(value.index);
+                    buf.writeUtf(value.dimension == null ? "" : value.dimension, 128);
+                    buf.writeBlockPos(value.pos == null ? BlockPos.ZERO : value.pos);
+                },
+                buf -> new DockWait(buf.readVarInt(), buf.readByte(), buf.readVarInt(), buf.readVarInt(),
+                        buf.readUtf(128), buf.readBlockPos()));
 
         @Override
         public Type<? extends CustomPacketPayload> type() {
             return TYPE;
+        }
+
+        public boolean personal() {
+            return home == 1;
+        }
+
+        public boolean placed() {
+            return home == 2;
         }
     }
 

@@ -584,6 +584,10 @@ public class DroneEntity extends Entity {
                 }
             }
         }
+        if (this.manageDock && this.ownerId != null) {
+            this.manageDock = false;
+            com.wrights.drone.HangarDock.arrived(level, this.ownerId, this.getUUID());
+        }
         this.discard();
     }
 }

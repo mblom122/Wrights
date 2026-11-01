@@ -670,7 +670,7 @@ public final class BlueprintNetwork {
         if (FMLEnvironment.dist != Dist.CLIENT) {
             return;
         }
-        context.enqueueWork(() -> com.wrights.client.WrightsClientState.dockWait(payload.remaining()));
+        context.enqueueWork(() -> com.wrights.client.WrightsClientState.dockWait(payload));
     }
 
     public static void dockToast(ServerPlayer player, int docked, BlockPos dock, String port, int digital, BlockPos storage, int dropped, BlockPos ground) {
