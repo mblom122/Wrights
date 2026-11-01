@@ -280,9 +280,9 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.BooleanValue EXCHANGE_SILK = BUILDER
             .comment("When true, Exchange breaks replaced blocks with silk touch and returns the drops.")
             .define("exchangeSilk", false);
-    public static final ModConfigSpec.BooleanValue EXCHANGE_SAME_ONLY = BUILDER
-            .comment("When true, Exchange only replaces the block type you are looking at. When false, any exchangeable solid in the volume.")
-            .define("exchangeSameOnly", true);
+    public static final ModConfigSpec.IntValue EXCHANGE_MATCH = BUILDER
+            .comment("Exchange Replace filter: 0 = Match look (exact block under crosshair), 1 = Similar blocks (same item-tag family, e.g. all planks / cobblestones), 2 = Any exchangeable solid.")
+            .defineInRange("exchangeMatch", 0, 0, 2);
     public static final ModConfigSpec.IntValue EXCHANGE_FORM = BUILDER
             .comment("Exchange preset: 0 floor, 1 wall, 2 pillar, 3 beam, 4 circle. Legacy 5/6 (rectangle/square) map to floor.")
             .defineInRange("exchangeForm", 0, 0, 6);
@@ -1071,21 +1071,22 @@ public final class WrightsClientConfig {
         save();
     }
 
-    public static boolean exchangeSameOnly() {
-        return EXCHANGE_SAME_ONLY.get();
+    public static com.wrights.util.ExchangeFamilies.Match exchangeMatch() {
+        return com.wrights.util.ExchangeFamilies.Match.byId(EXCHANGE_MATCH.get());
     }
 
-    public static void setExchangeSameOnly(boolean sameOnly) {
-        EXCHANGE_SAME_ONLY.set(sameOnly);
+    public static void setExchangeMatch(com.wrights.util.ExchangeFamilies.Match match) {
+        EXCHANGE_MATCH.set(match == null ? 0 : match.ordinal());
         save();
     }
 
     /**
-     * Encodes the looked-at (or pin) block as the exchange from-filter when Match look is on.
-     * Empty string means any exchangeable solid.
+     * Encodes the looked-at (or pin) block as the exchange from-filter when Match look / Similar is on.
+     * Similar expands via item-tag families. Empty string means any exchangeable solid.
      */
     public static String exchangeFromFilter(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pin) {
-        if (!exchangeSameOnly()) {
+        com.wrights.util.ExchangeFamilies.Match match = exchangeMatch();
+        if (match == com.wrights.util.ExchangeFamilies.Match.ANY) {
             return "";
         }
         net.minecraft.core.BlockPos sample = pin;
@@ -1100,6 +1101,10 @@ public final class WrightsClientConfig {
         net.minecraft.world.item.Item item = state.getBlock().asItem();
         if (!(item instanceof net.minecraft.world.item.BlockItem)) {
             return "";
+        }
+        if (match == com.wrights.util.ExchangeFamilies.Match.SIMILAR) {
+            return com.wrights.blueprint.ShapeMaterials.encode(
+                    com.wrights.util.ExchangeFamilies.similarEntries(item));
         }
         return com.wrights.blueprint.ShapeMaterials.encode(
                 java.util.List.of(new com.wrights.blueprint.ShapeMaterials.Entry(item, 1)));

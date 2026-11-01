@@ -225,12 +225,15 @@ public class ShapeTweakScreen extends Screen {
             graphics.drawString(this.font, Component.translatable("menu.wrights.exchange_match"),
                     panelX + PAD, matchLabelY + 3, WrightsUi.MUTED, false);
             int choiceX = panelX + PAD;
-            int choiceW = (panelW - PAD * 2 - GAP) / 2;
-            boolean same = WrightsClientConfig.exchangeSameOnly();
+            int gap = GAP;
+            int choiceW = Math.max(36, (panelW - PAD * 2 - gap * 2) / 3);
+            int match = WrightsClientConfig.exchangeMatch().ordinal();
             drawChoice(graphics, mouseX, mouseY, choiceX, matchChoicesY, choiceW,
-                    same, "menu.wrights.exchange_match_same");
-            drawChoice(graphics, mouseX, mouseY, choiceX + choiceW + GAP, matchChoicesY,
-                    panelW - PAD * 2 - choiceW - GAP, !same, "menu.wrights.exchange_match_any");
+                    match == 0, "menu.wrights.exchange_match_same");
+            drawChoice(graphics, mouseX, mouseY, choiceX + choiceW + gap, matchChoicesY, choiceW,
+                    match == 1, "menu.wrights.exchange_match_similar");
+            drawChoice(graphics, mouseX, mouseY, choiceX + (choiceW + gap) * 2, matchChoicesY,
+                    panelW - PAD * 2 - (choiceW + gap) * 2, match == 2, "menu.wrights.exchange_match_any");
         }
 
         if (matsLabelY >= 0) {
@@ -353,13 +356,19 @@ public class ShapeTweakScreen extends Screen {
             return true;
         }
         if (exchange && matchChoicesY >= 0) {
-            if (hit(mouseX, mouseY, choiceX, matchChoicesY, choiceW, ROW)) {
-                WrightsClientConfig.setExchangeSameOnly(true);
+            int gap = GAP;
+            int matchW = Math.max(36, (panelW - PAD * 2 - gap * 2) / 3);
+            if (hit(mouseX, mouseY, choiceX, matchChoicesY, matchW, ROW)) {
+                WrightsClientConfig.setExchangeMatch(com.wrights.util.ExchangeFamilies.Match.SAME);
                 return true;
             }
-            if (hit(mouseX, mouseY, choiceX + choiceW + GAP, matchChoicesY,
-                    panelW - PAD * 2 - choiceW - GAP, ROW)) {
-                WrightsClientConfig.setExchangeSameOnly(false);
+            if (hit(mouseX, mouseY, choiceX + matchW + gap, matchChoicesY, matchW, ROW)) {
+                WrightsClientConfig.setExchangeMatch(com.wrights.util.ExchangeFamilies.Match.SIMILAR);
+                return true;
+            }
+            if (hit(mouseX, mouseY, choiceX + (matchW + gap) * 2, matchChoicesY,
+                    panelW - PAD * 2 - (matchW + gap) * 2, ROW)) {
+                WrightsClientConfig.setExchangeMatch(com.wrights.util.ExchangeFamilies.Match.ANY);
                 return true;
             }
         }

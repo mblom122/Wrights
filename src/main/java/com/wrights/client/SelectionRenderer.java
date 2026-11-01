@@ -197,9 +197,10 @@ public final class SelectionRenderer {
         int tx = target.getX();
         int ty = target.getY();
         int tz = target.getZ();
-        // Same-as-look: only ghost cells matching the aimed (or pin) block type.
-        net.minecraft.world.item.Item matchItem = null;
-        if (exchange && WrightsClientConfig.exchangeSameOnly()) {
+        // Match look / Similar: only ghost cells matching the aimed (or pin) block family.
+        java.util.Set<net.minecraft.world.item.Item> matchItems = null;
+        com.wrights.util.ExchangeFamilies.Match exchangeMatch = WrightsClientConfig.exchangeMatch();
+        if (exchange && exchangeMatch.needsLook()) {
             BlockPos sample = target;
             BlockHitResult aim = WrightsClientState.shapeLookHit();
             if (aim != null) {
@@ -207,7 +208,11 @@ public final class SelectionRenderer {
             }
             net.minecraft.world.item.Item item = minecraft.level.getBlockState(sample).getBlock().asItem();
             if (item instanceof net.minecraft.world.item.BlockItem) {
-                matchItem = item;
+                if (exchangeMatch == com.wrights.util.ExchangeFamilies.Match.SIMILAR) {
+                    matchItems = com.wrights.util.ExchangeFamilies.similarTo(item);
+                } else {
+                    matchItems = java.util.Set.of(item);
+                }
             }
         }
         for (int i = 0; i < total; i++) {
@@ -237,10 +242,12 @@ public final class SelectionRenderer {
                 if (!com.wrights.util.BlockFilters.canExchange(minecraft.level, cursor, world)) {
                     continue;
                 }
-                if (WrightsClientConfig.exchangeSameOnly()) {
-                    if (matchItem == null || world.getBlock().asItem() != matchItem) {
+                if (matchItems != null) {
+                    if (!matchItems.contains(world.getBlock().asItem())) {
                         continue;
                     }
+                } else if (exchange && exchangeMatch.needsLook()) {
+                    continue;
                 }
             } else if (!voidBlocks && !world.isAir()) {
                 continue;

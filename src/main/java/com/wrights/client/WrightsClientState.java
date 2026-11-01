@@ -1858,7 +1858,7 @@ public final class WrightsClientState {
         WrightsClientConfig.enforceExchangeLineFootprint();
         BlockPos pin = pos == null ? BlockPos.ZERO : pos;
         String from = WrightsClientConfig.exchangeFromFilter(minecraft.level, pin);
-        if (WrightsClientConfig.exchangeSameOnly() && (from == null || from.isBlank())) {
+        if (WrightsClientConfig.exchangeMatch().needsLook() && (from == null || from.isBlank())) {
             minecraft.player.displayClientMessage(Component.translatable("message.wrights.exchange_same_look"), true);
             return false;
         }

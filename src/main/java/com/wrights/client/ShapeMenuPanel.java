@@ -268,9 +268,10 @@ final class ShapeMenuPanel {
         if (exchangeMode) {
             drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.exchange_match", "menu.wrights.exchange_match_hint");
             y += 12;
-            y = drawPair(graphics, mouseX, mouseY, x, y, leftW,
-                    !WrightsClientConfig.exchangeSameOnly(),
+            y = drawTriple(graphics, mouseX, mouseY, x, y, leftW,
+                    WrightsClientConfig.exchangeMatch().ordinal(),
                     "menu.wrights.exchange_match_same",
+                    "menu.wrights.exchange_match_similar",
                     "menu.wrights.exchange_match_any",
                     "exchange_match");
             y += 4;
@@ -688,7 +689,7 @@ final class ShapeMenuPanel {
             }
             case "exchange_match" -> {
                 if (exchangeMode) {
-                    WrightsClientConfig.setExchangeSameOnly(value == 0);
+                    WrightsClientConfig.setExchangeMatch(com.wrights.util.ExchangeFamilies.Match.byId(value));
                 }
                 yield true;
             }
