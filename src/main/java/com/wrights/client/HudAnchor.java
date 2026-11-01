@@ -14,9 +14,10 @@ public final class HudAnchor {
     public static final int CUSTOM = 5;
     /**
      * Room from the bottom of the screen so Bottom placement clears the hotbar, XP bar,
-     * and survival health / hunger (and armor / air) rows.
+     * and survival health / hunger (and armor / air) rows — close above the hearts, not mid-screen.
+     * Vanilla hearts sit at {@code height - 39}; armor / air at {@code height - 49}.
      */
-    public static final int HOTBAR_CLEARANCE = 70;
+    public static final int HOTBAR_CLEARANCE = 54;
     /** Vanilla hotbar width; used to park Ctrl/Shift menus beside it. */
     public static final int HOTBAR_WIDTH = 182;
     /** Gap between the mode menu and the hotbar edge. */
