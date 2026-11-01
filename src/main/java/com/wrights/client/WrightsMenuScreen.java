@@ -1651,10 +1651,10 @@ public class WrightsMenuScreen extends Screen {
             if (!WrightsConfig.allowBlueprints() && !mirrorPage && !shapePage && !exchangePage) {
                 if (WrightsConfig.allowMirror()) {
                     mirrorPage = true;
-                } else if (WrightsConfig.allowShape()) {
-                    shapePage = true;
                 } else if (WrightsConfig.allowExchange()) {
                     exchangePage = true;
+                } else if (WrightsConfig.allowShape()) {
+                    shapePage = true;
                 }
             }
             if (!WrightsConfig.allowMirror()) {
@@ -1688,8 +1688,8 @@ public class WrightsMenuScreen extends Screen {
         return 24 + (WrightsConfig.allowBlueprints() ? 20 : 0);
     }
 
-    private int taskShapeY() {
-        if (!buildingPage() || !WrightsConfig.allowShape()) {
+    private int taskExchangeY() {
+        if (!buildingPage() || !WrightsConfig.allowExchange()) {
             return -1;
         }
         int y = 24;
@@ -1702,8 +1702,8 @@ public class WrightsMenuScreen extends Screen {
         return y;
     }
 
-    private int taskExchangeY() {
-        if (!buildingPage() || !WrightsConfig.allowExchange()) {
+    private int taskShapeY() {
+        if (!buildingPage() || !WrightsConfig.allowShape()) {
             return -1;
         }
         int y = 24;
@@ -1713,7 +1713,7 @@ public class WrightsMenuScreen extends Screen {
         if (WrightsConfig.allowMirror()) {
             y += 20;
         }
-        if (WrightsConfig.allowShape()) {
+        if (WrightsConfig.allowExchange()) {
             y += 20;
         }
         return y;
@@ -1805,7 +1805,7 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private void drawBuildSubs(GuiGraphics graphics) {
-        int last = taskExchangeY() >= 0 ? taskExchangeY() : taskShapeY() >= 0 ? taskShapeY() : taskMirrorY() >= 0 ? taskMirrorY() : taskBlueprintsY();
+        int last = taskShapeY() >= 0 ? taskShapeY() : taskExchangeY() >= 0 ? taskExchangeY() : taskMirrorY() >= 0 ? taskMirrorY() : taskBlueprintsY();
         if (last < 0) {
             return;
         }
@@ -1820,11 +1820,11 @@ public class WrightsMenuScreen extends Screen {
         if (taskMirrorY() >= 0) {
             drawSubTask(graphics, Component.translatable("menu.wrights.sub_mirror"), mirrorPage, taskMirrorY());
         }
-        if (taskShapeY() >= 0) {
-            drawSubTask(graphics, Component.translatable("menu.wrights.sub_shape"), shapePage, taskShapeY());
-        }
         if (taskExchangeY() >= 0) {
             drawSubTask(graphics, Component.translatable("menu.wrights.sub_exchange"), exchangePage, taskExchangeY());
+        }
+        if (taskShapeY() >= 0) {
+            drawSubTask(graphics, Component.translatable("menu.wrights.sub_shape"), shapePage, taskShapeY());
         }
     }
 

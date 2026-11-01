@@ -1999,10 +1999,10 @@ public final class WrightsClientState {
                 selectBuildTool(false);
             } else if (WrightsConfig.allowMirror() && tool == cursor++) {
                 selectMirrorTool();
-            } else if (WrightsConfig.allowShape() && tool == cursor++) {
-                selectShapeTool();
             } else if (WrightsConfig.allowExchange() && tool == cursor++) {
                 selectExchangeTool();
+            } else if (WrightsConfig.allowShape() && tool == cursor++) {
+                selectShapeTool();
             } else {
                 selectBuildTool(true);
             }
@@ -2047,14 +2047,14 @@ public final class WrightsClientState {
             }
             slot++;
         }
-        if (WrightsConfig.allowShape()) {
-            if (mode == Mode.BUILD && shapeAim) {
+        if (WrightsConfig.allowExchange()) {
+            if (mode == Mode.BUILD && exchangeAim) {
                 return slot;
             }
             slot++;
         }
-        if (WrightsConfig.allowExchange()) {
-            if (mode == Mode.BUILD && exchangeAim) {
+        if (WrightsConfig.allowShape()) {
+            if (mode == Mode.BUILD && shapeAim) {
                 return slot;
             }
             slot++;

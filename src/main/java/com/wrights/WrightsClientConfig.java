@@ -128,7 +128,7 @@ public final class WrightsClientConfig {
             .comment("Last new-blueprint tool. 0 corners, 1 box, 2 move.")
             .defineInRange("lastStyle", 1, 0, 2);
     public static final ModConfigSpec.IntValue LAST_BUILD_TOOL = BUILDER
-            .comment("Last build sub-tool. 0 use template, 1 mirror, 2 shape, 3 bind inventory, 4 exchange.")
+            .comment("Last build sub-tool. 0 use template, 1 mirror, 2 shape, 3 bind inventory, 4 exchange. UI order is Mirror, Exchange, Shape, Bind.")
             .defineInRange("lastBuildTool", 0, 0, 4);
     public static final ModConfigSpec.ConfigValue<String> LAST_BUILD = BUILDER
             .comment("Last blueprint that was being built.")

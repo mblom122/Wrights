@@ -467,12 +467,12 @@ public final class WrightsHud {
             drawToolRow(graphics, minecraft, x, toolY, width, building && WrightsClientState.mirrorAim, mirror, mirrorMark);
             toolY += row;
         }
-        if (showShape) {
-            drawToolRow(graphics, minecraft, x, toolY, width, building && WrightsClientState.shapeAim, shape, shapeMark);
-            toolY += row;
-        }
         if (showExchange) {
             drawToolRow(graphics, minecraft, x, toolY, width, building && WrightsClientState.exchangeAim, exchange, exchangeMark);
+            toolY += row;
+        }
+        if (showShape) {
+            drawToolRow(graphics, minecraft, x, toolY, width, building && WrightsClientState.shapeAim, shape, shapeMark);
             toolY += row;
         }
         drawToolRow(graphics, minecraft, x, toolY, width, building && WrightsClientState.bindSupply, bind, selected);
