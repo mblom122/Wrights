@@ -1,6 +1,8 @@
 package com.wrights.client;
 
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.network.chat.Component;
 
 public final class WrightsUi {
     public static final int COPPER = 0xFFC47A3A;
@@ -111,5 +113,45 @@ public final class WrightsUi {
         graphics.fill(x, y, x + 18, y + 18, 0xFF050A10);
         border(graphics, x, y, 18, 18, edge);
         graphics.fill(x + 1, y + 1, x + 17, y + 2, 0xFF1A2836);
+    }
+
+    /** Thin rule above a section (skip for the first section under a page title). */
+    public static void sectionBreak(GuiGraphics graphics, int x, int y, int width) {
+        if (width <= 0) {
+            return;
+        }
+        graphics.fill(x, y, x + width, y + 1, 0xFF2A3844);
+    }
+
+    /**
+     * Section header: copper title plus a trailing hairline.
+     * @return title pixel width (for placing a ? help box after the text)
+     */
+    public static int section(GuiGraphics graphics, Font font, int x, int y, Component title, int lineEnd) {
+        graphics.drawString(font, title, x, y, COPPER, false);
+        int width = font.width(title);
+        int lineX = x + width + 8;
+        int rule = y + 4;
+        if (lineEnd > lineX) {
+            graphics.fill(lineX, rule, lineEnd, rule + 1, 0xFF5C4632);
+        }
+        return width;
+    }
+
+    public static int section(GuiGraphics graphics, Font font, int x, int y, String titleKey, int lineEnd) {
+        return section(graphics, font, x, y, Component.translatable(titleKey), lineEnd);
+    }
+
+    /**
+     * Field / option label under a section (muted).
+     * @return title pixel width (for placing a ? help box after the text)
+     */
+    public static int fieldLabel(GuiGraphics graphics, Font font, int x, int y, Component title) {
+        graphics.drawString(font, title, x, y, MUTED, false);
+        return font.width(title);
+    }
+
+    public static int fieldLabel(GuiGraphics graphics, Font font, int x, int y, String titleKey) {
+        return fieldLabel(graphics, font, x, y, Component.translatable(titleKey));
     }
 }

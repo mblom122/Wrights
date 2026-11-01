@@ -1429,17 +1429,10 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private void drawOptionSection(GuiGraphics graphics, int x, int y, String key, int lineEnd) {
-        Component title = Component.translatable(key);
-        graphics.drawString(this.font, title, x, y, WrightsUi.COPPER, false);
-        int lineX = x + this.font.width(title) + 8;
-        int rule = y + 4;
-        if (lineEnd > lineX) {
-            graphics.fill(lineX, rule, lineEnd, rule + 1, 0xFF5C4632);
-        }
         if (y != hologramHeadY) {
-            int divider = y - 8;
-            graphics.fill(x, divider, optionViewX + optionViewW - 16, divider + 1, 0xFF2A3844);
+            WrightsUi.sectionBreak(graphics, x, y - 8, Math.max(0, (optionViewX + optionViewW - 16) - x));
         }
+        WrightsUi.section(graphics, this.font, x, y, key, lineEnd);
     }
 
     private void drawSwatches(GuiGraphics graphics, int x, int y, int selected) {
@@ -1721,11 +1714,13 @@ public class WrightsMenuScreen extends Screen {
         mirrorScroll = Mth.clamp(mirrorScroll, 0, Math.max(0, mirrorContentH - mirrorViewH));
         graphics.enableScissor(x - 4, mirrorViewTop, x + w + 4, mirrorViewTop + mirrorViewH);
         int y = mirrorViewTop - mirrorScroll;
+        int lineEnd = x + w;
         graphics.drawString(this.font, Component.translatable("menu.wrights.mirror_title"), x, y, WrightsUi.COPPER, false);
         y += 14;
         int gap = 6;
-        drawSectionLabel(graphics, mouseX, mouseY, x, y, "menu.wrights.mirror_mode", "menu.wrights.mirror_mode_hint");
-        y += 12;
+        boolean firstSection = true;
+        y = beginMirrorSection(graphics, mouseX, mouseY, x, y, lineEnd, "menu.wrights.mirror_mode", "menu.wrights.mirror_mode_hint", firstSection);
+        firstSection = false;
         boolean blocksOn = WrightsConfig.allowMirrorBlocks();
         boolean plansOn = WrightsConfig.allowMirrorBlueprints();
         int modeCount = (blocksOn ? 1 : 0) + (plansOn ? 1 : 0);
@@ -1745,8 +1740,8 @@ public class WrightsMenuScreen extends Screen {
         boolean axisMode = WrightsConfig.allowMirrorAxes() && axes != 0;
         mirrorStyleY = -1;
         if (WrightsConfig.allowMirrorAxes()) {
-            drawSectionLabel(graphics, mouseX, mouseY, x, y, "menu.wrights.mirror_style", "menu.wrights.mirror_style_hint");
-            y += 12;
+            y = beginMirrorSection(graphics, mouseX, mouseY, x, y, lineEnd, "menu.wrights.mirror_style", "menu.wrights.mirror_style_hint", firstSection);
+            firstSection = false;
             int styleW = (w - gap) / 2;
             mirrorStyleY = y;
             mirrorStyleW = styleW;
@@ -1757,8 +1752,8 @@ public class WrightsMenuScreen extends Screen {
         mirrorCardY = -1;
         mirrorAxisY = -1;
         if (axisMode) {
-            drawSectionLabel(graphics, mouseX, mouseY, x, y, "menu.wrights.mirror_axis", "menu.wrights.mirror_axis_hint");
-            y += 12;
+            y = beginMirrorSection(graphics, mouseX, mouseY, x, y, lineEnd, "menu.wrights.mirror_axis", "menu.wrights.mirror_axis_hint", firstSection);
+            firstSection = false;
             int axisW = Math.max(36, (w - gap * 2) / 3);
             mirrorAxisY = y;
             mirrorAxisW = axisW;
@@ -1772,8 +1767,8 @@ public class WrightsMenuScreen extends Screen {
             }
             y += 36;
         } else {
-            drawSectionLabel(graphics, mouseX, mouseY, x, y, "menu.wrights.mirror_pattern", "menu.wrights.mirror_pattern_hint");
-            y += 14;
+            y = beginMirrorSection(graphics, mouseX, mouseY, x, y, lineEnd, "menu.wrights.mirror_pattern", "menu.wrights.mirror_pattern_hint", firstSection);
+            firstSection = false;
             int copies = WrightsConfig.allowedPattern(WrightsClientConfig.MIRROR_PATTERN.get());
             int maxCopies = Math.max(1, WrightsConfig.maxMirrorCopies());
             String count = Integer.toString(copies);
@@ -1786,6 +1781,8 @@ public class WrightsMenuScreen extends Screen {
             graphics.drawString(this.font, count, x + sliderW + 8, y, WrightsUi.TEXT, false);
             y += 18;
         }
+        y = beginMirrorSection(graphics, mouseX, mouseY, x, y, lineEnd, "menu.wrights.mirror_section_options", "menu.wrights.mirror_section_options_hint", firstSection);
+        firstSection = false;
         int col = (w - gap) / 2;
         int right = x + col + gap;
         mirrorToggleW = col;
@@ -1846,6 +1843,7 @@ public class WrightsMenuScreen extends Screen {
         y += 6;
         int statusH = drawMirrorStatus(graphics, mouseX, mouseY, x, y, w);
         y += statusH + 6;
+        y = beginMirrorSection(graphics, mouseX, mouseY, x, y, lineEnd, "menu.wrights.mirror_section_anchor", "menu.wrights.mirror_section_anchor_hint", false);
         mirrorHighlightY = y;
         int buttonGap = 8;
         int clearW = Math.min(108, Math.max(72, (w - buttonGap) / 2));
@@ -1925,10 +1923,14 @@ public class WrightsMenuScreen extends Screen {
         return height;
     }
 
-    private void drawSectionLabel(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, String label, String hint) {
-        Component text = Component.translatable(label);
-        graphics.drawString(this.font, text, x, y, WrightsUi.MUTED, false);
-        drawHelpBox(graphics, mouseX, mouseY, x + this.font.width(text) + 4, y - 2, hint);
+    private int beginMirrorSection(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int lineEnd, String label, String hint, boolean first) {
+        if (!first) {
+            WrightsUi.sectionBreak(graphics, x, y, Math.max(0, lineEnd - x));
+            y += 8;
+        }
+        int titleW = WrightsUi.section(graphics, this.font, x, y, label, lineEnd);
+        drawHelpBox(graphics, mouseX, mouseY, x + titleW + 4, y - 2, hint);
+        return y + 12;
     }
 
     private void drawChoice(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int w, int h, boolean on, String title) {
@@ -3294,7 +3296,7 @@ public class WrightsMenuScreen extends Screen {
         graphics.drawString(this.font, name, x + 6, y + 4, WrightsUi.TEXT, false);
         Component statusText = jobStatusText(job);
         graphics.drawString(this.font, statusText, x + width - 8 - this.font.width(statusText), y + 4, jobColor(job), false);
-        graphics.drawString(this.font, Component.translatable("menu.wrights.job_preview"), x + 6, y + 15, WrightsUi.COPPER, false);
+        WrightsUi.section(graphics, this.font, x + 6, y + 15, "menu.wrights.job_preview", x + width - 8);
         graphics.drawString(this.font, Component.translatable("menu.wrights.size", job.sizeX(), job.sizeY(), job.sizeZ()), x + 6, y + 25, WrightsUi.BLUE, false);
         graphics.drawString(this.font, Component.translatable("menu.wrights.job_preview_blocks", job.total()), x + 6, y + 35, WrightsUi.MUTED, false);
         Component source = jobSource(job);
