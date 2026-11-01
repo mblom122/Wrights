@@ -141,7 +141,8 @@ public final class WrightsInput {
                     || minecraft.screen instanceof DroneRosterScreen
                     || minecraft.screen instanceof ShapeLookSnapScreen
                     || minecraft.screen instanceof ShapeTweakScreen
-                    || minecraft.screen instanceof PlaceTweakScreen) {
+                    || minecraft.screen instanceof PlaceTweakScreen
+                    || minecraft.screen instanceof MirrorTweakScreen) {
                 minecraft.setScreen(null);
             }
         }
@@ -519,9 +520,13 @@ public final class WrightsInput {
     }
 
     private static void useMirrorClick(net.minecraft.world.entity.player.Player player, BlockPos pos, Direction face, BlockHitResult hit) {
-        // Ctrl+Shift = Mirror page. Ctrl = set / clear mirror anchor.
+        // Ctrl+Shift = Mirror page. Shift = quick tweak. Ctrl = set / clear mirror anchor.
         if (menuChord(player)) {
             openToolMenu();
+            return;
+        }
+        if (player.isShiftKeyDown()) {
+            Minecraft.getInstance().setScreen(new MirrorTweakScreen());
             return;
         }
         if (controlHeld()) {
