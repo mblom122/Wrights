@@ -1991,8 +1991,9 @@ public final class JobManager {
             if (!other.crewUnits().contains(unitId)) {
                 continue;
             }
-            // Home and waiting on items: the wright is not on the build, so another job may take it.
-            if (other.waitKind() == BuildJob.WAIT_ITEMS && !unitIsOut(player, other, unitId)) {
+            // Only wrights actually out on the build (or flying home) count as busy.
+            // Docked crew leftovers must show up as available again.
+            if (!unitIsOut(player, other, unitId)) {
                 continue;
             }
             return true;
@@ -2603,7 +2604,7 @@ public final class JobManager {
             int index = nextWork(level, player, schematic, job, hand, skipBudget);
             if (index == -2) {
                 scanning = true;
-                recallHand(level, player, hand);
+                // Stay on site while the scan catches up — do not send the wright home.
                 publishHandStatus(level, player, schematic, job, hand, DroneEntity.WAIT_NONE);
                 continue;
             }
@@ -2612,7 +2613,7 @@ public final class JobManager {
                 hand.awaitingItems = false;
                 hand.waitingOnOthers = true;
                 hand.idle = false;
-                recallHand(level, player, hand);
+                // Stay near the build so this wright can place as soon as the support lands.
                 publishHandStatus(level, player, schematic, job, hand, DroneEntity.WAIT_FLOOR);
                 continue;
             }
@@ -2624,7 +2625,7 @@ public final class JobManager {
                 continue;
             }
             if (index < 0) {
-                // Own share is empty — help another wright, or go idle and head home.
+                // Own share is empty — help another wright, or wait on site for held blocks.
                 int borrowed = borrowWork(level, player, schematic, job, hand, true);
                 if (borrowed >= 0) {
                     index = borrowed;
@@ -2662,14 +2663,12 @@ public final class JobManager {
                 int at = nextWork(level, player, schematic, job, hand, skipBudget);
                 if (at == -2) {
                     scanning = true;
-                    recallHand(level, player, hand);
                     break;
                 }
                 if (at == SUPPORT_WAIT) {
                     waiting = true;
                     hand.waitingOnOthers = true;
                     handStatus = DroneEntity.WAIT_FLOOR;
-                    recallHand(level, player, hand);
                     break;
                 }
                 if (at == NEED_ITEMS) {
@@ -2693,7 +2692,6 @@ public final class JobManager {
                     waiting = true;
                     hand.waitingOnOthers = true;
                     handStatus = DroneEntity.WAIT_FLOOR;
-                    recallHand(level, player, hand);
                     break;
                 }
                 if (job.outsideClip(entry)) {
@@ -2715,7 +2713,7 @@ public final class JobManager {
                     waitingItems = true;
                     waiting = true;
                     handStatus = DroneEntity.WAIT_ITEMS;
-                    recallHand(level, player, hand);
+                    parkForItems(level, player, hand);
                     break;
                 }
                 noteProgress(schematic, job, hand, entry, at);
@@ -2723,8 +2721,10 @@ public final class JobManager {
             publishHandStatus(level, player, schematic, job, hand, handStatus);
         }
         shareWithIdle(level, job, schematic);
-        releaseIdle(level, player, job, schematic);
-        parkWaiters(level, player, job, working);
+        // Only send spare wrights home when the job has nothing left to place or hold.
+        if (!jobHasRemainingWork(level, schematic, job)) {
+            releaseIdle(level, player, job, schematic);
+        }
         if (!working && !scanning) {
             for (BuildJob.Hand hand : job.hands()) {
                 int peek = nextInLane(level, player, schematic, job, hand);
@@ -2940,6 +2940,7 @@ public final class JobManager {
                 }
             }
             java.util.function.Predicate<Schematic.Entry> lane = entry -> CrewSplit.lane(entry.x(), entry.y(), entry.z(), hand.lanes, job.spanX(), job.spanY(), job.spanZ()) == hand.lane;
+            catchUpCursor(level, schematic, job, hand, null, lane);
             int found = scan(level, player, schematic, job, hand, hand.cursor, hand.probe, lane);
             if (found < 0 && Math.max(hand.cursor, hand.probe) > hand.cursor) {
                 hand.probe = hand.cursor;
@@ -2987,8 +2988,9 @@ public final class JobManager {
     }
 
     private static int scanSlice(ServerLevel level, ServerPlayer player, Schematic schematic, BuildJob job, BuildJob.Hand hand, BuildJob.Slice slice) {
-        int start = Math.max(slice.cursor, slice.probe);
         java.util.function.Predicate<Schematic.Entry> include = entry -> slice.contains(entry.x(), entry.y(), entry.z());
+        catchUpCursor(level, schematic, job, hand, slice, include);
+        int start = Math.max(slice.cursor, slice.probe);
         int found = scan(level, player, schematic, job, hand, slice.cursor, start, include);
         // A falling block can sit ahead of the floor it needs. Look back once so that floor is still placed.
         if (found < 0 && start > slice.cursor) {
@@ -2999,6 +3001,40 @@ public final class JobManager {
             slice.probe = found;
         }
         return found;
+    }
+
+    /** Push cursors past cells that are already done so late-job scans stay cheap. */
+    private static void catchUpCursor(ServerLevel level, Schematic schematic, BuildJob job, BuildJob.Hand hand, BuildJob.Slice slice, java.util.function.Predicate<Schematic.Entry> include) {
+        int cursor = slice == null ? hand.cursor : slice.cursor;
+        int probe = slice == null ? hand.probe : slice.probe;
+        while (cursor < schematic.blockCount()) {
+            Schematic.Entry entry = schematic.entry(cursor);
+            if (!include.test(entry)) {
+                cursor++;
+                continue;
+            }
+            if (job.outsideClip(entry) || satisfied(level, job, entry)) {
+                cursor++;
+                continue;
+            }
+            if (falling(level, schematic, job, entry) == Falling.SKIP) {
+                giveUpCell(job, entry, cursor);
+                cursor++;
+                continue;
+            }
+            break;
+        }
+        if (probe < cursor) {
+            probe = cursor;
+        }
+        if (slice == null) {
+            hand.cursor = cursor;
+            hand.probe = probe;
+        } else {
+            slice.cursor = cursor;
+            slice.probe = probe;
+            hand.cursor = Math.min(hand.cursor, cursor);
+        }
     }
 
     /** A later look that finds a real block wins. A missing item is remembered when the look-back finds nothing else. */
@@ -3766,6 +3802,23 @@ public final class JobManager {
             return false;
         }
         return falling(level, schematic, job, entry) != Falling.SKIP;
+    }
+
+    /** True while any schematic cell still needs to be placed or is only held for later. */
+    private static boolean jobHasRemainingWork(ServerLevel level, Schematic schematic, BuildJob job) {
+        if (schematic == null) {
+            return false;
+        }
+        for (int i = 0; i < schematic.blockCount(); i++) {
+            Schematic.Entry entry = schematic.entry(i);
+            if (job.outsideClip(entry) || satisfied(level, job, entry)) {
+                continue;
+            }
+            if (falling(level, schematic, job, entry) != Falling.SKIP) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
