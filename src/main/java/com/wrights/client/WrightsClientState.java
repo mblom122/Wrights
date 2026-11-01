@@ -1515,12 +1515,29 @@ public final class WrightsClientState {
         supplyBound = true;
         supplyPos = pos.immutable();
         PacketDistributor.sendToServer(new BlueprintPayloads.BindSupply(pos, false));
-        if (!bindFromMenu) {
+        bindFromMenu = false;
+    }
+
+    public static void clearSupplyBind() {
+        supplyBound = false;
+        supplyPos = null;
+        supplyHighlightUntil = 0L;
+        PacketDistributor.sendToServer(new BlueprintPayloads.BindSupply(BlockPos.ZERO, true));
+    }
+
+    public static void highlightSupply() {
+        if (supplyPos == null) {
             return;
         }
-        bindSupply = false;
-        bindFromMenu = false;
-        Minecraft.getInstance().setScreen(new PlacementScreen());
+        supplyHighlightUntil = System.currentTimeMillis() + 5000L;
+    }
+
+    /** Creative-only teleport to the bound supply chest. */
+    public static void visitSupply() {
+        if (!supplyBound || supplyPos == null) {
+            return;
+        }
+        PacketDistributor.sendToServer(new BlueprintPayloads.VisitSupply());
     }
 
     public static boolean tryBuild() {

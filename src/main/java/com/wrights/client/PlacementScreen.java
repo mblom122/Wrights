@@ -58,9 +58,6 @@ public class PlacementScreen extends Screen implements JeiPreview {
     private WrightsButton lockButton;
     private WrightsButton followButton;
     private WrightsButton priorityButton;
-    private WrightsButton bindSupplyButton;
-    private WrightsButton clearSupplyButton;
-    private WrightsButton highlightSupplyButton;
     private WrightsButton buildButton;
     private int supplySummaryY;
     private boolean suppress;
@@ -113,7 +110,7 @@ public class PlacementScreen extends Screen implements JeiPreview {
         int pasteRows = 3 + extraRows;
         int fieldPitch = btnH + 2;
         int leftNeed = 28 + modelSize + 16 + 18 + 32 + (map ? 18 : 0) + 52 + 40 + fieldPitch * 3 + 8;
-        int rightNeed = 28 + 46 + 36 + 48 + pasteRows * rowH + 14 + rowH + 14 + rowH + 20 + 16 + 18 + 18 + 12;
+        int rightNeed = 28 + 46 + 36 + 48 + pasteRows * rowH + 14 + rowH + 14 + rowH + 20 + 16 + 12;
         panelH = WrightsUi.fitH(Math.max(leftNeed, rightNeed), this.height);
         panelX = JeiPreview.left(this.width, panelW);
         panelY = WrightsUi.centerY(panelH, this.height);
@@ -204,18 +201,9 @@ public class PlacementScreen extends Screen implements JeiPreview {
         int supplyY = deployY + rowH + 8;
         supplySummaryY = supplyY + section;
         int priorityRow = supplySummaryY + 12;
-        int halfBtn = (inner - 4) / 2;
-        priorityButton = new WrightsButton(controlsX + side, priorityRow, halfBtn, btnH, Component.translatable("menu.wrights.shape_priority_edit"), button -> openPriority());
-        bindSupplyButton = new WrightsButton(controlsX + side + halfBtn + 4, priorityRow, inner - halfBtn - 4, btnH, Component.translatable("screen.wrights.supply_bind"), button -> bindChest());
+        priorityButton = new WrightsButton(controlsX + side, priorityRow, inner, btnH, Component.translatable("menu.wrights.shape_priority_edit"), button -> openPriority());
         addRenderableWidget(priorityButton);
-        addRenderableWidget(bindSupplyButton);
-        int clearW = 52;
-        int highlightW = 68;
-        highlightSupplyButton = new WrightsButton(controlsX + controlsW - clearW - highlightW, priorityRow + rowH + 4, highlightW, btnH, Component.translatable("screen.wrights.supply_highlight"), button -> highlightSupply());
-        clearSupplyButton = new WrightsButton(controlsX + controlsW - clearW, priorityRow + rowH + 4, clearW, btnH, Component.translatable("screen.wrights.supply_clear"), button -> clearSupply());
-        addRenderableWidget(highlightSupplyButton);
-        addRenderableWidget(clearSupplyButton);
-        int foot = priorityRow + rowH * 2 + 10;
+        int foot = priorityRow + rowH + 10;
         int footBtn = Math.max(16, btnH + 2);
         int half = (inner - 4) / 2;
         int rightHalf = inner - half - 4;
@@ -259,12 +247,6 @@ public class PlacementScreen extends Screen implements JeiPreview {
             followButton.setPicked(WrightsClientState.follow);
         }
         WrightsClientState.clampDeploy();
-        if (bindSupplyButton != null) {
-            boolean bound = WrightsClientState.supplyBound && WrightsClientState.supplyPos != null;
-            bindSupplyButton.setPicked(bound || WrightsClientState.bindSupply);
-            clearSupplyButton.visible = bound;
-            highlightSupplyButton.visible = bound;
-        }
         if (placeFluidsButton != null) {
             placeFluidsButton.setShown(WrightsConfig.allowPlaceFluids());
             placeFluidsButton.setPicked(WrightsClientConfig.PLACE_FLUIDS.get());
@@ -331,14 +313,6 @@ public class PlacementScreen extends Screen implements JeiPreview {
         graphics.drawString(this.font, Component.translatable("screen.wrights.use_items_from"), controlsX + 12, supplyLabelY, WrightsUi.MUTED, false);
         String orderLine = WrightsClientConfig.supplyOrderSummary();
         graphics.drawString(this.font, this.font.plainSubstrByWidth(orderLine, Math.max(40, controlsW - 24)), controlsX + 12, supplySummaryY, WrightsUi.MUTED, false);
-        boolean bound = WrightsClientState.supplyBound && WrightsClientState.supplyPos != null;
-        if (bound) {
-            Component supplyLine = Component.translatable("screen.wrights.supply_at", WrightsClientState.supplyPos.getX(), WrightsClientState.supplyPos.getY(), WrightsClientState.supplyPos.getZ());
-            int room = Math.max(40, highlightSupplyButton.getX() - (controlsX + 12) - 6);
-            graphics.drawString(this.font, this.font.plainSubstrByWidth(supplyLine.getString(), room), controlsX + 12, highlightSupplyButton.getY() + 3, WrightsUi.TEXT, false);
-        } else if (WrightsClientState.bindSupply) {
-            graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("screen.wrights.supply_aim").getString(), panelX + panelW - 24 - controlsX), controlsX + 12, highlightSupplyButton.getY() + 3, WrightsUi.MUTED, false);
-        }
         boolean paceInstant = this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild && !this.minecraft.player.isSpectator() && WrightsClientConfig.INSTANT_JOBS.get();
         if (paceInstant) {
             graphics.drawString(this.font, Component.translatable("screen.wrights.drones_instant"), controlsX + 12, deployY + 3, WrightsUi.MUTED, false);
@@ -547,33 +521,8 @@ public class PlacementScreen extends Screen implements JeiPreview {
         refresh();
     }
 
-    private void clearSupply() {
-        WrightsClientState.bindSupply = false;
-        WrightsClientState.supplyBound = false;
-        WrightsClientState.supplyPos = null;
-        WrightsClientState.supplyHighlightUntil = 0L;
-        PacketDistributor.sendToServer(new BlueprintPayloads.BindSupply(BlockPos.ZERO, true));
-        refresh();
-    }
-
     private void openPriority() {
         this.minecraft.setScreen(new ShapePriorityScreen(this));
-    }
-
-    private void highlightSupply() {
-        if (WrightsClientState.supplyPos == null) {
-            return;
-        }
-        WrightsClientState.supplyHighlightUntil = System.currentTimeMillis() + 5000L;
-        this.minecraft.setScreen(null);
-    }
-
-    private void bindChest() {
-        WrightsClientState.selectBindTool();
-        WrightsClientState.bindFromMenu = true;
-        WrightsClientState.styleHudTicks = WrightsClientState.STYLE_HUD_TICKS;
-        WrightsClientState.styleAnnounce = true;
-        this.minecraft.setScreen(null);
     }
 
     /** Keep the menu choices and return to the world — place with right-click. */

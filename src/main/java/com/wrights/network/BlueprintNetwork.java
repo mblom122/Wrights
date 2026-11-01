@@ -72,6 +72,7 @@ public final class BlueprintNetwork {
         registrar.playToServer(BlueprintPayloads.RenameWrightport.TYPE, BlueprintPayloads.RenameWrightport.STREAM_CODEC, BlueprintNetwork::renameWrightport);
         registrar.playToServer(BlueprintPayloads.RenameWright.TYPE, BlueprintPayloads.RenameWright.STREAM_CODEC, BlueprintNetwork::renameWright);
         registrar.playToServer(BlueprintPayloads.BindSupply.TYPE, BlueprintPayloads.BindSupply.STREAM_CODEC, BlueprintNetwork::bindSupply);
+        registrar.playToServer(BlueprintPayloads.VisitSupply.TYPE, BlueprintPayloads.VisitSupply.STREAM_CODEC, BlueprintNetwork::visitSupply);
         registrar.playToServer(BlueprintPayloads.BindPortChest.TYPE, BlueprintPayloads.BindPortChest.STREAM_CODEC, BlueprintNetwork::bindPortChest);
         registrar.playToServer(BlueprintPayloads.BindDigital.TYPE, BlueprintPayloads.BindDigital.STREAM_CODEC, BlueprintNetwork::bindDigital);
         registrar.playToServer(BlueprintPayloads.DigitalInfoRequest.TYPE, BlueprintPayloads.DigitalInfoRequest.STREAM_CODEC, BlueprintNetwork::digitalInfo);
@@ -530,6 +531,11 @@ public final class BlueprintNetwork {
     private static void bindSupply(BlueprintPayloads.BindSupply payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
         context.enqueueWork(() -> JobManager.bindSupply(player, payload.pos(), payload.clear()));
+    }
+
+    private static void visitSupply(BlueprintPayloads.VisitSupply payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> JobManager.visitSupply(player));
     }
 
     private static void bindPortChest(BlueprintPayloads.BindPortChest payload, IPayloadContext context) {

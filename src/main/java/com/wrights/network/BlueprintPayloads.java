@@ -1417,6 +1417,17 @@ public final class BlueprintPayloads {
         }
     }
 
+    /** Creative teleport to the player's bound supply chest. */
+    public record VisitSupply() implements CustomPacketPayload {
+        public static final Type<VisitSupply> TYPE = payloadType("visit_supply");
+        public static final StreamCodec<RegistryFriendlyByteBuf, VisitSupply> STREAM_CODEC = empty(new VisitSupply());
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public record SupplySync(boolean chest, BlockPos pos) implements CustomPacketPayload {
         public static final Type<SupplySync> TYPE = payloadType("supply_sync");
         public static final StreamCodec<RegistryFriendlyByteBuf, SupplySync> STREAM_CODEC = StreamCodec.of(

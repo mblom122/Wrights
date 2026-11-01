@@ -374,6 +374,22 @@ public final class WrightsInput {
             useShapeClick(player, pos, face);
             return;
         }
+        if (WrightsClientState.bindSupply) {
+            if (player.isShiftKeyDown()) {
+                Minecraft.getInstance().setScreen(new SupplyBindScreen());
+                return;
+            }
+            if (pos == null) {
+                WrightsClientState.clearSupplyBind();
+                return;
+            }
+            if (Minecraft.getInstance().level != null && SelectionRenderer.isSupplyContainer(Minecraft.getInstance().level, pos)) {
+                WrightsClientState.finishSupplyBind(pos);
+            } else {
+                player.displayClientMessage(net.minecraft.network.chat.Component.translatable("message.wrights.supply_not_container"), true);
+            }
+            return;
+        }
         if (WrightsClientState.buildId == null) {
             Minecraft.getInstance().setScreen(new WrightsMenuScreen());
             net.neoforged.neoforge.network.PacketDistributor.sendToServer(
@@ -381,22 +397,7 @@ public final class WrightsInput {
             return;
         }
         if (player.isShiftKeyDown()) {
-            if (WrightsClientState.bindSupply && WrightsClientState.supplyBound) {
-                WrightsClientState.supplyBound = false;
-                WrightsClientState.supplyPos = null;
-                WrightsClientState.bindFromMenu = false;
-                net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.wrights.network.BlueprintPayloads.BindSupply(BlockPos.ZERO, true));
-            } else {
-                Minecraft.getInstance().setScreen(new PlacementScreen());
-            }
-            return;
-        }
-        if (WrightsClientState.bindSupply) {
-            if (pos != null && Minecraft.getInstance().level != null && SelectionRenderer.isSupplyContainer(Minecraft.getInstance().level, pos)) {
-                WrightsClientState.finishSupplyBind(pos);
-            } else {
-                player.displayClientMessage(net.minecraft.network.chat.Component.translatable("message.wrights.supply_not_container"), true);
-            }
+            Minecraft.getInstance().setScreen(new PlacementScreen());
             return;
         }
         if (com.wrights.WrightsClientConfig.BUILD_MENU.get()) {

@@ -310,6 +310,43 @@ public final class JobManager {
         Messages.actionBar(player, "message.wrights.undo_started");
     }
 
+    /** Creative teleport to the session's bound supply chest. */
+    public static void visitSupply(ServerPlayer player) {
+        if (!player.getAbilities().instabuild || player.isSpectator()) {
+            Messages.actionBar(player, "message.wrights.visit_survival");
+            return;
+        }
+        BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
+        BlockPos chest = session.supplyPos();
+        if (chest == null || session.supplyDimension() == null || player.getServer() == null) {
+            Messages.actionBar(player, "message.wrights.supply_none");
+            return;
+        }
+        ServerLevel level = player.getServer().getLevel(session.supplyDimension());
+        if (level == null) {
+            Messages.actionBar(player, "message.wrights.visit_blocked");
+            return;
+        }
+        level.getChunk(chest.getX() >> 4, chest.getZ() >> 4);
+        BlockPos spot = standNearSupply(level, chest);
+        player.teleportTo(level, spot.getX() + 0.5D, spot.getY(), spot.getZ() + 0.5D, player.getYRot(), player.getXRot());
+        Messages.actionBar(player, "message.wrights.visited", spot.getX(), spot.getY(), spot.getZ());
+    }
+
+    private static BlockPos standNearSupply(ServerLevel level, BlockPos chest) {
+        BlockPos[] tries = {
+                chest.above(),
+                chest.north(), chest.south(), chest.east(), chest.west(),
+                chest.north().above(), chest.south().above(), chest.east().above(), chest.west().above()
+        };
+        for (BlockPos spot : tries) {
+            if (level.getBlockState(spot).isAir() && level.getBlockState(spot.above()).isAir()) {
+                return spot;
+            }
+        }
+        return chest.above();
+    }
+
     public static void bindSupply(ServerPlayer player, BlockPos pos, boolean clear) {
         if (!ControllerItem.isHeld(player)) {
             Messages.actionBar(player, "message.wrights.need_controller");

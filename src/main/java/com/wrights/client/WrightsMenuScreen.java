@@ -132,6 +132,7 @@ public class WrightsMenuScreen extends Screen {
     private int dropLineY = -1;
     private boolean options;
     private boolean infoPage;
+    private WrightsButton bindInventory;
     private WrightsButton unbindDigital;
     private int infoScroll;
     private int infoMaxScroll;
@@ -407,6 +408,8 @@ public class WrightsMenuScreen extends Screen {
         placeY = offsetBox(1);
         placeZ = offsetBox(2);
         shapeAirOffset = intOptionBox(0, 32, value -> WrightsClientConfig.setShapeAirOffset(value));
+        bindInventory = add(new WrightsButton(panelX + 14, panelY + panelH - 48, 72, 16,
+                Component.translatable("menu.wrights.info_bind"), button -> startBindInventory()));
         unbindDigital = add(new WrightsButton(panelX + 140, panelY + panelH - 48, 120, 18,
                 Component.translatable("menu.wrights.digital_unbind"), button -> clearDigitalLink()));
         manage.addWidgets(manageHost);
@@ -627,6 +630,10 @@ public class WrightsMenuScreen extends Screen {
             showOffset(shapeAirOffset, WrightsClientConfig.SHAPE_AIR_OFFSET.get());
             layoutOptions();
         }
+        if (bindInventory != null) {
+            bindInventory.visible = infoPage;
+            bindInventory.active = infoPage && toolHeld();
+        }
         if (unbindDigital != null) {
             unbindDigital.visible = infoPage && WrightsConfig.allowLink();
             unbindDigital.active = infoPage && WrightsConfig.allowLink() && WrightsClientState.digitalBound;
@@ -675,6 +682,9 @@ public class WrightsMenuScreen extends Screen {
             placeY.visible = false;
             placeZ.visible = false;
             shapeAirOffset.visible = false;
+            if (bindInventory != null) {
+                bindInventory.visible = false;
+            }
             if (unbindDigital != null) {
                 unbindDigital.visible = false;
             }
@@ -689,6 +699,10 @@ public class WrightsMenuScreen extends Screen {
     }
 
     public void refreshDigital() {
+        if (bindInventory != null) {
+            bindInventory.visible = infoPage;
+            bindInventory.active = infoPage && toolHeld();
+        }
         if (unbindDigital != null) {
             unbindDigital.visible = infoPage && WrightsConfig.allowLink();
             unbindDigital.active = infoPage && WrightsConfig.allowLink() && WrightsClientState.digitalBound;
@@ -697,6 +711,16 @@ public class WrightsMenuScreen extends Screen {
 
     private void requestDigitalInfo() {
         PacketDistributor.sendToServer(new BlueprintPayloads.DigitalInfoRequest());
+    }
+
+    private void startBindInventory() {
+        if (!requireTool()) {
+            return;
+        }
+        WrightsClientState.selectBindTool();
+        WrightsClientState.styleHudTicks = WrightsClientState.STYLE_HUD_TICKS;
+        WrightsClientState.styleAnnounce = true;
+        this.minecraft.setScreen(null);
     }
 
     private void clearDigitalLink() {
@@ -868,9 +892,19 @@ public class WrightsMenuScreen extends Screen {
         int width = panelX + panelW - 16 - x;
         int gap = 8;
         int cardW = Math.max(80, (width - gap) / 2);
-        int cardH = 88;
+        int cardH = 108;
         drawNetworkCard(graphics, x, y, cardW, cardH);
-        drawSupplyCard(graphics, x + cardW + gap, y, width - cardW - gap, cardH);
+        int supplyX = x + cardW + gap;
+        int supplyW = width - cardW - gap;
+        drawSupplyCard(graphics, supplyX, y, supplyW, cardH);
+        if (bindInventory != null && bindInventory.visible) {
+            // Sit on the supply card so Bind belongs to that section.
+            int btnW = Math.min(supplyW - 16, Math.max(72, this.font.width(Component.translatable("menu.wrights.info_bind")) + 16));
+            bindInventory.setX(supplyX + 8);
+            bindInventory.setY(y + cardH - 24);
+            bindInventory.setWidth(btnW);
+            bindInventory.setHeight(16);
+        }
         int stockY = y + cardH + 8;
         int stockH = panelY + panelH - 54 - stockY;
         if (stockH < 36) {
