@@ -57,8 +57,8 @@ public final class Shapes {
      * are oriented without the Shape orientation controls.
      * Floor / Wall are plates: equal-sides uses a single Size; otherwise Width × Height.
      * Pillar = vertical 1×1 post; Beam = horizontal 1-thick line across your look.
-     * Bridge (Place Look) toggles a flat walking path — not shown on the Exchange page.
-     * Legacy id 6 (square) maps to {@link #FLOOR}. Id 5 is {@link #BRIDGE}.
+     * Stairs (Place Look) toggles rising/descending steps — not shown on the Exchange page.
+     * Legacy id 6 (square) maps to {@link #FLOOR}. Id 5 is {@link #STAIRS}.
      */
     public enum ExchangeForm {
         FLOOR,
@@ -66,7 +66,7 @@ public final class Shapes {
         PILLAR,
         BEAM,
         CIRCLE,
-        BRIDGE;
+        STAIRS;
 
         public Kind kind() {
             return kind(false);
@@ -75,7 +75,7 @@ public final class Shapes {
         /** {@code equalSides} only affects Floor/Wall plates. */
         public Kind kind(boolean equalSides) {
             return switch (this) {
-                case FLOOR, WALL, BRIDGE -> equalSides ? Kind.RECTANGLE : Kind.SQUARE;
+                case FLOOR, WALL, STAIRS -> equalSides ? Kind.RECTANGLE : Kind.SQUARE;
                 case PILLAR, BEAM -> Kind.BOX;
                 case CIRCLE -> Kind.CIRCLE;
             };
@@ -91,13 +91,13 @@ public final class Shapes {
             return this == PILLAR || this == BEAM;
         }
 
-        /** Place Look path form — continuous flat bridge under the player. */
-        public boolean bridgePath() {
-            return this == BRIDGE;
+        /** Place Look path form — continuous stairs under the player. */
+        public boolean stairsPath() {
+            return this == STAIRS;
         }
 
         public static ExchangeForm byId(int id) {
-            // Old square (6) preset is Floor now. Id 5 is Bridge.
+            // Old square (6) preset is Floor now. Id 5 is Stairs.
             if (id == 6) {
                 return FLOOR;
             }
@@ -540,7 +540,7 @@ public final class Shapes {
                     default -> pivotId(0, 4); // center
                 };
             }
-            default -> pivotId(0, s); // FLOOR, CIRCLE, BRIDGE — bottom footprint
+            default -> pivotId(0, s); // FLOOR, CIRCLE, STAIRS — bottom footprint
         };
     }
 

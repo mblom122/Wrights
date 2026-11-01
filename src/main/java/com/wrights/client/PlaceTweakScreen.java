@@ -21,7 +21,7 @@ import com.wrights.blueprint.Shapes;
 import com.wrights.util.BlockFilters;
 
 /**
- * Compact Shift+right-click tweak for Place: Build mode (Look / To me / Stairs), form or path dims,
+ * Compact Shift+right-click tweak for Place: Build mode (Look / To me / Bridge), form or path dims,
  * path forward offset (1–12), stairs up/down, and materials.
  */
 public class PlaceTweakScreen extends Screen {
@@ -85,19 +85,19 @@ public class PlaceTweakScreen extends Screen {
         int style = WrightsClientConfig.placeStyle();
         boolean look = style == 0;
         boolean toMe = style == 1;
-        boolean stairs = WrightsClientConfig.placeStairsStyle();
-        boolean bridgeForm = look && WrightsClientConfig.exchangeForm().bridgePath();
-        boolean line = look && !bridgeForm && WrightsClientConfig.exchangeForm().line();
-        boolean showFormDims = look && !bridgeForm;
-        boolean pathDims = stairs || bridgeForm;
+        boolean bridge = WrightsClientConfig.placeBridgeStyle();
+        boolean stairsForm = look && WrightsClientConfig.exchangeForm().stairsPath();
+        boolean line = look && !stairsForm && WrightsClientConfig.exchangeForm().line();
+        boolean showFormDims = look && !stairsForm;
+        boolean pathDims = bridge || stairsForm;
         int rows = 1 // title
                 + 1 // build mode label
-                + 1 // build mode choices (Look / To me / Stairs)
+                + 1 // build mode choices (Look / To me / Bridge)
                 + (showFormDims && !line ? 1 : 0) // size
                 + (showFormDims && (line || WrightsClientConfig.exchangeKind().usesHeight()) ? 1 : 0)
                 + (pathDims ? 2 : 0) // offset + width
                 + (toMe ? 2 : 0) // width + height
-                + (stairs ? 1 : 0) // up/down
+                + (stairsForm ? 1 : 0) // up/down
                 + 1 // materials label
                 + 1 // icons
                 + 1; // done
@@ -151,7 +151,7 @@ public class PlaceTweakScreen extends Screen {
             step(plusX, y, "+", () -> nudgeToMeHeight(1));
             y += ROW + GAP;
         }
-        if (stairs) {
+        if (stairsForm) {
             stairsDirY = y;
             y += ROW + GAP;
         }
@@ -215,7 +215,7 @@ public class PlaceTweakScreen extends Screen {
             drawChoice(graphics, mouseX, mouseY, choiceX + choiceW + gap, styleChoicesY, choiceW,
                     style == 1, "menu.wrights.place_aim_me");
             drawChoice(graphics, mouseX, mouseY, choiceX + (choiceW + gap) * 2, styleChoicesY,
-                    panelW - PAD * 2 - (choiceW + gap) * 2, style == 2, "menu.wrights.place_aim_stairs");
+                    panelW - PAD * 2 - (choiceW + gap) * 2, style == 2, "menu.wrights.place_aim_bridge");
         }
         if (offsetY >= 0) {
             graphics.drawString(this.font, Component.translatable("menu.wrights.place_bridge_offset"),

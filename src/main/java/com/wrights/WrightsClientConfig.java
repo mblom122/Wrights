@@ -131,10 +131,10 @@ public final class WrightsClientConfig {
             .comment("Last build sub-tool. 0 use template, 1 mirror, 2 shape, 3 bind inventory, 4 exchange, 5 place.")
             .defineInRange("lastBuildTool", 0, 0, 5);
     public static final ModConfigSpec.IntValue PLACE_STYLE = BUILDER
-            .comment("Place build mode: 0 Look, 1 To me, 2 unused/legacy Bridge aim, 3 Stairs. UI maps Stairs to index 2; legacy 2 maps to Look + Bridge form.")
+            .comment("Place build mode: 0 Look, 1 To me, 2 Bridge. Legacy 3 (old Stairs aim) maps to Look + Stairs form.")
             .defineInRange("placeStyle", 0, 0, 3);
     public static final ModConfigSpec.IntValue PLACE_BRIDGE_OFFSET = BUILDER
-            .comment("Blocks in front of the player for Bridge form / Stairs path modes. Max 12.")
+            .comment("Blocks in front of the player for Bridge / Stairs path modes. Max 12.")
             .defineInRange("placeBridgeOffset", 3, 1, 12);
     public static final ModConfigSpec.IntValue PLACE_BRIDGE_WIDTH = BUILDER
             .comment("How wide Bridge / Stairs / To me paths are across the fill. Max 12.")
@@ -299,7 +299,7 @@ public final class WrightsClientConfig {
             .comment("Exchange Replace filter: 0 = Match look (exact block under crosshair), 1 = Similar blocks (same item-tag family, e.g. all planks / cobblestones), 2 = Any exchangeable solid.")
             .defineInRange("exchangeMatch", 0, 0, 2);
     public static final ModConfigSpec.IntValue EXCHANGE_FORM = BUILDER
-            .comment("Form preset: 0 floor, 1 wall, 2 pillar, 3 beam, 4 circle, 5 bridge (Place Look path). Legacy 6 (square) maps to floor.")
+            .comment("Form preset: 0 floor, 1 wall, 2 pillar, 3 beam, 4 circle, 5 stairs (Place Look path). Legacy 6 (square) maps to floor.")
             .defineInRange("exchangeForm", 0, 0, 6);
     public static final ModConfigSpec.BooleanValue EXCHANGE_FLOOR_EQUAL = BUILDER
             .comment("When true, Floor uses one Size for both sides. When false, Width and Height are separate.")
@@ -679,42 +679,39 @@ public final class WrightsClientConfig {
     }
 
     /**
-     * Place build mode UI index: 0 Look, 1 To me, 2 Stairs.
-     * Stored values stay 0 / 1 / 3 so legacy 2 (old Bridge aim) can map to Look without
-     * colliding with Stairs.
+     * Place build mode: 0 Look, 1 To me, 2 Bridge.
+     * Legacy stored 3 (Stairs aim) maps to Look so players can pick the Stairs form.
      */
     public static int placeStyle() {
         int raw = PLACE_STYLE.get();
         if (raw == 3) {
-            return 2; // Stairs
+            return 0; // legacy Stairs aim → Look (pick Stairs form for the path)
         }
-        if (raw == 2) {
-            return 0; // legacy Bridge aim → Look (pick Bridge form for the path)
-        }
-        return clamp(raw, 0, 1);
+        return clamp(raw, 0, 2);
     }
 
     public static void setPlaceStyle(int style) {
-        int ui = clamp(style, 0, 2);
-        // Persist Stairs as 3 so stored 2 remains the legacy Bridge marker.
-        PLACE_STYLE.set(ui == 2 ? 3 : ui);
+        int next = clamp(style, 0, 2);
+        PLACE_STYLE.set(next);
         if (!placePathStyle()) {
             com.wrights.client.WrightsClientState.bridgeActive = false;
         }
         save();
     }
 
-    /** Stairs build mode. */
-    public static boolean placeStairsStyle() {
+    /** Bridge build mode — flat walking path. */
+    public static boolean placeBridgeStyle() {
         return placeStyle() == 2;
     }
 
-    /** Look + Bridge form, or Stairs — RMB toggles continuous path placing. */
+    /** Look + Stairs form — rising/descending path. */
+    public static boolean placeStairsStyle() {
+        return placeStyle() == 0 && exchangeForm().stairsPath();
+    }
+
+    /** Bridge mode, or Look + Stairs form — RMB toggles continuous path placing. */
     public static boolean placePathStyle() {
-        if (placeStairsStyle()) {
-            return true;
-        }
-        return placeStyle() == 0 && exchangeForm().bridgePath();
+        return placeBridgeStyle() || placeStairsStyle();
     }
 
     public static int placeBridgeOffset() {
@@ -1216,7 +1213,7 @@ public final class WrightsClientConfig {
         return switch (exchangeForm()) {
             case FLOOR -> exchangeFloorEqual();
             case WALL -> exchangeWallEqual();
-            case PILLAR, BEAM, CIRCLE, BRIDGE -> false;
+            case PILLAR, BEAM, CIRCLE, STAIRS -> false;
         };
     }
 
@@ -1267,8 +1264,6 @@ public final class WrightsClientConfig {
         if (formId == 6) {
             EXCHANGE_FLOOR_EQUAL.set(true);
             setShapeHeight(SHAPE_SIZE.get());
-        } else if (formId == 5) {
-            EXCHANGE_FLOOR_EQUAL.set(false);
         }
         setShapeKind(exchangeKind().ordinal());
         setShapeYaw(0);
@@ -1326,8 +1321,8 @@ public final class WrightsClientConfig {
                 }
             }
             case CIRCLE -> setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
-            case BRIDGE -> {
-                // Flat deck defaults; Place Look uses path toggle instead of this footprint.
+            case STAIRS -> {
+                // Path form; Place Look uses stairs toggle instead of this footprint.
                 setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
                 if (SHAPE_SIZE.get() <= 1) {
                     setShapeSize(3);

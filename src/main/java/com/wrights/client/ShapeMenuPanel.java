@@ -1063,28 +1063,19 @@ final class ShapeMenuPanel {
                 WrightsClientConfig.placeStyle(),
                 "menu.wrights.place_aim_look",
                 "menu.wrights.place_aim_me",
-                "menu.wrights.place_aim_stairs",
+                "menu.wrights.place_aim_bridge",
                 "place_style");
         y += 4;
 
         int style = WrightsClientConfig.placeStyle();
         boolean look = style == 0;
         boolean toMe = style == 1;
-        boolean stairs = WrightsClientConfig.placeStairsStyle();
+        boolean bridge = WrightsClientConfig.placeBridgeStyle();
         Shapes.ExchangeForm form = WrightsClientConfig.exchangeForm();
-        boolean bridgeForm = look && form.bridgePath();
+        boolean stairsForm = look && form.stairsPath();
 
-        if (stairs) {
+        if (bridge) {
             y = drawPathOffsetWidth(graphics, mouseX, mouseY, x, y, leftW);
-            drawField(graphics, mouseX, mouseY, x, y,
-                    "menu.wrights.place_stairs_dir", "menu.wrights.place_stairs_dir_hint");
-            y += 12;
-            y = drawPair(graphics, mouseX, mouseY, x, y, leftW,
-                    !WrightsClientConfig.placeStairsUp(),
-                    "menu.wrights.place_stairs_up",
-                    "menu.wrights.place_stairs_down",
-                    "place_stairs_dir");
-            y += 4;
         }
 
         if (toMe) {
@@ -1109,11 +1100,20 @@ final class ShapeMenuPanel {
                     "menu.wrights.exchange_form", "menu.wrights.exchange_form_hint", false);
             y = drawKinds(graphics, mouseX, mouseY, x, y, leftW);
             form = WrightsClientConfig.exchangeForm();
-            bridgeForm = form.bridgePath();
+            stairsForm = form.stairsPath();
             y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
                     "menu.wrights.shape_section_dimensions", "menu.wrights.shape_section_dimensions_hint", false);
-            if (bridgeForm) {
+            if (stairsForm) {
                 y = drawPathOffsetWidth(graphics, mouseX, mouseY, x, y, leftW);
+                drawField(graphics, mouseX, mouseY, x, y,
+                        "menu.wrights.place_stairs_dir", "menu.wrights.place_stairs_dir_hint");
+                y += 12;
+                y = drawPair(graphics, mouseX, mouseY, x, y, leftW,
+                        !WrightsClientConfig.placeStairsUp(),
+                        "menu.wrights.place_stairs_up",
+                        "menu.wrights.place_stairs_down",
+                        "place_stairs_dir");
+                y += 4;
             } else {
                 boolean exchangeLine = form.line();
                 boolean exchangePlate = form.plate();
@@ -1236,7 +1236,7 @@ final class ShapeMenuPanel {
                             Shapes.ExchangeForm.PILLAR,
                             Shapes.ExchangeForm.BEAM,
                             Shapes.ExchangeForm.CIRCLE,
-                            Shapes.ExchangeForm.BRIDGE)
+                            Shapes.ExchangeForm.STAIRS)
                     : java.util.List.of(
                             Shapes.ExchangeForm.FLOOR,
                             Shapes.ExchangeForm.WALL,

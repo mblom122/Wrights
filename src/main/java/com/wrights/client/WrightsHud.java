@@ -672,7 +672,7 @@ public final class WrightsHud {
                     offset,
                     width);
         }
-        if (WrightsClientConfig.placePathStyle()) {
+        if (WrightsClientConfig.placeBridgeStyle()) {
             return Component.translatable(
                     "hud.wrights.tool_place_bridge_status",
                     name,
@@ -694,7 +694,7 @@ public final class WrightsHud {
     private static String placeAimKey() {
         return switch (WrightsClientConfig.placeStyle()) {
             case 1 -> "menu.wrights.place_aim_me";
-            case 2 -> "menu.wrights.place_aim_stairs";
+            case 2 -> "menu.wrights.place_aim_bridge";
             default -> "menu.wrights.place_aim_look";
         };
     }
@@ -704,6 +704,15 @@ public final class WrightsHud {
         if (style == 1) {
             return Component.translatable("hud.wrights.place_me_explain");
         }
+        if (WrightsClientConfig.placeBridgeStyle()) {
+            return WrightsClientState.bridgeActive
+                    ? Component.translatable(
+                            "hud.wrights.place_bridge_ready",
+                            Component.translatable("hud.wrights.place_bridge_state_on").withStyle(ChatFormatting.GREEN))
+                    : Component.translatable(
+                            "hud.wrights.place_bridge_explain",
+                            Component.translatable("hud.wrights.place_bridge_state_off").withStyle(ChatFormatting.RED));
+        }
         if (WrightsClientConfig.placeStairsStyle()) {
             return WrightsClientState.bridgeActive
                     ? Component.translatable(
@@ -712,15 +721,6 @@ public final class WrightsHud {
                     : Component.translatable(
                             "hud.wrights.place_stairs_explain",
                             Component.translatable("hud.wrights.place_stairs_state_off").withStyle(ChatFormatting.RED));
-        }
-        if (WrightsClientConfig.placePathStyle()) {
-            return WrightsClientState.bridgeActive
-                    ? Component.translatable(
-                            "hud.wrights.place_bridge_ready",
-                            Component.translatable("hud.wrights.place_bridge_state_on").withStyle(ChatFormatting.GREEN))
-                    : Component.translatable(
-                            "hud.wrights.place_bridge_explain",
-                            Component.translatable("hud.wrights.place_bridge_state_off").withStyle(ChatFormatting.RED));
         }
         return Component.translatable("hud.wrights.place_look_explain");
     }
