@@ -22,6 +22,9 @@ import com.wrights.WrightsMod;
 import com.wrights.WrightsClientConfig;
 import com.wrights.WrightsConfig;
 import com.wrights.blueprint.BoxEdits;
+import com.wrights.blueprint.Shapes;
+
+import net.minecraft.core.Direction;
 
 @EventBusSubscriber(modid = WrightsMod.MOD_ID, value = Dist.CLIENT)
 public final class WrightsHud {
@@ -87,16 +90,16 @@ public final class WrightsHud {
             line = Component.translatable("hud.wrights.saving", WrightsClientState.name);
         } else if (WrightsClientState.mode == WrightsClientState.Mode.BUILD) {
             if (WrightsClientState.exchangeToolActive()) {
-                line = Component.translatable("hud.wrights.tool_exchange");
+                line = exchangeStatusLine();
                 sub = Component.translatable("hud.wrights.exchange_explain");
             } else if (WrightsClientState.shapeToolActive()) {
-                line = Component.translatable("hud.wrights.tool_shape");
+                line = shapeStatusLine();
                 sub = Component.translatable(shapeFooter(minecraft));
                 if (WrightsClientConfig.shapeMaterials().isEmpty()) {
                     note = Component.translatable("hud.wrights.shape_pick_material");
                 }
-            } else if (WrightsClientState.mirrorToolActive() && WrightsClientConfig.mirrorBlocks()) {
-                line = Component.translatable("hud.wrights.tool_mirror");
+            } else if (WrightsClientState.mirrorToolActive()) {
+                line = mirrorStatusLine();
                 sub = Component.translatable(mirrorFooter(minecraft));
             } else if (WrightsClientState.buildId == null) {
                 line = Component.translatable("hud.wrights.pick_blueprint");
@@ -518,6 +521,77 @@ public final class WrightsHud {
 
     private static String signed(int value) {
         return value > 0 ? "+" + value : Integer.toString(value);
+    }
+
+    /** Title line: kind + size/height so the HUD shows the current Shape setup. */
+    private static Component shapeStatusLine() {
+        Shapes.Kind kind = Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
+        Component name = Component.translatable("menu.wrights.shape_kind_" + kind.name().toLowerCase());
+        return Component.translatable("hud.wrights.tool_shape_detail", name, shapeDimText(kind));
+    }
+
+    /** Title line: form + size so Exchange shows Floor/Wall/Pillar and its length. */
+    private static Component exchangeStatusLine() {
+        Shapes.ExchangeForm form = WrightsClientConfig.exchangeForm();
+        Component name = Component.translatable(form.langKey());
+        return Component.translatable("hud.wrights.tool_exchange_detail", name, exchangeDimText(form));
+    }
+
+    /** Title line: Blocks/Blueprints plus copies or axis mix. */
+    private static Component mirrorStatusLine() {
+        Component mode = Component.translatable(
+                WrightsClientConfig.mirrorBlocks() ? "menu.wrights.mirror_blocks" : "menu.wrights.mirror_blueprints");
+        int axes = WrightsConfig.allowedAxes(WrightsClientConfig.MIRROR_AXES.get()) & 7;
+        if (axes != 0) {
+            return Component.translatable("hud.wrights.tool_mirror_axes", mode, mirrorAxesText(axes));
+        }
+        int copies = WrightsConfig.allowedPattern(WrightsClientConfig.MIRROR_PATTERN.get());
+        Direction face = Direction.from3DDataValue(WrightsClientConfig.MIRROR_FACE.get());
+        Component faceName = Component.translatable("menu.wrights.face." + face.getSerializedName());
+        return Component.translatable("hud.wrights.tool_mirror_copies", mode, copies, faceName);
+    }
+
+    private static Component shapeDimText(Shapes.Kind kind) {
+        int size = WrightsClientConfig.SHAPE_SIZE.get();
+        int height = WrightsClientConfig.SHAPE_HEIGHT.get();
+        int thickness = WrightsClientConfig.SHAPE_THICKNESS.get();
+        return switch (kind) {
+            case SQUARE -> Component.translatable("hud.wrights.dim_wh", size, height);
+            case BOX -> Component.translatable("hud.wrights.dim_wdh", size, thickness, height);
+            case RING -> Component.translatable("hud.wrights.dim_size_band_along", size, thickness, height);
+            case CUBE, RECTANGLE, CIRCLE, SPHERE -> Component.translatable("hud.wrights.dim_size", size);
+            default -> kind.usesHeight()
+                    ? Component.translatable("hud.wrights.dim_size_height", size, height)
+                    : Component.translatable("hud.wrights.dim_size", size);
+        };
+    }
+
+    private static Component exchangeDimText(Shapes.ExchangeForm form) {
+        if (form.line()) {
+            int length = WrightsClientConfig.exchangeLineLength();
+            return form == Shapes.ExchangeForm.PILLAR
+                    ? Component.translatable("hud.wrights.dim_height", length)
+                    : Component.translatable("hud.wrights.dim_length", length);
+        }
+        int size = WrightsClientConfig.SHAPE_SIZE.get();
+        if (form.plate() && !WrightsClientConfig.exchangeEqualSides()) {
+            return Component.translatable("hud.wrights.dim_wh", size, WrightsClientConfig.SHAPE_HEIGHT.get());
+        }
+        return Component.translatable("hud.wrights.dim_size", size);
+    }
+
+    private static Component mirrorAxesText(int axes) {
+        StringBuilder bits = new StringBuilder();
+        if ((axes & 1) != 0) {
+            bits.append('X');
+        }
+        if ((axes & 2) != 0) {
+            bits.append('Y');
+        }
+        if ((axes & 4) != 0) {
+            bits.append('Z');
+        }
+        return Component.literal(bits.toString());
     }
 
     private static String mirrorFooter(Minecraft minecraft) {
