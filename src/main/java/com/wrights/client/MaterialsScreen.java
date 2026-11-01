@@ -83,7 +83,7 @@ public class MaterialsScreen extends Screen {
 
     @Override
     protected void init() {
-        panelW = WrightsUi.fitW(digitalBound ? 640 : 520, this.width);
+        panelW = WrightsUi.fitW(digitalBound ? 700 : 580, this.width);
         panelH = WrightsUi.fitH(240, this.height);
         panelX = WrightsUi.centerX(panelW, this.width);
         panelY = WrightsUi.centerY(panelH, this.height);
@@ -150,17 +150,19 @@ public class MaterialsScreen extends Screen {
                 digitalW = Math.max(digitalW, this.font.width(Integer.toString(line.digital())));
             }
         }
-        int totalW = COUNT_W;
-        if (digitalBound) {
-            for (BlueprintPayloads.MaterialLine line : lines) {
-                long sum = (long) line.player() + line.supply() + line.digital();
-                totalW = Math.max(totalW, this.font.width(Long.toString(sum)));
-            }
+        int missingW = Math.max(COUNT_W, this.font.width(Component.translatable("menu.wrights.column_missing").getString()));
+        int totalW = Math.max(COUNT_W, this.font.width(Component.translatable("menu.wrights.column_total").getString()));
+        for (BlueprintPayloads.MaterialLine line : lines) {
+            long sum = (long) line.player() + line.supply() + line.digital();
+            long shortfall = Math.max(0L, line.count() - sum);
+            totalW = Math.max(totalW, this.font.width(Long.toString(sum)));
+            missingW = Math.max(missingW, this.font.width(Long.toString(shortfall)));
         }
         int needX = right - COUNT_W;
         int totalX = needX - 8 - totalW;
-        int digitalX = totalX - 8 - digitalW;
-        int inventoryX = (digitalBound ? digitalX : totalX) - 8 - inventoryW;
+        int missingX = totalX - 8 - missingW;
+        int digitalX = missingX - 8 - digitalW;
+        int inventoryX = (digitalBound ? digitalX : missingX) - 8 - inventoryW;
         int playerX = inventoryX - 8 - COUNT_W;
         int iconX = panelX + 16;
         int nameX = iconX + 22;
@@ -171,6 +173,7 @@ public class MaterialsScreen extends Screen {
         if (digitalBound) {
             drawColumn(graphics, Component.translatable("menu.wrights.column_digital"), digitalX, listY + 2, digitalW, true);
         }
+        drawColumn(graphics, Component.translatable("menu.wrights.column_missing"), missingX, listY + 2, missingW, true);
         drawColumn(graphics, Component.translatable("menu.wrights.column_total"), totalX, listY + 2, totalW, true);
         drawColumn(graphics, Component.translatable("menu.wrights.column_need"), needX, listY + 2, COUNT_W, true);
         graphics.fill(panelX + 16, listY + HEADER - 2, right, listY + HEADER - 1, 0xFF31404E);
@@ -188,6 +191,7 @@ public class MaterialsScreen extends Screen {
             ItemStack stack = new ItemStack(item);
             int need = line.count();
             long total = (long) line.player() + line.supply() + line.digital();
+            long missing = Math.max(0L, need - total);
             WrightsUi.slot(graphics, iconX, y, 0xFF31404E);
             graphics.renderItem(stack, iconX + 1, y + 1);
             String name = this.font.plainSubstrByWidth(stack.getHoverName().getString(), nameW);
@@ -197,6 +201,7 @@ public class MaterialsScreen extends Screen {
             if (digitalBound) {
                 drawCount(graphics, Integer.toString(line.digital()), digitalX, y + 5, digitalW, stockColor(creative, line.digital(), need));
             }
+            drawCount(graphics, Long.toString(missing), missingX, y + 5, missingW, missingColor(creative, missing));
             drawCount(graphics, Long.toString(total), totalX, y + 5, totalW, stockColor(creative, total, need));
             drawCount(graphics, Integer.toString(need), needX, y + 5, COUNT_W, WrightsUi.TEXT);
             if (mouseX >= iconX && mouseX < right && mouseY >= y && mouseY < y + ROW) {
@@ -214,6 +219,13 @@ public class MaterialsScreen extends Screen {
             return WrightsUi.BLUE;
         }
         return held >= need ? GREEN : RED;
+    }
+
+    private int missingColor(boolean creative, long missing) {
+        if (creative) {
+            return WrightsUi.BLUE;
+        }
+        return missing > 0L ? RED : GREEN;
     }
 
     private void drawColumn(GuiGraphics graphics, Component label, int x, int y, int width, boolean count) {
