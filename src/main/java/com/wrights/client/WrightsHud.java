@@ -262,7 +262,7 @@ public final class WrightsHud {
      * The hotbar status line is easy to miss when walking a path.
      */
     private static void drawPathModeBanner(GuiGraphics graphics, Minecraft minecraft) {
-        boolean stairs = WrightsClientConfig.placeStyle() == 3;
+        boolean stairs = WrightsClientConfig.placeStairsStyle();
         boolean on = WrightsClientState.bridgeActive;
         Component label = Component.translatable(stairs
                 ? (on ? "hud.wrights.place_stairs_banner_on" : "hud.wrights.place_stairs_banner_off")
@@ -642,7 +642,7 @@ public final class WrightsHud {
         return Component.translatable("hud.wrights.tool_exchange_detail", name, exchangeDimText(form));
     }
 
-    /** Title line: Place form + Look / To me / Bridge / Stairs status. */
+    /** Title line: Place form + Look / To me / Stairs status (Bridge is a Look form). */
     private static Component placeStatusLine() {
         Shapes.ExchangeForm form = WrightsClientConfig.exchangeForm();
         Component name = Component.translatable(form.langKey());
@@ -659,15 +659,7 @@ public final class WrightsHud {
                     width,
                     WrightsClientConfig.placeToMeHeight());
         }
-        if (style == 2) {
-            return Component.translatable(
-                    "hud.wrights.tool_place_bridge_status",
-                    name,
-                    pathStateLabel(true, WrightsClientState.bridgeActive),
-                    offset,
-                    width);
-        }
-        if (style == 3) {
+        if (WrightsClientConfig.placeStairsStyle()) {
             Component dir = Component.translatable(
                     WrightsClientConfig.placeStairsUp()
                             ? "menu.wrights.place_stairs_up"
@@ -677,6 +669,14 @@ public final class WrightsHud {
                     name,
                     dir,
                     pathStateLabel(false, WrightsClientState.bridgeActive),
+                    offset,
+                    width);
+        }
+        if (WrightsClientConfig.placePathStyle()) {
+            return Component.translatable(
+                    "hud.wrights.tool_place_bridge_status",
+                    name,
+                    pathStateLabel(true, WrightsClientState.bridgeActive),
                     offset,
                     width);
         }
@@ -694,8 +694,7 @@ public final class WrightsHud {
     private static String placeAimKey() {
         return switch (WrightsClientConfig.placeStyle()) {
             case 1 -> "menu.wrights.place_aim_me";
-            case 2 -> "menu.wrights.place_aim_bridge";
-            case 3 -> "menu.wrights.place_aim_stairs";
+            case 2 -> "menu.wrights.place_aim_stairs";
             default -> "menu.wrights.place_aim_look";
         };
     }
@@ -705,7 +704,7 @@ public final class WrightsHud {
         if (style == 1) {
             return Component.translatable("hud.wrights.place_me_explain");
         }
-        if (style == 3) {
+        if (WrightsClientConfig.placeStairsStyle()) {
             return WrightsClientState.bridgeActive
                     ? Component.translatable(
                             "hud.wrights.place_stairs_ready",
@@ -714,7 +713,7 @@ public final class WrightsHud {
                             "hud.wrights.place_stairs_explain",
                             Component.translatable("hud.wrights.place_stairs_state_off").withStyle(ChatFormatting.RED));
         }
-        if (style == 2) {
+        if (WrightsClientConfig.placePathStyle()) {
             return WrightsClientState.bridgeActive
                     ? Component.translatable(
                             "hud.wrights.place_bridge_ready",

@@ -53,18 +53,20 @@ public final class Shapes {
     }
 
     /**
-     * Exchange presets. Each picks a Kind and Axis so Wall/Floor/Pillar/Beam are oriented
-     * without the Shape orientation controls.
+     * Exchange / Place form presets. Each picks a Kind and Axis so Wall/Floor/Pillar/Beam
+     * are oriented without the Shape orientation controls.
      * Floor / Wall are plates: equal-sides uses a single Size; otherwise Width × Height.
      * Pillar = vertical 1×1 post; Beam = horizontal 1-thick line across your look.
-     * Legacy ids 5 (rectangle) and 6 (square) map to {@link #FLOOR}.
+     * Bridge (Place Look) toggles a flat walking path — not shown on the Exchange page.
+     * Legacy id 6 (square) maps to {@link #FLOOR}. Id 5 is {@link #BRIDGE}.
      */
     public enum ExchangeForm {
         FLOOR,
         WALL,
         PILLAR,
         BEAM,
-        CIRCLE;
+        CIRCLE,
+        BRIDGE;
 
         public Kind kind() {
             return kind(false);
@@ -73,7 +75,7 @@ public final class Shapes {
         /** {@code equalSides} only affects Floor/Wall plates. */
         public Kind kind(boolean equalSides) {
             return switch (this) {
-                case FLOOR, WALL -> equalSides ? Kind.RECTANGLE : Kind.SQUARE;
+                case FLOOR, WALL, BRIDGE -> equalSides ? Kind.RECTANGLE : Kind.SQUARE;
                 case PILLAR, BEAM -> Kind.BOX;
                 case CIRCLE -> Kind.CIRCLE;
             };
@@ -89,9 +91,14 @@ public final class Shapes {
             return this == PILLAR || this == BEAM;
         }
 
+        /** Place Look path form — continuous flat bridge under the player. */
+        public boolean bridgePath() {
+            return this == BRIDGE;
+        }
+
         public static ExchangeForm byId(int id) {
-            // Old rectangle (5) / square (6) presets are Floor now.
-            if (id == 5 || id == 6) {
+            // Old square (6) preset is Floor now. Id 5 is Bridge.
+            if (id == 6) {
                 return FLOOR;
             }
             ExchangeForm[] all = values();
@@ -533,7 +540,7 @@ public final class Shapes {
                     default -> pivotId(0, 4); // center
                 };
             }
-            default -> pivotId(0, s); // FLOOR, CIRCLE — bottom footprint
+            default -> pivotId(0, s); // FLOOR, CIRCLE, BRIDGE — bottom footprint
         };
     }
 

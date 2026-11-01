@@ -148,29 +148,6 @@ final class ShapeMenuPanel {
                 : exchangeMode ? "menu.wrights.exchange_title" : "menu.wrights.shape_title";
         graphics.drawString(font, Component.translatable(titleKey), x, y, WrightsUi.COPPER, false);
         y += 14;
-        y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
-                formPresets() ? "menu.wrights.exchange_form" : "menu.wrights.shape_kind",
-                formPresets() ? "menu.wrights.exchange_form_hint" : "menu.wrights.shape_kind_hint",
-                !formPresets());
-        y = drawKinds(graphics, mouseX, mouseY, x, y, leftW);
-        Shapes.Kind kind = formPresets()
-                ? WrightsClientConfig.exchangeKind()
-                : Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
-        Shapes.ExchangeForm exchangeForm = formPresets() ? WrightsClientConfig.exchangeForm() : null;
-        boolean exchangeLine = exchangeForm != null && exchangeForm.line();
-        boolean exchangePlate = exchangeForm != null && exchangeForm.plate();
-        if (exchangeLine) {
-            WrightsClientConfig.enforceExchangeLineFootprint();
-        }
-        if (exchangePlate) {
-            WrightsClientConfig.syncExchangeEqualDims();
-            kind = WrightsClientConfig.exchangeKind();
-        }
-        int axis = WrightsClientConfig.SHAPE_PLANE.get();
-        boolean ring = kind == Shapes.Kind.RING;
-        boolean box = kind == Shapes.Kind.BOX;
-        y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
-                "menu.wrights.shape_section_dimensions", "menu.wrights.shape_section_dimensions_hint", false);
         sizeY = -1;
         heightY = -1;
         thicknessY = -1;
@@ -182,130 +159,65 @@ final class ShapeMenuPanel {
         bridgeValueX = bridgeValueW = 0;
         pathWidthValueX = pathWidthValueW = 0;
         pathHeightValueX = pathHeightValueW = 0;
-        // Pillar / Beam: only the run length is editable (1-block thick otherwise).
-        if (exchangeLine) {
-            boolean pillar = exchangeForm == Shapes.ExchangeForm.PILLAR;
-            drawField(graphics, mouseX, mouseY, x, y,
-                    pillar ? "menu.wrights.shape_height" : "menu.wrights.exchange_beam_length",
-                    pillar ? "menu.wrights.exchange_pillar_height_hint" : "menu.wrights.exchange_beam_length_hint");
-            y += 12;
-            heightY = y;
-            drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.exchangeLineLength(), SLIDER_HEIGHT);
-            y += 18;
-        } else {
-            if (exchangePlate) {
-                boolean equal = WrightsClientConfig.exchangeEqualSides();
-                y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, equal,
-                        "menu.wrights.exchange_equal", "menu.wrights.exchange_equal_hint", "exchange_equal");
-            }
-            drawField(graphics, mouseX, mouseY, x, y, sizeLabel(kind, axis), sizeHint(kind, axis));
-            y += 12;
-            sizeY = y;
-            drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_SIZE.get(), SLIDER_SIZE);
-            y += 18;
-            // Ring band / Box depth — Cube is equal on all sides so it only needs Size.
-            if (ring || box) {
-                drawField(graphics, mouseX, mouseY, x, y,
-                        box ? "menu.wrights.shape_depth" : "menu.wrights.shape_thickness",
-                        box ? "menu.wrights.shape_depth_hint" : "menu.wrights.shape_thickness_hint");
-                y += 12;
-                thicknessY = y;
-                int thickness = Mth.clamp(WrightsClientConfig.SHAPE_THICKNESS.get(), 1, axisMax());
-                drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, thickness, SLIDER_THICKNESS);
-                y += 18;
-            }
-            if (kind.usesHeight()) {
-                drawField(graphics, mouseX, mouseY, x, y, alongLabel(kind, axis), alongHint(kind, axis));
-                y += 12;
-                heightY = y;
-                drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_HEIGHT.get(), SLIDER_HEIGHT);
-                y += 18;
-            }
-        }
-        // Shape keeps Axis/Rotation. Exchange / Place skip that whole Orientation block.
-        if (!formPresets()) {
-            y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
-                    "menu.wrights.shape_section_orientation", "menu.wrights.shape_section_orientation_hint", false);
-            drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_axis", "menu.wrights.shape_axis_hint");
-            y += 12;
-            y = drawTriple(graphics, mouseX, mouseY, x, y, leftW,
-                    WrightsClientConfig.SHAPE_PLANE.get(),
-                    "menu.wrights.shape_axis_y",
-                    "menu.wrights.shape_axis_z",
-                    "menu.wrights.shape_axis_x",
-                    "plane");
-            y += 4;
-            drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_rotation", "menu.wrights.shape_rotation_hint");
-            y += 12;
-            y = drawQuad(graphics, mouseX, mouseY, x, y, leftW,
-                    Shapes.clampYaw(WrightsClientConfig.SHAPE_YAW.get()),
-                    "menu.wrights.shape_rot_0",
-                    "menu.wrights.shape_rot_90",
-                    "menu.wrights.shape_rot_180",
-                    "menu.wrights.shape_rot_270",
-                    "rotation");
-        }
-        // Materials / Replace with sit above Build so exchange setup is filter → place options.
-        String matsKey = exchangeMode ? "menu.wrights.exchange_to" : "menu.wrights.shape_materials";
-        String matsHint = exchangeMode ? "menu.wrights.exchange_to_hint" : "menu.wrights.shape_materials_hint";
-        y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd, matsKey, matsHint, false);
-        y = drawMaterials(graphics, mouseX, mouseY, x, y, leftW);
-        y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
-                "menu.wrights.shape_priority", "menu.wrights.shape_priority_hint", false);
-        y = drawPriority(graphics, mouseX, mouseY, x, y, leftW);
-        y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
-                "menu.wrights.shape_section_build", "menu.wrights.shape_section_build_hint", false);
         boolean useAnchor = false;
         if (placeMode) {
-            drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.place_aim", "menu.wrights.place_aim_hint");
-            y += 12;
-            y = drawQuad(graphics, mouseX, mouseY, x, y, leftW,
-                    WrightsClientConfig.placeStyle(),
-                    "menu.wrights.place_aim_look",
-                    "menu.wrights.place_aim_me",
-                    "menu.wrights.place_aim_bridge",
-                    "menu.wrights.place_aim_stairs",
-                    "place_style");
-            y += 4;
-            if (WrightsClientConfig.placePathStyle()) {
-                drawField(graphics, mouseX, mouseY, x, y,
-                        "menu.wrights.place_bridge_offset", "menu.wrights.place_bridge_offset_hint");
-                y += 12;
-                bridgeY = y;
-                drawDimSlider(graphics, mouseX, mouseY, x, y, leftW,
-                        WrightsClientConfig.placeBridgeOffset(), SLIDER_BRIDGE);
-                y += 18;
-            }
-            if (WrightsClientConfig.placePathStyle() || WrightsClientConfig.placeStyle() == 1) {
-                drawField(graphics, mouseX, mouseY, x, y,
-                        "menu.wrights.place_bridge_width", "menu.wrights.place_bridge_width_hint");
-                y += 12;
-                pathWidthY = y;
-                drawDimSlider(graphics, mouseX, mouseY, x, y, leftW,
-                        WrightsClientConfig.placeBridgeWidth(), SLIDER_PATH_WIDTH);
-                y += 18;
-            }
-            if (WrightsClientConfig.placeStyle() == 1) {
-                drawField(graphics, mouseX, mouseY, x, y,
-                        "menu.wrights.place_to_me_height", "menu.wrights.place_to_me_height_hint");
-                y += 12;
-                pathHeightY = y;
-                drawDimSlider(graphics, mouseX, mouseY, x, y, leftW,
-                        WrightsClientConfig.placeToMeHeight(), SLIDER_PATH_HEIGHT);
-                y += 18;
-            }
-            if (WrightsClientConfig.placeStyle() == 3) {
-                drawField(graphics, mouseX, mouseY, x, y,
-                        "menu.wrights.place_stairs_dir", "menu.wrights.place_stairs_dir_hint");
-                y += 12;
-                y = drawPair(graphics, mouseX, mouseY, x, y, leftW,
-                        !WrightsClientConfig.placeStairsUp(),
-                        "menu.wrights.place_stairs_up",
-                        "menu.wrights.place_stairs_down",
-                        "place_stairs_dir");
-                y += 4;
-            }
+            y = renderPlaceBody(graphics, mouseX, mouseY, x, y, leftW, lineEnd);
         } else {
+            y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
+                    formPresets() ? "menu.wrights.exchange_form" : "menu.wrights.shape_kind",
+                    formPresets() ? "menu.wrights.exchange_form_hint" : "menu.wrights.shape_kind_hint",
+                    !formPresets());
+            y = drawKinds(graphics, mouseX, mouseY, x, y, leftW);
+            Shapes.Kind kind = formPresets()
+                    ? WrightsClientConfig.exchangeKind()
+                    : Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
+            Shapes.ExchangeForm exchangeForm = formPresets() ? WrightsClientConfig.exchangeForm() : null;
+            boolean exchangeLine = exchangeForm != null && exchangeForm.line();
+            boolean exchangePlate = exchangeForm != null && exchangeForm.plate();
+            if (exchangeLine) {
+                WrightsClientConfig.enforceExchangeLineFootprint();
+            }
+            if (exchangePlate) {
+                WrightsClientConfig.syncExchangeEqualDims();
+                kind = WrightsClientConfig.exchangeKind();
+            }
+            int axis = WrightsClientConfig.SHAPE_PLANE.get();
+            boolean ring = kind == Shapes.Kind.RING;
+            boolean box = kind == Shapes.Kind.BOX;
+            y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
+                    "menu.wrights.shape_section_dimensions", "menu.wrights.shape_section_dimensions_hint", false);
+            y = drawFormDimensions(graphics, mouseX, mouseY, x, y, leftW, kind, exchangeForm, exchangeLine, exchangePlate, ring, box, axis);
+            if (!formPresets()) {
+                y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
+                        "menu.wrights.shape_section_orientation", "menu.wrights.shape_section_orientation_hint", false);
+                drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_axis", "menu.wrights.shape_axis_hint");
+                y += 12;
+                y = drawTriple(graphics, mouseX, mouseY, x, y, leftW,
+                        WrightsClientConfig.SHAPE_PLANE.get(),
+                        "menu.wrights.shape_axis_y",
+                        "menu.wrights.shape_axis_z",
+                        "menu.wrights.shape_axis_x",
+                        "plane");
+                y += 4;
+                drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_rotation", "menu.wrights.shape_rotation_hint");
+                y += 12;
+                y = drawQuad(graphics, mouseX, mouseY, x, y, leftW,
+                        Shapes.clampYaw(WrightsClientConfig.SHAPE_YAW.get()),
+                        "menu.wrights.shape_rot_0",
+                        "menu.wrights.shape_rot_90",
+                        "menu.wrights.shape_rot_180",
+                        "menu.wrights.shape_rot_270",
+                        "rotation");
+            }
+            String matsKey = exchangeMode ? "menu.wrights.exchange_to" : "menu.wrights.shape_materials";
+            String matsHint = exchangeMode ? "menu.wrights.exchange_to_hint" : "menu.wrights.shape_materials_hint";
+            y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd, matsKey, matsHint, false);
+            y = drawMaterials(graphics, mouseX, mouseY, x, y, leftW);
+            y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
+                    "menu.wrights.shape_priority", "menu.wrights.shape_priority_hint", false);
+            y = drawPriority(graphics, mouseX, mouseY, x, y, leftW);
+            y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
+                    "menu.wrights.shape_section_build", "menu.wrights.shape_section_build_hint", false);
             drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_place", "menu.wrights.shape_place_hint");
             y += 12;
             useAnchor = WrightsConfig.allowShapeAnchor() && WrightsClientConfig.SHAPE_USE_ANCHOR.get();
@@ -332,53 +244,53 @@ final class ShapeMenuPanel {
                 y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_LOOK_LOCK.get(),
                         "menu.wrights.shape_look_lock", "menu.wrights.shape_look_lock_hint", "look_lock");
             }
+            if (formPresets()) {
+                drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.exchange_pivot", "menu.wrights.exchange_pivot_hint");
+                y += 12;
+                y = drawExchangePivot(graphics, mouseX, mouseY, x, y, leftW);
+            } else {
+                drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_pivot", "menu.wrights.shape_pivot_hint");
+                y += 12;
+                graphics.drawString(font,
+                        font.plainSubstrByWidth(ShapePivotScreen.pivotSummary(WrightsClientConfig.SHAPE_PIVOT.get()).getString(), Math.max(24, leftW - 8)),
+                        x, y, WrightsUi.MUTED, false);
+                y += 12;
+                boolean pivotHover = mouseX >= x && mouseX < x + leftW && mouseY >= y && mouseY < y + 18;
+                WrightsUi.choice(graphics, x, y, leftW, 18, false, pivotHover);
+                graphics.drawCenteredString(font, Component.translatable("menu.wrights.shape_pivot_btn"), x + leftW / 2, y + 5, WrightsUi.TEXT);
+                hits.add(new Hit(x, y, leftW, 18, "pivot", 0));
+                y += 22;
+            }
+            if (!formPresets() && WrightsConfig.allowShapeHollow()) {
+                y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_HOLLOW.get(), "menu.wrights.shape_hollow", "menu.wrights.shape_hollow_hint", "hollow");
+            }
+            if (exchangeMode) {
+                drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.exchange_match", "menu.wrights.exchange_match_hint");
+                y += 12;
+                y = drawTriple(graphics, mouseX, mouseY, x, y, leftW,
+                        WrightsClientConfig.exchangeMatch().ordinal(),
+                        "menu.wrights.exchange_match_same",
+                        "menu.wrights.exchange_match_similar",
+                        "menu.wrights.exchange_match_any",
+                        "exchange_match");
+                y += 4;
+                y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.exchangeSilk(),
+                        "menu.wrights.exchange_silk", "menu.wrights.exchange_silk_hint", "exchange_silk");
+            }
+            if (WrightsConfig.allowShapeVoid()) {
+                String voidHint = exchangeMode
+                        ? "menu.wrights.exchange_void_hint"
+                        : "menu.wrights.shape_void_hint";
+                y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_VOID.get(),
+                        "menu.wrights.shape_void", voidHint, "void");
+            }
+            if (useAnchor) {
+                y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
+                        "menu.wrights.shape_anchor_section", "menu.wrights.shape_anchor_section_hint", false);
+                y = drawStatus(graphics, mouseX, mouseY, x, y, leftW);
+            }
         }
-        if (formPresets()) {
-            drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.exchange_pivot", "menu.wrights.exchange_pivot_hint");
-            y += 12;
-            y = drawExchangePivot(graphics, mouseX, mouseY, x, y, leftW);
-        } else {
-            drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_pivot", "menu.wrights.shape_pivot_hint");
-            y += 12;
-            graphics.drawString(font,
-                    font.plainSubstrByWidth(ShapePivotScreen.pivotSummary(WrightsClientConfig.SHAPE_PIVOT.get()).getString(), Math.max(24, leftW - 8)),
-                    x, y, WrightsUi.MUTED, false);
-            y += 12;
-            boolean pivotHover = mouseX >= x && mouseX < x + leftW && mouseY >= y && mouseY < y + 18;
-            WrightsUi.choice(graphics, x, y, leftW, 18, false, pivotHover);
-            graphics.drawCenteredString(font, Component.translatable("menu.wrights.shape_pivot_btn"), x + leftW / 2, y + 5, WrightsUi.TEXT);
-            hits.add(new Hit(x, y, leftW, 18, "pivot", 0));
-            y += 22;
-        }
-        if (!formPresets() && WrightsConfig.allowShapeHollow()) {
-            y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_HOLLOW.get(), "menu.wrights.shape_hollow", "menu.wrights.shape_hollow_hint", "hollow");
-        }
-        if (exchangeMode) {
-            drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.exchange_match", "menu.wrights.exchange_match_hint");
-            y += 12;
-            y = drawTriple(graphics, mouseX, mouseY, x, y, leftW,
-                    WrightsClientConfig.exchangeMatch().ordinal(),
-                    "menu.wrights.exchange_match_same",
-                    "menu.wrights.exchange_match_similar",
-                    "menu.wrights.exchange_match_any",
-                    "exchange_match");
-            y += 4;
-            y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.exchangeSilk(),
-                    "menu.wrights.exchange_silk", "menu.wrights.exchange_silk_hint", "exchange_silk");
-        }
-        if (WrightsConfig.allowShapeVoid()) {
-            String voidHint = exchangeMode
-                    ? "menu.wrights.exchange_void_hint"
-                    : placeMode ? "menu.wrights.place_void_hint" : "menu.wrights.shape_void_hint";
-            y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_VOID.get(),
-                    "menu.wrights.shape_void", voidHint, "void");
-        }
-        // Anchor status/editor only when Build at is On anchor (Shape and Exchange).
-        if (useAnchor) {
-            y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
-                    "menu.wrights.shape_anchor_section", "menu.wrights.shape_anchor_section_hint", false);
-            y = drawStatus(graphics, mouseX, mouseY, x, y, leftW);
-        }
+
         contentH = y - (viewTop - scroll) + 8;
         graphics.disableScissor();
         if (contentH > viewH) {
@@ -1141,6 +1053,174 @@ final class ShapeMenuPanel {
         return y + 22;
     }
 
+    /** Place page: Build mode first; form / dims only for Look. */
+    private int renderPlaceBody(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int leftW, int lineEnd) {
+        y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
+                "menu.wrights.place_aim", "menu.wrights.place_aim_hint", false);
+        drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.place_aim", "menu.wrights.place_aim_hint");
+        y += 12;
+        y = drawTriple(graphics, mouseX, mouseY, x, y, leftW,
+                WrightsClientConfig.placeStyle(),
+                "menu.wrights.place_aim_look",
+                "menu.wrights.place_aim_me",
+                "menu.wrights.place_aim_stairs",
+                "place_style");
+        y += 4;
+
+        int style = WrightsClientConfig.placeStyle();
+        boolean look = style == 0;
+        boolean toMe = style == 1;
+        boolean stairs = WrightsClientConfig.placeStairsStyle();
+        Shapes.ExchangeForm form = WrightsClientConfig.exchangeForm();
+        boolean bridgeForm = look && form.bridgePath();
+
+        if (stairs) {
+            y = drawPathOffsetWidth(graphics, mouseX, mouseY, x, y, leftW);
+            drawField(graphics, mouseX, mouseY, x, y,
+                    "menu.wrights.place_stairs_dir", "menu.wrights.place_stairs_dir_hint");
+            y += 12;
+            y = drawPair(graphics, mouseX, mouseY, x, y, leftW,
+                    !WrightsClientConfig.placeStairsUp(),
+                    "menu.wrights.place_stairs_up",
+                    "menu.wrights.place_stairs_down",
+                    "place_stairs_dir");
+            y += 4;
+        }
+
+        if (toMe) {
+            drawField(graphics, mouseX, mouseY, x, y,
+                    "menu.wrights.place_bridge_width", "menu.wrights.place_bridge_width_hint");
+            y += 12;
+            pathWidthY = y;
+            drawDimSlider(graphics, mouseX, mouseY, x, y, leftW,
+                    WrightsClientConfig.placeBridgeWidth(), SLIDER_PATH_WIDTH);
+            y += 18;
+            drawField(graphics, mouseX, mouseY, x, y,
+                    "menu.wrights.place_to_me_height", "menu.wrights.place_to_me_height_hint");
+            y += 12;
+            pathHeightY = y;
+            drawDimSlider(graphics, mouseX, mouseY, x, y, leftW,
+                    WrightsClientConfig.placeToMeHeight(), SLIDER_PATH_HEIGHT);
+            y += 18;
+        }
+
+        if (look) {
+            y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
+                    "menu.wrights.exchange_form", "menu.wrights.exchange_form_hint", false);
+            y = drawKinds(graphics, mouseX, mouseY, x, y, leftW);
+            form = WrightsClientConfig.exchangeForm();
+            bridgeForm = form.bridgePath();
+            y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
+                    "menu.wrights.shape_section_dimensions", "menu.wrights.shape_section_dimensions_hint", false);
+            if (bridgeForm) {
+                y = drawPathOffsetWidth(graphics, mouseX, mouseY, x, y, leftW);
+            } else {
+                boolean exchangeLine = form.line();
+                boolean exchangePlate = form.plate();
+                if (exchangeLine) {
+                    WrightsClientConfig.enforceExchangeLineFootprint();
+                }
+                if (exchangePlate) {
+                    WrightsClientConfig.syncExchangeEqualDims();
+                }
+                Shapes.Kind kind = WrightsClientConfig.exchangeKind();
+                int axis = WrightsClientConfig.SHAPE_PLANE.get();
+                y = drawFormDimensions(graphics, mouseX, mouseY, x, y, leftW, kind, form, exchangeLine, exchangePlate,
+                        kind == Shapes.Kind.RING, kind == Shapes.Kind.BOX, axis);
+            }
+            y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
+                    "menu.wrights.shape_materials", "menu.wrights.shape_materials_hint", false);
+            y = drawMaterials(graphics, mouseX, mouseY, x, y, leftW);
+            y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
+                    "menu.wrights.shape_priority", "menu.wrights.shape_priority_hint", false);
+            y = drawPriority(graphics, mouseX, mouseY, x, y, leftW);
+            drawField(graphics, mouseX, mouseY, x, y, "menu.wrights.exchange_pivot", "menu.wrights.exchange_pivot_hint");
+            y += 12;
+            y = drawExchangePivot(graphics, mouseX, mouseY, x, y, leftW);
+        } else {
+            y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
+                    "menu.wrights.shape_materials", "menu.wrights.shape_materials_hint", false);
+            y = drawMaterials(graphics, mouseX, mouseY, x, y, leftW);
+        }
+
+        if (WrightsConfig.allowShapeVoid()) {
+            y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_VOID.get(),
+                    "menu.wrights.shape_void", "menu.wrights.place_void_hint", "void");
+        }
+        return y;
+    }
+
+    private int drawPathOffsetWidth(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int leftW) {
+        drawField(graphics, mouseX, mouseY, x, y,
+                "menu.wrights.place_bridge_offset", "menu.wrights.place_bridge_offset_hint");
+        y += 12;
+        bridgeY = y;
+        drawDimSlider(graphics, mouseX, mouseY, x, y, leftW,
+                WrightsClientConfig.placeBridgeOffset(), SLIDER_BRIDGE);
+        y += 18;
+        drawField(graphics, mouseX, mouseY, x, y,
+                "menu.wrights.place_bridge_width", "menu.wrights.place_bridge_width_hint");
+        y += 12;
+        pathWidthY = y;
+        drawDimSlider(graphics, mouseX, mouseY, x, y, leftW,
+                WrightsClientConfig.placeBridgeWidth(), SLIDER_PATH_WIDTH);
+        return y + 18;
+    }
+
+    private int drawFormDimensions(
+            GuiGraphics graphics,
+            int mouseX,
+            int mouseY,
+            int x,
+            int y,
+            int leftW,
+            Shapes.Kind kind,
+            Shapes.ExchangeForm exchangeForm,
+            boolean exchangeLine,
+            boolean exchangePlate,
+            boolean ring,
+            boolean box,
+            int axis) {
+        if (exchangeLine) {
+            boolean pillar = exchangeForm == Shapes.ExchangeForm.PILLAR;
+            drawField(graphics, mouseX, mouseY, x, y,
+                    pillar ? "menu.wrights.shape_height" : "menu.wrights.exchange_beam_length",
+                    pillar ? "menu.wrights.exchange_pillar_height_hint" : "menu.wrights.exchange_beam_length_hint");
+            y += 12;
+            heightY = y;
+            drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.exchangeLineLength(), SLIDER_HEIGHT);
+            return y + 18;
+        }
+        if (exchangePlate) {
+            boolean equal = WrightsClientConfig.exchangeEqualSides();
+            y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, equal,
+                    "menu.wrights.exchange_equal", "menu.wrights.exchange_equal_hint", "exchange_equal");
+        }
+        drawField(graphics, mouseX, mouseY, x, y, sizeLabel(kind, axis), sizeHint(kind, axis));
+        y += 12;
+        sizeY = y;
+        drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_SIZE.get(), SLIDER_SIZE);
+        y += 18;
+        if (ring || box) {
+            drawField(graphics, mouseX, mouseY, x, y,
+                    box ? "menu.wrights.shape_depth" : "menu.wrights.shape_thickness",
+                    box ? "menu.wrights.shape_depth_hint" : "menu.wrights.shape_thickness_hint");
+            y += 12;
+            thicknessY = y;
+            int thickness = Mth.clamp(WrightsClientConfig.SHAPE_THICKNESS.get(), 1, axisMax());
+            drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, thickness, SLIDER_THICKNESS);
+            y += 18;
+        }
+        if (kind.usesHeight()) {
+            drawField(graphics, mouseX, mouseY, x, y, alongLabel(kind, axis), alongHint(kind, axis));
+            y += 12;
+            heightY = y;
+            drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_HEIGHT.get(), SLIDER_HEIGHT);
+            y += 18;
+        }
+        return y;
+    }
+
     private int drawKinds(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width) {
         int gap = 4;
         int cols = 3;
@@ -1149,7 +1229,20 @@ final class ShapeMenuPanel {
         int sectionGap = 6;
         int cardW = Math.max(36, (width - gap * (cols - 1)) / cols);
         if (formPresets()) {
-            java.util.List<Shapes.ExchangeForm> forms = java.util.List.of(Shapes.ExchangeForm.values());
+            java.util.List<Shapes.ExchangeForm> forms = placeMode
+                    ? java.util.List.of(
+                            Shapes.ExchangeForm.FLOOR,
+                            Shapes.ExchangeForm.WALL,
+                            Shapes.ExchangeForm.PILLAR,
+                            Shapes.ExchangeForm.BEAM,
+                            Shapes.ExchangeForm.CIRCLE,
+                            Shapes.ExchangeForm.BRIDGE)
+                    : java.util.List.of(
+                            Shapes.ExchangeForm.FLOOR,
+                            Shapes.ExchangeForm.WALL,
+                            Shapes.ExchangeForm.PILLAR,
+                            Shapes.ExchangeForm.BEAM,
+                            Shapes.ExchangeForm.CIRCLE);
             int rows = Math.max(1, (forms.size() + cols - 1) / cols);
             int cursor = y;
             graphics.drawString(font, Component.translatable("menu.wrights.exchange_form_presets"), x, cursor, WrightsUi.MUTED, false);

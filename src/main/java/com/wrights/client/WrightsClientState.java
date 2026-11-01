@@ -1957,7 +1957,7 @@ public final class WrightsClientState {
         if (WrightsClientConfig.placePathStyle() && !force) {
             bridgeActive = !bridgeActive;
             bridgeCooldown = 0;
-            if (style == 3) {
+            if (WrightsClientConfig.placeStairsStyle()) {
                 Component state = Component.translatable(
                                 bridgeActive
                                         ? "hud.wrights.place_stairs_state_on"
@@ -2087,7 +2087,7 @@ public final class WrightsClientState {
         int width = Math.max(1, WrightsClientConfig.placeBridgeWidth());
         int sideStart = -(width - 1) / 2;
         BlockPos feet = player.blockPosition();
-        boolean stairs = WrightsClientConfig.placeStyle() == 3;
+        boolean stairs = WrightsClientConfig.placeStairsStyle();
         boolean up = WrightsClientConfig.placeStairsUp();
         java.util.ArrayList<BlockPos> cells = new java.util.ArrayList<>(offset * width);
         for (int d = 1; d <= offset; d++) {

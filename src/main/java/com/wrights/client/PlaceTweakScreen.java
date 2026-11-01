@@ -21,7 +21,7 @@ import com.wrights.blueprint.Shapes;
 import com.wrights.util.BlockFilters;
 
 /**
- * Compact Shift+right-click tweak for Place: form size, Look / To me / Bridge / Stairs,
+ * Compact Shift+right-click tweak for Place: Build mode (Look / To me / Stairs), form or path dims,
  * path forward offset (1–12), stairs up/down, and materials.
  */
 public class PlaceTweakScreen extends Screen {
@@ -40,8 +40,7 @@ public class PlaceTweakScreen extends Screen {
     private int alongY = -1;
     private int styleLabelY = -1;
     private int styleChoicesY = -1;
-    private int styleRow2Y = -1;
-    private int offsetY = -1;
+        private int offsetY = -1;
     private int widthY = -1;
     private int toMeHeightY = -1;
     private int stairsDirY = -1;
@@ -83,18 +82,21 @@ public class PlaceTweakScreen extends Screen {
         int matsNeed = ICON * MAX_ICONS + GAP * (MAX_ICONS - 1) + GAP + changeW;
         panelW = WrightsUi.fitW(PAD * 2 + Math.max(Math.max(rowInner, btnW), matsNeed), this.width);
 
-        boolean line = WrightsClientConfig.exchangeForm().line();
-        boolean path = WrightsClientConfig.placePathStyle();
-        boolean toMe = WrightsClientConfig.placeStyle() == 1;
-        boolean stairs = WrightsClientConfig.placeStyle() == 3;
+        int style = WrightsClientConfig.placeStyle();
+        boolean look = style == 0;
+        boolean toMe = style == 1;
+        boolean stairs = WrightsClientConfig.placeStairsStyle();
+        boolean bridgeForm = look && WrightsClientConfig.exchangeForm().bridgePath();
+        boolean line = look && !bridgeForm && WrightsClientConfig.exchangeForm().line();
+        boolean showFormDims = look && !bridgeForm;
+        boolean pathDims = stairs || bridgeForm;
         int rows = 1 // title
-                + (line ? 0 : 1) // size
-                + (line || WrightsClientConfig.exchangeKind().usesHeight() ? 1 : 0)
-                + 1 // aim label
-                + 2 // aim choices (2×2)
-                + (path ? 1 : 0) // offset
-                + (path || toMe ? 1 : 0) // width (Bridge/Stairs/To me)
-                + (toMe ? 1 : 0) // To me height
+                + 1 // build mode label
+                + 1 // build mode choices (Look / To me / Stairs)
+                + (showFormDims && !line ? 1 : 0) // size
+                + (showFormDims && (line || WrightsClientConfig.exchangeKind().usesHeight()) ? 1 : 0)
+                + (pathDims ? 2 : 0) // offset + width
+                + (toMe ? 2 : 0) // width + height
                 + (stairs ? 1 : 0) // up/down
                 + 1 // materials label
                 + 1 // icons
@@ -110,39 +112,40 @@ public class PlaceTweakScreen extends Screen {
         int plusX = valueX + fieldW + 2;
         int y = panelY + PAD + 12 + GAP;
 
-        sizeY = alongY = styleLabelY = styleChoicesY = styleRow2Y = offsetY = widthY = toMeHeightY = stairsDirY = matsLabelY = matsRowY = -1;
-        if (!line) {
-            sizeY = y;
-            step(minusX, y, "-", () -> nudgeSize(-1));
-            step(plusX, y, "+", () -> nudgeSize(1));
-            y += ROW + GAP;
-        }
-        if (line || WrightsClientConfig.exchangeKind().usesHeight()) {
-            alongY = y;
-            step(minusX, y, "-", () -> nudgeAlong(-1));
-            step(plusX, y, "+", () -> nudgeAlong(1));
-            y += ROW + GAP;
-        }
+        sizeY = alongY = styleLabelY = styleChoicesY = offsetY = widthY = toMeHeightY = stairsDirY = matsLabelY = matsRowY = -1;
 
         styleLabelY = y;
         y += ROW + GAP;
         styleChoicesY = y;
         y += ROW + GAP;
-        styleRow2Y = y;
-        y += ROW + GAP;
-        if (path) {
+
+        if (showFormDims && !line) {
+            sizeY = y;
+            step(minusX, y, "-", () -> nudgeSize(-1));
+            step(plusX, y, "+", () -> nudgeSize(1));
+            y += ROW + GAP;
+        }
+        if (showFormDims && (line || WrightsClientConfig.exchangeKind().usesHeight())) {
+            alongY = y;
+            step(minusX, y, "-", () -> nudgeAlong(-1));
+            step(plusX, y, "+", () -> nudgeAlong(1));
+            y += ROW + GAP;
+        }
+        if (pathDims) {
             offsetY = y;
             step(minusX, y, "-", () -> nudgeOffset(-1));
             step(plusX, y, "+", () -> nudgeOffset(1));
             y += ROW + GAP;
-        }
-        if (path || toMe) {
             widthY = y;
             step(minusX, y, "-", () -> nudgeWidth(-1));
             step(plusX, y, "+", () -> nudgeWidth(1));
             y += ROW + GAP;
         }
         if (toMe) {
+            widthY = y;
+            step(minusX, y, "-", () -> nudgeWidth(-1));
+            step(plusX, y, "+", () -> nudgeWidth(1));
+            y += ROW + GAP;
             toMeHeightY = y;
             step(minusX, y, "-", () -> nudgeToMeHeight(-1));
             step(plusX, y, "+", () -> nudgeToMeHeight(1));
@@ -202,19 +205,17 @@ public class PlaceTweakScreen extends Screen {
             graphics.drawString(this.font, Component.translatable("menu.wrights.place_aim"),
                     panelX + PAD, styleLabelY + 3, WrightsUi.MUTED, false);
         }
-        if (styleChoicesY >= 0 && styleRow2Y >= 0) {
+        if (styleChoicesY >= 0) {
             int style = WrightsClientConfig.placeStyle();
             int gap = GAP;
-            int choiceW = (panelW - PAD * 2 - gap) / 2;
+            int choiceW = (panelW - PAD * 2 - gap * 2) / 3;
             int choiceX = panelX + PAD;
             drawChoice(graphics, mouseX, mouseY, choiceX, styleChoicesY, choiceW,
                     style == 0, "menu.wrights.place_aim_look");
-            drawChoice(graphics, mouseX, mouseY, choiceX + choiceW + gap, styleChoicesY,
-                    panelW - PAD * 2 - choiceW - gap, style == 1, "menu.wrights.place_aim_me");
-            drawChoice(graphics, mouseX, mouseY, choiceX, styleRow2Y, choiceW,
-                    style == 2, "menu.wrights.place_aim_bridge");
-            drawChoice(graphics, mouseX, mouseY, choiceX + choiceW + gap, styleRow2Y,
-                    panelW - PAD * 2 - choiceW - gap, style == 3, "menu.wrights.place_aim_stairs");
+            drawChoice(graphics, mouseX, mouseY, choiceX + choiceW + gap, styleChoicesY, choiceW,
+                    style == 1, "menu.wrights.place_aim_me");
+            drawChoice(graphics, mouseX, mouseY, choiceX + (choiceW + gap) * 2, styleChoicesY,
+                    panelW - PAD * 2 - (choiceW + gap) * 2, style == 2, "menu.wrights.place_aim_stairs");
         }
         if (offsetY >= 0) {
             graphics.drawString(this.font, Component.translatable("menu.wrights.place_bridge_offset"),
@@ -309,28 +310,23 @@ public class PlaceTweakScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 0 && styleChoicesY >= 0 && styleRow2Y >= 0) {
+        if (button == 0 && styleChoicesY >= 0) {
             int gap = GAP;
-            int choiceW = (panelW - PAD * 2 - gap) / 2;
+            int choiceW = (panelW - PAD * 2 - gap * 2) / 3;
             int choiceX = panelX + PAD;
-            int rightW = panelW - PAD * 2 - choiceW - gap;
+            int rightW = panelW - PAD * 2 - (choiceW + gap) * 2;
             if (hit(mouseX, mouseY, choiceX, styleChoicesY, choiceW, ROW)) {
                 WrightsClientConfig.setPlaceStyle(0);
                 rebuild();
                 return true;
             }
-            if (hit(mouseX, mouseY, choiceX + choiceW + gap, styleChoicesY, rightW, ROW)) {
+            if (hit(mouseX, mouseY, choiceX + choiceW + gap, styleChoicesY, choiceW, ROW)) {
                 WrightsClientConfig.setPlaceStyle(1);
                 rebuild();
                 return true;
             }
-            if (hit(mouseX, mouseY, choiceX, styleRow2Y, choiceW, ROW)) {
+            if (hit(mouseX, mouseY, choiceX + (choiceW + gap) * 2, styleChoicesY, rightW, ROW)) {
                 WrightsClientConfig.setPlaceStyle(2);
-                rebuild();
-                return true;
-            }
-            if (hit(mouseX, mouseY, choiceX + choiceW + gap, styleRow2Y, rightW, ROW)) {
-                WrightsClientConfig.setPlaceStyle(3);
                 rebuild();
                 return true;
             }
