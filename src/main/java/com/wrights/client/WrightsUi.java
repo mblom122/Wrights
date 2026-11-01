@@ -223,4 +223,19 @@ public final class WrightsUi {
     public static int fieldLabel(GuiGraphics graphics, Font font, int x, int y, String titleKey) {
         return fieldLabel(graphics, font, x, y, Component.translatable(titleKey));
     }
+
+    /**
+     * Small {@code ?} mark after a header. Returns true when the cursor is over it
+     * so the caller can show {@code hint}.
+     */
+    public static boolean helpMark(GuiGraphics graphics, Font font, int mouseX, int mouseY, int x, int y, String hint) {
+        if (hint == null || hint.isEmpty()) {
+            return false;
+        }
+        boolean over = mouseX >= x && mouseX < x + 12 && mouseY >= y && mouseY < y + 12;
+        graphics.fill(x, y, x + 12, y + 12, 0xFF18222C);
+        border(graphics, x, y, 12, 12, over ? COPPER : 0xFF3D4E5E);
+        graphics.drawCenteredString(font, "?", x + 6, y + 2, over ? COPPER : MUTED);
+        return over;
+    }
 }

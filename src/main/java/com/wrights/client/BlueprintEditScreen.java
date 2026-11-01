@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Renderable;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
@@ -42,6 +43,7 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
     private WrightsButton materialsButton;
     private WrightsButton saveButton;
     private WrightsButton cancelButton;
+    private Component helpTip;
     private boolean leaving;
 
     public BlueprintEditScreen() {
@@ -99,16 +101,29 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
         addRenderableWidget(new WrightsButton(controlsX + side, flipY + rowH, row, btnH, Component.translatable("screen.wrights.center_short"), button -> transform(BlueprintTransforms.Op.CENTER)));
         addRenderableWidget(new WrightsButton(controlsX + side + row + 4, flipY + rowH, row, btnH, Component.translatable("screen.wrights.ground"), button -> transform(BlueprintTransforms.Op.GROUND)));
         placeFluidsButton = new WrightsButton(controlsX + side, pasteY, inner, btnH, Component.translatable("screen.wrights.place_fluids"), button -> togglePlaceFluids());
+        placeFluidsButton.setTooltip(Tooltip.create(Component.translatable("screen.wrights.place_fluids_hint")));
         placeNbtButton = new WrightsButton(controlsX + side, pasteY + rowH, inner, btnH, Component.translatable("screen.wrights.place_nbt_blocks"), button -> togglePlaceNbt());
+        placeNbtButton.setTooltip(Tooltip.create(Component.translatable("screen.wrights.place_nbt_blocks_hint")));
         placeSettingsButton = new WrightsButton(controlsX + side, pasteY + rowH * 2, inner, btnH, Component.translatable("screen.wrights.place_nbt_settings"), button -> togglePlaceSettings());
+        placeSettingsButton.setTooltip(Tooltip.create(Component.translatable("screen.wrights.place_nbt_settings_hint")));
         placeAllButton = new WrightsButton(controlsX + side, pasteY + rowH * 3, inner, btnH, Component.translatable("screen.wrights.place_nbt_all"), button -> togglePlaceAll());
+        placeAllButton.setTooltip(Tooltip.create(Component.translatable("screen.wrights.place_nbt_all_hint")));
         addRenderableWidget(placeFluidsButton);
         addRenderableWidget(placeNbtButton);
         addRenderableWidget(placeSettingsButton);
         addRenderableWidget(placeAllButton);
 
         footY = pasteY + rowH * 2 + extraRows * rowH + 12;
-        materialsButton = new WrightsButton(controlsX + side, footY, inner, btnH, Component.translatable("menu.wrights.materials"), button -> MaterialsScreen.request(WrightsClientState.editId, 0, 0, 0, this));
+        materialsButton = new WrightsButton(controlsX + side, footY, inner, btnH, Component.translatable("menu.wrights.materials"), button -> MaterialsScreen.request(
+                WrightsClientState.editId,
+                0,
+                0,
+                0,
+                WrightsClientConfig.PLACE_FLUIDS.get(),
+                WrightsClientConfig.PLACE_NBT_BLOCKS.get(),
+                WrightsClientState.placeSettingsChosen(),
+                WrightsClientState.placeAllChosen(),
+                this));
         int backW = 68;
         int backX = controlsW - backW;
         int footBtn = Math.max(16, btnH + 2);
@@ -208,15 +223,28 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
         graphics.drawString(this.font, Component.translatable("screen.wrights.anchor_section"), anchorX, detailY, WrightsUi.BLUE, false);
         String pivot = WrightsClientState.editPivotX + ", " + WrightsClientState.editPivotY + ", " + WrightsClientState.editPivotZ;
         graphics.drawString(this.font, this.font.plainSubstrByWidth(pivot, Math.max(40, controlsW - side - half)), anchorX, detailY + 12, WrightsUi.TEXT, false);
-        graphics.drawString(this.font, Component.translatable("screen.wrights.rotate"), controlsX + 12, rotateY - 12, WrightsUi.BLUE, false);
-        graphics.drawString(this.font, Component.translatable("screen.wrights.flip"), controlsX + 12, flipY - 12, WrightsUi.BLUE, false);
-        graphics.drawString(this.font, Component.translatable("screen.wrights.paste_options"), controlsX + 12, pasteY - 12, WrightsUi.BLUE, false);
+        helpTip = null;
+        int labelX = controlsX + 12;
+        drawHeaderHelp(graphics, mouseX, mouseY, labelX, rotateY - 12, "screen.wrights.rotate", "screen.wrights.rotate_hint");
+        drawHeaderHelp(graphics, mouseX, mouseY, labelX, flipY - 12, "screen.wrights.flip", "screen.wrights.flip_hint");
+        drawHeaderHelp(graphics, mouseX, mouseY, labelX, pasteY - 12, "screen.wrights.paste_options", "screen.wrights.paste_options_hint");
         graphics.disableScissor();
         String title = WrightsClientState.editName == null || WrightsClientState.editName.isEmpty()
                 ? Component.translatable("screen.wrights.adjust_edit").getString()
                 : WrightsClientState.editName;
         graphics.drawString(this.font, this.font.plainSubstrByWidth(title, panelW - 24), panelX + 14, panelY + 8, WrightsUi.COPPER, false);
         WrightsUi.scrollBar(graphics, panelX + panelW - 5, bodyTop, bodyViewH, bodyScroll, contentH);
+        if (helpTip != null) {
+            graphics.renderTooltip(this.font, this.font.split(helpTip, 240), mouseX, mouseY);
+        }
+    }
+
+    private void drawHeaderHelp(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, String titleKey, String hintKey) {
+        Component title = Component.translatable(titleKey);
+        graphics.drawString(this.font, title, x, y, WrightsUi.BLUE, false);
+        if (WrightsUi.helpMark(graphics, this.font, mouseX, mouseY, x + this.font.width(title) + 4, y - 2, hintKey)) {
+            helpTip = Component.translatable(hintKey);
+        }
     }
 
     private boolean insideBody(double mouseX, double mouseY) {

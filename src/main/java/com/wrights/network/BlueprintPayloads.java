@@ -382,7 +382,15 @@ public final class BlueprintPayloads {
     public record MaterialLine(int itemId, int count, int player, int supply, int digital) {
     }
 
-    public record MaterialsRequest(UUID id, int clipX, int clipY, int clipZ, boolean placeFluids) implements CustomPacketPayload {
+    public record MaterialsRequest(
+            UUID id,
+            int clipX,
+            int clipY,
+            int clipZ,
+            boolean placeFluids,
+            boolean placeNbt,
+            boolean placeSettings,
+            boolean placeAll) implements CustomPacketPayload {
         public static final Type<MaterialsRequest> TYPE = payloadType("materials_request");
         public static final StreamCodec<RegistryFriendlyByteBuf, MaterialsRequest> STREAM_CODEC = StreamCodec.of(
                 (buf, value) -> {
@@ -391,8 +399,19 @@ public final class BlueprintPayloads {
                     buf.writeVarInt(value.clipY);
                     buf.writeVarInt(value.clipZ);
                     buf.writeBoolean(value.placeFluids);
+                    buf.writeBoolean(value.placeNbt);
+                    buf.writeBoolean(value.placeSettings);
+                    buf.writeBoolean(value.placeAll);
                 },
-                buf -> new MaterialsRequest(buf.readUUID(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readBoolean()));
+                buf -> new MaterialsRequest(
+                        buf.readUUID(),
+                        buf.readVarInt(),
+                        buf.readVarInt(),
+                        buf.readVarInt(),
+                        buf.readBoolean(),
+                        buf.readBoolean(),
+                        buf.readBoolean(),
+                        buf.readBoolean()));
 
         @Override
         public Type<? extends CustomPacketPayload> type() {

@@ -249,7 +249,16 @@ public final class BlueprintNetwork {
 
     private static void materialsRequest(BlueprintPayloads.MaterialsRequest payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
-        context.enqueueWork(() -> BlueprintActions.sendMaterials(player, payload.id(), payload.clipX(), payload.clipY(), payload.clipZ(), payload.placeFluids()));
+        context.enqueueWork(() -> BlueprintActions.sendMaterials(
+                player,
+                payload.id(),
+                payload.clipX(),
+                payload.clipY(),
+                payload.clipZ(),
+                payload.placeFluids(),
+                payload.placeNbt(),
+                payload.placeSettings(),
+                payload.placeAll()));
     }
 
     private static void edit(BlueprintPayloads.BeginEdit payload, IPayloadContext context) {

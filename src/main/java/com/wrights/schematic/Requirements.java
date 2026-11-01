@@ -18,6 +18,7 @@ import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
+import com.wrights.WrightsConfig;
 import com.wrights.util.BlockFilters;
 
 public final class Requirements {
@@ -31,10 +32,30 @@ public final class Requirements {
     }
 
     public static List<Cost> of(Schematic schematic, int clipX, int clipY, int clipZ) {
-        return of(schematic, clipX, clipY, clipZ, true);
+        return of(schematic, clipX, clipY, clipZ, true, true, true, false);
     }
 
     public static List<Cost> of(Schematic schematic, int clipX, int clipY, int clipZ, boolean placeFluids) {
+        return of(schematic, clipX, clipY, clipZ, placeFluids, true, true, false);
+    }
+
+    /**
+     * @param placeNbt include chests / machines / framed blocks (off skips those cells)
+     * @param placeSettings include camo / facade / copycat skins and other settings extras
+     * @param placeAll creative full-NBT also restores skins, so extras are included
+     */
+    public static List<Cost> of(
+            Schematic schematic,
+            int clipX,
+            int clipY,
+            int clipZ,
+            boolean placeFluids,
+            boolean placeNbt,
+            boolean placeSettings,
+            boolean placeAll) {
+        // Match JobManager.willApplyExtras: skins only when Settings/All will actually restore them.
+        boolean settingsExtras = placeSettings && WrightsConfig.copySettings();
+        boolean includeExtras = placeAll || settingsExtras;
         int limitX = clipX <= 0 ? schematic.sizeX() : clipX;
         int limitY = clipY <= 0 ? schematic.sizeY() : clipY;
         int limitZ = clipZ <= 0 ? schematic.sizeZ() : clipZ;
@@ -46,11 +67,20 @@ public final class Requirements {
             if (!placeFluids && BlockFilters.isFluid(entry.state())) {
                 continue;
             }
+            if (!placeNbt && entry.state().hasBlockEntity()) {
+                continue;
+            }
             Item item = BlockFilters.payment(entry.state());
             if (item != null) {
                 counts.merge(item, 1, Integer::sum);
             }
-            // Camo skins and other NBT-held extras (Framed Blocks, …).
+            // Skins only when Settings (or All) will restore NBT — not for empty framed/cable shells.
+            if (!includeExtras) {
+                continue;
+            }
+            if (!placeAll && !WrightsConfig.settingsAllowed(entry.state().getBlock())) {
+                continue;
+            }
             for (Item extra : com.wrights.util.BlockExtras.of(entry)) {
                 counts.merge(extra, 1, Integer::sum);
             }

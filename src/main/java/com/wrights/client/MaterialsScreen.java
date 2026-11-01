@@ -46,16 +46,48 @@ public class MaterialsScreen extends Screen {
     }
 
     public static void request(UUID id, int clipX, int clipY, int clipZ, Screen parent) {
-        request(id, clipX, clipY, clipZ, true, parent);
+        request(
+                id,
+                clipX,
+                clipY,
+                clipZ,
+                WrightsClientConfig.PLACE_FLUIDS.get(),
+                WrightsClientConfig.PLACE_NBT_BLOCKS.get(),
+                WrightsClientState.placeSettingsChosen(),
+                WrightsClientState.placeAllChosen(),
+                parent);
     }
 
     public static void request(UUID id, int clipX, int clipY, int clipZ, boolean placeFluids, Screen parent) {
+        request(
+                id,
+                clipX,
+                clipY,
+                clipZ,
+                placeFluids,
+                WrightsClientConfig.PLACE_NBT_BLOCKS.get(),
+                WrightsClientState.placeSettingsChosen(),
+                WrightsClientState.placeAllChosen(),
+                parent);
+    }
+
+    public static void request(
+            UUID id,
+            int clipX,
+            int clipY,
+            int clipZ,
+            boolean placeFluids,
+            boolean placeNbt,
+            boolean placeSettings,
+            boolean placeAll,
+            Screen parent) {
         if (id == null) {
             return;
         }
         net.minecraft.client.Minecraft minecraft = net.minecraft.client.Minecraft.getInstance();
         minecraft.setScreen(new MaterialsScreen(id, parent));
-        PacketDistributor.sendToServer(new BlueprintPayloads.MaterialsRequest(id, clipX, clipY, clipZ, placeFluids));
+        PacketDistributor.sendToServer(new BlueprintPayloads.MaterialsRequest(
+                id, clipX, clipY, clipZ, placeFluids, placeNbt, placeSettings, placeAll));
     }
 
     public static void show(BlueprintPayloads.Materials payload) {

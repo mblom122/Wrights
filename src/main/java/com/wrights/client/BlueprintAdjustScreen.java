@@ -91,7 +91,8 @@ public class BlueprintAdjustScreen extends Screen {
         int toggles = (WrightsConfig.allowCopyFluids() ? 1 : 0) + 3;
         // Name, side-by-side loc/size, volume, rotate, flip, reset, save.
         int leftNeed = 28 + 16 + 8 + 12 + 54 + 14 + 12 + 16 + 12 + 16 + 20 + 16 + 24 + 18 + 8;
-        int rightChrome = 28 + 8 + toggles * 18 + 8;
+        // Model + Copy options header + toggle rows.
+        int rightChrome = 28 + 8 + 14 + toggles * 18 + 8;
         int modelHWant = Math.min(176, Math.max(modelMin, this.height - 8 - rightChrome));
         int rightNeed = rightChrome + modelHWant;
         panelH = Math.min(this.height - 8, Math.max(leftNeed, rightNeed));
@@ -170,7 +171,8 @@ public class BlueprintAdjustScreen extends Screen {
         modelY = panelY + 28;
         modelW = panelW - pad - (modelX - panelX);
         fluidX = modelX;
-        fluidY = modelY + modelH + 8;
+        // Leave room for the Copy options header + ? above the first toggle.
+        fluidY = modelY + modelH + 22;
         nbtX = modelX;
         nbtY = fluidY + (WrightsConfig.allowCopyFluids() ? 18 : 0);
         settingsX = modelX;
@@ -566,6 +568,12 @@ public class BlueprintAdjustScreen extends Screen {
             }
         } else if (WrightsClientState.cornerA != null && WrightsClientState.cornerB != null) {
             graphics.drawCenteredString(this.font, Component.translatable("message.wrights.copy_empty"), modelX + modelW / 2, modelY + modelH / 2, WrightsUi.MUTED);
+        }
+        int optionsY = (WrightsConfig.allowCopyFluids() ? fluidY : nbtY) - 14;
+        Component options = Component.translatable("screen.wrights.copy_options");
+        graphics.drawString(this.font, options, modelX, optionsY, WrightsUi.BLUE, false);
+        if (WrightsUi.helpMark(graphics, this.font, mouseX, mouseY, modelX + this.font.width(options) + 4, optionsY - 2, "screen.wrights.copy_options_hint")) {
+            helpTip = Component.translatable("screen.wrights.copy_options_hint");
         }
         if (WrightsConfig.allowCopyFluids()) {
             drawToggle(graphics, mouseX, mouseY, fluidX, fluidY, WrightsClientConfig.COPY_FLUIDS.get(), "screen.wrights.copy_fluids", "screen.wrights.copy_fluids_hint", true);

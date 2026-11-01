@@ -974,10 +974,22 @@ public final class BlueprintActions {
     }
 
     public static void sendMaterials(ServerPlayer player, java.util.UUID id, int clipX, int clipY, int clipZ) {
-        sendMaterials(player, id, clipX, clipY, clipZ, true);
+        sendMaterials(player, id, clipX, clipY, clipZ, true, true, true, false);
     }
 
-    public static void sendMaterials(ServerPlayer player, java.util.UUID id, int clipX, int clipY, int clipZ, boolean placeFluids) {
+    public static void sendMaterials(
+            ServerPlayer player,
+            java.util.UUID id,
+            int clipX,
+            int clipY,
+            int clipZ,
+            boolean placeFluids,
+            boolean placeNbt,
+            boolean placeSettings,
+            boolean placeAll) {
+        placeFluids = placeFluids && WrightsConfig.allowPlaceFluids();
+        placeAll = placeAll && WrightsConfig.copyAll();
+        placeSettings = placeSettings && WrightsConfig.copySettings() && !placeAll;
         Schematic schematic = workingCopy(player, id);
         if (schematic == null) {
             schematic = stored(player, id);
@@ -987,7 +999,15 @@ public final class BlueprintActions {
             return;
         }
         BlueprintSessions.BlueprintSession supplySession = BlueprintSessions.get(player);
-        BlueprintNetwork.materials(player, id, false, Requirements.stocked(player, Requirements.of(schematic, clipX, clipY, clipZ, placeFluids), supplySession.supplyPos(), supplySession.supplyDimension()));
+        BlueprintNetwork.materials(
+                player,
+                id,
+                false,
+                Requirements.stocked(
+                        player,
+                        Requirements.of(schematic, clipX, clipY, clipZ, placeFluids, placeNbt, placeSettings, placeAll),
+                        supplySession.supplyPos(),
+                        supplySession.supplyDimension()));
     }
 
     public static void saveSession(ServerPlayer player, boolean placeFluids, boolean voidBlocks, boolean voidFluids, boolean voidNbt, boolean placeNbt, boolean placeSettings, boolean placeAll) {
@@ -1096,6 +1116,8 @@ public final class BlueprintActions {
         voidBlocks = voidBlocks && WrightsConfig.allowVoidBlocks();
         voidFluids = voidFluids && WrightsConfig.allowVoidFluids();
         voidNbt = voidNbt && WrightsConfig.allowVoidNbt();
+        placeAll = placeAll && WrightsConfig.copyAll() && player.getAbilities().instabuild && !player.isSpectator();
+        placeSettings = placeSettings && WrightsConfig.copySettings() && !placeAll;
         if (mirror && !WrightsConfig.allowMirrorBlueprints()) {
             mirror = false;
         }
@@ -1125,7 +1147,8 @@ public final class BlueprintActions {
             return;
         }
         if (!force && !player.getAbilities().instabuild && !player.isSpectator()) {
-            java.util.List<Requirements.Cost> costs = Requirements.of(schematic, sx, sy, sz, placeFluids);
+            java.util.List<Requirements.Cost> costs = Requirements.of(
+                    schematic, sx, sy, sz, placeFluids, placeNbt, placeSettings, placeAll);
             if (mirror) {
                 int times = Mirror.copyCount(mirrorPattern, mirrorAxes);
                 if (times > 1) {
