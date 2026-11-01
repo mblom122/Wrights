@@ -6,9 +6,14 @@ import java.util.List;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
 import com.wrights.WrightsClientConfig;
@@ -36,6 +41,13 @@ final class ShapeMenuPanel {
     private final List<Hit> hits = new ArrayList<>();
     private Component tip;
     private ItemStack hoveredStack = ItemStack.EMPTY;
+    /** Menu preview mesh — kept as one list so {@link BlueprintModelView} can reuse the bake. */
+    private List<WrightsClientState.Ghost> previewGhosts = List.of();
+    private int previewSizeX = 1;
+    private int previewSizeY = 1;
+    private int previewSizeZ = 1;
+    private long previewKey = Long.MIN_VALUE;
+    private float previewYaw = 35.0F;
 
     ShapeMenuPanel(Font font) {
         this.font = font;
@@ -331,15 +343,20 @@ final class ShapeMenuPanel {
         y += 12;
         int gap = 4;
         int cols = 3;
-        int cardW = Math.max(48, (width - gap * (cols - 1)) / cols);
+        int rows = 3;
+        int rowH = 26;
+        int previewGap = 8;
+        // Half the row for the 9 kind buttons; the other half hosts a spinning preview.
+        int gridW = Math.max(72, (width - previewGap) / 2);
+        int cardW = Math.max(36, (gridW - gap * (cols - 1)) / cols);
         int kind = WrightsClientConfig.SHAPE_KIND.get();
         Shapes.Kind[] all = Shapes.Kind.values();
         for (int i = 0; i < all.length; i++) {
             int col = i % cols;
             int row = i / cols;
             int cx = x + col * (cardW + gap);
-            int cy = y + row * 26;
-            int cw = col == cols - 1 ? x + width - cx : cardW;
+            int cy = y + row * rowH;
+            int cw = col == cols - 1 ? x + gridW - cx : cardW;
             boolean on = kind == i;
             boolean hover = mouseX >= cx && mouseX < cx + cw && mouseY >= cy && mouseY < cy + 22;
             WrightsUi.choice(graphics, cx, cy, cw, 22, on, hover);
@@ -347,7 +364,97 @@ final class ShapeMenuPanel {
             graphics.drawString(font, label, cx + 5, cy + 7, on ? WrightsUi.TEXT : WrightsUi.MUTED, false);
             hits.add(new Hit(cx, cy, cw, 22, "kind", i));
         }
-        return y + ((all.length + cols - 1) / cols) * 26;
+        int gridH = rows * rowH;
+        int previewX = x + gridW + previewGap;
+        int previewW = Math.max(40, x + width - previewX);
+        drawShapePreview(graphics, previewX, y, previewW, gridH);
+        return y + gridH;
+    }
+
+    private void drawShapePreview(GuiGraphics graphics, int x, int y, int width, int height) {
+        graphics.fill(x, y, x + width, y + height, 0xFF101820);
+        WrightsUi.border(graphics, x, y, width, height, 0xFF31404E);
+        refreshShapePreview();
+        if (previewGhosts.isEmpty()) {
+            graphics.drawCenteredString(font, Component.translatable("screen.wrights.preview_hidden"), x + width / 2, y + height / 2 - 4, WrightsUi.MUTED);
+            return;
+        }
+        previewYaw += 0.35F;
+        BlueprintModelView.render(graphics, x + 1, y + 1, width - 2, height - 2, previewGhosts, previewSizeX, previewSizeY, previewSizeZ, previewYaw, 28.0F);
+    }
+
+    private void refreshShapePreview() {
+        Shapes.Kind kind = Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
+        // Cap the menu sample so huge sizes stay cheap to bake and spin.
+        int size = Math.min(10, WrightsClientConfig.SHAPE_SIZE.get());
+        int height = Math.min(10, WrightsClientConfig.SHAPE_HEIGHT.get());
+        boolean hollow = WrightsClientConfig.SHAPE_HOLLOW.get();
+        int plane = WrightsClientConfig.SHAPE_PLANE.get();
+        BlockState fill = previewFill();
+        long key = (((long) kind.ordinal() & 0xF) << 48)
+                | (((long) size & 0x3F) << 42)
+                | (((long) height & 0x3F) << 36)
+                | (((long) plane & 0x3) << 34)
+                | ((hollow ? 1L : 0L) << 33)
+                | (Integer.toUnsignedLong(Block.getId(fill)) & 0x1FFFFFFFFL);
+        if (key == previewKey) {
+            return;
+        }
+        previewKey = key;
+        List<BlockPos> worlds = Shapes.blocks(kind, BlockPos.ZERO, size, height, hollow, plane);
+        if (worlds.isEmpty()) {
+            previewGhosts = List.of();
+            previewSizeX = previewSizeY = previewSizeZ = 1;
+            return;
+        }
+        if (worlds.size() > WrightsConfig.maxPreviewBlocks()) {
+            previewGhosts = List.of();
+            BlockPos origin = Shapes.origin(worlds);
+            int maxX = 0;
+            int maxY = 0;
+            int maxZ = 0;
+            for (BlockPos pos : worlds) {
+                maxX = Math.max(maxX, pos.getX() - origin.getX());
+                maxY = Math.max(maxY, pos.getY() - origin.getY());
+                maxZ = Math.max(maxZ, pos.getZ() - origin.getZ());
+            }
+            previewSizeX = maxX + 1;
+            previewSizeY = maxY + 1;
+            previewSizeZ = maxZ + 1;
+            return;
+        }
+        BlockPos origin = Shapes.origin(worlds);
+        int maxX = 0;
+        int maxY = 0;
+        int maxZ = 0;
+        int stateId = Block.getId(fill);
+        List<WrightsClientState.Ghost> ghosts = new ArrayList<>(worlds.size());
+        for (BlockPos pos : worlds) {
+            int lx = pos.getX() - origin.getX();
+            int ly = pos.getY() - origin.getY();
+            int lz = pos.getZ() - origin.getZ();
+            maxX = Math.max(maxX, lx);
+            maxY = Math.max(maxY, ly);
+            maxZ = Math.max(maxZ, lz);
+            ghosts.add(new WrightsClientState.Ghost(lx, ly, lz, 1.0F, 1.0F, 1.0F, stateId));
+        }
+        previewGhosts = List.copyOf(ghosts);
+        previewSizeX = maxX + 1;
+        previewSizeY = maxY + 1;
+        previewSizeZ = maxZ + 1;
+    }
+
+    private BlockState previewFill() {
+        List<ShapeMaterials.Entry> materials = WrightsClientConfig.shapeMaterials();
+        Item item;
+        if (materials.isEmpty()) {
+            item = Items.STONE;
+        } else {
+            int index = Mth.clamp(selectedMaterial, 0, materials.size() - 1);
+            item = materials.get(index).item();
+        }
+        BlockState state = Block.byItem(item).defaultBlockState();
+        return state.isAir() ? Blocks.STONE.defaultBlockState() : state;
     }
 
     private int drawPriority(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width) {
