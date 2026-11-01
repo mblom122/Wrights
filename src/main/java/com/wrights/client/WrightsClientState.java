@@ -1088,10 +1088,13 @@ public final class WrightsClientState {
         cornerA = null;
         cornerB = null;
         clearCapturePreview();
-        // A chosen blueprint is placed from Use template. Bind inventory is a separate tool.
+        // Menu Build always means Use template — leave Shape / Mirror / Bind inventory.
+        mirrorAim = false;
+        shapeAim = false;
         bindSupply = false;
         bindFromMenu = false;
         restorePlacementPending = true;
+        rememberMode();
         updateFlags();
     }
 
@@ -1248,9 +1251,9 @@ public final class WrightsClientState {
             boolean wasBuild = mode == Mode.BUILD;
             boolean same = wasBuild && payload.id().equals(buildId);
             boolean sizeChanged = fullX != editX || fullY != editY || fullZ != editZ;
-            // Saving a new template and choosing Build arrives here while still capturing.
-            // Keep an in-progress Bind inventory selection, which is already in build mode.
-            if (!wasBuild) {
+            // Hotbar / style-wheel entry restores last Shape/Mirror/Bind tool.
+            // Explicit menu Build (armBuild) already chose Use template via restorePlacementPending.
+            if (!wasBuild && !restorePlacementPending) {
                 applyLastBuildTool();
             }
             mode = Mode.BUILD;
