@@ -102,7 +102,7 @@ public class PersonalWrightportRenderer implements ICurioRenderer {
             return false;
         }
         Vec3 dock = behindClient(entity);
-        AABB box = new AABB(dock.x - 5.0D, dock.y - 1.5D, dock.z - 5.0D, dock.x + 5.0D, dock.y + 11.0D, dock.z + 5.0D);
+        AABB box = new AABB(dock.x - 5.0D, dock.y - 1.5D, dock.z - 5.0D, dock.x + 5.0D, dock.y + 56.0D, dock.z + 5.0D);
         return !entity.level().getEntitiesOfClass(DroneEntity.class, box, drone -> drone.isAlive()).isEmpty()
                 || PersonalPortFx.doorHold() > 0;
     }
