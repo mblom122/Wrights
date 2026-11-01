@@ -64,6 +64,9 @@ public final class BuildJob {
     private UUID droneId;
     private final List<Hand> hands = new ArrayList<>();
     private final List<UUID> crewUnits = new ArrayList<>();
+    /** Snapshot for Jobs UI after hands clear: 0 unknown, 1 you, 2 port, 3 both. */
+    private int crewSource;
+    private BlockPos crewSourcePort;
     private int spanX = 1;
     private int spanY = 1;
     private int spanZ = 1;
@@ -317,6 +320,39 @@ public final class BuildJob {
             hand.speed = com.wrights.drone.WrightTier.clamp(speeds.get(i));
             hands.add(hand);
         }
+        refreshCrewSource();
+    }
+
+    /** 0 unknown, 1 from you, 2 from Wrightport, 3 both — kept after hands clear for the Jobs card. */
+    public int crewSource() {
+        return crewSource;
+    }
+
+    public BlockPos crewSourcePort() {
+        return crewSourcePort == null ? BlockPos.ZERO : crewSourcePort;
+    }
+
+    public void refreshCrewSource() {
+        if (hands.isEmpty()) {
+            return;
+        }
+        boolean you = false;
+        boolean port = false;
+        BlockPos firstPort = null;
+        for (Hand hand : hands) {
+            if (hand.homePort == null) {
+                you = true;
+            } else {
+                port = true;
+                if (firstPort == null) {
+                    firstPort = hand.homePort;
+                }
+            }
+        }
+        crewSource = you && port ? 3 : port ? 2 : you ? 1 : 0;
+        if (firstPort != null) {
+            crewSourcePort = firstPort.immutable();
+        }
     }
 
     public boolean awaitingDrones() {
@@ -358,6 +394,7 @@ public final class BuildJob {
     }
 
     public void clearAssigned() {
+        refreshCrewSource();
         hands.clear();
         crewUnits.clear();
         awaitDrones = true;
@@ -392,6 +429,7 @@ public final class BuildJob {
         hands.clear();
         hands.addAll(next);
         awaitDrones = false;
+        refreshCrewSource();
         return dropped;
     }
 
@@ -1046,6 +1084,7 @@ public final class BuildJob {
     }
 
     public void markFinished(int order, boolean stopped) {
+        refreshCrewSource();
         finished = true;
         this.stopped = stopped;
         if (stopped) {
@@ -1266,6 +1305,12 @@ public final class BuildJob {
         tag.putBoolean("stopped", stopped);
         tag.putBoolean("undone", undone);
         tag.putBoolean("undoing", undoing);
+        if (crewSource != 0) {
+            tag.putInt("crewSource", crewSource);
+        }
+        if (crewSourcePort != null && !crewSourcePort.equals(BlockPos.ZERO)) {
+            tag.put("crewSourcePort", NbtUtils.writeBlockPos(crewSourcePort));
+        }
         tag.putInt("historyOrder", historyOrder);
         tag.putInt("undoTotal", undoTotal);
         tag.putInt("returned", returned);
@@ -1461,6 +1506,15 @@ public final class BuildJob {
         job.stopped = tag.getBoolean("stopped");
         job.undone = tag.getBoolean("undone");
         job.undoing = tag.getBoolean("undoing");
+        if (tag.contains("crewSource")) {
+            job.crewSource = tag.getInt("crewSource");
+        }
+        if (tag.contains("crewSourcePort")) {
+            job.crewSourcePort = NbtUtils.readBlockPos(tag, "crewSourcePort").orElse(null);
+        }
+        if (job.crewSource == 0) {
+            job.refreshCrewSource();
+        }
         job.historyOrder = tag.getInt("historyOrder");
         job.undoTotal = tag.getInt("undoTotal");
         job.returned = tag.getInt("returned");

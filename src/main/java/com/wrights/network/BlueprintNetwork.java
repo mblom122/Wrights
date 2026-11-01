@@ -864,22 +864,15 @@ public final class BlueprintNetwork {
     }
 
     private static int jobSource(BuildJob job) {
-        boolean you = false;
-        boolean port = false;
-        for (BuildJob.Hand hand : job.hands()) {
-            if (hand.homePort == null) {
-                you = true;
-            } else {
-                port = true;
-            }
+        if (!job.hands().isEmpty()) {
+            job.refreshCrewSource();
         }
-        if (you && port) {
-            return 3;
+        int source = job.crewSource();
+        // Older finished jobs cleared hands before we snapshot — treat unknown as from you.
+        if (source == 0 && job.finished()) {
+            return 1;
         }
-        if (port) {
-            return 2;
-        }
-        return you ? 1 : 0;
+        return source;
     }
 
     private static String jobSourceName(ServerPlayer player, BuildJob job) {
@@ -900,7 +893,7 @@ public final class BlueprintNetwork {
                 return hand.homePort;
             }
         }
-        return BlockPos.ZERO;
+        return job.crewSourcePort();
     }
 
     private static boolean labelPort(ServerPlayer player, BuildJob job) {

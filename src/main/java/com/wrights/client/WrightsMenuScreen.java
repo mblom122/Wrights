@@ -3268,7 +3268,9 @@ public class WrightsMenuScreen extends Screen {
     private static final int ACT_MARK = -2;
     private static final int ACT_MANAGE_ALL = -3;
     private static final int ACT_CLEAR_MARKS = -4;
-    private int jobStride = JOB_BODY + JOB_CREW + JOB_BUTTON + 6;
+    /** Working rows keep a crew line; finished rows skip it so action buttons fit. */
+    private int workStride = JOB_BODY + JOB_CREW + JOB_BUTTON + 6;
+    private int doneStride = JOB_BODY + JOB_BUTTON + 6;
 
     /** Bottom of the full-width page card, with room for Close inside it. */
     private int wideCardBottom() {
@@ -3390,20 +3392,24 @@ public class WrightsMenuScreen extends Screen {
         boolean workOpen = !workingJobs.isEmpty();
         boolean doneOpen = !finishedJobs.isEmpty();
         // Probe with full width, then reserve an outer scrollbar gutter when both groups need room.
-        jobStride = JOB_BODY + JOB_CREW + actionLines(Math.max(80, jobW - 8)) * JOB_BUTTON + 6;
-        int workCap = Math.max(1, Math.min(3, Math.max(1, (jobsViewH - gap - JOB_GROUP_MIN) / Math.max(1, jobStride))));
-        int doneCap = workOpen ? workCap : Math.max(1, Math.min(4, Math.max(1, (jobsViewH - gap - JOB_GROUP_MIN) / Math.max(1, jobStride))));
+        int probeW = Math.max(80, jobW - 8);
+        workStride = JOB_BODY + JOB_CREW + buttonLines(workingKeys(), probeW) * JOB_BUTTON + 6;
+        doneStride = JOB_BODY + buttonLines(finishedKeys(), probeW) * JOB_BUTTON + 6;
+        int workCap = Math.max(1, Math.min(3, Math.max(1, (jobsViewH - gap - JOB_GROUP_MIN) / Math.max(1, workStride))));
+        int doneCap = workOpen ? workCap : Math.max(1, Math.min(4, Math.max(1, (jobsViewH - gap - JOB_GROUP_MIN) / Math.max(1, doneStride))));
         workRows = workOpen ? Math.min(workingJobs.size(), workCap) : 0;
         doneRows = doneOpen ? Math.min(finishedJobs.size(), doneCap) : 0;
-        int workBlock = jobGroupHeight(workRows);
-        int doneBlock = jobGroupHeight(doneRows);
+        int workBlock = jobGroupHeight(workRows, workStride);
+        int doneBlock = jobGroupHeight(doneRows, doneStride);
         jobsContentH = workBlock + gap + doneBlock;
         jobsOuterGutter = jobsContentH > jobsViewH ? 8 : 0;
         jobsPanelW = jobW - jobsOuterGutter;
         if (jobsOuterGutter > 0) {
-            jobStride = JOB_BODY + JOB_CREW + actionLines(Math.max(80, jobsPanelW - 8)) * JOB_BUTTON + 6;
-            workBlock = jobGroupHeight(workRows);
-            doneBlock = jobGroupHeight(doneRows);
+            int tightW = Math.max(80, jobsPanelW - 8);
+            workStride = JOB_BODY + JOB_CREW + buttonLines(workingKeys(), tightW) * JOB_BUTTON + 6;
+            doneStride = JOB_BODY + buttonLines(finishedKeys(), tightW) * JOB_BUTTON + 6;
+            workBlock = jobGroupHeight(workRows, workStride);
+            doneBlock = jobGroupHeight(doneRows, doneStride);
             jobsContentH = workBlock + gap + doneBlock;
         }
         jobsBodyScroll = Mth.clamp(jobsBodyScroll, 0, Math.max(0, jobsContentH - jobsViewH));
@@ -3438,11 +3444,15 @@ public class WrightsMenuScreen extends Screen {
         clearJobRight = manageAllRight - manageAllWidth - 4;
     }
 
-    private int jobGroupHeight(int rows) {
+    private int jobGroupHeight(int rows, int stride) {
         if (rows <= 0) {
             return JOB_GROUP_MIN;
         }
-        return JOB_HEADER + 8 + rows * jobStride;
+        return JOB_HEADER + 8 + rows * stride;
+    }
+
+    private int jobStride(BlueprintPayloads.JobLine job) {
+        return job != null && job.finished() ? doneStride : workStride;
     }
 
     private int jobButtonWidth(String key) {
@@ -3489,12 +3499,12 @@ public class WrightsMenuScreen extends Screen {
             if (workClipBottom > workClipTop) {
                 graphics.enableScissor(jobX + 2, workClipTop, jobX + jobsPanelW - 2 - workGutter, workClipBottom);
                 for (int row = 0; row < workRows && jobScroll + row < workingJobs.size(); row++) {
-                    drawJobRow(graphics, mouseX, mouseY, rowX, jobsPanelW - 8 - workGutter, workListY + row * jobStride, workingJobs.get(jobScroll + row));
+                    drawJobRow(graphics, mouseX, mouseY, rowX, jobsPanelW - 8 - workGutter, workListY + row * workStride, workingJobs.get(jobScroll + row));
                 }
                 graphics.disableScissor();
-                int workBarH = Math.max(12, Math.min(workRows * jobStride, workClipBottom - Math.max(workListY, jobsViewTop)));
+                int workBarH = Math.max(12, Math.min(workRows * workStride, workClipBottom - Math.max(workListY, jobsViewTop)));
                 if (workListY < jobsViewTop + jobsViewH && workClipBottom > jobsViewTop) {
-                    drawJobBar(graphics, workListY, Math.max(workBarH, workRows * jobStride), jobScroll, workingJobs.size(), Math.max(1, workRows), mouseX, mouseY);
+                    drawJobBar(graphics, workListY, Math.max(workBarH, workRows * workStride), jobScroll, workingJobs.size(), Math.max(1, workRows), mouseX, mouseY);
                 }
             }
         }
@@ -3508,12 +3518,12 @@ public class WrightsMenuScreen extends Screen {
             if (doneClipBottom > doneClipTop) {
                 graphics.enableScissor(jobX + 2, doneClipTop, jobX + jobsPanelW - 2 - doneGutter, doneClipBottom);
                 for (int row = 0; row < doneRows && historyScroll + row < finishedJobs.size(); row++) {
-                    drawJobRow(graphics, mouseX, mouseY, rowX, jobsPanelW - 8 - doneGutter, doneListY + row * jobStride, finishedJobs.get(historyScroll + row));
+                    drawJobRow(graphics, mouseX, mouseY, rowX, jobsPanelW - 8 - doneGutter, doneListY + row * doneStride, finishedJobs.get(historyScroll + row));
                 }
                 graphics.disableScissor();
-                int doneBarH = Math.max(12, Math.min(doneRows * jobStride, doneClipBottom - Math.max(doneListY, jobsViewTop)));
+                int doneBarH = Math.max(12, Math.min(doneRows * doneStride, doneClipBottom - Math.max(doneListY, jobsViewTop)));
                 if (doneListY < jobsViewTop + jobsViewH && doneClipBottom > jobsViewTop) {
-                    drawJobBar(graphics, doneListY, Math.max(doneBarH, doneRows * jobStride), historyScroll, finishedJobs.size(), Math.max(1, doneRows), mouseX, mouseY);
+                    drawJobBar(graphics, doneListY, Math.max(doneBarH, doneRows * doneStride), historyScroll, finishedJobs.size(), Math.max(1, doneRows), mouseX, mouseY);
                 }
             }
         }
@@ -3567,15 +3577,16 @@ public class WrightsMenuScreen extends Screen {
         int visible = working ? workRows : doneRows;
         int scroll = working ? jobScroll : historyScroll;
         int top = working ? workListY : doneListY;
-        JobBar bar = jobBar(top, visible * jobStride, scroll, total, visible);
-        if (bar == null || mouseX < bar.x() || mouseX >= bar.x() + 12 || mouseY < top || mouseY >= top + visible * jobStride) {
+        int stride = working ? workStride : doneStride;
+        JobBar bar = jobBar(top, visible * stride, scroll, total, visible);
+        if (bar == null || mouseX < bar.x() || mouseX >= bar.x() + 12 || mouseY < top || mouseY >= top + visible * stride) {
             return false;
         }
         if (mouseY < top + 12) {
             setJobScroll(working, scroll - 1);
             return true;
         }
-        int downTop = top + visible * jobStride - 12;
+        int downTop = top + visible * stride - 12;
         if (mouseY >= downTop) {
             setJobScroll(working, scroll + 1);
             return true;
@@ -3596,7 +3607,8 @@ public class WrightsMenuScreen extends Screen {
         int visible = working ? workRows : doneRows;
         int scroll = working ? jobScroll : historyScroll;
         int top = working ? workListY : doneListY;
-        JobBar bar = jobBar(top, visible * jobStride, scroll, total, visible);
+        int stride = working ? workStride : doneStride;
+        JobBar bar = jobBar(top, visible * stride, scroll, total, visible);
         if (bar == null) {
             return;
         }
@@ -3630,7 +3642,8 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private void drawJobRow(GuiGraphics graphics, int mouseX, int mouseY, int x, int width, int y, BlueprintPayloads.JobLine job) {
-        int rowH = jobStride - 4;
+        int stride = jobStride(job);
+        int rowH = stride - 4;
         boolean hover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + rowH;
         hoveredJob = hover ? job : hoveredJob;
         graphics.fill(x, y, x + width, y + rowH, hover ? WrightsUi.CARD_HOVER : WrightsUi.SHADE);
@@ -3777,7 +3790,8 @@ public class WrightsMenuScreen extends Screen {
         buttons.add(new RowButton(0, 0, 0, BlueprintPayloads.JobControl.REMOVE, "menu.wrights.remove", 0));
         int limit = x + width - 4;
         int cursor = x + 6;
-        int lineY = y + JOB_BODY + JOB_CREW;
+        // Finished cards skip the crew line so Redo/Undo/Highlight stay on-screen.
+        int lineY = y + JOB_BODY + (job.finished() || job.saving() ? 0 : JOB_CREW);
         List<RowButton> placed = new ArrayList<>(buttons.size());
         for (RowButton button : buttons) {
             int buttonW = jobButtonWidth(button.key());
@@ -3853,7 +3867,8 @@ public class WrightsMenuScreen extends Screen {
                     : (coords
                             ? Component.translatable("menu.wrights.job_from_both_at", at.getX(), at.getY(), at.getZ())
                             : Component.translatable("menu.wrights.job_from_both"));
-            default -> Component.empty();
+            // Finished jobs used to drop crew before we snapshoted source — show From you.
+            default -> job.finished() ? Component.translatable("menu.wrights.job_from_you") : Component.empty();
         };
     }
 
@@ -4023,7 +4038,7 @@ public class WrightsMenuScreen extends Screen {
             int workGutter = workingJobs.size() > workRows ? 16 : 0;
             for (int row = 0; row < workRows && jobScroll + row < workingJobs.size(); row++) {
                 BlueprintPayloads.JobLine job = workingJobs.get(jobScroll + row);
-                for (RowButton button : rowButtons(job, rowX, workListY + row * jobStride, jobsPanelW - 8 - workGutter)) {
+                for (RowButton button : rowButtons(job, rowX, workListY + row * workStride, jobsPanelW - 8 - workGutter)) {
                     jobHits.add(new JobHit(button.x(), button.y(), button.width(), 16, job.id(), button.action()));
                 }
             }
@@ -4034,7 +4049,7 @@ public class WrightsMenuScreen extends Screen {
             int doneGutter = finishedJobs.size() > doneRows ? 16 : 0;
             for (int row = 0; row < doneRows && historyScroll + row < finishedJobs.size(); row++) {
                 BlueprintPayloads.JobLine job = finishedJobs.get(historyScroll + row);
-                for (RowButton button : rowButtons(job, rowX, doneListY + row * jobStride, jobsPanelW - 8 - doneGutter)) {
+                for (RowButton button : rowButtons(job, rowX, doneListY + row * doneStride, jobsPanelW - 8 - doneGutter)) {
                     jobHits.add(new JobHit(button.x(), button.y(), button.width(), 16, job.id(), button.action()));
                 }
             }
