@@ -55,7 +55,7 @@ public class ShapeAnchorScreen extends Screen {
     @Override
     protected void init() {
         panelW = WrightsUi.fitW(360, this.width);
-        panelH = WrightsUi.fitH(260, this.height);
+        panelH = WrightsUi.fitH(280, this.height);
         panelX = WrightsUi.centerX(panelW, this.width);
         panelY = WrightsUi.centerY(panelH, this.height);
         if (WrightsClientConfig.SHAPE_SET.get()) {
@@ -80,10 +80,11 @@ public class ShapeAnchorScreen extends Screen {
         set(yBox, start.getY());
         set(zBox, start.getZ());
         suppress = false;
-        int btnW = (panelW - 40) / 2;
-        addRenderableWidget(new WrightsButton(panelX + 16, panelY + 116, btnW, 18,
+        // Stack Under me / Look in the left column so Look is not drawn under the preview.
+        int leftW = Math.max(96, panelW / 2 - 24);
+        addRenderableWidget(new WrightsButton(panelX + 16, panelY + 116, leftW, 18,
                 Component.translatable("screen.wrights.shape_anchor_here"), button -> usePlayer()));
-        addRenderableWidget(new WrightsButton(panelX + 24 + btnW, panelY + 116, btnW, 18,
+        addRenderableWidget(new WrightsButton(panelX + 16, panelY + 138, leftW, 18,
                 Component.translatable("screen.wrights.shape_anchor_look"), button -> useLook()));
         addRenderableWidget(new WrightsButton(panelX + 16, panelY + panelH - 36, panelW - 100, 20,
                 Component.translatable("screen.wrights.done"), button -> saveAndClose()));
@@ -117,11 +118,11 @@ public class ShapeAnchorScreen extends Screen {
         String dim = dimension == null || dimension.isBlank() ? "-" : shortDim(dimension);
         graphics.drawString(this.font, this.font.plainSubstrByWidth(
                 Component.translatable("screen.wrights.shape_anchor_dim", dim).getString(), panelW / 2 - 24),
-                panelX + 16, panelY + 142, WrightsUi.MUTED, false);
+                panelX + 16, panelY + 162, WrightsUi.MUTED, false);
         previewLeft = panelX + panelW / 2 + 8;
         previewTop = panelY + 48;
         previewWidth = panelW / 2 - 24;
-        previewHeight = panelH - 100;
+        previewHeight = Math.max(72, panelH - 100);
         graphics.fill(previewLeft, previewTop, previewLeft + previewWidth, previewTop + previewHeight, 0xFF101820);
         WrightsUi.border(graphics, previewLeft, previewTop, previewWidth, previewHeight, 0xFF31404E);
         if (!sameWorld()) {
