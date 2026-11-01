@@ -162,6 +162,13 @@ public final class WrightsClientConfig {
             .defineInRange("hudToastX", 900, 0, 1000);
     public static final ModConfigSpec.IntValue HUD_TOAST_Y = BUILDER
             .defineInRange("hudToastY", 80, 0, 1000);
+    public static final ModConfigSpec.IntValue HUD_MODE = BUILDER
+            .comment("Where Ctrl/Shift mode menus sit. 0 top, 1 above hotbar, 2 left, 3 right (default, above hotbar), 4 middle, 5 dragged.")
+            .defineInRange("hudMode", 3, 0, 5);
+    public static final ModConfigSpec.IntValue HUD_MODE_X = BUILDER
+            .defineInRange("hudModeX", 900, 0, 1000);
+    public static final ModConfigSpec.IntValue HUD_MODE_Y = BUILDER
+            .defineInRange("hudModeY", 720, 0, 1000);
     public static final ModConfigSpec.BooleanValue MIRROR_ON = BUILDER
             .comment("When true, a placed blueprint also starts the mirrored copies.")
             .define("mirrorOn", true);
@@ -488,6 +495,17 @@ public final class WrightsClientConfig {
         (hint ? HUD_HINT : HUD_TOAST).set(5);
         (hint ? HUD_HINT_X : HUD_TOAST_X).set(clamp(x, 0, 1000));
         (hint ? HUD_HINT_Y : HUD_TOAST_Y).set(clamp(y, 0, 1000));
+    }
+
+    public static void setHudModeSpot(int spot) {
+        HUD_MODE.set(clamp(spot, 0, 5));
+        save();
+    }
+
+    public static void setHudModeCustom(int x, int y) {
+        HUD_MODE.set(5);
+        HUD_MODE_X.set(clamp(x, 0, 1000));
+        HUD_MODE_Y.set(clamp(y, 0, 1000));
     }
 
     public static int deployTarget(int freeDrones, int blocks) {

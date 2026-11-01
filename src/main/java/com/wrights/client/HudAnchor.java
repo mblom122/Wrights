@@ -62,6 +62,26 @@ public final class HudAnchor {
         return y(toastSpot(), WrightsClientConfig.HUD_TOAST_Y.get(), screen, size);
     }
 
+    public static int modeSpot() {
+        return Mth.clamp(WrightsClientConfig.HUD_MODE.get(), TOP, CUSTOM);
+    }
+
+    public static int modeX(int screen, int size) {
+        return x(modeSpot(), WrightsClientConfig.HUD_MODE_X.get(), screen, size);
+    }
+
+    /**
+     * Left/right sit above the hotbar on that side so Shift/Ctrl menus clear the action bar.
+     * Other spots match hint/toast placement.
+     */
+    public static int modeY(int screen, int size) {
+        int spot = modeSpot();
+        if (spot == LEFT || spot == RIGHT) {
+            return Mth.clamp(screen - HOTBAR_CLEARANCE - size, 2, Math.max(2, screen - size - 2));
+        }
+        return y(spot, WrightsClientConfig.HUD_MODE_Y.get(), screen, size);
+    }
+
     public static int fraction(int center, int screen) {
         if (screen <= 0) {
             return 500;

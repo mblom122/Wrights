@@ -268,8 +268,8 @@ public final class WrightsHud {
         int tipLines = Math.max(1, minecraft.font.split(tip, textWidth).size());
         int howLines = Math.max(1, minecraft.font.split(how, textWidth).size());
         int height = 28 + 18 * 2 + 8 + tipLines * 10 + 8 + howLines * 10;
-        int x = (graphics.guiWidth() - width) / 2;
-        int y = graphics.guiHeight() / 2 + 8;
+        int x = HudAnchor.modeX(graphics.guiWidth(), width);
+        int y = HudAnchor.modeY(graphics.guiHeight(), height);
         WrightsUi.panel(graphics, x, y, width, height);
         graphics.drawString(minecraft.font, title, x + 12, y + 8, WrightsUi.TEXT, false);
         graphics.fill(x + 8, y + 21, x + width - 8, y + 35, 0xA0C47A3A);
@@ -333,8 +333,8 @@ public final class WrightsHud {
         int undoHeight = footerHeight(minecraft, undo, textWidth);
         int footer = howHeight + undoHeight;
         int height = 28 + row * 5 + footer;
-        int x = (graphics.guiWidth() - width) / 2;
-        int y = graphics.guiHeight() / 2 + 8;
+        int x = HudAnchor.modeX(graphics.guiWidth(), width);
+        int y = HudAnchor.modeY(graphics.guiHeight(), height);
         WrightsUi.panel(graphics, x, y, width, height);
         graphics.drawString(minecraft.font, title, x + 12, y + 8, WrightsUi.TEXT, false);
         boolean building = WrightsClientState.mode == WrightsClientState.Mode.BUILD
@@ -430,8 +430,8 @@ public final class WrightsHud {
         int textWidth = width - 24;
         int footer = footerHeight(minecraft, how, textWidth);
         int height = 28 + row * rows + footer;
-        int x = (graphics.guiWidth() - width) / 2;
-        int y = graphics.guiHeight() / 2 + 8;
+        int x = HudAnchor.modeX(graphics.guiWidth(), width);
+        int y = HudAnchor.modeY(graphics.guiHeight(), height);
         WrightsUi.panel(graphics, x, y, width, height);
         graphics.drawString(minecraft.font, title, x + 12, y + 8, WrightsUi.TEXT, false);
         boolean building = WrightsClientState.mode == WrightsClientState.Mode.BUILD;
@@ -749,6 +749,27 @@ public final class WrightsHud {
                 minecraft.font.width(Component.translatable("hud.wrights.job_finished")) + 30,
                 Math.max(minecraft.font.width(name), Math.max(minecraft.font.width(detail),
                         minecraft.font.width(Component.translatable("hud.wrights.job_time", "12s")))) + 18));
+    }
+
+    static int sampleModeMenuWidth(Minecraft minecraft) {
+        return Math.max(188, minecraft.font.width(Component.translatable("hud.wrights.build_modes")) + 28);
+    }
+
+    static int sampleModeMenuHeight(Minecraft minecraft) {
+        return 28 + 18 * 6 + 28;
+    }
+
+    static void drawSampleModeMenu(GuiGraphics graphics, Minecraft minecraft, int x, int y, int width, int height) {
+        Component title = Component.translatable("hud.wrights.build_modes");
+        Component use = Component.translatable("hud.wrights.tool_build");
+        Component fresh = Component.translatable("hud.wrights.tool_new");
+        Component selected = Component.translatable("hud.wrights.mode_selected");
+        Component how = Component.translatable("hud.wrights.mode_how");
+        WrightsUi.panel(graphics, x, y, width, height);
+        graphics.drawString(minecraft.font, title, x + 12, y + 8, WrightsUi.TEXT, false);
+        drawToolRow(graphics, minecraft, x, y + 24, width, true, fresh, selected);
+        drawToolRow(graphics, minecraft, x, y + 42, width, false, use, selected);
+        drawFooter(graphics, minecraft, how, x + 12, y + height - 20, width - 24, WrightsUi.MUTED);
     }
 
     private static boolean hasDetail(WrightsClientState.JobNotice notice) {

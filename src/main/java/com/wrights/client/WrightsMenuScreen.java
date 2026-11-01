@@ -268,6 +268,9 @@ public class WrightsMenuScreen extends Screen {
     private int hudPlaceX;
     private int hudPlaceY;
     private int hudPlaceW;
+    private int modePlaceX;
+    private int modePlaceY;
+    private int modePlaceW;
     private final List<HelpSpot> optionHelps = new ArrayList<>();
     private Component optionTip;
     private EditBox wallPercent;
@@ -1287,9 +1290,20 @@ public class WrightsMenuScreen extends Screen {
         messageHeadY = optionY(local);
         local += 18;
         Component moveMessages = Component.translatable("menu.wrights.hud_place");
+        Component moveModes = Component.translatable("menu.wrights.mode_place");
         hudPlaceW = Math.max(120, this.font.width(moveMessages) + 16);
+        modePlaceW = Math.max(120, this.font.width(moveModes) + 16);
         hudPlaceX = x;
         hudPlaceY = optionY(local);
+        // Leave room for the ? help between the two buttons when they share a row.
+        modePlaceX = x + hudPlaceW + 18;
+        if (modePlaceX + modePlaceW > optionViewX + optionViewW - 16) {
+            modePlaceX = x;
+            modePlaceY = optionY(local + 20);
+            local += 20;
+        } else {
+            modePlaceY = hudPlaceY;
+        }
         swatchX = controls;
         optionContentH = local + 28;
         int maxScroll = Math.max(0, optionContentH - optionViewH);
@@ -1451,7 +1465,10 @@ public class WrightsMenuScreen extends Screen {
         drawOptionSection(graphics, x, messageHeadY, "menu.wrights.section_messages", lineEnd);
         WrightsUi.choice(graphics, hudPlaceX, hudPlaceY, hudPlaceW, 16, true, false);
         graphics.drawCenteredString(this.font, Component.translatable("menu.wrights.hud_place"), hudPlaceX + hudPlaceW / 2, hudPlaceY + 4, WrightsUi.TEXT);
-        drawOptionHelp(graphics, mouseX, mouseY, hudPlaceX + hudPlaceW + 2, hudPlaceY + 4, Component.empty(), 0, 0, Component.translatable("menu.wrights.hud_place_hint"));
+        drawOptionHelp(graphics, mouseX, mouseY, hudPlaceX + hudPlaceW + 2, hudPlaceY + 2, Component.empty(), 0, 0, Component.translatable("menu.wrights.hud_place_hint"));
+        WrightsUi.choice(graphics, modePlaceX, modePlaceY, modePlaceW, 16, true, false);
+        graphics.drawCenteredString(this.font, Component.translatable("menu.wrights.mode_place"), modePlaceX + modePlaceW / 2, modePlaceY + 4, WrightsUi.TEXT);
+        drawOptionHelp(graphics, mouseX, mouseY, modePlaceX + modePlaceW + 2, modePlaceY + 2, Component.empty(), 0, 0, Component.translatable("menu.wrights.mode_place_hint"));
         graphics.disableScissor();
         if (optionTip != null) {
             graphics.renderTooltip(this.font, this.font.split(optionTip, 240), mouseX, mouseY);
@@ -2804,6 +2821,10 @@ public class WrightsMenuScreen extends Screen {
                 }
                 if (mouseX >= hudPlaceX && mouseX < hudPlaceX + hudPlaceW && mouseY >= hudPlaceY && mouseY < hudPlaceY + 16) {
                     this.minecraft.setScreen(new HudPlaceScreen());
+                    return true;
+                }
+                if (mouseX >= modePlaceX && mouseX < modePlaceX + modePlaceW && mouseY >= modePlaceY && mouseY < modePlaceY + 16) {
+                    this.minecraft.setScreen(new ModePlaceScreen());
                     return true;
                 }
                 if (hitSlider(mouseX, mouseY, wallSliderX, wallSliderY, wallSliderW)) {
