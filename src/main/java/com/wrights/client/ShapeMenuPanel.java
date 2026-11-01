@@ -788,32 +788,35 @@ final class ShapeMenuPanel {
         previewSizeY = maxY + 1;
         previewSizeZ = maxZ + 1;
         previewBlocks = worlds.size();
-        if (worlds.size() > WrightsConfig.maxPreviewBlocks()) {
-            previewGhosts = List.of();
-            return;
-        }
+        // Small spinning panel: keep a strided sample so large shapes still show a silhouette
+        // instead of blanking past maxPreviewBlocks.
+        int budget = Math.max(256, Math.min(WrightsConfig.maxPreviewBlocks(), WrightsConfig.ghostBudget()));
+        int step = Math.max(1, (worlds.size() + budget - 1) / budget);
+        int sampleCount = (worlds.size() + step - 1) / step;
         List<BlockState> planned = ShapeMaterials.assign(
                 materials,
-                worlds.size(),
+                sampleCount,
                 mode,
                 batch,
                 new Random(key),
                 true,
                 item -> Long.MAX_VALUE / 4L,
                 true);
+        BlockState fallback = Blocks.STONE.defaultBlockState();
         if (planned.isEmpty()) {
-            BlockState fallback = Blocks.STONE.defaultBlockState();
-            planned = new ArrayList<>(worlds.size());
-            for (int i = 0; i < worlds.size(); i++) {
+            planned = new ArrayList<>(sampleCount);
+            for (int i = 0; i < sampleCount; i++) {
                 planned.add(fallback);
             }
         }
-        List<WrightsClientState.Ghost> ghosts = new ArrayList<>(worlds.size());
-        for (int i = 0; i < worlds.size(); i++) {
+        List<WrightsClientState.Ghost> ghosts = new ArrayList<>(sampleCount);
+        int sample = 0;
+        for (int i = 0; i < worlds.size(); i += step) {
             BlockPos pos = worlds.get(i);
-            BlockState state = i < planned.size() ? planned.get(i) : planned.get(planned.size() - 1);
+            BlockState state = sample < planned.size() ? planned.get(sample) : planned.get(planned.size() - 1);
+            sample++;
             if (state == null || state.isAir()) {
-                state = Blocks.STONE.defaultBlockState();
+                state = fallback;
             }
             ghosts.add(new WrightsClientState.Ghost(
                     pos.getX() - origin.getX(),
