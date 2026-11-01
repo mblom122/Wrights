@@ -2302,25 +2302,25 @@ public final class WrightsClientState {
             PacketDistributor.sendToServer(new BlueprintPayloads.CapturePick(pos, BlueprintPayloads.CapturePick.BOX_COMMIT));
             return;
         }
-        if (hasBox()) {
-            if (aimingAtSelection()) {
-                minecraft.setScreen(new BlueprintAdjustScreen());
-                return;
-            }
-            if (clicked == null) {
-                return;
-            }
-            cornerA = clicked;
-            cornerB = null;
-            clearCapturePreview();
-            PacketDistributor.sendToServer(new BlueprintPayloads.CapturePick(clicked, BlueprintPayloads.CapturePick.BOX_BEGIN));
+        // Two corners: right-click sets / moves corner A, Shift+right-click sets / moves corner B.
+        // Never clear the other corner here — only leaving New / capture clears the box.
+        if (hasBox() && !shift && aimingAtSelection()) {
+            minecraft.setScreen(new BlueprintAdjustScreen());
             return;
         }
         if (clicked == null) {
             return;
         }
-        int action = shift ? BlueprintPayloads.CapturePick.SECOND : BlueprintPayloads.CapturePick.CORNER;
-        PacketDistributor.sendToServer(new BlueprintPayloads.CapturePick(clicked, action));
+        if (shift) {
+            if (cornerA == null) {
+                return;
+            }
+            cornerB = clicked;
+            PacketDistributor.sendToServer(new BlueprintPayloads.CapturePick(clicked, BlueprintPayloads.CapturePick.SECOND));
+            return;
+        }
+        cornerA = clicked;
+        PacketDistributor.sendToServer(new BlueprintPayloads.CapturePick(clicked, BlueprintPayloads.CapturePick.CORNER));
     }
 
     public static boolean hasBox() {
