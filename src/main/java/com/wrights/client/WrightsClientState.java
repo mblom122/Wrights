@@ -648,12 +648,17 @@ public final class WrightsClientState {
         com.wrights.WrightsClientConfig.setLastMode(modeId, style, tool, id);
     }
 
-    /** Restore Mirror / Shape / Bind inventory after Build mode comes back. */
-    public static void applyLastBuildTool() {
+    /** Drop Shape / Mirror / Bind aims without changing mode or remembered tool. */
+    public static void clearBuildAims() {
         mirrorAim = false;
         shapeAim = false;
         bindSupply = false;
         bindFromMenu = false;
+    }
+
+    /** Restore Mirror / Shape / Bind inventory after Build mode comes back. */
+    public static void applyLastBuildTool() {
+        clearBuildAims();
         int tool = com.wrights.WrightsClientConfig.LAST_BUILD_TOOL.get();
         if (tool == 1 && WrightsConfig.allowMirror()) {
             mirrorAim = true;
@@ -790,6 +795,7 @@ public final class WrightsClientState {
         moveOriginB = null;
         captureDirty = false;
         clearedGeneration = generation;
+        clearBuildAims();
         styleHudTicks = STYLE_HUD_TICKS;
         updateFlags();
     }
@@ -805,28 +811,28 @@ public final class WrightsClientState {
     public static void enterJobs() {
         leaveCapture();
         mode = Mode.JOBS;
-        bindSupply = false;
+        clearBuildAims();
         updateFlags();
     }
 
     public static void enterManage() {
         leaveCapture();
         mode = Mode.MANAGE;
-        bindSupply = false;
+        clearBuildAims();
         updateFlags();
     }
 
     public static void enterInfo() {
         leaveCapture();
         mode = Mode.INFO;
-        bindSupply = false;
+        clearBuildAims();
         updateFlags();
     }
 
     public static void enterLink() {
         leaveCapture();
         mode = Mode.LINK;
-        bindSupply = false;
+        clearBuildAims();
         updateFlags();
     }
 
@@ -859,7 +865,7 @@ public final class WrightsClientState {
         buildName = "";
         ghosts = List.of();
         follow = false;
-        bindSupply = false;
+        clearBuildAims();
         cornerA = null;
         cornerB = null;
         boxDragging = false;
@@ -1089,12 +1095,9 @@ public final class WrightsClientState {
         cornerB = null;
         clearCapturePreview();
         // Menu Build always means Use template — leave Shape / Mirror / Bind inventory.
-        mirrorAim = false;
-        shapeAim = false;
-        bindSupply = false;
-        bindFromMenu = false;
+        // Do not rememberMode here: hotbar entry calls armBuild then applyLastBuildTool.
+        clearBuildAims();
         restorePlacementPending = true;
-        rememberMode();
         updateFlags();
     }
 
@@ -1178,9 +1181,7 @@ public final class WrightsClientState {
                 concealed = false;
                 follow = false;
                 if (incoming == Mode.CAPTURE || incoming == Mode.SAVING) {
-                    mirrorAim = false;
-                    shapeAim = false;
-                    bindSupply = false;
+                    clearBuildAims();
                 }
             } else if (previous != Mode.BUILD) {
                 applyLastBuildTool();
@@ -1915,6 +1916,10 @@ public final class WrightsClientState {
         selectBuildTool(false);
     }
 
+    public static void selectBindTool() {
+        selectBuildTool(true);
+    }
+
     public static void selectMirrorTool() {
         selectBuildTool(false);
         mirrorAim = true;
@@ -1942,9 +1947,8 @@ public final class WrightsClientState {
             clearCapturePreview();
             enterBuildFromLast();
         }
+        clearBuildAims();
         bindSupply = bind;
-        mirrorAim = false;
-        shapeAim = false;
         if (bind) {
             bindFromMenu = false;
         }
@@ -1952,8 +1956,7 @@ public final class WrightsClientState {
     }
 
     private static void selectNewStyle(CaptureStyle style) {
-        mirrorAim = false;
-        shapeAim = false;
+        clearBuildAims();
         if (mode == Mode.SAVING) {
             return;
         }
@@ -2493,6 +2496,7 @@ public final class WrightsClientState {
         editingId = null;
         boxDragging = false;
         moveGrabbed = false;
+        clearBuildAims();
         clearCapturePreview();
         updateFlags();
         Minecraft.getInstance().setScreen(new WrightsMenuScreen());

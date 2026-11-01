@@ -1494,9 +1494,7 @@ public class WrightsMenuScreen extends Screen {
     static void preferBlueprintsStrip() {
         savedShape = false;
         savedMirror = false;
-        WrightsClientState.mirrorAim = false;
-        WrightsClientState.shapeAim = false;
-        WrightsClientState.bindSupply = false;
+        WrightsClientState.clearBuildAims();
     }
 
     private void honorFeatures() {
@@ -2451,9 +2449,7 @@ public class WrightsMenuScreen extends Screen {
             if (requireTool()) {
                 WrightsClientState.selectBlueprintTool();
             } else {
-                WrightsClientState.mirrorAim = false;
-                WrightsClientState.shapeAim = false;
-                WrightsClientState.bindSupply = false;
+                WrightsClientState.clearBuildAims();
             }
             sortOpen = false;
             setFocused(null);
@@ -4019,6 +4015,7 @@ public class WrightsMenuScreen extends Screen {
             return;
         }
         WrightsClientState.armBuild(summary);
+        WrightsClientState.selectBlueprintTool();
         PacketDistributor.sendToServer(new BlueprintPayloads.BeginBuild(summary.id()));
         this.minecraft.setScreen(null);
     }
