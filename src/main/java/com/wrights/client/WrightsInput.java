@@ -379,10 +379,35 @@ public final class WrightsInput {
     /**
      * Shared controller chords:
      * Ctrl+right-click = set / clear that mode’s anchor,
-     * Shift+right-click = mode special action (second corner, pick From block, …),
+     * Shift+right-click = mode special action (second corner, …),
+     * Middle-click = pick the aimed block as Shape / Exchange material (like creative pick),
      * Ctrl+Shift+right-click = that mode’s special menu (or the controller page for it),
      * Alt+right-click = undo last finished build.
      */
+
+    /** Middle mouse / pick-block: set Shape materials or Exchange Replace with from the aimed block. */
+    @SubscribeEvent
+    public static void onPickBlock(InputEvent.InteractionKeyMappingTriggered event) {
+        if (!event.isPickBlock()) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || minecraft.screen != null
+                || !com.wrights.item.ControllerItem.isHeld(minecraft.player)) {
+            return;
+        }
+        if (WrightsClientState.exchangeToolActive() && com.wrights.WrightsConfig.allowExchange()) {
+            if (pickMaterialBlock(minecraft.player, true)) {
+                event.setCanceled(true);
+            }
+            return;
+        }
+        if (WrightsClientState.shapeToolActive() && com.wrights.WrightsConfig.allowShape()) {
+            if (pickMaterialBlock(minecraft.player, false)) {
+                event.setCanceled(true);
+            }
+        }
+    }
     private static boolean controlHeld() {
         Minecraft minecraft = Minecraft.getInstance();
         return InputConstants.isKeyDown(minecraft.getWindow().getWindow(), GLFW.GLFW_KEY_LEFT_CONTROL)
@@ -744,7 +769,7 @@ public final class WrightsInput {
         Minecraft.getInstance().setScreen(new ShapeAnchorScreen(null));
     }
 
-    /** Same look/anchor flow as Shape. Shift picks From. Ctrl+Shift opens Exchange options. */
+    /** Same look/anchor flow as Shape. Middle-click picks Replace with. Ctrl+Shift opens Exchange options. */
     private static void useExchangeClick(net.minecraft.world.entity.player.Player player, BlockPos pos, Direction face) {
         if (!com.wrights.WrightsConfig.allowExchange()) {
             player.displayClientMessage(Component.translatable("message.wrights.feature_off"), true);
@@ -756,10 +781,6 @@ public final class WrightsInput {
         }
         if (controlHeld()) {
             setShapeWorldAnchor(player, pos);
-            return;
-        }
-        if (player.isShiftKeyDown()) {
-            pickExchangeTo(player, pos);
             return;
         }
         boolean lookMode = !com.wrights.WrightsClientConfig.SHAPE_USE_ANCHOR.get()
@@ -794,31 +815,42 @@ public final class WrightsInput {
         WrightsClientState.tryExchange(false, pos, face);
     }
 
-    /** Shift+right-click: set Replace with to the aimed block (and clear any old From filter). */
-    private static void pickExchangeTo(net.minecraft.world.entity.player.Player player, BlockPos clicked) {
+    /**
+     * Middle-click / pick-block: set Shape materials or Exchange Replace with to the aimed block.
+     * @return true when the click was handled (cancel vanilla pick).
+     */
+    private static boolean pickMaterialBlock(net.minecraft.world.entity.player.Player player, boolean exchange) {
         Minecraft minecraft = Minecraft.getInstance();
         BlockHitResult aim = WrightsClientState.lookHit();
-        BlockPos at = aim != null ? aim.getBlockPos() : clicked;
-        if (at == null || minecraft.level == null) {
-            player.displayClientMessage(Component.translatable("message.wrights.exchange_to_look"), true);
-            return;
+        if (aim == null || minecraft.level == null) {
+            player.displayClientMessage(Component.translatable(
+                    exchange ? "message.wrights.exchange_to_look" : "message.wrights.shape_material_look"), true);
+            return true;
         }
+        BlockPos at = aim.getBlockPos();
         net.minecraft.world.level.block.state.BlockState state = minecraft.level.getBlockState(at);
         if (!com.wrights.util.BlockFilters.canShapeMaterial(state)) {
-            player.displayClientMessage(Component.translatable("message.wrights.exchange_to_blocked"), true);
-            return;
+            player.displayClientMessage(Component.translatable(
+                    exchange ? "message.wrights.exchange_to_blocked" : "message.wrights.shape_material_blocked"), true);
+            return true;
         }
         net.minecraft.world.item.Item item = state.getBlock().asItem();
-        if (!(item instanceof net.minecraft.world.item.BlockItem)) {
-            player.displayClientMessage(Component.translatable("message.wrights.exchange_to_blocked"), true);
-            return;
+        if (!(item instanceof BlockItem)) {
+            player.displayClientMessage(Component.translatable(
+                    exchange ? "message.wrights.exchange_to_blocked" : "message.wrights.shape_material_blocked"), true);
+            return true;
         }
         com.wrights.WrightsClientConfig.setShapeMaterials(
                 java.util.List.of(new com.wrights.blueprint.ShapeMaterials.Entry(item, 1)));
-        com.wrights.WrightsClientConfig.setExchangeFrom(java.util.List.of());
+        if (exchange) {
+            com.wrights.WrightsClientConfig.setExchangeFrom(java.util.List.of());
+        }
         player.displayClientMessage(
-                Component.translatable("message.wrights.exchange_to_set", state.getBlock().getName()),
+                Component.translatable(
+                        exchange ? "message.wrights.exchange_to_set" : "message.wrights.shape_material_set",
+                        state.getBlock().getName()),
                 true);
+        return true;
     }
 
     private static String mirrorAxisKey(Direction.Axis axis) {

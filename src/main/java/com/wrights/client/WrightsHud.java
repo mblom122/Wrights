@@ -92,6 +92,9 @@ public final class WrightsHud {
             } else if (WrightsClientState.shapeToolActive()) {
                 line = Component.translatable("hud.wrights.tool_shape");
                 sub = Component.translatable(shapeFooter(minecraft));
+                if (WrightsClientConfig.shapeMaterials().isEmpty()) {
+                    note = Component.translatable("hud.wrights.shape_pick_material");
+                }
             } else if (WrightsClientState.mirrorToolActive() && WrightsClientConfig.mirrorBlocks()) {
                 line = Component.translatable("hud.wrights.tool_mirror");
                 sub = Component.translatable(mirrorFooter(minecraft));
