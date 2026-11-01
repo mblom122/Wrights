@@ -17,11 +17,17 @@ import com.wrights.schematic.Schematic;
 
 /** The spinning block model used by the blueprint list, shared with import and item tooltips. */
 public final class SchematicViews {
-    public record Shot(List<WrightsClientState.Ghost> ghosts, int sizeX, int sizeY, int sizeZ, boolean concealed) {
+    public record Shot(List<WrightsClientState.Ghost> ghosts, int sizeX, int sizeY, int sizeZ, boolean sampled) {
         private static final Shot EMPTY = new Shot(List.of(), 1, 1, 1, false);
 
         public boolean visible() {
-            return concealed || !ghosts.isEmpty();
+            return !ghosts.isEmpty();
+        }
+
+        /** Previews sample instead of concealing; always false. */
+        @Deprecated
+        public boolean concealed() {
+            return false;
         }
     }
 
@@ -70,11 +76,14 @@ public final class SchematicViews {
         }
         graphics.fill(x, y, x + width, y + height, 0xFF101820);
         WrightsUi.border(graphics, x, y, width, height, 0xFF31404E);
-        if (shot.concealed() || shot.ghosts().isEmpty()) {
+        if (shot.ghosts().isEmpty()) {
             graphics.drawCenteredString(font, Component.translatable("screen.wrights.preview_hidden"), x + width / 2, y + height / 2 - 4, WrightsUi.MUTED);
             return;
         }
         render(graphics, x + 1, y + 1, width - 2, height - 2, shot);
+        if (shot.sampled()) {
+            graphics.drawString(font, font.plainSubstrByWidth(Component.translatable("screen.wrights.sampled").getString(), width - 4), x + 2, y + 2, WrightsUi.MUTED, false);
+        }
     }
 
     public static void render(GuiGraphics graphics, int x, int y, int width, int height, Shot shot) {
@@ -95,11 +104,13 @@ public final class SchematicViews {
             int sizeX = Math.max(1, schematic.sizeX());
             int sizeY = Math.max(1, schematic.sizeY());
             int sizeZ = Math.max(1, schematic.sizeZ());
-            if (schematic.entries().size() > WrightsConfig.maxPreviewBlocks()) {
-                return new Shot(List.of(), sizeX, sizeY, sizeZ, true);
-            }
-            List<WrightsClientState.Ghost> ghosts = new ArrayList<>();
-            for (Schematic.Entry entry : schematic.entries()) {
+            List<Schematic.Entry> entries = schematic.entries();
+            int budget = WrightsConfig.previewSampleBudget();
+            boolean sampled = entries.size() > budget;
+            int step = sampled ? Math.max(1, (entries.size() + budget - 1) / budget) : 1;
+            List<WrightsClientState.Ghost> ghosts = new ArrayList<>(Math.min(entries.size(), budget));
+            for (int i = 0; i < entries.size(); i += step) {
+                Schematic.Entry entry = entries.get(i);
                 BlockState state = entry.state();
                 if (state.isAir()) {
                     continue;
@@ -113,7 +124,7 @@ public final class SchematicViews {
                         1.0F,
                         Block.getId(state)));
             }
-            return new Shot(List.copyOf(ghosts), sizeX, sizeY, sizeZ, false);
+            return new Shot(List.copyOf(ghosts), sizeX, sizeY, sizeZ, sampled);
         } catch (RuntimeException ignored) {
             return Shot.EMPTY;
         }

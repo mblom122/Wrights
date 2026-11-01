@@ -275,6 +275,14 @@ public final class WrightsConfig {
         return read(GHOST_BUDGET, 4096);
     }
 
+    /**
+     * How many ghost cells to bake/send for large shapes and blueprints.
+     * Prefer a silhouette sample over blanking the preview.
+     */
+    public static int previewSampleBudget() {
+        return Math.max(256, Math.min(maxPreviewBlocks(), ghostBudget()));
+    }
+
     public static int ghostRange() {
         return read(GHOST_RANGE, 48);
     }

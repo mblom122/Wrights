@@ -18,13 +18,13 @@ public record BlueprintTip(CompoundTag tag) implements TooltipComponent {
         @Override
         public int getHeight() {
             SchematicViews.Shot shot = SchematicViews.fromTag(tip.tag());
-            return shot.concealed() ? 12 : 80;
+            return shot.visible() ? 80 : 12;
         }
 
         @Override
         public int getWidth(Font font) {
             SchematicViews.Shot shot = SchematicViews.fromTag(tip.tag());
-            if (shot.concealed()) {
+            if (!shot.visible()) {
                 return font.width(Component.translatable("screen.wrights.preview_hidden"));
             }
             return 96;
@@ -33,7 +33,7 @@ public record BlueprintTip(CompoundTag tag) implements TooltipComponent {
         @Override
         public void renderImage(Font font, int x, int y, GuiGraphics graphics) {
             SchematicViews.Shot shot = SchematicViews.fromTag(tip.tag());
-            if (shot.concealed()) {
+            if (!shot.visible()) {
                 graphics.drawString(font, Component.translatable("screen.wrights.preview_hidden"), x, y + 2, WrightsUi.MUTED, false);
                 return;
             }

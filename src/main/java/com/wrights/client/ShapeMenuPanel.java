@@ -790,7 +790,7 @@ final class ShapeMenuPanel {
         previewBlocks = worlds.size();
         // Small spinning panel: keep a strided sample so large shapes still show a silhouette
         // instead of blanking past maxPreviewBlocks.
-        int budget = Math.max(256, Math.min(WrightsConfig.maxPreviewBlocks(), WrightsConfig.ghostBudget()));
+        int budget = WrightsConfig.previewSampleBudget();
         int step = Math.max(1, (worlds.size() + budget - 1) / budget);
         int sampleCount = (worlds.size() + step - 1) / step;
         List<BlockState> planned = ShapeMaterials.assign(

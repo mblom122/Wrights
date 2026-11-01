@@ -1354,12 +1354,13 @@ public final class BlueprintActions {
 
     public static BlueprintPayloads.Preview previewOf(Schematic schematic, boolean forBuild, boolean openEditor) {
         List<Schematic.Entry> entries = schematic.entries();
-        boolean concealed = entries.size() > WrightsConfig.maxPreviewBlocks();
-        List<BlueprintPayloads.Bit> bits = new ArrayList<>();
-        if (!concealed) {
-            for (Schematic.Entry entry : entries) {
-                bits.add(new BlueprintPayloads.Bit(entry.x(), entry.y(), entry.z(), Block.getId(entry.state())));
-            }
+        int budget = WrightsConfig.previewSampleBudget();
+        boolean sampled = entries.size() > budget;
+        int step = sampled ? Math.max(1, (entries.size() + budget - 1) / budget) : 1;
+        List<BlueprintPayloads.Bit> bits = new ArrayList<>(Math.min(entries.size(), budget));
+        for (int i = 0; i < entries.size(); i += step) {
+            Schematic.Entry entry = entries.get(i);
+            bits.add(new BlueprintPayloads.Bit(entry.x(), entry.y(), entry.z(), Block.getId(entry.state())));
         }
         return new BlueprintPayloads.Preview(
                 schematic.id(),
@@ -1368,8 +1369,8 @@ public final class BlueprintActions {
                 schematic.sizeY(),
                 schematic.sizeZ(),
                 schematic.blockCount(),
+                sampled,
                 false,
-                concealed,
                 bits,
                 schematic.anchorX(),
                 schematic.anchorY(),

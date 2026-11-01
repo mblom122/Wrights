@@ -551,11 +551,12 @@ public class BlueprintAdjustScreen extends Screen {
         if (!spinning) {
             yaw += 0.35F;
         }
-        if (preview.concealed()) {
-            graphics.drawCenteredString(this.font, Component.translatable("screen.wrights.preview_hidden"), modelX + modelW / 2, modelY + modelH / 2, WrightsUi.MUTED);
-        } else if (!preview.ghosts().isEmpty()) {
+        if (!preview.ghosts().isEmpty()) {
             BlueprintModelView.render(graphics, modelX, modelY, modelW, modelH, preview.ghosts(), preview.sizeX(), preview.sizeY(), preview.sizeZ(), yaw, pitch);
             graphics.drawCenteredString(this.font, Component.translatable("menu.wrights.spin"), modelX + modelW / 2, modelY + modelH - 10, WrightsUi.MUTED);
+            if (preview.sampled()) {
+                graphics.drawString(this.font, this.font.plainSubstrByWidth(Component.translatable("screen.wrights.sampled").getString(), modelW), modelX, modelY + 2, WrightsUi.MUTED, false);
+            }
         } else if (WrightsClientState.cornerA != null && WrightsClientState.cornerB != null) {
             graphics.drawCenteredString(this.font, Component.translatable("message.wrights.copy_empty"), modelX + modelW / 2, modelY + modelH / 2, WrightsUi.MUTED);
         }
@@ -611,7 +612,7 @@ public class BlueprintAdjustScreen extends Screen {
         preview = this.minecraft == null
                 ? SelectionPreview.Shot.empty()
                 : SelectionPreview.orient(SelectionPreview.capture(this.minecraft.level, first, second, fluids, nbt), turns);
-        WrightsClientState.showCapturePreview(preview.ghosts(), preview.concealed());
+        WrightsClientState.showCapturePreview(preview.ghosts(), false);
     }
 
     private static boolean same(BlockPos left, BlockPos right) {
