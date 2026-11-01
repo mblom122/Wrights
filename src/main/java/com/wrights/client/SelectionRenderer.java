@@ -140,8 +140,7 @@ public final class SelectionRenderer {
             return;
         }
         List<com.wrights.blueprint.ShapeMaterials.Entry> materials = WrightsClientConfig.shapeMaterials();
-        List<BlockState> palette = com.wrights.blueprint.ShapeMaterials.states(materials);
-        if (palette.isEmpty()) {
+        if (com.wrights.blueprint.ShapeMaterials.states(materials).isEmpty()) {
             return;
         }
         List<BlockPos> worlds = com.wrights.blueprint.Shapes.blocks(
@@ -152,24 +151,38 @@ public final class SelectionRenderer {
                 WrightsClientConfig.SHAPE_HOLLOW.get(),
                 WrightsClientConfig.SHAPE_PLANE.get());
         boolean replace = WrightsClientConfig.SHAPE_REPLACE.get() && WrightsConfig.allowShapeReplace();
+        List<BlockPos> ready = new java.util.ArrayList<>();
+        for (BlockPos world : worlds) {
+            if (!replace && !minecraft.level.getBlockState(world).isAir()) {
+                continue;
+            }
+            ready.add(world);
+        }
+        if (ready.isEmpty()) {
+            return;
+        }
+        java.util.Random previewRandom = new java.util.Random(center.asLong() ^ materials.hashCode());
+        List<BlockState> planned = com.wrights.blueprint.ShapeMaterials.assign(
+                materials,
+                ready.size(),
+                WrightsClientConfig.shapeFillMode(),
+                WrightsClientConfig.SHAPE_ORDER_BATCH.get(),
+                previewRandom,
+                true,
+                item -> Long.MAX_VALUE / 4L,
+                true);
         BlockRenderDispatcher renderer = minecraft.getBlockRenderer();
         int budget = previewBudget();
         int drawn = 0;
-        java.util.Random previewRandom = new java.util.Random(center.asLong() ^ materials.hashCode());
-        for (BlockPos world : worlds) {
-            if (drawn >= budget) {
-                break;
-            }
+        for (int i = 0; i < ready.size() && drawn < budget; i++) {
+            BlockPos world = ready.get(i);
             double dx = world.getX() + 0.5D - camera.x;
             double dy = world.getY() + 0.5D - camera.y;
             double dz = world.getZ() + 0.5D - camera.z;
             if (dx * dx + dy * dy + dz * dz > rangeSqr()) {
                 continue;
             }
-            if (!replace && !minecraft.level.getBlockState(world).isAir()) {
-                continue;
-            }
-            BlockState state = com.wrights.blueprint.ShapeMaterials.pick(materials, previewRandom);
+            BlockState state = i < planned.size() ? planned.get(i) : null;
             if (state == null || !ghostVisible(state)) {
                 continue;
             }

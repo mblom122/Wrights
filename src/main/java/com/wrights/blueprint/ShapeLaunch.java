@@ -80,10 +80,10 @@ public final class ShapeLaunch {
             return;
         }
         ServerLevel level = player.serverLevel();
-        Random random = new Random(player.getUUID().getMostSignificantBits() ^ level.getGameTime() ^ worlds.size() ^ materials.hashCode());
+        ShapeMaterials.FillMode fillMode = ShapeMaterials.FillMode.byId(payload.fillMode());
+        int orderBatch = ShapeMaterials.clampBatch(payload.orderBatch());
+        Random random = new Random(player.getUUID().getMostSignificantBits() ^ level.getGameTime() ^ worlds.size() ^ materials.hashCode() ^ fillMode.ordinal());
         List<BlockPos> ready = new ArrayList<>(worlds.size());
-        List<BlockState> states = new ArrayList<>(worlds.size());
-        Map<Item, Integer> need = new HashMap<>();
         for (BlockPos world : worlds) {
             if (!level.isLoaded(world) || !BoxEdits.inWorld(world) || !level.mayInteract(player, world)) {
                 continue;
@@ -92,34 +92,51 @@ public final class ShapeLaunch {
             if (!replace && !voidBlocks && !current.isAir()) {
                 continue;
             }
-            BlockState next = ShapeMaterials.pick(materials, random);
-            if (next == null || next.isAir()) {
-                continue;
-            }
-            if (!replace && !current.isAir() && current.getBlock() == next.getBlock()) {
-                continue;
-            }
             ready.add(world.immutable());
-            states.add(next);
-            Item item = next.getBlock().asItem();
-            need.merge(item, 1, Integer::sum);
         }
         if (ready.isEmpty()) {
             Messages.actionBar(player, "message.wrights.shape_nowhere");
             return;
         }
+        boolean creative = player.getAbilities().instabuild || player.isSpectator();
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
-        if (!payload.force() && !player.getAbilities().instabuild && !player.isSpectator()) {
+        List<BlockState> planned = ShapeMaterials.assign(
+                materials,
+                ready.size(),
+                fillMode,
+                orderBatch,
+                random,
+                creative,
+                item -> ShapeSupply.available(player, item, order),
+                payload.force() || creative || fillMode != ShapeMaterials.FillMode.PRIORITY);
+        if (planned.isEmpty()) {
+            Messages.actionBar(player, "message.wrights.shape_need_materials");
+            return;
+        }
+        Map<Item, Integer> need = new HashMap<>();
+        for (BlockState state : planned) {
+            need.merge(state.getBlock().asItem(), 1, Integer::sum);
+        }
+        if (planned.size() < ready.size()) {
+            int shortfall = ready.size() - planned.size();
+            Item primary = materials.get(0).item();
+            need.merge(primary, shortfall, Integer::sum);
+        }
+        if (!payload.force() && !creative) {
             List<Requirements.Cost> costs = new ArrayList<>(need.size());
             for (Map.Entry<Item, Integer> entry : need.entrySet()) {
                 costs.add(new Requirements.Cost(Item.getId(entry.getKey()), entry.getValue()));
             }
             List<Requirements.Cost> listed = Requirements.ordered(player, costs, session.supplyPos(), session.supplyDimension());
-            if (Requirements.anyShort(listed)) {
+            if (Requirements.anyShort(listed) || planned.size() < ready.size()) {
                 BlueprintNetwork.materials(player, MATERIALS_ID, true, listed);
                 return;
             }
         }
+        if (planned.size() < ready.size()) {
+            planned = ShapeMaterials.assign(materials, ready.size(), fillMode, orderBatch, random, creative, item -> ShapeSupply.available(player, item, order), true);
+        }
+        List<BlockState> states = planned;
         BlockPos origin = Shapes.origin(ready);
         int maxX = origin.getX();
         int maxY = origin.getY();

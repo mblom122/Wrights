@@ -216,8 +216,14 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.BooleanValue SHAPE_HOLLOW = BUILDER
             .define("shapeHollow", false);
     public static final ModConfigSpec.BooleanValue SHAPE_RANDOMIZE = BUILDER
-            .comment("When true, each block is picked at random from block items on the action bar.")
+            .comment("Legacy. Prefer shapeFillMode.")
             .define("shapeRandomize", false);
+    public static final ModConfigSpec.IntValue SHAPE_FILL_MODE = BUILDER
+            .comment("0 random (weights), 1 priority (left-to-right until stock runs out), 2 order (alternate in batches).")
+            .defineInRange("shapeFillMode", 0, 0, 2);
+    public static final ModConfigSpec.IntValue SHAPE_ORDER_BATCH = BUILDER
+            .comment("In order mode, how many of each material to place before moving to the next.")
+            .defineInRange("shapeOrderBatch", 1, 1, 64);
     public static final ModConfigSpec.BooleanValue SHAPE_USE_ANCHOR = BUILDER
             .comment("When true, builds on the shape anchor. When false, builds where you look.")
             .define("shapeUseAnchor", false);
@@ -795,6 +801,20 @@ public final class WrightsClientConfig {
         save();
     }
 
+    public static void setShapeFillMode(int mode) {
+        SHAPE_FILL_MODE.set(clamp(mode, 0, 2));
+        save();
+    }
+
+    public static void setShapeOrderBatch(int batch) {
+        SHAPE_ORDER_BATCH.set(com.wrights.blueprint.ShapeMaterials.clampBatch(batch));
+        save();
+    }
+
+    public static com.wrights.blueprint.ShapeMaterials.FillMode shapeFillMode() {
+        return com.wrights.blueprint.ShapeMaterials.FillMode.byId(SHAPE_FILL_MODE.get());
+    }
+
     public static void setShapeUseAnchor(boolean useAnchor) {
         SHAPE_USE_ANCHOR.set(useAnchor);
         save();
@@ -872,6 +892,10 @@ public final class WrightsClientConfig {
 
     public static void shapeMaterialWeight(int index, int weight) {
         setShapeMaterials(com.wrights.blueprint.ShapeMaterials.setWeight(shapeMaterials(), index, weight));
+    }
+
+    public static void shapeMaterialMove(int index, int delta) {
+        setShapeMaterials(com.wrights.blueprint.ShapeMaterials.move(shapeMaterials(), index, delta));
     }
 
     private static int clamp(int value, int min, int max) {

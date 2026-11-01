@@ -274,6 +274,28 @@ final class ShapeMenuPanel {
                 }
                 yield true;
             }
+            case "mat_move_left" -> {
+                WrightsClientConfig.shapeMaterialMove(value, -1);
+                selectedMaterial = Math.max(0, value - 1);
+                yield true;
+            }
+            case "mat_move_right" -> {
+                WrightsClientConfig.shapeMaterialMove(value, 1);
+                selectedMaterial = value + 1;
+                yield true;
+            }
+            case "fill" -> {
+                WrightsClientConfig.setShapeFillMode(value);
+                yield true;
+            }
+            case "batch_up" -> {
+                WrightsClientConfig.setShapeOrderBatch(WrightsClientConfig.SHAPE_ORDER_BATCH.get() + 1);
+                yield true;
+            }
+            case "batch_down" -> {
+                WrightsClientConfig.setShapeOrderBatch(WrightsClientConfig.SHAPE_ORDER_BATCH.get() - 1);
+                yield true;
+            }
             default -> false;
         };
     }
@@ -289,6 +311,23 @@ final class ShapeMenuPanel {
     private int drawMaterials(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width) {
         drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_materials", "menu.wrights.shape_materials_hint");
         y += 12;
+        ShapeMaterials.FillMode mode = WrightsClientConfig.shapeFillMode();
+        y = drawTriple(graphics, mouseX, mouseY, x, y, width, mode.ordinal(),
+                "menu.wrights.shape_fill_random",
+                "menu.wrights.shape_fill_priority",
+                "menu.wrights.shape_fill_order",
+                "fill");
+        if (mode == ShapeMaterials.FillMode.ORDER) {
+            graphics.drawString(font, Component.translatable("menu.wrights.shape_order_batch"), x, y + 4, WrightsUi.MUTED, false);
+            int controls = x + width;
+            controls = drawMini(graphics, mouseX, mouseY, controls - 16, y + 1, 16, "+", "batch_up", 0, WrightsClientConfig.SHAPE_ORDER_BATCH.get() < 64) - 2;
+            String batch = Integer.toString(WrightsClientConfig.SHAPE_ORDER_BATCH.get());
+            int batchW = Math.max(18, font.width(batch) + 6);
+            graphics.drawCenteredString(font, batch, controls - batchW / 2, y + 4, WrightsUi.COPPER);
+            controls -= batchW + 2;
+            drawMini(graphics, mouseX, mouseY, controls - 16, y + 1, 16, "-", "batch_down", 0, WrightsClientConfig.SHAPE_ORDER_BATCH.get() > 1);
+            y += 20;
+        }
         List<ShapeMaterials.Entry> entries = WrightsClientConfig.shapeMaterials();
         if (entries.isEmpty()) {
             graphics.drawString(font, Component.translatable("menu.wrights.shape_materials_empty"), x, y + 4, WrightsUi.MUTED, false);
@@ -307,10 +346,12 @@ final class ShapeMenuPanel {
                 WrightsUi.slot(graphics, cx, cy, on || hover ? WrightsUi.COPPER : 0xFF31404E);
                 ItemStack stack = entries.get(i).item().getDefaultInstance();
                 graphics.renderItem(stack, cx + 2, cy + 2);
-                String weight = Integer.toString(entries.get(i).weight());
-                int wx = cx + CHIP - 1 - font.width(weight);
+                String badge = mode == ShapeMaterials.FillMode.RANDOM
+                        ? Integer.toString(entries.get(i).weight())
+                        : Integer.toString(i + 1);
+                int wx = cx + CHIP - 1 - font.width(badge);
                 graphics.fill(wx - 1, cy + CHIP - 9, cx + CHIP - 1, cy + CHIP - 1, 0xAA101820);
-                graphics.drawString(font, weight, wx, cy + CHIP - 9, WrightsUi.COPPER, false);
+                graphics.drawString(font, badge, wx, cy + CHIP - 9, WrightsUi.COPPER, false);
                 hits.add(new Hit(cx, cy, CHIP, CHIP, "mat_select", i));
                 if (hover) {
                     hoveredStack = stack;
@@ -319,16 +360,21 @@ final class ShapeMenuPanel {
             int rows = (entries.size() + cols - 1) / cols;
             y += rows * (CHIP + gap) + 2;
             ShapeMaterials.Entry selected = entries.get(selectedMaterial);
-            String name = font.plainSubstrByWidth(selected.item().getDefaultInstance().getHoverName().getString(), Math.max(40, width - 110));
+            String name = font.plainSubstrByWidth(selected.item().getDefaultInstance().getHoverName().getString(), Math.max(40, width - 130));
             graphics.drawString(font, name, x, y + 4, WrightsUi.TEXT, false);
             int controls = x + width;
             controls = drawMini(graphics, mouseX, mouseY, controls - 16, y + 1, 16, "x", "mat_remove", selectedMaterial, entries.size() > 1) - 2;
-            controls = drawMini(graphics, mouseX, mouseY, controls - 16, y + 1, 16, "+", "mat_weight_up", selectedMaterial, true) - 2;
-            String weight = Integer.toString(selected.weight());
-            int weightW = Math.max(18, font.width(weight) + 6);
-            graphics.drawCenteredString(font, weight, controls - weightW / 2, y + 4, WrightsUi.COPPER);
-            controls -= weightW + 2;
-            drawMini(graphics, mouseX, mouseY, controls - 16, y + 1, 16, "-", "mat_weight_down", selectedMaterial, selected.weight() > 1);
+            if (mode == ShapeMaterials.FillMode.RANDOM) {
+                controls = drawMini(graphics, mouseX, mouseY, controls - 16, y + 1, 16, "+", "mat_weight_up", selectedMaterial, true) - 2;
+                String weight = Integer.toString(selected.weight());
+                int weightW = Math.max(18, font.width(weight) + 6);
+                graphics.drawCenteredString(font, weight, controls - weightW / 2, y + 4, WrightsUi.COPPER);
+                controls -= weightW + 2;
+                drawMini(graphics, mouseX, mouseY, controls - 16, y + 1, 16, "-", "mat_weight_down", selectedMaterial, selected.weight() > 1);
+            } else {
+                controls = drawMini(graphics, mouseX, mouseY, controls - 16, y + 1, 16, ">", "mat_move_right", selectedMaterial, selectedMaterial < entries.size() - 1) - 2;
+                drawMini(graphics, mouseX, mouseY, controls - 16, y + 1, 16, "<", "mat_move_left", selectedMaterial, selectedMaterial > 0);
+            }
             y += 20;
         }
         boolean pickHover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 18;

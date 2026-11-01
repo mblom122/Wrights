@@ -1527,6 +1527,8 @@ public final class WrightsClientState {
                 WrightsClientConfig.SHAPE_REPLACE.get(),
                 WrightsClientConfig.SHAPE_VOID.get(),
                 force,
+                WrightsClientConfig.SHAPE_FILL_MODE.get(),
+                WrightsClientConfig.SHAPE_ORDER_BATCH.get(),
                 WrightsClientConfig.SHAPE_MATERIALS.get(),
                 WrightsClientConfig.SHAPE_SUPPLY.get());
         PacketDistributor.sendToServer(pendingShape);
