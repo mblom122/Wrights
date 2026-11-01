@@ -46,7 +46,7 @@ public class ShapePivotScreen extends Screen {
     @Override
     protected void init() {
         panelW = WrightsUi.fitW(420, this.width);
-        panelH = WrightsUi.fitH(320, this.height);
+        panelH = WrightsUi.fitH(380, this.height);
         panelX = WrightsUi.centerX(panelW, this.width);
         panelY = WrightsUi.centerY(panelH, this.height);
         addRenderableWidget(new WrightsButton(
@@ -98,11 +98,16 @@ public class ShapePivotScreen extends Screen {
         }
         y += 28;
 
-        int grid = Math.min(168, Math.max(120, panelH - (y - panelY) - 100));
+        // Footer: Done at bottom, then Selected text, then Middle-of-shape — reserve that stack.
+        int doneTop = panelY + panelH - 36;
+        int selectedY = doneTop - 18;
+        int centerY = selectedY - 26;
+        int gridBudget = Math.max(72, centerY - y - 8);
+        int grid = Math.min(150, gridBudget);
         int gridX = panelX + 16 + (inner - grid) / 2;
         int gridY = y;
         drawFaceWire(graphics, gridX, gridY, grid, face);
-        int cell = grid / 3;
+        int cell = Math.max(1, grid / 3);
         for (int slot = 0; slot < 9; slot++) {
             int col = slot % 3;
             int row = slot / 3;
@@ -116,17 +121,15 @@ public class ShapePivotScreen extends Screen {
             graphics.fill(cx - r + 1, cy - r + 1, cx + r - 1, cy + r - 1, on ? 0xFFE8C07A : hover ? 0xFF2A3A48 : 0xFF18222C);
             hits.add(new Hit(cx - 10, cy - 10, 20, 20, "slot", slot));
         }
-        y = gridY + grid + 12;
 
         boolean centerOn = pivot == Shapes.PIVOT_CENTER;
-        boolean centerHover = mouseX >= panelX + 16 && mouseX < panelX + 16 + inner && mouseY >= y && mouseY < y + 20;
-        WrightsUi.choice(graphics, panelX + 16, y, inner, 20, centerOn, centerHover);
+        boolean centerHover = mouseX >= panelX + 16 && mouseX < panelX + 16 + inner && mouseY >= centerY && mouseY < centerY + 20;
+        WrightsUi.choice(graphics, panelX + 16, centerY, inner, 20, centerOn, centerHover);
         graphics.drawCenteredString(this.font, Component.translatable("screen.wrights.shape_pivot_center"),
-                panelX + 16 + inner / 2, y + 6, centerOn ? WrightsUi.TEXT : WrightsUi.MUTED);
-        hits.add(new Hit(panelX + 16, y, inner, 20, "center", 0));
-        y += 26;
+                panelX + 16 + inner / 2, centerY + 6, centerOn ? WrightsUi.TEXT : WrightsUi.MUTED);
+        hits.add(new Hit(panelX + 16, centerY, inner, 20, "center", 0));
         graphics.drawString(this.font, Component.translatable("screen.wrights.shape_pivot_current", pivotSummary(pivot)),
-                panelX + 16, y, WrightsUi.MUTED, false);
+                panelX + 16, selectedY, WrightsUi.MUTED, false);
     }
 
     private void drawFaceWire(GuiGraphics graphics, int x, int y, int size, int faceIndex) {
