@@ -264,9 +264,19 @@ public final class BlueprintModelView {
         dx /= len;
         dy /= len;
         dz /= len;
-        float hx = Math.abs(dx) < 0.9F ? 0.0F : 1.0F;
-        float hy = Math.abs(dx) < 0.9F ? 1.0F : 0.0F;
-        float hz = 0.0F;
+        // Pick a helper axis that is not parallel to the edge (Y fails for verticals).
+        float hx;
+        float hy;
+        float hz;
+        if (Math.abs(dy) < 0.9F) {
+            hx = 0.0F;
+            hy = 1.0F;
+            hz = 0.0F;
+        } else {
+            hx = 1.0F;
+            hy = 0.0F;
+            hz = 0.0F;
+        }
         // Perpendicular pair for the beam cross-section.
         float px = hy * dz - hz * dy;
         float py = hz * dx - hx * dz;
