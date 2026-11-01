@@ -442,10 +442,10 @@ public final class SelectionRenderer {
         double cx = block.getX() + 0.5D;
         double cy = block.getY() + 0.5D;
         double cz = block.getZ() + 0.5D;
-        // Cross arms stay readable past the block; the cube is always a little larger than one block
-        // so the wire sits outside solid faces instead of vanishing inside them.
-        double arm = Math.max(0.85D, Math.min(3.0D, span * 0.1D));
-        double marker = Math.max(0.55D, Math.min(1.25D, span * 0.04D));
+        // Cube always outlines one cell (slightly outside the faces). Arms may grow with span
+        // so a pin stays visible on large shapes without bloating the wire box.
+        double arm = Math.max(0.85D, Math.min(2.5D, span * 0.08D));
+        double marker = 0.55D;
         float ar = WrightsUi.anchorR();
         float ag = WrightsUi.anchorG();
         float ab = WrightsUi.anchorB();
