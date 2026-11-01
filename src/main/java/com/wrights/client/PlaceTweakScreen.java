@@ -44,6 +44,7 @@ public class PlaceTweakScreen extends Screen {
     private int widthY = -1;
     private int toMeHeightY = -1;
     private int stairsDirY = -1;
+    private int rotateY = -1;
     private int matsLabelY = -1;
     private int matsRowY = -1;
     private int valueX;
@@ -71,6 +72,8 @@ public class PlaceTweakScreen extends Screen {
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_aim")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_bridge_offset")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_bridge_width")));
+        labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_stairs_height")));
+        labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_stairs_width")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_to_me_height")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_stairs_dir")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.shape_materials")));
@@ -217,13 +220,19 @@ public class PlaceTweakScreen extends Screen {
             drawChoice(graphics, mouseX, mouseY, choiceX + (choiceW + gap) * 2, styleChoicesY,
                     panelW - PAD * 2 - (choiceW + gap) * 2, style == 2, "menu.wrights.place_aim_bridge");
         }
+        boolean stairsLabels = WrightsClientConfig.placeStyle() == 0
+                && WrightsClientConfig.exchangeForm().stairsPath();
         if (offsetY >= 0) {
-            graphics.drawString(this.font, Component.translatable("menu.wrights.place_bridge_offset"),
+            graphics.drawString(this.font, Component.translatable(stairsLabels
+                            ? "menu.wrights.place_stairs_height"
+                            : "menu.wrights.place_bridge_offset"),
                     panelX + PAD, offsetY + 3, WrightsUi.MUTED, false);
             drawValue(graphics, offsetY, WrightsClientConfig.placeBridgeOffset());
         }
         if (widthY >= 0) {
-            graphics.drawString(this.font, Component.translatable("menu.wrights.place_bridge_width"),
+            graphics.drawString(this.font, Component.translatable(stairsLabels
+                            ? "menu.wrights.place_stairs_width"
+                            : "menu.wrights.place_bridge_width"),
                     panelX + PAD, widthY + 3, WrightsUi.MUTED, false);
             drawValue(graphics, widthY, WrightsClientConfig.placeBridgeWidth());
         }

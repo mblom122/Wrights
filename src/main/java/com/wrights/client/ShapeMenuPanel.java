@@ -1075,7 +1075,7 @@ final class ShapeMenuPanel {
         boolean stairsForm = look && form.stairsPath();
 
         if (bridge) {
-            y = drawPathOffsetWidth(graphics, mouseX, mouseY, x, y, leftW);
+            y = drawPathOffsetWidth(graphics, mouseX, mouseY, x, y, leftW, false);
         }
 
         if (toMe) {
@@ -1104,7 +1104,7 @@ final class ShapeMenuPanel {
             y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
                     "menu.wrights.shape_section_dimensions", "menu.wrights.shape_section_dimensions_hint", false);
             if (stairsForm) {
-                y = drawPathOffsetWidth(graphics, mouseX, mouseY, x, y, leftW);
+                y = drawPathOffsetWidth(graphics, mouseX, mouseY, x, y, leftW, true);
                 drawField(graphics, mouseX, mouseY, x, y,
                         "menu.wrights.place_stairs_dir", "menu.wrights.place_stairs_dir_hint");
                 y += 12;
@@ -1150,16 +1150,18 @@ final class ShapeMenuPanel {
         return y;
     }
 
-    private int drawPathOffsetWidth(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int leftW) {
+    private int drawPathOffsetWidth(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int leftW, boolean stairs) {
         drawField(graphics, mouseX, mouseY, x, y,
-                "menu.wrights.place_bridge_offset", "menu.wrights.place_bridge_offset_hint");
+                stairs ? "menu.wrights.place_stairs_height" : "menu.wrights.place_bridge_offset",
+                stairs ? "menu.wrights.place_stairs_height_hint" : "menu.wrights.place_bridge_offset_hint");
         y += 12;
         bridgeY = y;
         drawDimSlider(graphics, mouseX, mouseY, x, y, leftW,
                 WrightsClientConfig.placeBridgeOffset(), SLIDER_BRIDGE);
         y += 18;
         drawField(graphics, mouseX, mouseY, x, y,
-                "menu.wrights.place_bridge_width", "menu.wrights.place_bridge_width_hint");
+                stairs ? "menu.wrights.place_stairs_width" : "menu.wrights.place_bridge_width",
+                stairs ? "menu.wrights.place_stairs_width_hint" : "menu.wrights.place_bridge_width_hint");
         y += 12;
         pathWidthY = y;
         drawDimSlider(graphics, mouseX, mouseY, x, y, leftW,
