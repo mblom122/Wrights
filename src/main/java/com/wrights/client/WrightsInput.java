@@ -385,27 +385,32 @@ public final class WrightsInput {
      * Alt+right-click = undo last finished build.
      */
 
-    /** Middle mouse / pick-block: set Shape materials or Exchange Replace with from the aimed block. */
+    /**
+     * Middle mouse / pick-block while the controller is the main-hand tool.
+     * Always cancels vanilla creative pick so it cannot replace the controller,
+     * then (in Shape / Exchange) sets the aimed block as the material.
+     */
     @SubscribeEvent
     public static void onPickBlock(InputEvent.InteractionKeyMappingTriggered event) {
         if (!event.isPickBlock()) {
             return;
         }
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.player == null || minecraft.screen != null
-                || !com.wrights.item.ControllerItem.isHeld(minecraft.player)) {
+        if (minecraft.player == null || minecraft.screen != null) {
             return;
         }
+        // Creative pick writes into the selected hotbar slot — only steal when that slot is the controller.
+        if (!(minecraft.player.getMainHandItem().getItem() instanceof com.wrights.item.ControllerItem)) {
+            return;
+        }
+        event.setCanceled(true);
+        event.setSwingHand(false);
         if (WrightsClientState.exchangeToolActive() && com.wrights.WrightsConfig.allowExchange()) {
-            if (pickMaterialBlock(minecraft.player, true)) {
-                event.setCanceled(true);
-            }
+            pickMaterialBlock(minecraft.player, true);
             return;
         }
         if (WrightsClientState.shapeToolActive() && com.wrights.WrightsConfig.allowShape()) {
-            if (pickMaterialBlock(minecraft.player, false)) {
-                event.setCanceled(true);
-            }
+            pickMaterialBlock(minecraft.player, false);
         }
     }
     private static boolean controlHeld() {
@@ -815,30 +820,27 @@ public final class WrightsInput {
         WrightsClientState.tryExchange(false, pos, face);
     }
 
-    /**
-     * Middle-click / pick-block: set Shape materials or Exchange Replace with to the aimed block.
-     * @return true when the click was handled (cancel vanilla pick).
-     */
-    private static boolean pickMaterialBlock(net.minecraft.world.entity.player.Player player, boolean exchange) {
+    /** Middle-click: set Shape materials or Exchange Replace with to the aimed block. */
+    private static void pickMaterialBlock(net.minecraft.world.entity.player.Player player, boolean exchange) {
         Minecraft minecraft = Minecraft.getInstance();
         BlockHitResult aim = WrightsClientState.lookHit();
         if (aim == null || minecraft.level == null) {
             player.displayClientMessage(Component.translatable(
                     exchange ? "message.wrights.exchange_to_look" : "message.wrights.shape_material_look"), true);
-            return true;
+            return;
         }
         BlockPos at = aim.getBlockPos();
         net.minecraft.world.level.block.state.BlockState state = minecraft.level.getBlockState(at);
         if (!com.wrights.util.BlockFilters.canShapeMaterial(state)) {
             player.displayClientMessage(Component.translatable(
                     exchange ? "message.wrights.exchange_to_blocked" : "message.wrights.shape_material_blocked"), true);
-            return true;
+            return;
         }
         net.minecraft.world.item.Item item = state.getBlock().asItem();
         if (!(item instanceof BlockItem)) {
             player.displayClientMessage(Component.translatable(
                     exchange ? "message.wrights.exchange_to_blocked" : "message.wrights.shape_material_blocked"), true);
-            return true;
+            return;
         }
         com.wrights.WrightsClientConfig.setShapeMaterials(
                 java.util.List.of(new com.wrights.blueprint.ShapeMaterials.Entry(item, 1)));
@@ -850,7 +852,6 @@ public final class WrightsInput {
                         exchange ? "message.wrights.exchange_to_set" : "message.wrights.shape_material_set",
                         state.getBlock().getName()),
                 true);
-        return true;
     }
 
     private static String mirrorAxisKey(Direction.Axis axis) {
