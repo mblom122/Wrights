@@ -16,6 +16,8 @@ public class UndoConfirmScreen extends Screen {
     private final Screen parent;
     private int panelX;
     private int panelY;
+    private int panelW;
+    private int panelH;
 
     public UndoConfirmScreen(UUID id, int extra, int drop, Screen parent) {
         super(Component.translatable("screen.wrights.undo_title"));
@@ -27,12 +29,13 @@ public class UndoConfirmScreen extends Screen {
 
     @Override
     protected void init() {
-        int panelW = 280;
-        int panelH = 132;
-        panelX = (this.width - panelW) / 2;
-        panelY = (this.height - panelH) / 2;
-        addRenderableWidget(new WrightsButton(panelX + 16, panelY + 96, 120, 20, Component.translatable("screen.wrights.undo_confirm"), button -> confirm()));
-        addRenderableWidget(new WrightsButton(panelX + 144, panelY + 96, 120, 20, Component.translatable("menu.wrights.cancel_preview"), button -> onClose()));
+        panelW = WrightsUi.fitW(280, this.width);
+        panelH = WrightsUi.fitH(132, this.height);
+        panelX = WrightsUi.centerX(panelW, this.width);
+        panelY = WrightsUi.centerY(panelH, this.height);
+        int half = (panelW - 40) / 2;
+        addRenderableWidget(new WrightsButton(panelX + 16, panelY + panelH - 36, half, 20, Component.translatable("screen.wrights.undo_confirm"), button -> confirm()));
+        addRenderableWidget(new WrightsButton(panelX + 24 + half, panelY + panelH - 36, panelW - 40 - half, 20, Component.translatable("menu.wrights.cancel_preview"), button -> onClose()));
     }
 
     private void confirm() {
@@ -48,7 +51,7 @@ public class UndoConfirmScreen extends Screen {
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         WrightsUi.scrim(graphics, this.width, this.height);
-        WrightsUi.panel(graphics, panelX, panelY, 280, 132);
+        WrightsUi.panel(graphics, panelX, panelY, panelW, panelH);
     }
 
     @Override
@@ -60,10 +63,12 @@ public class UndoConfirmScreen extends Screen {
                 : drop == BlueprintPayloads.UndoPrompt.CHEST_GONE
                         ? "screen.wrights.undo_missing"
                         : "screen.wrights.undo_inventory";
-        WrightsUi.status(graphics, panelX + 16, panelY + 26, 248, 62, WrightsUi.GOLD);
+        int statusH = Math.max(40, panelH - 70);
+        WrightsUi.status(graphics, panelX + 16, panelY + 26, panelW - 32, statusH, WrightsUi.GOLD);
         int y = panelY + 34;
-        for (var line : this.font.split(Component.translatable(key, extra), 228)) {
-            if (y > panelY + 76) {
+        int wrap = panelW - 52;
+        for (var line : this.font.split(Component.translatable(key, extra), wrap)) {
+            if (y > panelY + 26 + statusH - 12) {
                 break;
             }
             graphics.drawString(this.font, line, panelX + 26, y, WrightsUi.TEXT, false);

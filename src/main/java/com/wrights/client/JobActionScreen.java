@@ -13,6 +13,8 @@ public class JobActionScreen extends Screen {
     private final UUID id;
     private int panelX;
     private int panelY;
+    private int panelW;
+    private int panelH;
     private WrightsButton paceButton;
 
     public JobActionScreen(UUID id) {
@@ -22,17 +24,19 @@ public class JobActionScreen extends Screen {
 
     @Override
     protected void init() {
-        int panelW = 240;
-        int panelH = 188;
-        panelX = (this.width - panelW) / 2;
-        panelY = (this.height - panelH) / 2;
+        panelW = WrightsUi.fitW(240, this.width);
+        panelH = WrightsUi.fitH(188, this.height);
+        panelX = WrightsUi.centerX(panelW, this.width);
+        panelY = WrightsUi.centerY(panelH, this.height);
+        int inner = panelW - 32;
+        int half = (inner - 8) / 2;
         BlueprintPayloads.JobLine job = live();
         boolean paused = job != null && job.paused();
-        addRenderableWidget(new WrightsButton(panelX + 16, panelY + 78, 208, 18, Component.translatable("screen.wrights.manage_drones"), button -> manage()));
-        paceButton = new WrightsButton(panelX + 16, panelY + 100, 208, 18, Component.translatable(paused ? "menu.wrights.resume" : "menu.wrights.pause"), button -> togglePace());
+        addRenderableWidget(new WrightsButton(panelX + 16, panelY + panelH - 110, inner, 18, Component.translatable("screen.wrights.manage_drones"), button -> manage()));
+        paceButton = new WrightsButton(panelX + 16, panelY + panelH - 88, inner, 18, Component.translatable(paused ? "menu.wrights.resume" : "menu.wrights.pause"), button -> togglePace());
         addRenderableWidget(paceButton);
-        addRenderableWidget(new WrightsButton(panelX + 16, panelY + 122, 100, 18, Component.translatable("menu.wrights.stop"), button -> stop(), true));
-        addRenderableWidget(new WrightsButton(panelX + 124, panelY + 122, 100, 18, Component.translatable("menu.wrights.close"), button -> onClose()));
+        addRenderableWidget(new WrightsButton(panelX + 16, panelY + panelH - 66, half, 18, Component.translatable("menu.wrights.stop"), button -> stop(), true));
+        addRenderableWidget(new WrightsButton(panelX + 16 + half + 8, panelY + panelH - 66, panelW - 32 - half - 8, 18, Component.translatable("menu.wrights.close"), button -> onClose()));
     }
 
     @Override
@@ -51,7 +55,7 @@ public class JobActionScreen extends Screen {
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         WrightsUi.scrim(graphics, this.width, this.height);
-        WrightsUi.panel(graphics, panelX, panelY, 240, 188);
+        WrightsUi.panel(graphics, panelX, panelY, panelW, panelH);
     }
 
     @Override
@@ -61,14 +65,15 @@ public class JobActionScreen extends Screen {
         if (job == null) {
             return;
         }
-        String name = this.font.plainSubstrByWidth(job.name(), 208);
+        int inner = panelW - 32;
+        String name = this.font.plainSubstrByWidth(job.name(), inner);
         graphics.drawString(this.font, name, panelX + 16, panelY + 10, WrightsUi.COPPER, false);
         boolean stalled = !job.paused() && job.waitKind() == com.wrights.job.BuildJob.WAIT_ITEMS;
         String status = job.undoing()
                 ? "menu.wrights.undoing"
                 : job.paused() ? "menu.wrights.paused" : stalled ? "menu.wrights.stalled" : "menu.wrights.running";
         int statusColor = job.paused() ? WrightsUi.GOLD : stalled ? WrightsUi.TEAL : WrightsUi.COPPER;
-        WrightsUi.status(graphics, panelX + 16, panelY + 24, 208, 48, statusColor);
+        WrightsUi.status(graphics, panelX + 16, panelY + 24, inner, Math.min(48, panelH - 140), statusColor);
         graphics.drawString(this.font, Component.translatable(status), panelX + 26, panelY + 30, statusColor, false);
         int percent = job.finished() ? 100 : WrightsClientState.percent(job);
         graphics.drawString(this.font, Component.translatable("menu.wrights.job_percent", percent, job.done(), job.total()), panelX + 26, panelY + 42, WrightsUi.MUTED, false);

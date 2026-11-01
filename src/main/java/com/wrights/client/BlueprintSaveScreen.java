@@ -34,10 +34,10 @@ public class BlueprintSaveScreen extends Screen {
 
     @Override
     protected void init() {
-        panelW = Math.min(360, this.width - 16);
-        panelH = Math.min(280, this.height - 16);
-        panelX = (this.width - panelW) / 2;
-        panelY = (this.height - panelH) / 2;
+        panelW = WrightsUi.fitW(360, this.width);
+        panelH = WrightsUi.fitH(280, this.height);
+        panelX = WrightsUi.centerX(panelW, this.width);
+        panelY = WrightsUi.centerY(panelH, this.height);
         listX = panelX + 12;
         listY = panelY + 48;
         listW = panelW - 24;

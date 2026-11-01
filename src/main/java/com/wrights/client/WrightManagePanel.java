@@ -597,10 +597,10 @@ final class WrightManagePanel {
             panelH = Math.max(120, screen.areaH());
             return;
         }
-        panelW = 360;
-        panelH = Math.min(screen.screenHeight() - 24, 340);
-        panelX = (screen.screenWidth() - panelW) / 2;
-        panelY = Math.max(8, (screen.screenHeight() - panelH) / 2);
+        panelW = WrightsUi.fitW(360, screen.screenWidth());
+        panelH = WrightsUi.fitH(340, screen.screenHeight());
+        panelX = WrightsUi.centerX(panelW, screen.screenWidth());
+        panelY = WrightsUi.centerY(panelH, screen.screenHeight());
     }
 
     boolean keyPressed(ManageHost screen, int keyCode, int scanCode, int modifiers) {

@@ -17,7 +17,7 @@ import com.wrights.network.BlueprintPayloads;
 
 /** Moves wrights between jobs. The window stays put, and each list scrolls on its own. */
 public class DroneRosterScreen extends Screen {
-    private static final int PANEL_W = 372;
+    private static final int PREFERRED_W = 372;
     private static final int ROW = 20;
     private static final int HEADER = 46;
     private static final int MOVE_H = 78;
@@ -34,6 +34,7 @@ public class DroneRosterScreen extends Screen {
     private UUID selected = FREE;
     private int panelX;
     private int panelY;
+    private int panelW;
     private int panelH;
     private int freeScroll;
     private int busyScroll;
@@ -52,7 +53,7 @@ public class DroneRosterScreen extends Screen {
         place();
         rebuild();
         back = addRenderableWidget(new WrightsButton(
-                panelX + 12, panelY + panelH - 26, PANEL_W - 24, 16,
+                panelX + 12, panelY + panelH - 26, panelW - 24, 16,
                 Component.translatable("screen.wrights.back"), button -> onClose()));
     }
 
@@ -65,7 +66,7 @@ public class DroneRosterScreen extends Screen {
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         WrightsUi.scrim(graphics, this.width, this.height);
-        WrightsUi.panel(graphics, panelX, panelY, PANEL_W, panelH);
+        WrightsUi.panel(graphics, panelX, panelY, panelW, panelH);
     }
 
     @Override
@@ -161,9 +162,10 @@ public class DroneRosterScreen extends Screen {
     }
 
     private void place() {
-        panelH = Mth.clamp(this.height - 24, 280, 460);
-        panelX = (this.width - PANEL_W) / 2;
-        panelY = Math.max(8, (this.height - panelH) / 2);
+        panelW = WrightsUi.fitW(PREFERRED_W, this.width);
+        panelH = WrightsUi.fitH(460, this.height);
+        panelX = WrightsUi.centerX(panelW, this.width);
+        panelY = WrightsUi.centerY(panelH, this.height);
     }
 
     private int bodyTop() {
@@ -175,8 +177,8 @@ public class DroneRosterScreen extends Screen {
     }
 
     private Well freeWell() {
-        int height = (bodyHeight() - 8) / 2;
-        return new Well(panelX + 12, bodyTop(), PANEL_W - 24, height);
+        int height = Math.max(ROW + SECTION_HEAD + 4, (bodyHeight() - 8) / 2);
+        return new Well(panelX + 12, bodyTop(), panelW - 24, height);
     }
 
     private Well busyWell() {
@@ -185,7 +187,7 @@ public class DroneRosterScreen extends Screen {
     }
 
     private Well moveWell() {
-        return new Well(panelX + 12, panelY + panelH - FOOTER - MOVE_H, PANEL_W - 24, MOVE_H);
+        return new Well(panelX + 12, panelY + panelH - FOOTER - MOVE_H, panelW - 24, MOVE_H);
     }
 
     private static int listH(Well well) {
@@ -419,7 +421,7 @@ public class DroneRosterScreen extends Screen {
         UUID current = jobOf(selected);
         int x = 0;
         int y = 0;
-        int limit = PANEL_W - 24 - 18;
+        int limit = panelW - 24 - 18;
         if (current != null) {
             boolean marked = WrightsClientState.wrightMarked(selected);
             choices.add(choice(x, y, Component.translatable(marked ? "menu.wrights.mark_on" : "menu.wrights.mark").getString(), MARK, marked));

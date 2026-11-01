@@ -86,11 +86,11 @@ public class ImportExportScreen extends Screen {
 
     @Override
     protected void init() {
-        panelW = Math.min(520, this.width - 16);
+        panelW = WrightsUi.fitW(520, this.width);
         // Room for selection line, columns, and a 3-row conflict stack above Close.
-        panelH = Math.min(320, this.height - 16);
-        panelX = (this.width - panelW) / 2;
-        panelY = (this.height - panelH) / 2;
+        panelH = WrightsUi.fitH(320, this.height);
+        panelX = WrightsUi.centerX(panelW, this.width);
+        panelY = WrightsUi.centerY(panelH, this.height);
         leftX = panelX + 14;
         columnW = (panelW - 36) / 2;
         rightX = leftX + columnW + 8;

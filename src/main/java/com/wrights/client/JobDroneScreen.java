@@ -17,7 +17,7 @@ import com.wrights.network.BlueprintPayloads;
 
 /** Assigns wrights to one job. The window stays put; each list scrolls on its own. */
 public class JobDroneScreen extends Screen {
-    private static final int PANEL_W = 372;
+    private static final int PREFERRED_W = 372;
     private static final int ROW = 20;
     private static final int HEADER = 52;
     private static final int FOOTER = 36;
@@ -30,6 +30,7 @@ public class JobDroneScreen extends Screen {
     private final List<Entry> others = new ArrayList<>();
     private int panelX;
     private int panelY;
+    private int panelW;
     private int panelH;
     private int onScroll;
     private int otherScroll;
@@ -48,7 +49,7 @@ public class JobDroneScreen extends Screen {
         place();
         rebuild();
         back = addRenderableWidget(new WrightsButton(
-                panelX + 12, panelY + panelH - 26, PANEL_W - 24, 16,
+                panelX + 12, panelY + panelH - 26, panelW - 24, 16,
                 Component.translatable("screen.wrights.back"), button -> onClose()));
     }
 
@@ -66,7 +67,7 @@ public class JobDroneScreen extends Screen {
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         WrightsUi.scrim(graphics, this.width, this.height);
-        WrightsUi.panel(graphics, panelX, panelY, PANEL_W, panelH);
+        WrightsUi.panel(graphics, panelX, panelY, panelW, panelH);
     }
 
     @Override
@@ -77,13 +78,13 @@ public class JobDroneScreen extends Screen {
             return;
         }
         graphics.drawString(this.font, this.title, panelX + 16, panelY + 8, WrightsUi.COPPER, false);
-        graphics.drawString(this.font, this.font.plainSubstrByWidth(job.name(), PANEL_W - 32), panelX + 16, panelY + 20, WrightsUi.TEXT, false);
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(job.name(), panelW - 32), panelX + 16, panelY + 20, WrightsUi.TEXT, false);
         int busy = busyCount();
         int free = freeCount();
         Component summary = busy == 0
                 ? Component.translatable("screen.wrights.drone_split", assigned.size(), free)
                 : Component.translatable("screen.wrights.drone_split_busy", assigned.size(), free, busy);
-        graphics.drawString(this.font, this.font.plainSubstrByWidth(summary.getString(), PANEL_W - 32), panelX + 16, panelY + 32, WrightsUi.MUTED, false);
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(summary.getString(), panelW - 32), panelX + 16, panelY + 32, WrightsUi.MUTED, false);
 
         Well onJob = onJobWell();
         Well available = availableWell();
@@ -150,16 +151,17 @@ public class JobDroneScreen extends Screen {
     }
 
     private void place() {
-        panelH = Mth.clamp(this.height - 24, 240, 420);
-        panelX = (this.width - PANEL_W) / 2;
-        panelY = Math.max(8, (this.height - panelH) / 2);
+        panelW = WrightsUi.fitW(PREFERRED_W, this.width);
+        panelH = WrightsUi.fitH(420, this.height);
+        panelX = WrightsUi.centerX(panelW, this.width);
+        panelY = WrightsUi.centerY(panelH, this.height);
     }
 
     private Well onJobWell() {
         int top = panelY + HEADER;
         int body = panelH - HEADER - FOOTER;
-        int height = (body - 8) / 2;
-        return new Well(panelX + 12, top, PANEL_W - 24, height);
+        int height = Math.max(ROW + SECTION_HEAD + 4, (body - 8) / 2);
+        return new Well(panelX + 12, top, panelW - 24, height);
     }
 
     private Well availableWell() {

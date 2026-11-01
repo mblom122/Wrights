@@ -23,6 +23,24 @@ public final class WrightsUi {
     private WrightsUi() {
     }
 
+    /** Preferred panel width, never wider than the window. */
+    public static int fitW(int preferred, int screenW) {
+        return Math.min(preferred, Math.max(120, screenW - 16));
+    }
+
+    /** Preferred panel height, never taller than the window. */
+    public static int fitH(int preferred, int screenH) {
+        return Math.min(preferred, Math.max(100, screenH - 16));
+    }
+
+    public static int centerX(int panelW, int screenW) {
+        return Math.max(8, (screenW - panelW) / 2);
+    }
+
+    public static int centerY(int panelH, int screenH) {
+        return Math.max(4, (screenH - panelH) / 2);
+    }
+
     public static void scrim(GuiGraphics graphics, int width, int height) {
         graphics.fill(0, 0, width, height, 0xC0060C14);
     }

@@ -83,10 +83,10 @@ public class MaterialsScreen extends Screen {
 
     @Override
     protected void init() {
-        panelW = Math.min(digitalBound ? 640 : 520, this.width - 16);
-        panelH = Math.min(240, this.height - 16);
-        panelX = (this.width - panelW) / 2;
-        panelY = (this.height - panelH) / 2;
+        panelW = WrightsUi.fitW(digitalBound ? 640 : 520, this.width);
+        panelH = WrightsUi.fitH(240, this.height);
+        panelX = WrightsUi.centerX(panelW, this.width);
+        panelY = WrightsUi.centerY(panelH, this.height);
         listY = panelY + 36;
         listH = panelH - 78;
         int y = panelY + panelH - 28;

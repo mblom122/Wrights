@@ -80,10 +80,10 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
 
     @Override
     protected void init() {
-        panelW = Math.min(220, this.width - 16);
-        panelH = Math.min(248, this.height - 16);
+        panelW = WrightsUi.fitW(220, this.width);
+        panelH = WrightsUi.fitH(248, this.height);
         panelX = JeiPreview.left(this.width, panelW);
-        panelY = (this.height - panelH) / 2;
+        panelY = WrightsUi.centerY(panelH, this.height);
         search = new EditBox(this.font, panelX + 12, panelY + 28, panelW - 24, 16, Component.translatable("menu.wrights.search"));
         search.setHint(Component.translatable("menu.wrights.search"));
         search.setMaxLength(48);

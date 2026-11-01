@@ -34,8 +34,8 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
 
     @Override
     protected void init() {
-        this.imageWidth = Math.min(368, this.width - 16);
-        this.imageHeight = Math.min(348, this.height - 16);
+        this.imageWidth = WrightsUi.fitW(368, this.width);
+        this.imageHeight = WrightsUi.fitH(348, this.height);
         super.init();
         manage.setActive(true);
         clearWidgets();

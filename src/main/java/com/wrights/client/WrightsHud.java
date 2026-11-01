@@ -143,18 +143,19 @@ public final class WrightsHud {
             detailWidth += 16;
             detailHeight = 6 + look.size() * 12;
         } else if (line != null) {
+            boolean hideNote = note != null && showCtrlHelp(minecraft);
             detailWidth = minecraft.font.width(line);
             if (sub != null) {
                 detailWidth = Math.max(detailWidth, minecraft.font.width(sub));
             }
-            if (note != null) {
+            if (note != null && !hideNote) {
                 detailWidth = Math.max(detailWidth, minecraft.font.width(note));
             }
             if (offset != null) {
                 detailWidth = Math.max(detailWidth, minecraft.font.width(offset));
             }
             detailWidth += 16;
-            int rows = 1 + (sub == null ? 0 : 1) + (note == null ? 0 : 1) + (offset == null ? 0 : 1);
+            int rows = 1 + (sub == null ? 0 : 1) + (note == null || hideNote ? 0 : 1) + (offset == null ? 0 : 1);
             detailHeight = 6 + rows * 12;
         }
         int stackWidth = Math.max(taskWidth, detailWidth);
@@ -166,7 +167,7 @@ public final class WrightsHud {
         graphics.fill(taskX, stackY, taskX + taskWidth, stackY + 14, 0xC0101822);
         graphics.fill(taskX, stackY, taskX + 2, stackY + 14, WrightsUi.COPPER);
         graphics.drawString(minecraft.font, task, taskX + 8, stackY + 3, WrightsUi.COPPER, false);
-        if (line == null && look.isEmpty() && !showModes(minecraft)) {
+        if (line == null && look.isEmpty() && !showModes(minecraft) && !showMainModes(minecraft) && !showCtrlHelp(minecraft)) {
             return;
         }
         if (!look.isEmpty()) {
@@ -190,7 +191,8 @@ public final class WrightsHud {
                 textY += 12;
                 graphics.drawString(minecraft.font, sub, x + 8, textY, WrightsUi.MUTED, false);
             }
-            if (note != null) {
+            // Hide the one-line Ctrl tip while the full Ctrl hold panel is open.
+            if (note != null && !showCtrlHelp(minecraft)) {
                 textY += 12;
                 graphics.drawString(minecraft.font, note, x + 8, textY, 0xFFF0C14A, false);
             }
@@ -201,9 +203,67 @@ public final class WrightsHud {
         }
         if (showMainModes(minecraft)) {
             drawMainModes(graphics, minecraft);
+        } else if (showCtrlHelp(minecraft)) {
+            drawCtrlHelp(graphics, minecraft);
         } else if (showModes(minecraft)) {
             drawBuildModes(graphics, minecraft);
         }
+    }
+
+    private static boolean controlDown(Minecraft minecraft) {
+        return InputConstants.isKeyDown(minecraft.getWindow().getWindow(), GLFW.GLFW_KEY_LEFT_CONTROL)
+                || InputConstants.isKeyDown(minecraft.getWindow().getWindow(), GLFW.GLFW_KEY_RIGHT_CONTROL);
+    }
+
+    /** Ctrl alone — shortcuts for the current capture/build tool. */
+    private static boolean showCtrlHelp(Minecraft minecraft) {
+        return controlDown(minecraft) && !minecraft.player.isShiftKeyDown() && ctrlHelpKind() != CtrlHelp.NONE;
+    }
+
+    private enum CtrlHelp {
+        NONE,
+        RESIZE,
+        ROTATE
+    }
+
+    private static CtrlHelp ctrlHelpKind() {
+        if (WrightsClientState.mode == WrightsClientState.Mode.CAPTURE && WrightsClientState.hasBox()) {
+            return CtrlHelp.RESIZE;
+        }
+        if (WrightsClientState.mode == WrightsClientState.Mode.BUILD
+                && WrightsClientState.buildId != null
+                && !WrightsClientState.bindSupply
+                && !(WrightsClientState.mirrorToolActive() && WrightsClientConfig.mirrorBlocks())) {
+            return CtrlHelp.ROTATE;
+        }
+        return CtrlHelp.NONE;
+    }
+
+    private static void drawCtrlHelp(GuiGraphics graphics, Minecraft minecraft) {
+        CtrlHelp kind = ctrlHelpKind();
+        Component title = Component.translatable(kind == CtrlHelp.ROTATE ? "hud.wrights.ctrl_rotate_title" : "hud.wrights.ctrl_resize_title");
+        Component up = Component.translatable(kind == CtrlHelp.ROTATE ? "hud.wrights.ctrl_rotate_up" : "hud.wrights.ctrl_resize_up");
+        Component down = Component.translatable(kind == CtrlHelp.ROTATE ? "hud.wrights.ctrl_rotate_down" : "hud.wrights.ctrl_resize_down");
+        Component tip = Component.translatable(kind == CtrlHelp.ROTATE ? "hud.wrights.ctrl_rotate_tip" : "hud.wrights.ctrl_resize_tip");
+        Component how = Component.translatable("hud.wrights.ctrl_how");
+        int width = 220;
+        width = Math.max(width, minecraft.font.width(title) + 28);
+        width = Math.max(width, minecraft.font.width(up) + 28);
+        width = Math.max(width, minecraft.font.width(down) + 28);
+        int textWidth = width - 24;
+        int tipLines = Math.max(1, minecraft.font.split(tip, textWidth).size());
+        int howLines = Math.max(1, minecraft.font.split(how, textWidth).size());
+        int height = 28 + 18 * 2 + 8 + tipLines * 10 + 8 + howLines * 10;
+        int x = (graphics.guiWidth() - width) / 2;
+        int y = graphics.guiHeight() / 2 + 8;
+        WrightsUi.panel(graphics, x, y, width, height);
+        graphics.drawString(minecraft.font, title, x + 12, y + 8, WrightsUi.TEXT, false);
+        graphics.fill(x + 8, y + 21, x + width - 8, y + 35, 0xA0C47A3A);
+        graphics.drawString(minecraft.font, up, x + 14, y + 24, 0xFFFFFFFF, false);
+        graphics.drawString(minecraft.font, down, x + 14, y + 42, WrightsUi.MUTED, false);
+        int tipY = y + 62;
+        drawFooter(graphics, minecraft, tip, x + 12, tipY, textWidth, 0xFFF0C14A);
+        drawFooter(graphics, minecraft, how, x + 12, tipY + tipLines * 10 + 6, textWidth, WrightsUi.MUTED);
     }
 
     private static Component taskLine() {
@@ -232,9 +292,7 @@ public final class WrightsHud {
     }
 
     private static boolean showMainModes(Minecraft minecraft) {
-        boolean control = InputConstants.isKeyDown(minecraft.getWindow().getWindow(), GLFW.GLFW_KEY_LEFT_CONTROL)
-                || InputConstants.isKeyDown(minecraft.getWindow().getWindow(), GLFW.GLFW_KEY_RIGHT_CONTROL);
-        return minecraft.player.isShiftKeyDown() && control
+        return minecraft.player.isShiftKeyDown() && controlDown(minecraft)
                 || WrightsClientState.mainPicker && WrightsClientState.styleHudTicks > 0;
     }
 

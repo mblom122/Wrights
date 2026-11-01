@@ -209,6 +209,10 @@ public class WrightsMenuScreen extends Screen {
     private int optionViewW;
     private int optionViewH;
     private int optionContentH;
+    private int mirrorScroll;
+    private int mirrorViewTop;
+    private int mirrorViewH;
+    private int mirrorContentH;
     private int optionThumbY;
     private int optionThumbH;
     private boolean optionDragging;
@@ -418,10 +422,10 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private void layout() {
-        panelW = Math.min(540, this.width - 16);
-        panelH = Math.min(mirrorPage ? 480 : 360, this.height - 16);
-        panelX = (this.width - panelW) / 2;
-        panelY = (this.height - panelH) / 2;
+        panelW = WrightsUi.fitW(540, this.width);
+        panelH = WrightsUi.fitH(mirrorPage ? 480 : 360, this.height);
+        panelX = WrightsUi.centerX(panelW, this.width);
+        panelY = WrightsUi.centerY(panelH, this.height);
         listX = panelX + 126;
         headingY = panelY + 36;
         searchY = panelY + 68;
@@ -1596,10 +1600,14 @@ public class WrightsMenuScreen extends Screen {
         mirrorHelps.clear();
         mirrorTip = null;
         int x = listX + 8;
-        int y = panelY + 44;
         int w = Math.max(120, panelX + panelW - 28 - listX);
         mirrorBodyX = x;
         mirrorBodyW = w;
+        mirrorViewTop = panelY + 40;
+        mirrorViewH = Math.max(40, panelY + panelH - 10 - mirrorViewTop);
+        mirrorScroll = Mth.clamp(mirrorScroll, 0, Math.max(0, mirrorContentH - mirrorViewH));
+        graphics.enableScissor(x - 4, mirrorViewTop, x + w + 4, mirrorViewTop + mirrorViewH);
+        int y = mirrorViewTop - mirrorScroll;
         graphics.drawString(this.font, Component.translatable("menu.wrights.mirror_title"), x, y, WrightsUi.COPPER, false);
         y += 14;
         int gap = 6;
@@ -1747,6 +1755,22 @@ public class WrightsMenuScreen extends Screen {
         graphics.drawString(this.font, clear, mirrorClearX + 8, y + 5, clearOn ? WrightsUi.RED : WrightsUi.MUTED, false);
         drawHelpBox(graphics, mouseX, mouseY, mirrorClearX + clearW - 16, y + 3, "menu.wrights.mirror_clear_hint");
         mirrorClearY = y;
+        mirrorContentH = y + 18 - (mirrorViewTop - mirrorScroll);
+        graphics.disableScissor();
+        int maxScroll = Math.max(0, mirrorContentH - mirrorViewH);
+        mirrorScroll = Mth.clamp(mirrorScroll, 0, maxScroll);
+        if (maxScroll > 0) {
+            int track = mirrorViewH - 4;
+            int thumb = Math.max(16, track * mirrorViewH / mirrorContentH);
+            int thumbY = mirrorViewTop + 2 + (track - thumb) * mirrorScroll / maxScroll;
+            graphics.fill(x + w - 2, mirrorViewTop + 2, x + w, mirrorViewTop + mirrorViewH - 2, 0xFF1A2836);
+            graphics.fill(x + w - 2, thumbY, x + w, thumbY + thumb, WrightsUi.COPPER_DIM);
+        }
+    }
+
+    private boolean insideMirrorView(double mouseX, double mouseY) {
+        return mirrorPage && mouseX >= mirrorBodyX - 4 && mouseX < mirrorBodyX + mirrorBodyW + 4
+                && mouseY >= mirrorViewTop && mouseY < mirrorViewTop + mirrorViewH;
     }
 
     private static String mirrorAxisKey(Direction.Axis axis) {
@@ -3446,6 +3470,11 @@ public class WrightsMenuScreen extends Screen {
         if (options && insideOptionView(mouseX, mouseY)) {
             int max = Math.max(0, optionContentH - optionViewH);
             optionScroll = Mth.clamp(optionScroll - (int) Math.signum(scrollY) * 16, 0, max);
+            return true;
+        }
+        if (insideMirrorView(mouseX, mouseY)) {
+            int max = Math.max(0, mirrorContentH - mirrorViewH);
+            mirrorScroll = Mth.clamp(mirrorScroll - (int) Math.signum(scrollY) * 16, 0, max);
             return true;
         }
         if (insideList(mouseX, mouseY)) {

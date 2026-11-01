@@ -58,10 +58,10 @@ public class FolderLoadScreen extends Screen {
 
     @Override
     protected void init() {
-        panelW = Math.min(500, this.width - 16);
-        panelH = Math.min(320, this.height - 16);
-        panelX = (this.width - panelW) / 2;
-        panelY = (this.height - panelH) / 2;
+        panelW = WrightsUi.fitW(500, this.width);
+        panelH = WrightsUi.fitH(320, this.height);
+        panelX = WrightsUi.centerX(panelW, this.width);
+        panelY = WrightsUi.centerY(panelH, this.height);
         listX = panelX + 12;
         listY = panelY + 32;
         listW = Math.min(220, panelW / 2);
