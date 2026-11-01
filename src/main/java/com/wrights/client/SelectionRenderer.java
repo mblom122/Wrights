@@ -66,6 +66,11 @@ public final class SelectionRenderer {
     private static Vec3 viewLook = new Vec3(0.0D, 0.0D, 1.0D);
     /** Keep line vertices this far in front of the camera. A vertex behind it makes the whole edge vanish. */
     private static final double EDGE_NEAR = 0.08D;
+    /** Local (unpinned) shape cells — rebuilt only when shape settings change, not every look-frame. */
+    private static long shapeLocalKey = Long.MIN_VALUE;
+    private static List<BlockPos> shapeLocal = List.of();
+    private static BlockPos shapeLocalMin = BlockPos.ZERO;
+    private static BlockPos shapeLocalMax = BlockPos.ZERO;
 
     private SelectionRenderer() {
     }
@@ -130,16 +135,16 @@ public final class SelectionRenderer {
             return;
         }
         String here = minecraft.level.dimension().location().toString();
-        BlockPos center;
+        BlockPos target;
         boolean useAnchor = WrightsConfig.allowShapeAnchor() && WrightsClientConfig.SHAPE_USE_ANCHOR.get();
         if (useAnchor) {
             if (!WrightsClientConfig.shapePlaced(here)) {
                 return;
             }
-            center = WrightsClientConfig.shapeAnchor();
+            target = WrightsClientConfig.shapeAnchor();
         } else {
-            center = WrightsClientState.shapeLookTarget();
-            if (center == null) {
+            target = WrightsClientState.shapeLookTarget();
+            if (target == null) {
                 return;
             }
         }
@@ -155,51 +160,94 @@ public final class SelectionRenderer {
         int plane = WrightsClientConfig.SHAPE_PLANE.get();
         int yaw = WrightsClientConfig.SHAPE_YAW.get();
         int pivot = WrightsClientConfig.SHAPE_PIVOT.get();
-        List<BlockPos> worlds = com.wrights.blueprint.Shapes.blocksPinned(
-                kind, center, size, height, thickness, hollow, plane, yaw, pivot);
-        if (worlds.isEmpty()) {
+        ensureShapeLocal(kind, size, height, thickness, hollow, plane, yaw);
+        if (shapeLocal.isEmpty()) {
             return;
         }
+        BlockPos pinLocal = com.wrights.blueprint.Shapes.pivotBlock(shapeLocalMin, shapeLocalMax, pivot);
+        int ox = target.getX() - pinLocal.getX();
+        int oy = target.getY() - pinLocal.getY();
+        int oz = target.getZ() - pinLocal.getZ();
+        BlockPos worldMin = shapeLocalMin.offset(ox, oy, oz);
+        BlockPos worldMax = shapeLocalMax.offset(ox, oy, oz);
+        // Bounds are O(1). RFTools-style placement cue — always cheap even for huge volumes.
+        drawShapeBounds(pose, buffers, camera, worldMin, worldMax, target);
+
         boolean voidBlocks = WrightsClientConfig.SHAPE_VOID.get() && WrightsConfig.allowShapeVoid();
-        List<BlockPos> ready = new java.util.ArrayList<>();
-        for (BlockPos world : worlds) {
+        int budget = previewBudget();
+        int total = shapeLocal.size();
+        // Never walk / allocate the whole million-block list for ghosts. Stride the cached locals.
+        int step = Math.max(1, (total + budget - 1) / budget);
+        int capacity = Math.min(budget, (total + step - 1) / step);
+        java.util.ArrayList<BlockPos> drawAt = new java.util.ArrayList<>(capacity);
+        double limit = rangeSqr();
+        for (int i = 0; i < total && drawAt.size() < budget; i += step) {
+            BlockPos local = shapeLocal.get(i);
+            BlockPos world = local.offset(ox, oy, oz);
+            double dx = world.getX() + 0.5D - camera.x;
+            double dy = world.getY() + 0.5D - camera.y;
+            double dz = world.getZ() + 0.5D - camera.z;
+            if (dx * dx + dy * dy + dz * dz > limit) {
+                continue;
+            }
             if (!voidBlocks && !minecraft.level.getBlockState(world).isAir()) {
                 continue;
             }
-            ready.add(world);
+            drawAt.add(world);
         }
-        if (!ready.isEmpty()) {
-            java.util.Random previewRandom = new java.util.Random(center.asLong() ^ materials.hashCode());
-            List<BlockState> planned = com.wrights.blueprint.ShapeMaterials.assign(
-                    materials,
-                    ready.size(),
-                    WrightsClientConfig.shapeFillMode(),
-                    WrightsClientConfig.SHAPE_ORDER_BATCH.get(),
-                    previewRandom,
-                    true,
-                    item -> Long.MAX_VALUE / 4L,
-                    true);
-            BlockRenderDispatcher renderer = minecraft.getBlockRenderer();
-            int budget = previewBudget();
-            int drawn = 0;
-            for (int i = 0; i < ready.size() && drawn < budget; i++) {
-                BlockPos world = ready.get(i);
-                double dx = world.getX() + 0.5D - camera.x;
-                double dy = world.getY() + 0.5D - camera.y;
-                double dz = world.getZ() + 0.5D - camera.z;
-                if (dx * dx + dy * dy + dz * dz > rangeSqr()) {
-                    continue;
-                }
-                BlockState state = i < planned.size() ? planned.get(i) : null;
-                if (state == null || !ghostVisible(state)) {
-                    continue;
-                }
-                drawGhost(pose, buffers, renderer, camera, world.getX(), world.getY(), world.getZ(), state);
-                drawn++;
+        if (drawAt.isEmpty()) {
+            return;
+        }
+        java.util.Random previewRandom = new java.util.Random(target.asLong() ^ materials.hashCode());
+        List<BlockState> planned = com.wrights.blueprint.ShapeMaterials.assign(
+                materials,
+                drawAt.size(),
+                WrightsClientConfig.shapeFillMode(),
+                WrightsClientConfig.SHAPE_ORDER_BATCH.get(),
+                previewRandom,
+                true,
+                item -> Long.MAX_VALUE / 4L,
+                true);
+        BlockRenderDispatcher renderer = minecraft.getBlockRenderer();
+        for (int i = 0; i < drawAt.size(); i++) {
+            BlockPos world = drawAt.get(i);
+            BlockState state = i < planned.size() ? planned.get(i) : null;
+            if (state == null || !ghostVisible(state)) {
+                continue;
             }
-            buffers.endBatch();
+            drawGhost(pose, buffers, renderer, camera, world.getX(), world.getY(), world.getZ(), state);
         }
-        drawShapeBounds(pose, buffers, camera, worlds, center);
+        buffers.endBatch();
+    }
+
+    /** Rebuild local shape cells only when kind/size/etc change — not when the look target moves. */
+    private static void ensureShapeLocal(
+            com.wrights.blueprint.Shapes.Kind kind,
+            int size,
+            int height,
+            int thickness,
+            boolean hollow,
+            int plane,
+            int yaw) {
+        long key = (((long) kind.ordinal() & 0xF) << 56)
+                | (((long) size & 0x3FF) << 46)
+                | (((long) height & 0x3FF) << 36)
+                | (((long) thickness & 0x3FF) << 26)
+                | (((long) plane & 0x3) << 24)
+                | (((long) yaw & 0x3) << 22)
+                | (hollow ? 1L << 21 : 0L);
+        if (key == shapeLocalKey) {
+            return;
+        }
+        shapeLocalKey = key;
+        shapeLocal = com.wrights.blueprint.Shapes.blocks(kind, BlockPos.ZERO, size, height, thickness, hollow, plane, yaw);
+        if (shapeLocal.isEmpty()) {
+            shapeLocalMin = BlockPos.ZERO;
+            shapeLocalMax = BlockPos.ZERO;
+            return;
+        }
+        shapeLocalMin = com.wrights.blueprint.Shapes.origin(shapeLocal);
+        shapeLocalMax = com.wrights.blueprint.Shapes.extent(shapeLocal);
     }
 
     /** Wire AABB around the full shape plus a see-through pivot marker at the pin cell. */
@@ -207,10 +255,9 @@ public final class SelectionRenderer {
             PoseStack pose,
             MultiBufferSource.BufferSource buffers,
             Vec3 camera,
-            List<BlockPos> worlds,
+            BlockPos min,
+            BlockPos max,
             BlockPos pin) {
-        BlockPos min = com.wrights.blueprint.Shapes.origin(worlds);
-        BlockPos max = com.wrights.blueprint.Shapes.extent(worlds);
         AABB box = new AABB(min.getX(), min.getY(), min.getZ(), max.getX() + 1.0D, max.getY() + 1.0D, max.getZ() + 1.0D)
                 .inflate(0.015D);
         float pulse = 0.55F + 0.35F * (float) Math.sin(System.currentTimeMillis() / 280.0D);
