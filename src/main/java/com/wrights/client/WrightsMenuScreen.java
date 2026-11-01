@@ -612,6 +612,7 @@ public class WrightsMenuScreen extends Screen {
         if (previewButton.visible) {
             discardButton.visible = false;
         }
+        placeModeButtons(building);
         boolean showOptions = options;
         wallPercent.visible = showOptions;
         edgePercent.visible = showOptions;
@@ -3101,6 +3102,54 @@ public class WrightsMenuScreen extends Screen {
         materialsButton.setX(detailX + 4);
         materialsButton.setY(footY);
         materialsButton.visible = buildingPage;
+    }
+
+    /**
+     * Cancel place / Resume / Discard sit in the detail footer — never on the left task strip,
+     * where a short panel (large GUI scale) would overlap Info/Options.
+     */
+    private void placeModeButtons(boolean building) {
+        if (!building) {
+            return;
+        }
+        int footY = detailY + detailH - detailFooterH + 2;
+        int h = closeButton != null ? closeButton.getHeight() : 16;
+        int left = detailX + 4;
+        if (materialsButton != null && materialsButton.visible && compactDetailFooter()) {
+            left = materialsButton.getX() + materialsButton.getWidth() + 4;
+        }
+        int rightLimit = buildButton != null && buildButton.visible
+                ? buildButton.getX() - 4
+                : closeButton != null ? closeButton.getX() - 4 : detailX + detailW;
+        if (previewButton != null && previewButton.visible) {
+            int w = Math.max(52, this.font.width(previewButton.getMessage()) + 12);
+            if (left + w > rightLimit) {
+                left = Math.max(detailX + 4, rightLimit - w);
+            }
+            previewButton.setWidth(Math.min(w, Math.max(40, rightLimit - left)));
+            previewButton.setHeight(h);
+            previewButton.setX(left);
+            previewButton.setY(footY);
+            return;
+        }
+        if (resumeButton != null && resumeButton.visible) {
+            int w = Math.max(52, this.font.width(resumeButton.getMessage()) + 12);
+            resumeButton.setWidth(Math.min(w, Math.max(40, rightLimit - left)));
+            resumeButton.setHeight(h);
+            resumeButton.setX(left);
+            resumeButton.setY(footY);
+            left += resumeButton.getWidth() + 4;
+        }
+        if (discardButton != null && discardButton.visible) {
+            int w = Math.max(52, this.font.width(discardButton.getMessage()) + 12);
+            if (left + w > rightLimit) {
+                left = Math.max(detailX + 4, rightLimit - w);
+            }
+            discardButton.setWidth(Math.min(w, Math.max(40, rightLimit - left)));
+            discardButton.setHeight(h);
+            discardButton.setX(left);
+            discardButton.setY(footY);
+        }
     }
 
     private int jobsInsetY() {
