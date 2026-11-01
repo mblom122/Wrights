@@ -444,6 +444,48 @@ public final class Shapes {
     }
 
     /**
+     * Anchor so a player at {@code feet} ends standing on the center of the shape’s top face
+     * after the build (feet on the block above that top cell).
+     */
+    public static BlockPos anchorStandingOnTop(
+            Kind kind,
+            BlockPos feet,
+            int size,
+            int height,
+            int thickness,
+            boolean hollow,
+            int plane,
+            boolean flipVertical,
+            int yaw) {
+        if (feet == null) {
+            return BlockPos.ZERO;
+        }
+        List<BlockPos> local = blocks(kind, BlockPos.ZERO, size, height, thickness, hollow, plane, flipVertical, yaw);
+        if (local.isEmpty()) {
+            return feet.below();
+        }
+        int minX = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE;
+        int maxY = Integer.MIN_VALUE;
+        int minZ = Integer.MAX_VALUE;
+        int maxZ = Integer.MIN_VALUE;
+        for (BlockPos pos : local) {
+            minX = Math.min(minX, pos.getX());
+            maxX = Math.max(maxX, pos.getX());
+            maxY = Math.max(maxY, pos.getY());
+            minZ = Math.min(minZ, pos.getZ());
+            maxZ = Math.max(maxZ, pos.getZ());
+        }
+        int topCenterX = (minX + maxX) >> 1;
+        int topCenterZ = (minZ + maxZ) >> 1;
+        // Top of the shape should be the block under the player's feet.
+        return new BlockPos(
+                feet.getX() - topCenterX,
+                feet.getY() - 1 - maxY,
+                feet.getZ() - topCenterZ);
+    }
+
+    /**
      * Aim cell for look-at builds: the block next to the clicked face.
      * That cell becomes the shape’s bottom corner ({@link #blocksFromCorner}), not its center.
      */

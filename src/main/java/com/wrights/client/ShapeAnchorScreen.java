@@ -207,10 +207,21 @@ public class ShapeAnchorScreen extends Screen {
     }
 
     private void usePlayer() {
-        BlockPos pos = playerOrZero();
         if (this.minecraft != null && this.minecraft.level != null) {
             dimension = this.minecraft.level.dimension().location().toString();
         }
+        // Same as “Set under me”: stand on the center of the shape’s top when it finishes.
+        BlockPos feet = playerOrZero();
+        BlockPos pos = com.wrights.blueprint.Shapes.anchorStandingOnTop(
+                com.wrights.blueprint.Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get()),
+                feet,
+                WrightsClientConfig.SHAPE_SIZE.get(),
+                WrightsClientConfig.SHAPE_HEIGHT.get(),
+                WrightsClientConfig.SHAPE_THICKNESS.get(),
+                WrightsClientConfig.SHAPE_HOLLOW.get(),
+                WrightsClientConfig.SHAPE_PLANE.get(),
+                WrightsClientConfig.SHAPE_FLIP_VERTICAL.get(),
+                WrightsClientConfig.SHAPE_YAW.get());
         apply(pos);
     }
 

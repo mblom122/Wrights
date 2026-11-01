@@ -147,6 +147,15 @@ final class ShapeMenuPanel {
                 "menu.wrights.shape_place_anchor",
                 "place");
         y += 4;
+        if (WrightsClientConfig.SHAPE_USE_ANCHOR.get()) {
+            drawSection(graphics, mouseX, mouseY, x, y, "menu.wrights.shape_under_me", "menu.wrights.shape_under_me_hint");
+            y += 12;
+            boolean underHover = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 18;
+            WrightsUi.choice(graphics, x, y, width, 18, false, underHover);
+            graphics.drawCenteredString(font, Component.translatable("menu.wrights.shape_under_me_btn"), x + width / 2, y + 5, WrightsUi.TEXT);
+            hits.add(new Hit(x, y, width, 18, "under_me", 0));
+            y += 22;
+        }
         int col = (width - 6) / 2;
         int right = x + col + 6;
         y = drawToggle(graphics, mouseX, mouseY, x, y, col, WrightsClientConfig.SHAPE_HOLLOW.get(), "menu.wrights.shape_hollow", "menu.wrights.shape_hollow_hint", "hollow");
@@ -258,6 +267,10 @@ final class ShapeMenuPanel {
                 WrightsClientConfig.setShapeUseAnchor(value != 0);
                 yield true;
             }
+            case "under_me" -> {
+                setAnchorUnderPlayer();
+                yield true;
+            }
             case "hollow" -> {
                 WrightsClientConfig.setShapeHollow(!WrightsClientConfig.SHAPE_HOLLOW.get());
                 yield true;
@@ -356,6 +369,30 @@ final class ShapeMenuPanel {
             }
             default -> false;
         };
+    }
+
+    /** Anchor so the player will stand on the center of the finished shape’s top. */
+    private void setAnchorUnderPlayer() {
+        net.minecraft.client.Minecraft minecraft = net.minecraft.client.Minecraft.getInstance();
+        if (minecraft.player == null || minecraft.level == null) {
+            return;
+        }
+        Shapes.Kind kind = Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
+        BlockPos anchor = Shapes.anchorStandingOnTop(
+                kind,
+                minecraft.player.blockPosition(),
+                WrightsClientConfig.SHAPE_SIZE.get(),
+                WrightsClientConfig.SHAPE_HEIGHT.get(),
+                WrightsClientConfig.SHAPE_THICKNESS.get(),
+                WrightsClientConfig.SHAPE_HOLLOW.get(),
+                WrightsClientConfig.SHAPE_PLANE.get(),
+                WrightsClientConfig.SHAPE_FLIP_VERTICAL.get(),
+                WrightsClientConfig.SHAPE_YAW.get());
+        WrightsClientState.setShapeAnchor(anchor);
+        WrightsClientConfig.setShapeUseAnchor(true);
+        minecraft.player.displayClientMessage(
+                Component.translatable("message.wrights.shape_under_me", anchor.getX(), anchor.getY(), anchor.getZ()),
+                true);
     }
 
     /** Replace the materials list with the picker tray, keeping weights for blocks that stay. */
