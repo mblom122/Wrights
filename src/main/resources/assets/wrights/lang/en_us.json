@@ -941,7 +941,7 @@
   "message.wrights.exchange_same_look": "Look at a solid block to exchange that type",
   "menu.wrights.exchange_silk": "Silk touch",
   "menu.wrights.exchange_silk_hint": "Return the replaced blocks with silk touch instead of destroying them.",
-  "menu.wrights.exchange_void_hint": "Clears each matching block before placing Replace with. Off skips occupied cells. Turn this on to actually swap solids.",
+  "menu.wrights.exchange_void_hint": "Exchange always swaps matching solids.\nOff: the old blocks are returned to you (silk touch if that option is on).\nOn: the old blocks are destroyed and nothing is returned.",
   "menu.wrights.exchange_mark": "Swap",
   "menu.wrights.exchange_form": "Form",
   "menu.wrights.exchange_form_hint": "Presets set Kind and Axis for you. Floor and Wall are plates — tick Equal sides for one Size, or leave it off for Width and Height. Wall faces the way you look. Pillar is a vertical 1×1 post; Beam is a horizontal 1-thick line. Ctrl+scroll changes Size (Pillar height / Beam length).",
@@ -1351,7 +1351,7 @@
 
   "help.wrights.exchange.lead": "Exchange swaps solid blocks inside a shape volume for your Replace with materials.",
   "help.wrights.exchange.h1": "How to use it",
-  "help.wrights.exchange.p1": "In Build, Shift+scroll to Exchange. Pick a Form (Floor, Wall, Pillar, Beam, Circle, Rectangle, Square) — orientation is set for you. Pillar is vertical 1×1; Beam is a horizontal 1-thick line. Rectangle has Width×Height; Square is Size only. Set Replace with on the Exchange page (or middle-click a block). Turn on Void blocks to clear solids before placing.",
+  "help.wrights.exchange.p1": "In Build, Shift+scroll to Exchange. Pick a Form (Floor, Wall, Pillar, Beam, Circle) — orientation is set for you. Floor and Wall can lock Equal sides. Pillar is vertical 1×1; Beam is a horizontal 1-thick line. Set Replace with on the Exchange page (or middle-click a block). Exchange always swaps matching solids — Void blocks destroys them with no returns; leave Void off to get the old blocks back.",
   "help.wrights.exchange.h2": "Clicks",
   "help.wrights.exchange.p2": "Right-click runs the exchange. Middle-click aiming at a block sets Replace with (same as creative pick). Ctrl+scroll changes Size (Pillar height / Beam length). Ctrl+right-click sets the world anchor. Ctrl+Shift+right-click opens Exchange options.",
   "help.wrights.exchange.tip": "Wall and Beam face across the direction you are looking when you pick them. Exchange still spends items from Player, a bound chest, or a linked network like any other job.",

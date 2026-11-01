@@ -5316,9 +5316,14 @@ public final class JobManager {
         }
         if (clearFirst) {
             if (job.exchangeJob()) {
-                // Same as Mirror mine: harvest into the player and show the drop on the wright.
-                ItemStack tool = job.exchangeSilk() ? silkTouchPick(level.getServer()) : ItemStack.EMPTY;
-                showCarry(level, job, hand, com.wrights.blueprint.MirrorLaunch.harvest(player, level, pos, tool, false));
+                if (job.voidBlocks()) {
+                    // Void on: destroy with no returns to the player.
+                    voidCell(level, pos);
+                } else {
+                    // Void off: still swap, but harvest drops back (silk if enabled).
+                    ItemStack tool = job.exchangeSilk() ? silkTouchPick(level.getServer()) : ItemStack.EMPTY;
+                    showCarry(level, job, hand, com.wrights.blueprint.MirrorLaunch.harvest(player, level, pos, tool, false));
+                }
             } else {
                 voidCell(level, pos);
             }
@@ -5537,6 +5542,10 @@ public final class JobManager {
         }
         if (BlockFilters.isFluid(existing)) {
             return job.voidFluids();
+        }
+        // Exchange always clears matching solids; Void only controls whether drops return.
+        if (job.exchangeJob()) {
+            return true;
         }
         return job.voidBlocks();
     }

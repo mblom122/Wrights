@@ -233,10 +233,7 @@ public final class SelectionRenderer {
             }
             BlockState world = minecraft.level.getBlockState(cursor.set(wx, wy, wz));
             if (exchange) {
-                // Ghosts mark solids Exchange will actually hit (void off → none if occupied stay).
-                if (!voidBlocks) {
-                    continue;
-                }
+                // Ghosts mark solids Exchange will swap (Void only controls whether drops return).
                 if (!com.wrights.util.BlockFilters.canExchange(minecraft.level, cursor, world)) {
                     continue;
                 }
