@@ -1510,8 +1510,13 @@ public final class WrightsClientState {
             return false;
         }
         if (!useAnchor && (pos == null || face == null)) {
-            minecraft.player.displayClientMessage(Component.translatable("message.wrights.shape_look"), true);
-            return false;
+            BlockHitResult aim = shapeLookHit();
+            if (aim == null) {
+                minecraft.player.displayClientMessage(Component.translatable("message.wrights.shape_look"), true);
+                return false;
+            }
+            pos = aim.getBlockPos();
+            face = aim.getDirection();
         }
         pendingShape = new BlueprintPayloads.ShapePlace(
                 pos == null ? BlockPos.ZERO : pos,
@@ -2363,19 +2368,50 @@ public final class WrightsClientState {
     }
 
     public static BlockPos lookTarget() {
+        BlockHitResult hit = lookHit();
+        if (hit != null) {
+            return hit.getBlockPos().relative(hit.getDirection());
+        }
+        Player player = Minecraft.getInstance().player;
+        return player != null ? fallbackAnchor(player) : BlockPos.ZERO;
+    }
+
+    /**
+     * Long-range block under the crosshair — same reach as build holograms ({@link WrightsConfig#MAX_RANGE}).
+     * Null when looking at air / too far.
+     */
+    public static BlockHitResult lookHit() {
         Minecraft minecraft = Minecraft.getInstance();
         Player player = minecraft.player;
-        if (player != null && minecraft.level != null) {
-            double range = WrightsConfig.MAX_RANGE.getAsInt();
-            Vec3 eye = player.getEyePosition(1.0F);
-            Vec3 end = eye.add(player.getViewVector(1.0F).scale(range));
-            BlockHitResult hit = minecraft.level.clip(new ClipContext(eye, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player));
-            if (hit.getType() == HitResult.Type.BLOCK && eye.distanceToSqr(hit.getLocation()) <= range * range) {
-                return hit.getBlockPos().relative(hit.getDirection());
-            }
-            return fallbackAnchor(player);
+        if (player == null || minecraft.level == null) {
+            return null;
         }
-        return BlockPos.ZERO;
+        double range = WrightsConfig.MAX_RANGE.getAsInt();
+        Vec3 eye = player.getEyePosition(1.0F);
+        Vec3 end = eye.add(player.getViewVector(1.0F).scale(range));
+        BlockHitResult hit = minecraft.level.clip(new ClipContext(eye, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player));
+        if (hit.getType() == HitResult.Type.BLOCK && eye.distanceToSqr(hit.getLocation()) <= range * range) {
+            return hit;
+        }
+        return null;
+    }
+
+    /**
+     * Shape “where I look” aim: a real long-range block hit, or a synthetic hit on the hologram
+     * fallback cell when looking at air so placement still works out to {@link WrightsConfig#MAX_RANGE}.
+     */
+    public static BlockHitResult shapeLookHit() {
+        BlockHitResult hit = lookHit();
+        if (hit != null) {
+            return hit;
+        }
+        Player player = Minecraft.getInstance().player;
+        if (player == null) {
+            return null;
+        }
+        BlockPos place = fallbackAnchor(player);
+        // lookCenter(place.below(), UP) == place
+        return new BlockHitResult(Vec3.atCenterOf(place), Direction.UP, place.below(), false);
     }
 
     public static BlockPos fallbackAnchor(Player player) {

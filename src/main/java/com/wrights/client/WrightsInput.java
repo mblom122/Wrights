@@ -555,14 +555,24 @@ public final class WrightsInput {
             return;
         }
         if (player.isShiftKeyDown()) {
-            if (pos != null) {
-                WrightsClientState.setShapeAnchor(pos);
-                player.displayClientMessage(Component.translatable("message.wrights.shape_set", pos.getX(), pos.getY(), pos.getZ()), true);
+            // Prefer long-range look so the anchor can be set as far as holograms aim.
+            BlockHitResult aim = WrightsClientState.lookHit();
+            BlockPos at = aim != null ? aim.getBlockPos() : pos;
+            if (at != null) {
+                WrightsClientState.setShapeAnchor(at);
+                player.displayClientMessage(Component.translatable("message.wrights.shape_set", at.getX(), at.getY(), at.getZ()), true);
             } else {
                 com.wrights.WrightsClientConfig.clearShapeAnchor();
                 player.displayClientMessage(Component.translatable("message.wrights.shape_cleared"), true);
             }
             return;
+        }
+        if (!com.wrights.WrightsClientConfig.SHAPE_USE_ANCHOR.get()) {
+            BlockHitResult aim = WrightsClientState.shapeLookHit();
+            if (aim != null) {
+                pos = aim.getBlockPos();
+                face = aim.getDirection();
+            }
         }
         WrightsClientState.tryShape(false, pos, face);
     }

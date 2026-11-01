@@ -134,10 +134,13 @@ public final class SelectionRenderer {
                 return;
             }
             center = WrightsClientConfig.shapeAnchor();
-        } else if (minecraft.hitResult instanceof BlockHitResult hit && hit.getType() == HitResult.Type.BLOCK) {
-            center = com.wrights.blueprint.Shapes.lookCenter(hit.getBlockPos(), hit.getDirection());
         } else {
-            return;
+            // Same long-range aim as build holograms (not vanilla ~4.5 block reach).
+            BlockHitResult hit = WrightsClientState.shapeLookHit();
+            if (hit == null) {
+                return;
+            }
+            center = com.wrights.blueprint.Shapes.lookCenter(hit.getBlockPos(), hit.getDirection());
         }
         List<com.wrights.blueprint.ShapeMaterials.Entry> materials = WrightsClientConfig.shapeMaterials();
         if (com.wrights.blueprint.ShapeMaterials.states(materials).isEmpty()) {
