@@ -1887,9 +1887,9 @@ public class WrightsMenuScreen extends Screen {
             }
         }
         y += 6;
+        y = beginMirrorSection(graphics, mouseX, mouseY, x, y, lineEnd, "menu.wrights.mirror_section_anchor", "menu.wrights.mirror_section_anchor_hint", false);
         int statusH = drawMirrorStatus(graphics, mouseX, mouseY, x, y, w);
         y += statusH + 6;
-        y = beginMirrorSection(graphics, mouseX, mouseY, x, y, lineEnd, "menu.wrights.mirror_section_anchor", "menu.wrights.mirror_section_anchor_hint", false);
         mirrorHighlightY = y;
         int buttonGap = 8;
         int clearW = Math.min(108, Math.max(72, (w - buttonGap) / 2));
