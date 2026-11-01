@@ -591,6 +591,9 @@ public final class JobManager {
         data = data.ensureId();
         cancel(player, false);
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        if (!jobSlotOpen(player, library)) {
+            return;
+        }
         UUID previous = data.schematicId().orElse(null);
         if (previous != null && !library.isInUse(previous)) {
             library.removeSchematic(previous);
@@ -626,6 +629,9 @@ public final class JobManager {
             return;
         }
         cancel(player, false);
+        if (!jobSlotOpen(player, library)) {
+            return;
+        }
         BuildJob job = BuildJob.paste(
                 player.getUUID(),
                 data.controllerId().orElseThrow(),
@@ -650,6 +656,9 @@ public final class JobManager {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         if (hasCopy(library, player.getUUID())) {
             Messages.actionBar(player, "message.wrights.busy");
+            return false;
+        }
+        if (!jobSlotOpen(player, library)) {
             return false;
         }
         if (replaceId != null && library.isInUse(replaceId)) {
@@ -710,6 +719,9 @@ public final class JobManager {
         Schematic schematic = library.schematic(schematicId).orElse(null);
         if (schematic == null || schematic.blockCount() == 0) {
             Messages.actionBar(player, "message.wrights.blueprint_missing");
+            return false;
+        }
+        if (!jobSlotOpen(player, library)) {
             return false;
         }
         if (overlapsBuild(library, player.level().dimension(), schematic, origin, sizeX, sizeY, sizeZ)) {
@@ -783,6 +795,9 @@ public final class JobManager {
             return false;
         }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        if (!jobSlotOpen(player, library)) {
+            return false;
+        }
         library.putSchematic(schematic);
         BlockPos origin = schematic.sourceMin();
         BuildJob job = BuildJob.paste(
@@ -830,6 +845,16 @@ public final class JobManager {
                 return true;
             }
         }
+        return false;
+    }
+
+    /** False when the player already has {@link WrightsConfig#maxJobs()} unfinished jobs. */
+    private static boolean jobSlotOpen(ServerPlayer player, SchematicLibrary library) {
+        int cap = WrightsConfig.maxJobs();
+        if (library.activeJobCount(player.getUUID()) < cap) {
+            return true;
+        }
+        Messages.actionBar(player, "message.wrights.job_limit", cap);
         return false;
     }
 
@@ -966,6 +991,9 @@ public final class JobManager {
             return false;
         }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        if (!jobSlotOpen(player, library)) {
+            return false;
+        }
         if (overlapsJobBoxes(library, player.level().dimension(), min, max)) {
             Messages.actionBar(player, "message.wrights.build_overlap");
             return false;

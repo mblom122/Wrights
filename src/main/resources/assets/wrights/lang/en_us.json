@@ -913,6 +913,7 @@
   "message.wrights.launched_crew": "Sent %s wrights",
   "message.wrights.drone_block_cap": "This job has %s blocks, so it can't use more wrights than that.",
   "message.wrights.job_wright_cap": "A job can use at most %s wrights",
+  "message.wrights.job_limit": "You can have at most %s jobs at once",
   "config.jade.plugin_wrights.wright": "Wright",
   "config.jade.plugin_wrights.wrightport": "Wrightport",
   "jade.wrights.tier": "%s wright",

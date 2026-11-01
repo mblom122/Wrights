@@ -701,24 +701,29 @@ public final class WrightsHud {
     }
 
     private static Component placeFooter() {
-        return switch (WrightsClientConfig.placeStyle()) {
-            case 1 -> Component.translatable("hud.wrights.place_me_explain");
-            case 2 -> WrightsClientState.bridgeActive
-                    ? Component.translatable(
-                            "hud.wrights.place_bridge_ready",
-                            Component.translatable("hud.wrights.place_bridge_state_on").withStyle(ChatFormatting.GREEN))
-                    : Component.translatable(
-                            "hud.wrights.place_bridge_explain",
-                            Component.translatable("hud.wrights.place_bridge_state_off").withStyle(ChatFormatting.RED));
-            case 3 -> WrightsClientState.bridgeActive
+        int style = WrightsClientConfig.placeStyle();
+        if (style == 1) {
+            return Component.translatable("hud.wrights.place_me_explain");
+        }
+        if (style == 3) {
+            return WrightsClientState.bridgeActive
                     ? Component.translatable(
                             "hud.wrights.place_stairs_ready",
                             Component.translatable("hud.wrights.place_stairs_state_on").withStyle(ChatFormatting.GREEN))
                     : Component.translatable(
                             "hud.wrights.place_stairs_explain",
                             Component.translatable("hud.wrights.place_stairs_state_off").withStyle(ChatFormatting.RED));
-            default -> Component.translatable("hud.wrights.place_look_explain");
-        };
+        }
+        if (style == 2) {
+            return WrightsClientState.bridgeActive
+                    ? Component.translatable(
+                            "hud.wrights.place_bridge_ready",
+                            Component.translatable("hud.wrights.place_bridge_state_on").withStyle(ChatFormatting.GREEN))
+                    : Component.translatable(
+                            "hud.wrights.place_bridge_explain",
+                            Component.translatable("hud.wrights.place_bridge_state_off").withStyle(ChatFormatting.RED));
+        }
+        return Component.translatable("hud.wrights.place_look_explain");
     }
 
     /** Title line: Blocks/Blueprints plus copies or axis mix. */

@@ -23,6 +23,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
 
+import com.wrights.WrightsConfig;
 import com.wrights.job.BuildJob;
 import com.wrights.storage.DigitalLink;
 
@@ -91,6 +92,7 @@ public final class SchematicLibrary extends SavedData {
                 }
             }
         }
+        library.pruneAllHistory();
         return library;
     }
 
@@ -246,7 +248,18 @@ public final class SchematicLibrary extends SavedData {
         return historyClock;
     }
 
+    public int activeJobCount(UUID playerId) {
+        int count = 0;
+        for (BuildJob job : jobsFor(playerId)) {
+            if (!job.finished()) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     public void pruneHistory(UUID playerId) {
+        int keep = Math.max(1, WrightsConfig.maxJobHistory());
         List<BuildJob> done = new ArrayList<>();
         for (BuildJob job : jobsFor(playerId)) {
             if (job.finished()) {
@@ -254,8 +267,15 @@ public final class SchematicLibrary extends SavedData {
             }
         }
         done.sort(Comparator.comparingInt(BuildJob::historyOrder));
-        while (done.size() > 32) {
+        while (done.size() > keep) {
             removeJob(done.remove(0));
+        }
+    }
+
+    /** Trim finished history for every player after load or config change. */
+    public void pruneAllHistory() {
+        for (UUID playerId : new ArrayList<>(jobsByPlayer.keySet())) {
+            pruneHistory(playerId);
         }
     }
 

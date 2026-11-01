@@ -33,6 +33,18 @@ public final class WrightsConfig {
                     "Each port is still limited by maxWrightsCarried.")
             .defineInRange("maxWrightsOwned", 200, 1, 1_000_000);
 
+    public static final ModConfigSpec.IntValue MAX_JOBS = BUILDER
+            .comment(
+                    "Most unfinished jobs one player may have at once (working + queued).",
+                    "New jobs are refused while at this cap. Max 500.")
+            .defineInRange("maxJobs", 50, 1, 500);
+
+    public static final ModConfigSpec.IntValue MAX_JOB_HISTORY = BUILDER
+            .comment(
+                    "Most finished jobs kept in one player's Jobs history.",
+                    "Older finished jobs are dropped when a new one finishes. Max 50.")
+            .defineInRange("maxJobHistory", 32, 1, 50);
+
     public static final ModConfigSpec.IntValue MAX_AXIS = BUILDER
             .comment(
                     "Largest selection length on one axis, in blocks. Default 512.",
@@ -280,6 +292,14 @@ public final class WrightsConfig {
 
     public static int maxWrightsOwned() {
         return read(MAX_WRIGHTS_OWNED, 200);
+    }
+
+    public static int maxJobs() {
+        return read(MAX_JOBS, 50);
+    }
+
+    public static int maxJobHistory() {
+        return read(MAX_JOB_HISTORY, 32);
     }
 
     public static int maxPreviewBlocks() {
