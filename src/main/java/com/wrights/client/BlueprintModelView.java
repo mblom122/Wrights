@@ -24,8 +24,10 @@ import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.ShaderInstance;
+import net.minecraft.client.renderer.Sheets;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.inventory.InventoryMenu;
@@ -443,12 +445,23 @@ public final class BlueprintModelView {
                 if (state.isAir()) {
                     continue;
                 }
+                float alpha = ghost.a() <= 0.0F ? 1.0F : Math.min(1.0F, ghost.a());
+                MultiBufferSource output = capture;
+                if (alpha < 0.996F || ghost.r() < 0.996F || ghost.g() < 0.996F || ghost.b() < 0.996F) {
+                    int packed = Math.round(alpha * 255.0F);
+                    float tr = ghost.r();
+                    float tg = ghost.g();
+                    float tb = ghost.b();
+                    output = type -> new TintConsumer(
+                            capture.getBuffer(alpha < 0.996F ? fadeLayer(type) : type),
+                            packed, tr, tg, tb);
+                }
                 pose.pushPose();
                 pose.translate(ghost.x(), ghost.y(), ghost.z());
                 if (state.getBlock() instanceof LiquidBlock) {
-                    renderFluid(pose, capture, state);
+                    renderFluid(pose, output, state);
                 } else if (state.getRenderShape() != RenderShape.INVISIBLE) {
-                    renderer.renderSingleBlock(state, pose, capture, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
+                    renderer.renderSingleBlock(state, pose, output, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
                 }
                 pose.popPose();
             }
@@ -535,6 +548,86 @@ public final class BlueprintModelView {
                 builders.put(type, builder);
             }
             return builder;
+        }
+    }
+
+    /** Same atlas remaps as world holograms so faded menu blocks actually blend. */
+    private static RenderType fadeLayer(RenderType type) {
+        if (type == RenderType.solid()
+                || type == RenderType.cutout()
+                || type == RenderType.cutoutMipped()
+                || type == RenderType.translucent()
+                || type == RenderType.tripwire()
+                || type == Sheets.solidBlockSheet()
+                || type == Sheets.cutoutBlockSheet()
+                || type == Sheets.translucentCullBlockSheet()
+                || type == Sheets.translucentItemSheet()
+                || type == RenderType.entityCutoutNoCull(TextureAtlas.LOCATION_BLOCKS)) {
+            return RenderType.translucent();
+        }
+        if (type == Sheets.chestSheet()) {
+            return RenderType.entityTranslucentCull(Sheets.CHEST_SHEET);
+        }
+        if (type == Sheets.shulkerBoxSheet()) {
+            return RenderType.entityTranslucent(Sheets.SHULKER_SHEET);
+        }
+        return type;
+    }
+
+    /** Multiplies baked vertex color by the ghost tint and forces a packed alpha. */
+    private static final class TintConsumer implements VertexConsumer {
+        private final VertexConsumer delegate;
+        private final int alpha;
+        private final float redMul;
+        private final float greenMul;
+        private final float blueMul;
+
+        private TintConsumer(VertexConsumer delegate, int alpha, float redMul, float greenMul, float blueMul) {
+            this.delegate = delegate;
+            this.alpha = alpha;
+            this.redMul = redMul;
+            this.greenMul = greenMul;
+            this.blueMul = blueMul;
+        }
+
+        @Override
+        public VertexConsumer addVertex(float x, float y, float z) {
+            delegate.addVertex(x, y, z);
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setColor(int red, int green, int blue, int ignored) {
+            delegate.setColor(
+                    Math.min(255, Math.round(red * redMul)),
+                    Math.min(255, Math.round(green * greenMul)),
+                    Math.min(255, Math.round(blue * blueMul)),
+                    alpha);
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setUv(float u, float v) {
+            delegate.setUv(u, v);
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setUv1(int u, int v) {
+            delegate.setUv1(u, v);
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setUv2(int u, int v) {
+            delegate.setUv2(u, v);
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setNormal(float x, float y, float z) {
+            delegate.setNormal(x, y, z);
+            return this;
         }
     }
 }

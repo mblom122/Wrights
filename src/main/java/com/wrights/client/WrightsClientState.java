@@ -195,7 +195,11 @@ public final class WrightsClientState {
     private WrightsClientState() {
     }
 
-    public record Ghost(int x, int y, int z, float r, float g, float b, int stateId) {
+    public record Ghost(int x, int y, int z, float r, float g, float b, int stateId, float a) {
+        /** Opaque ghost (menu / world holograms that do not fade). */
+        public Ghost(int x, int y, int z, float r, float g, float b, int stateId) {
+            this(x, y, z, r, g, b, stateId, 1.0F);
+        }
     }
 
     public record ActiveBuild(BlockPos origin, int clipX, int clipY, int clipZ, List<Ghost> ghosts, String dimension, boolean mine) {

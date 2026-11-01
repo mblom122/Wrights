@@ -294,18 +294,22 @@ public class ShapeAnchorScreen extends Screen {
                         }
                         // Blue stand-in so an empty anchor cell still matches world/menu markers.
                         state = Blocks.LIGHT_BLUE_CONCRETE.defaultBlockState();
-                    } else if (anchor) {
+                    }
+                    if (anchor) {
                         // Keep the real block, but tint blue so the center matches the anchor marker.
                         ghosts.add(new WrightsClientState.Ghost(
                                 dx + RADIUS, dy + RADIUS, dz + RADIUS,
                                 WrightsUi.anchorR(), WrightsUi.anchorG(), WrightsUi.anchorB(),
-                                Block.getId(state)));
+                                Block.getId(state),
+                                1.0F));
                         continue;
                     }
+                    // Fade neighbors so the anchor cell reads clearly in the spinning preview.
                     ghosts.add(new WrightsClientState.Ghost(
                             dx + RADIUS, dy + RADIUS, dz + RADIUS,
                             1.0F, 1.0F, 1.0F,
-                            Block.getId(state)));
+                            Block.getId(state),
+                            0.38F));
                 }
             }
         }
