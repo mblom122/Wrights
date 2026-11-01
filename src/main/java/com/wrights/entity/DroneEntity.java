@@ -324,8 +324,9 @@ public class DroneEntity extends Entity {
     }
 
     /**
-     * Block rendered under the wright: the place/mine target while working, or the
-     * harvested drop while flying home.
+     * Block rendered under the wright.
+     * Place jobs set {@link #currentBlock()} so the material shows while flying out.
+     * Mine jobs leave current empty until {@link #takeHaul} fills carried after the break.
      */
     public ItemStack displayCargo() {
         if (returning()) {

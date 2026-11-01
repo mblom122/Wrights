@@ -44,7 +44,7 @@ public class DroneRenderer extends EntityRenderer<DroneEntity> {
         this.model.renderToBuffer(pose, consumer, light, OverlayTexture.NO_OVERLAY, color);
         this.model.renderLens(pose, consumer, light, OverlayTexture.NO_OVERLAY);
         pose.popPose();
-        // Same hanging cargo as a return trip — place/mine target while working, harvested drop while homebound.
+        // Place: material while flying out. Mine: only after haul is received. Homebound: carried haul.
         ItemStack cargo = entity.displayCargo();
         if (!cargo.isEmpty()) {
             pose.pushPose();

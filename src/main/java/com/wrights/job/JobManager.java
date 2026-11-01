@@ -2106,28 +2106,29 @@ public final class JobManager {
             return;
         }
         Vec3 hover = Vec3.atCenterOf(nextPos).add(0.0D, 0.9D, 0.0D);
-        ItemStack soloTarget = stackFor(schematic, at);
+        // Place jobs show the block right away; mine jobs only show haul after the break.
+        ItemStack soloShow = job.mining() ? ItemStack.EMPTY : stackFor(schematic, at);
         if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
             double step = drone.distanceToSqr(hover) > 64.0D ? 0.85D : 0.4D;
             drone.moveToward(hover, step);
             job.setLastDronePos(drone.blockPosition());
             job.setWaitKind(BuildJob.WAIT_NONE);
-            drone.setWorkStatus(soloTarget, ItemStack.EMPTY, DroneEntity.WAIT_NONE);
+            drone.setWorkStatus(soloShow, ItemStack.EMPTY, DroneEntity.WAIT_NONE);
             library.setDirty();
             return;
         }
-        drone.setWorkStatus(soloTarget, ItemStack.EMPTY, DroneEntity.WAIT_NONE);
+        drone.setWorkStatus(soloShow, ItemStack.EMPTY, DroneEntity.WAIT_NONE);
         int budget = WrightsConfig.BLOCKS_PER_TICK.getAsInt();
         for (int i = 0; i < budget; i++) {
             int index = i == 0 ? at : nextSolo(level, player, schematic, job);
             if (index == SUPPORT_WAIT) {
                 job.setWaitKind(BuildJob.WAIT_FLOOR);
-                drone.setWorkStatus(soloTarget, ItemStack.EMPTY, DroneEntity.WAIT_FLOOR);
+                drone.setWorkStatus(soloShow, ItemStack.EMPTY, DroneEntity.WAIT_FLOOR);
                 break;
             }
             if (index == NEED_ITEMS) {
                 job.setWaitKind(BuildJob.WAIT_ITEMS);
-                drone.setWorkStatus(soloTarget, ItemStack.EMPTY, DroneEntity.WAIT_ITEMS);
+                drone.setWorkStatus(soloShow, ItemStack.EMPTY, DroneEntity.WAIT_ITEMS);
                 parkSolo(level, player, job);
                 releaseStalledHome(player, library, job);
                 break;
@@ -2137,11 +2138,13 @@ public final class JobManager {
             }
             Schematic.Entry entry = schematic.entry(index);
             BlockPos pos = job.min().offset(entry.x(), entry.y(), entry.z());
-            ItemStack aiming = BlockFilters.icon(entry.state());
-            if (!aiming.isEmpty()) {
-                soloTarget = aiming;
+            if (!job.mining()) {
+                ItemStack aiming = BlockFilters.icon(entry.state());
+                if (!aiming.isEmpty()) {
+                    soloShow = aiming;
+                }
             }
-            drone.setWorkStatus(soloTarget, ItemStack.EMPTY, DroneEntity.WAIT_NONE);
+            drone.setWorkStatus(soloShow, ItemStack.EMPTY, DroneEntity.WAIT_NONE);
             if (drone.distanceToSqr(Vec3.atCenterOf(pos)) > 9.0D) {
                 break;
             }
@@ -2157,7 +2160,7 @@ public final class JobManager {
             PlaceResult placed = actOne(level, player, job, pos, entry, false, null);
             if (placed == PlaceResult.PAUSE) {
                 job.setWaitKind(BuildJob.WAIT_CHUNK);
-                drone.setWorkStatus(soloTarget, ItemStack.EMPTY, DroneEntity.WAIT_CHUNK);
+                drone.setWorkStatus(soloShow, ItemStack.EMPTY, DroneEntity.WAIT_CHUNK);
                 if (job.tickMessage()) {
                     noteChunk(player, library, job);
                 }
@@ -2166,7 +2169,7 @@ public final class JobManager {
             }
             if (placed == PlaceResult.WAIT) {
                 job.setWaitKind(BuildJob.WAIT_ITEMS);
-                drone.setWorkStatus(soloTarget, ItemStack.EMPTY, DroneEntity.WAIT_ITEMS);
+                drone.setWorkStatus(soloShow, ItemStack.EMPTY, DroneEntity.WAIT_ITEMS);
                 break;
             }
             markSolo(job, index);
@@ -4870,8 +4873,9 @@ public final class JobManager {
             return;
         }
         int[] targets = peekHandTargets(level, schematic, job, hand);
-        ItemStack current = stackFor(schematic, targets[0]);
-        ItemStack next = stackFor(schematic, targets[1]);
+        // Mine jobs keep CURRENT empty until harvest fills haul; place jobs show the target immediately.
+        ItemStack current = job.mining() ? ItemStack.EMPTY : stackFor(schematic, targets[0]);
+        ItemStack next = job.mining() ? ItemStack.EMPTY : stackFor(schematic, targets[1]);
         drone.setWorkStatus(current, next, reason);
     }
 
