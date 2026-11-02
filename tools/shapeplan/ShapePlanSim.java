@@ -77,6 +77,7 @@ public final class ShapePlanSim {
             sectionZoo(out, zoo);
             sectionTravel(out);
             sectionTicks(out);
+            sectionCrewAoe(out);
             sectionScores(out);
             out.println();
             out.println("Done. Rows " + ROWS.size() + ".");
@@ -1136,6 +1137,10 @@ public final class ShapePlanSim {
 
     /** port, center, corners, face mids, edge mids, already on the first hover. */
     static long[] travel(Stations s, Shape shape) {
+        return travel(s, shape, CREW);
+    }
+
+    static long[] travel(Stations s, Shape shape, int crewCap) {
         long[] ticks = new long[6];
         if (s == null || s.n == 0) {
             return ticks;
@@ -1146,7 +1151,7 @@ public final class ShapePlanSim {
             idx[i] = i;
         }
         qsort(idx, s, 0, n - 1, 0);
-        int crew = Math.min(CREW, n);
+        int crew = Math.min(Math.max(1, crewCap), n);
         int base = n / crew;
         int extra = n % crew;
         int cursor = 0;
@@ -1934,6 +1939,90 @@ public final class ShapePlanSim {
         out.println("Gold and diamond keep the netherite groups: two place ticks clear 19, still no fly inside the ball.");
         out.println("Copper and iron use a smaller cross (squared distance ≤ 1, 7 cells) and need their own tiling.");
         out.println();
+    }
+
+    /**
+     * Full AOE (Netherite sphere, cap 19) against no AOE upgrade (cap 1, stand on the block).
+     * Flight stays at netherite speed so the only change is the sphere. Crew is 1 or 10.
+     */
+    static void sectionCrewAoe(java.io.PrintStream out) {
+        out.println("## 8. One wright versus ten, full AOE versus none");
+        out.println();
+        out.println("Full AOE is the 19-cell sphere. No AOE upgrade places only the block the wright stands on");
+        out.println("(reach squared 0, cap 1). Flight speed is still netherite, so this is the AOE upgrade alone.");
+        out.println("pre1 / pre10 are seconds for the slowest wright, already at its first block.");
+        out.println("ideal is the same hovers walked with no fly tick (adjacent step, or the diagonal on the lattice).");
+        out.println("A reused full-AOE center list with cap 1 places one block per center and leaves the rest.");
+        out.println();
+        out.printf(Locale.US, "%-18s %10s %8s %8s %8s %8s %8s %8s %8s %8s%n",
+                "shape", "blocks", "fullH", "pre10", "pre1", "ratio", "noneH", "none10", "none1", "miss%");
+        Shape[] shapes = {
+                cube(1, false), cube(3, false), cube(8, false), cube(16, false), cube(32, false), cube(100, false),
+                sphere(16, false), sphere(100, false),
+                box("wall 100", 100, 100, 1, false),
+                box("pillar 100", 1, 100, 1, false),
+                cube(32, true), cube(100, true)
+        };
+        for (Shape shape : shapes) {
+            System.err.println("crew/aoe " + shape.name);
+            Bits bits = new Bits(shape);
+            bits.fill(shape);
+            shape.cells = bits.remain;
+            Stations full = latticeStations(shape);
+            long[] full10 = travel(full, shape, 10);
+            long[] full1 = travel(full, shape, 1);
+            int hop = flyTicks(0, 0, 0, STEP_X, STEP_Y, STEP_Z);
+            long ideal10 = idealTicks(full.n, 10, hop);
+            long ideal1 = idealTicks(full.n, 1, hop);
+            Stations none = everyCell(shape);
+            long[] none10 = travel(none, shape, 10);
+            long[] none1 = travel(none, shape, 1);
+            long missed = shape.cells - full.n;
+            double miss = shape.cells <= 0 ? 0 : 100.0 * missed / shape.cells;
+            double ratio = full10[5] <= 0 ? 0 : full1[5] / (double) full10[5];
+            out.printf(Locale.US, "%-18s %10d %8d %8.1f %8.1f %8.2f %8d %8.1f %8.1f %7.1f%n",
+                    shape.name, shape.cells, full.n,
+                    full10[5] / 20.0, full1[5] / 20.0, ratio,
+                    none.n, none10[5] / 20.0, none1[5] / 20.0, miss);
+            out.printf(Locale.US, "%-18s %10s %8s %8.1f %8.1f %8.2f %8s %8.1f %8.1f%n",
+                    "  ideal no-fly", "", "",
+                    ideal10 / 20.0, ideal1 / 20.0,
+                    ideal10 <= 0 ? 0 : ideal1 / (double) ideal10,
+                    "",
+                    idealTicks(none.n, 10, 0) / 20.0,
+                    idealTicks(none.n, 1, 0) / 20.0);
+        }
+        out.println();
+        out.println("Hover counts do not change with crew. A second wright does not place a bigger sphere.");
+        out.println("Ten wrights finish in about 1/10 the time only while there are at least 10 hovers.");
+        out.println("A 3x3x3 solid is 3 hovers with full AOE, so a tenth wright has nothing to stand on.");
+        out.println("No AOE upgrade makes every block its own hover. The mod-11 centers then skip most of the cube;");
+        out.println("miss% is the share left unplaced if those centers are reused and only one block is set down.");
+        out.println();
+    }
+
+    static long idealTicks(int hovers, int crewCap, int hopFly) {
+        if (hovers <= 0) {
+            return 0;
+        }
+        int used = Math.min(Math.max(1, crewCap), hovers);
+        int per = (hovers + used - 1) / used;
+        return (long) per + (long) Math.max(0, per - 1) * hopFly;
+    }
+
+    /** One hover per block. This is the whole plan when the AOE upgrade is absent. */
+    static Stations everyCell(Shape shape) {
+        Stations stations = new Stations();
+        for (int z = shape.z0; z <= shape.z1; z++) {
+            for (int y = shape.y0; y <= shape.y1; y++) {
+                for (int x = shape.x0; x <= shape.x1; x++) {
+                    if (shape.contains(x, y, z)) {
+                        stations.add(x, y, z, 1);
+                    }
+                }
+            }
+        }
+        return stations;
     }
 
     static void sectionScores(java.io.PrintStream out) {

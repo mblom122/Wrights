@@ -163,6 +163,26 @@ Past a 16³, changing the launch corner, the face, the edge, or the middle moves
 
 The pattern matters far more than the launch point. On the 100³ the corner crawl took 54 minutes from every launch point. The lattice took 21 minutes from every launch point, and 8 minutes if the walk follows the diagonal. Launching “from the middle” does not fix a 4-block hover.
 
+## One wright, and no AOE upgrade
+
+The first tables are full AOE (the 19-cell sphere) and 10 wrights. The same shapes were run again as a 2×2: full AOE or none, and 1 wright or 10. No AOE upgrade is reach 0 and cap 1: the wright places the block it stands on and nothing else. Flight was left at netherite speed, so the gap is the sphere alone. Basic flight (0.25 blocks/tick instead of 2.75) does not change an adjacent step, because one block is already inside the 1.5-block arrive radius.
+
+Crew size does not change the hover list. A tenth wright does not make the sphere bigger. It shortens the clock by about 10× when the shape has at least 10 hovers, and by less when it does not. One block is one hover either way: the extra nine wrights stand idle, and both crews take one place tick.
+
+| Shape | Full AOE hovers | 10 wrights | 1 wright | No AOE hovers | 10 wrights | 1 wright |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 block | 1 | 0.05 s | 0.05 s | 1 | 0.05 s | 0.05 s |
+| Solid 3³, best plan (stand on a placed face) | 3 | 0.05 s | 0.15 s | 27 | 0.15 s | 1.35 s |
+| Solid 100³, lattice walked on the diagonal | 96,410 | 8.0 min | 80 min | 1,000,000 | 83 min | 13.9 h |
+| Wall 100, tiled by 3 | 1,156 | ~12 s | ~2 min | 10,000 | 50 s | 8.3 min |
+| Pillar 100, step of 3 | 34 | ~0.4 s | ~3.4 s | 100 | 0.5 s | 5.0 s |
+
+Times with no fly tick between hovers. The 3³ full-AOE row is the 3-hover plan. The lattice alone, which refuses to stand on a block already placed, uses 9 hovers there and is the wrong plan for that cube.
+
+On a large solid, one wright with the sphere and ten wrights without it finish in almost the same time (80 min versus 83 min on a 100³). Ten wrights with the sphere are about ten times faster than ten wrights without it. A pillar barely notices the upgrade: the sphere only holds 3 blocks of a line, and the step to the next trio costs a fly tick, so the rate is 1.5 blocks/tick against 1 block/tick for a wright that simply walks to the next block.
+
+Reusing the full-AOE center list on a wright with no sphere leaves the build unfinished. Each center would set down one block. On a 100³ that is 96,410 blocks and **90% of the cube still missing**. On a solid 3³ it is 9 blocks placed and 18 missing. The no-AOE plan is a walk through every block. The sphere math is unused, and it is wrong if it is left in charge.
+
 ## Scores
 
 0–100. Higher is better.
