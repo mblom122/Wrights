@@ -3813,7 +3813,7 @@ public class WrightsMenuScreen extends Screen {
         drawProgress(graphics, x + 6, y + 48, Math.max(40, width - 12), job);
         boolean tool = toolHeld();
         if (!job.finished() && !job.saving()) {
-            drawCrewAdjust(graphics, mouseX, mouseY, x, y, job, tool);
+            drawCrewAdjust(graphics, mouseX, mouseY, x, y, width, job, tool);
         }
         for (RowButton button : rowButtons(job, x, y, width)) {
             jobHits.add(new JobHit(button.x(), button.y(), button.width(), 16, job.id(), button.action()));
@@ -3822,14 +3822,15 @@ public class WrightsMenuScreen extends Screen {
         }
     }
 
-    /** Working N / Assigned M — compact − / + changes how many wrights the job should keep. */
-    private void drawCrewAdjust(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, BlueprintPayloads.JobLine job, boolean tool) {
+    /** Working N / Assigned M on the left; − / + stay pinned to the row’s right edge. */
+    private void drawCrewAdjust(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width, BlueprintPayloads.JobLine job, boolean tool) {
+        int by = y + JOB_BODY + 1;
+        int bx = crewAdjustX(x, width);
         String text = crewCountText(job);
         int textX = x + 6;
         int textY = y + JOB_BODY + 4;
-        graphics.drawString(this.font, text, textX, textY, WrightsUi.MUTED, false);
-        int bx = textX + this.font.width(text) + 6;
-        int by = y + JOB_BODY + 1;
+        int textMax = Math.max(24, bx - 6 - textX);
+        graphics.drawString(this.font, this.font.plainSubstrByWidth(text, textMax), textX, textY, WrightsUi.MUTED, false);
         int assigned = assignedWrights(job);
         int cap = jobCrewCap();
         boolean canMinus = tool && assigned > 0;
@@ -3845,14 +3846,19 @@ public class WrightsMenuScreen extends Screen {
         }
     }
 
-    private void trackCrewAdjust(int x, int y, BlueprintPayloads.JobLine job) {
+    private void trackCrewAdjust(int x, int y, int width, BlueprintPayloads.JobLine job) {
         if (job.finished() || job.saving()) {
             return;
         }
-        int bx = x + 6 + this.font.width(crewCountText(job)) + 6;
+        int bx = crewAdjustX(x, width);
         int by = y + JOB_BODY + 1;
         jobHits.add(new JobHit(bx, by, CREW_STEP, CREW_STEP, job.id(), ACT_CREW_MINUS));
         jobHits.add(new JobHit(bx + CREW_STEP + 2, by, CREW_STEP, CREW_STEP, job.id(), ACT_CREW_PLUS));
+    }
+
+    /** Right edge of the card, same inset as the status label. */
+    private static int crewAdjustX(int x, int width) {
+        return x + width - 8 - (CREW_STEP * 2 + 2);
     }
 
     private void drawCrewStep(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, String label, boolean enabled) {
@@ -4232,11 +4238,12 @@ public class WrightsMenuScreen extends Screen {
                     workAllPaused ? BlueprintPayloads.JobControl.RESUME_ALL : BlueprintPayloads.JobControl.PAUSE_ALL);
             int rowX = jobX + 4;
             int workGutter = workingJobs.size() > workRows ? 16 : 0;
+            int rowW = jobsPanelW - 8 - workGutter;
             for (int row = 0; row < workRows && jobScroll + row < workingJobs.size(); row++) {
                 BlueprintPayloads.JobLine job = workingJobs.get(jobScroll + row);
                 int rowY = workListY + row * workStride;
-                trackCrewAdjust(rowX, rowY, job);
-                for (RowButton button : rowButtons(job, rowX, rowY, jobsPanelW - 8 - workGutter)) {
+                trackCrewAdjust(rowX, rowY, rowW, job);
+                for (RowButton button : rowButtons(job, rowX, rowY, rowW)) {
                     jobHits.add(new JobHit(button.x(), button.y(), button.width(), 16, job.id(), button.action()));
                 }
             }
