@@ -24,12 +24,12 @@ public final class PortEnergy {
     private PortEnergy() {
     }
 
-    /** Placed-port buffer. Missing NBT starts full once so an existing world does not stall immediately. */
+    /** Placed-port buffer. A new port starts empty and has to be charged. */
     public static final class Buffer extends EnergyStorage {
         public Buffer() {
-            super(1_000_000, 10_000, 10_000, 1_000_000);
+            super(1_000_000, 10_000, 10_000, 0);
             refresh();
-            this.energy = this.capacity;
+            this.energy = 0;
         }
 
         public void load(CompoundTag tag) {
@@ -37,7 +37,7 @@ public final class PortEnergy {
             if (tag != null && tag.contains("Energy")) {
                 this.energy = Mth.clamp(tag.getInt("Energy"), 0, this.capacity);
             } else {
-                this.energy = this.capacity;
+                this.energy = 0;
             }
         }
 

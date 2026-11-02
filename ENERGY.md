@@ -13,7 +13,7 @@ Creative mode does not pay. Set `energy` to false in the server config and every
 
 A wright from a placed port never falls back to the player's batteries. If that port's chunk is not loaded, the action simply cannot be paid.
 
-A placed port holds **1,000,000 FE** and accepts or emits **10,000 FE** per transfer. A port that has never saved an energy value starts full, once. After that, the saved amount is what it has.
+A placed port holds **1,000,000 FE** and accepts or emits **10,000 FE** per transfer. Placing one starts it empty. Cables or a battery have to fill it. After that, the saved amount is what it has.
 
 A personal wright can pull at most **10,000 FE** for one block, and only if the items together hold the whole cost. A shortfall does not leave a partial drain.
 
