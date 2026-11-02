@@ -842,6 +842,7 @@ public final class BlueprintNetwork {
                     labelPort(player, job),
                     job.queued(),
                     job.crewQuota(),
+                    com.wrights.WrightsConfig.maxWrightsPerJob(job),
                     jobSourceName(player, job),
                     cellMarks(library, job),
                     crewHands(player.getServer(), job)));

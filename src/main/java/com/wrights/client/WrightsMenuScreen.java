@@ -3832,7 +3832,7 @@ public class WrightsMenuScreen extends Screen {
         int textMax = Math.max(24, bx - 6 - textX);
         graphics.drawString(this.font, this.font.plainSubstrByWidth(text, textMax), textX, textY, WrightsUi.MUTED, false);
         int assigned = assignedWrights(job);
-        int cap = jobCrewCap();
+        int cap = jobCrewCap(job);
         boolean canMinus = tool && assigned > 0;
         boolean canPlus = tool && assigned < cap;
         drawCrewStep(graphics, mouseX, mouseY, bx, by, "-", canMinus);
@@ -4034,9 +4034,9 @@ public class WrightsMenuScreen extends Screen {
         return Math.max(job.crew().size(), job.quota());
     }
 
-    /** Client enable cap — Exchange/Place may use 2×; server clamps per job. */
-    private static int jobCrewCap() {
-        return WrightsConfig.maxWrightsPerJob(true);
+    /** Config max assigned for this job kind — not how many wrights you own or have free. */
+    private static int jobCrewCap(BlueprintPayloads.JobLine job) {
+        return job == null ? WrightsConfig.maxWrightsPerJob() : Math.max(1, job.crewCap());
     }
 
     private Component jobStatusText(BlueprintPayloads.JobLine job) {
@@ -4318,7 +4318,7 @@ public class WrightsMenuScreen extends Screen {
             return;
         }
         int assigned = assignedWrights(job);
-        int next = WrightsClientState.stepped(assigned, add ? 1 : -1, 0, jobCrewCap());
+        int next = WrightsClientState.stepped(assigned, add ? 1 : -1, 0, jobCrewCap(job));
         if (next == assigned) {
             return;
         }

@@ -782,9 +782,11 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record JobLine(UUID id, String name, int done, int total, int skipped, int held, boolean paused, boolean saving, boolean finished, boolean canUndo, boolean undoing, boolean stopped, boolean undone, String dimension, BlockPos anchor, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, List<UUID> crew, int workedTicks, int hold, int waitKind, int source, BlockPos sourcePort, boolean labelPort, boolean queued, int quota, String sourceName, boolean cellMarks, List<CrewHand> crewHands) {
+    public record JobLine(UUID id, String name, int done, int total, int skipped, int held, boolean paused, boolean saving, boolean finished, boolean canUndo, boolean undoing, boolean stopped, boolean undone, String dimension, BlockPos anchor, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, List<UUID> crew, int workedTicks, int hold, int waitKind, int source, BlockPos sourcePort, boolean labelPort, boolean queued, int quota, int crewCap, String sourceName, boolean cellMarks, List<CrewHand> crewHands) {
         public JobLine {
             crewHands = crewHands == null ? List.of() : List.copyOf(crewHands);
+            // Config maxWrightsPerJob for this job kind — not owned/free count.
+            crewCap = Math.max(1, crewCap);
         }
 
         public CrewHand crewHand(UUID unit) {
@@ -832,6 +834,7 @@ public final class BlueprintPayloads {
             buf.writeBoolean(labelPort);
             buf.writeBoolean(queued);
             buf.writeVarInt(quota);
+            buf.writeVarInt(crewCap);
             buf.writeUtf(sourceName == null ? "" : sourceName, 32);
             buf.writeBoolean(cellMarks);
             buf.writeVarInt(crewHands.size());
@@ -870,6 +873,7 @@ public final class BlueprintPayloads {
                     buf.readBlockPos(),
                     buf.readBoolean(),
                     buf.readBoolean(),
+                    buf.readVarInt(),
                     buf.readVarInt(),
                     buf.readUtf(32),
                     buf.readBoolean(),

@@ -7,7 +7,6 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-import com.wrights.WrightsConfig;
 import com.wrights.network.BlueprintPayloads;
 
 public class JobActionScreen extends Screen {
@@ -92,7 +91,7 @@ public class JobActionScreen extends Screen {
         minusX = panelX + 26 + this.font.width(crew) + 6;
         plusX = minusX + CREW_STEP + 2;
         stepY = panelY + 51;
-        int cap = WrightsConfig.maxWrightsPerJob(true);
+        int cap = Math.max(1, job.crewCap());
         drawStep(graphics, mouseX, mouseY, minusX, stepY, "-", tool && assigned > 0);
         drawStep(graphics, mouseX, mouseY, plusX, stepY, "+", tool && assigned < cap);
         if (mouseX >= minusX && mouseX < minusX + CREW_STEP && mouseY >= stepY && mouseY < stepY + CREW_STEP) {
@@ -135,7 +134,7 @@ public class JobActionScreen extends Screen {
             return;
         }
         int assigned = Math.max(job.crew().size(), job.quota());
-        int next = WrightsClientState.stepped(assigned, add ? 1 : -1, 0, WrightsConfig.maxWrightsPerJob(true));
+        int next = WrightsClientState.stepped(assigned, add ? 1 : -1, 0, Math.max(1, job.crewCap()));
         if (next == assigned) {
             return;
         }
