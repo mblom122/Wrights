@@ -954,6 +954,12 @@ public final class SelectionRenderer {
         return box.inflate(0.02D);
     }
 
+    /**
+     * Solid fill for marked job boxes larger than this washes the whole view when you stand inside
+     * (e.g. a 200³ Shape). Those jobs get outline + guide only.
+     */
+    private static final long MARK_SOLID_MAX = 48L * 48L * 48L;
+
     private static void drawMarkedJobs(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
         if (WrightsClientState.markedJobs.isEmpty() || minecraft.level == null) {
             return;
@@ -971,32 +977,58 @@ public final class SelectionRenderer {
         }
         float pulse = 0.65F + 0.35F * (float) Math.sin(System.currentTimeMillis() / 180.0D);
         VertexConsumer fill = buffers.getBuffer(RenderType.debugFilledBox());
+        boolean filled = false;
         for (BlueprintPayloads.JobLine job : WrightsClientState.jobs) {
             if (!markedHere(job, here)) {
                 continue;
             }
             if (job.cellMarks()) {
                 markCells(pose, fill, null, camera, job, pulse, true);
+                filled = true;
+                continue;
+            }
+            if (markVolume(job) > MARK_SOLID_MAX) {
                 continue;
             }
             AABB local = markedBox(job).move(-camera.x, -camera.y, -camera.z);
             LevelRenderer.addChainedFilledBoxVertices(
                     pose, fill, local.minX, local.minY, local.minZ, local.maxX, local.maxY, local.maxZ,
                     0.95F, 0.82F, 0.28F, 0.14F + 0.08F * pulse);
+            filled = true;
         }
-        buffers.endBatch(RenderType.debugFilledBox());
+        if (filled) {
+            buffers.endBatch(RenderType.debugFilledBox());
+        }
         VertexConsumer lines = buffers.getBuffer(RenderType.lines());
+        AABB body = minecraft.player == null ? null : minecraft.player.getBoundingBox();
+        boolean lined = false;
         for (BlueprintPayloads.JobLine job : WrightsClientState.jobs) {
             if (!markedHere(job, here)) {
                 continue;
             }
             if (job.cellMarks()) {
                 markCells(pose, null, lines, camera, job, pulse, false);
+                lined = true;
                 continue;
             }
-                drawBox(pose, lines, markedBox(job), camera, 0.98F, 0.86F, 0.32F, pulse);
+            AABB box = markedBox(job);
+            drawBox(pose, lines, box, camera, 0.98F, 0.86F, 0.32F, pulse);
+            if (markVolume(job) > MARK_SOLID_MAX) {
+                // Second outer wire so huge jobs stay readable from far / while standing inside.
+                drawBox(pose, lines, box.inflate(0.45D), camera, 1.0F, 0.94F, 0.45F, pulse * 0.75F);
             }
-        buffers.endBatch(RenderType.lines());
+            if (body != null) {
+                drawGuide(pose, lines, camera, body, box, 0.98F, 0.86F, 0.32F, pulse);
+            }
+            lined = true;
+        }
+        if (lined) {
+            buffers.endBatch(RenderType.lines());
+        }
+    }
+
+    private static long markVolume(BlueprintPayloads.JobLine job) {
+        return (long) Math.max(1, job.sizeX()) * Math.max(1, job.sizeY()) * Math.max(1, job.sizeZ());
     }
 
     /** Mirror jobs mark each placed block. The bounding box would cover the empty space between copies. */
