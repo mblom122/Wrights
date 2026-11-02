@@ -83,6 +83,11 @@ public final class JobManager {
     private static final double PLACE_NEAR_SQR = 9.0D;
     /** Soft near band when the local cluster is empty; prefer these before a long index walk. */
     private static final double FLY_NEAR_SQR = 64.0D;
+    /**
+     * When choosing a fly-to hover, allow this much extra distance over the nearest READY cell
+     * if another cell in that band covers a denser place-reach cluster (e.g. wall center vs corner).
+     */
+    private static final double SEED_SLACK_SQR = 8.0D;
     /** Chebyshev probe around the drone for {@link #PLACE_NEAR_SQR} (hover sits slightly above the cell). */
     private static final int CLUSTER_RADIUS = 4;
     /** Chebyshev probe for {@link #FLY_NEAR_SQR}. */
@@ -2001,7 +2006,9 @@ public final class JobManager {
                 if (aimDist <= PLACE_NEAR_SQR) {
                     return hand.aim;
                 }
-                int local = shapeClusterIndex(level, player, job, hand, origin, PLACE_NEAR_SQR, CLUSTER_RADIUS, shapeKind, shapePinLocal, onlyOwned);
+                int local = shapeClusterIndex(
+                        level, player, job, hand, origin, PLACE_NEAR_SQR, CLUSTER_RADIUS,
+                        shapeKind, shapePinLocal, onlyOwned, false);
                 if (local >= 0) {
                     return local;
                 }
@@ -2023,23 +2030,59 @@ public final class JobManager {
             }
         }
         if (origin != null) {
-            int local = shapeClusterIndex(level, player, job, hand, origin, PLACE_NEAR_SQR, CLUSTER_RADIUS, shapeKind, shapePinLocal, onlyOwned);
+            // Already in place-reach: closest READY (finish this hover, cut fly time).
+            int local = shapeClusterIndex(
+                    level, player, job, hand, origin, PLACE_NEAR_SQR, CLUSTER_RADIUS,
+                    shapeKind, shapePinLocal, onlyOwned, false);
             if (local >= 0) {
                 return local;
             }
-            int near = shapeClusterIndex(level, player, job, hand, origin, FLY_NEAR_SQR, FLY_NEAR_RADIUS, shapeKind, shapePinLocal, onlyOwned);
+            // Soft fly band: still near-first, but nudge to a denser hover within a short slack
+            // (corner vs middle of a 3×3) so one burst can replace several moves.
+            int near = shapeClusterIndex(
+                    level, player, job, hand, origin, FLY_NEAR_SQR, FLY_NEAR_RADIUS,
+                    shapeKind, shapePinLocal, onlyOwned, true);
             if (near >= 0) {
                 return near;
             }
         }
-        // Help mode: near self first (above), then near busy crew mates, then their aim cells.
-        // Never linear-walk/resolve another strip — that would steal progress accounting.
+        // Help mode: near idle peers only — never poach a busy strip.
         if (!onlyOwned) {
             return shapeHelpTarget(level, player, job, hand, shapeKind, shapePinLocal, scanCap);
         }
+        int seed = shapeBestSeedIndex(level, player, job, hand, origin, shapeKind, shapePinLocal, scanCap);
+        if (seed >= 0) {
+            return seed;
+        }
+        return -1;
+    }
+
+    /**
+     * Long-range fly-to for this hand. Near-first when the wright already has a position;
+     * within {@link #SEED_SLACK_SQR} of the nearest READY cell, prefer the hover that covers
+     * the densest place-reach cluster so a small plate finishes in one burst.
+     */
+    private static int shapeBestSeedIndex(
+            ServerLevel level,
+            ServerPlayer player,
+            BuildJob job,
+            BuildJob.Hand hand,
+            Vec3 origin,
+            com.wrights.blueprint.Shapes.Kind shapeKind,
+            BlockPos shapePinLocal,
+            int scanCap) {
         int total = job.total();
+        if (total <= 0) {
+            return -1;
+        }
         int examined = 0;
-        for (int i = Math.max(0, hand.cursor); i < total && examined < scanCap; i++) {
+        int nearest = -1;
+        double nearestDist = Double.MAX_VALUE;
+        boolean scoreAll = total <= CREW_SCAN_CAP;
+        int[] candidates = scoreAll ? new int[Math.min(total, scanCap)] : null;
+        int candidateCount = 0;
+        int from = Math.max(0, hand.cursor);
+        for (int i = from; i < total && examined < scanCap; i++) {
             BlockPos pos = job.scanPosAt(i);
             int lx = pos.getX() - job.min().getX();
             int ly = pos.getY() - job.min().getY();
@@ -2070,11 +2113,21 @@ public final class JobManager {
                 resolveShapeCell(job, hand, i, true);
                 continue;
             }
-            if (kind == ShapeCell.BLOCKED) {
+            if (kind == ShapeCell.BLOCKED || kind != ShapeCell.READY) {
                 continue;
             }
-            if (kind == ShapeCell.READY) {
-                return i;
+            double dist = origin == null
+                    ? 0.0D
+                    : origin.distanceToSqr(Vec3.atCenterOf(pos));
+            if (nearest < 0 || dist < nearestDist || (dist == nearestDist && i < nearest)) {
+                nearest = i;
+                nearestDist = dist;
+            }
+            if (candidates != null && candidateCount < candidates.length) {
+                candidates[candidateCount++] = i;
+            }
+            if (!scoreAll) {
+                break;
             }
         }
         while (hand.cursor < total) {
@@ -2087,7 +2140,109 @@ public final class JobManager {
             }
             hand.cursor++;
         }
-        return -1;
+        if (nearest < 0) {
+            return -1;
+        }
+        if (!scoreAll || candidates == null || candidateCount <= 1) {
+            return nearest;
+        }
+        // Among cells near the closest READY, pick the densest place-reach hover.
+        int best = nearest;
+        int bestScore = shapeClusterReadyCount(
+                level, player, job, hand, Vec3.atCenterOf(job.scanPosAt(nearest)), shapeKind, shapePinLocal, true);
+        double bestDist = nearestDist;
+        for (int c = 0; c < candidateCount; c++) {
+            int index = candidates[c];
+            BlockPos pos = job.scanPosAt(index);
+            double dist = origin == null
+                    ? pos.distToCenterSqr(
+                            job.min().getX() + job.boxSizeX() * 0.5D,
+                            job.min().getY() + job.boxSizeY() * 0.5D,
+                            job.min().getZ() + job.boxSizeZ() * 0.5D)
+                    : origin.distanceToSqr(Vec3.atCenterOf(pos));
+            if (origin != null && dist > nearestDist + SEED_SLACK_SQR) {
+                continue;
+            }
+            int score = shapeClusterReadyCount(
+                    level, player, job, hand, Vec3.atCenterOf(pos), shapeKind, shapePinLocal, true);
+            if (score > bestScore || (score == bestScore && dist < bestDist)
+                    || (score == bestScore && dist == bestDist && index < best)) {
+                best = index;
+                bestScore = score;
+                bestDist = dist;
+            }
+        }
+        // No live origin (pre-launch): prefer densest hover, then closer to box center.
+        if (origin == null) {
+            best = nearest;
+            bestScore = -1;
+            bestDist = Double.MAX_VALUE;
+            double cx = job.min().getX() + job.boxSizeX() * 0.5D;
+            double cy = job.min().getY() + job.boxSizeY() * 0.5D;
+            double cz = job.min().getZ() + job.boxSizeZ() * 0.5D;
+            for (int c = 0; c < candidateCount; c++) {
+                int index = candidates[c];
+                BlockPos pos = job.scanPosAt(index);
+                int score = shapeClusterReadyCount(
+                        level, player, job, hand, Vec3.atCenterOf(pos), shapeKind, shapePinLocal, true);
+                double dist = pos.distToCenterSqr(cx, cy, cz);
+                if (bestScore < 0 || score > bestScore || (score == bestScore && dist < bestDist)) {
+                    best = index;
+                    bestScore = score;
+                    bestDist = dist;
+                }
+            }
+        }
+        return best;
+    }
+
+    /** How many owned READY cells sit inside place-reach of {@code origin}. */
+    private static int shapeClusterReadyCount(
+            ServerLevel level,
+            ServerPlayer player,
+            BuildJob job,
+            BuildJob.Hand hand,
+            Vec3 origin,
+            com.wrights.blueprint.Shapes.Kind shapeKind,
+            BlockPos shapePinLocal,
+            boolean onlyOwned) {
+        BlockPos min = job.min();
+        int ox = (int) Math.floor(origin.x) - min.getX();
+        int oy = (int) Math.floor(origin.y) - min.getY();
+        int oz = (int) Math.floor(origin.z) - min.getZ();
+        int count = 0;
+        for (int dy = -CLUSTER_RADIUS; dy <= CLUSTER_RADIUS; dy++) {
+            for (int dx = -CLUSTER_RADIUS; dx <= CLUSTER_RADIUS; dx++) {
+                for (int dz = -CLUSTER_RADIUS; dz <= CLUSTER_RADIUS; dz++) {
+                    BlockPos pos = min.offset(ox + dx, oy + dy, oz + dz);
+                    int index = job.scanIndex(pos);
+                    if (index < 0 || aimedByOther(job, hand, index)) {
+                        continue;
+                    }
+                    if (origin.distanceToSqr(Vec3.atCenterOf(pos)) > PLACE_NEAR_SQR) {
+                        continue;
+                    }
+                    if (classifyShapeCell(level, player, job, hand, index, shapeKind, shapePinLocal, onlyOwned)
+                            == ShapeCell.READY) {
+                        count++;
+                    }
+                }
+            }
+        }
+        return count;
+    }
+
+    /** True when another non-idle hand owns this local cell — helpers must not poach it. */
+    private static boolean ownedByBusyPeer(BuildJob job, BuildJob.Hand hand, int lx, int ly, int lz) {
+        for (BuildJob.Hand other : job.hands()) {
+            if (other == hand || other.idle || other.sheltering) {
+                continue;
+            }
+            if (ownsShapeCell(job, other, lx, ly, lz)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private enum ShapeCell {
@@ -2179,6 +2334,11 @@ public final class JobManager {
         return planned != null && current.equals(planned);
     }
 
+    /**
+     * READY cell near {@code origin}. Closest by default; when {@code preferDense}, still near-first
+     * but within {@link #SEED_SLACK_SQR} of the nearest hit prefer a denser place-reach hover.
+     * Help mode skips cells owned by a busy peer.
+     */
     private static int shapeClusterIndex(
             ServerLevel level,
             ServerPlayer player,
@@ -2189,13 +2349,17 @@ public final class JobManager {
             int radius,
             com.wrights.blueprint.Shapes.Kind shapeKind,
             BlockPos shapePinLocal,
-            boolean onlyOwned) {
+            boolean onlyOwned,
+            boolean preferDense) {
         BlockPos min = job.min();
         int cx = (int) Math.floor(origin.x) - min.getX();
         int cy = (int) Math.floor(origin.y) - min.getY();
         int cz = (int) Math.floor(origin.z) - min.getZ();
-        int best = -1;
-        double bestDist = Double.MAX_VALUE;
+        int nearest = -1;
+        double nearestDist = Double.MAX_VALUE;
+        int[] denseCandidates = preferDense ? new int[64] : null;
+        double[] denseDists = preferDense ? new double[64] : null;
+        int denseCount = 0;
         for (int dy = -radius; dy <= radius; dy++) {
             for (int dx = -radius; dx <= radius; dx++) {
                 for (int dz = -radius; dz <= radius; dz++) {
@@ -2203,6 +2367,14 @@ public final class JobManager {
                     int index = job.scanIndex(pos);
                     if (index < 0 || aimedByOther(job, hand, index)) {
                         continue;
+                    }
+                    if (!onlyOwned) {
+                        int lx = pos.getX() - min.getX();
+                        int ly = pos.getY() - min.getY();
+                        int lz = pos.getZ() - min.getZ();
+                        if (ownedByBusyPeer(job, hand, lx, ly, lz)) {
+                            continue;
+                        }
                     }
                     ShapeCell kind = classifyShapeCell(level, player, job, hand, index, shapeKind, shapePinLocal, onlyOwned);
                     if (kind != ShapeCell.READY) {
@@ -2212,11 +2384,38 @@ public final class JobManager {
                     if (dist > reachSqr) {
                         continue;
                     }
-                    if (best < 0 || dist < bestDist || (dist == bestDist && index < best)) {
-                        best = index;
-                        bestDist = dist;
+                    if (nearest < 0 || dist < nearestDist || (dist == nearestDist && index < nearest)) {
+                        nearest = index;
+                        nearestDist = dist;
+                    }
+                    if (denseCandidates != null && denseCount < denseCandidates.length) {
+                        denseCandidates[denseCount] = index;
+                        denseDists[denseCount] = dist;
+                        denseCount++;
                     }
                 }
+            }
+        }
+        if (nearest < 0 || !preferDense || denseCandidates == null || denseCount <= 1) {
+            return nearest;
+        }
+        int best = nearest;
+        int bestScore = shapeClusterReadyCount(
+                level, player, job, hand, Vec3.atCenterOf(job.scanPosAt(nearest)), shapeKind, shapePinLocal, onlyOwned);
+        double bestDist = nearestDist;
+        for (int i = 0; i < denseCount; i++) {
+            if (denseDists[i] > nearestDist + SEED_SLACK_SQR) {
+                continue;
+            }
+            int index = denseCandidates[i];
+            int score = shapeClusterReadyCount(
+                    level, player, job, hand, Vec3.atCenterOf(job.scanPosAt(index)), shapeKind, shapePinLocal, onlyOwned);
+            if (score > bestScore
+                    || (score == bestScore && denseDists[i] < bestDist)
+                    || (score == bestScore && denseDists[i] == bestDist && index < best)) {
+                best = index;
+                bestScore = score;
+                bestDist = denseDists[i];
             }
         }
         return best;
@@ -2239,8 +2438,8 @@ public final class JobManager {
     }
 
     /**
-     * Find a placeable cell on another wright's strip so an idle hand can help instead of standing by.
-     * Prefers work near busy crew mates, then their current aim.
+     * Help only on strips whose owner is idle/sheltering — never poach a busy peer's lane
+     * (that left a second beam wright standing on the shape while the first did all the work).
      */
     private static int shapeHelpTarget(
             ServerLevel level,
@@ -2251,7 +2450,7 @@ public final class JobManager {
             BlockPos shapePinLocal,
             int scanCap) {
         for (BuildJob.Hand other : job.hands()) {
-            if (other == hand || other.idle) {
+            if (other == hand || !other.idle) {
                 continue;
             }
             Vec3 otherOrigin = handOrigin(level, other);
@@ -2260,30 +2459,30 @@ public final class JobManager {
             }
             int near = shapeClusterIndex(
                     level, player, job, hand, otherOrigin, FLY_NEAR_SQR, FLY_NEAR_RADIUS,
-                    shapeKind, shapePinLocal, false);
+                    shapeKind, shapePinLocal, false, true);
             if (near >= 0) {
                 return near;
             }
         }
         int examined = 0;
         for (BuildJob.Hand other : job.hands()) {
-            if (other == hand || other.aim < 0 || other.aim >= job.total()) {
+            // Idle peer with an old aim left behind — finish their leftover cluster.
+            if (other == hand || !other.idle || other.aim < 0 || other.aim >= job.total()) {
                 continue;
             }
             if (examined++ >= scanCap) {
                 break;
             }
-            // Don't steal the cell they are already flying to — take a neighbour in their cluster.
             Vec3 aimOrigin = Vec3.atCenterOf(job.scanPosAt(other.aim));
             int near = shapeClusterIndex(
                     level, player, job, hand, aimOrigin, PLACE_NEAR_SQR, CLUSTER_RADIUS,
-                    shapeKind, shapePinLocal, false);
+                    shapeKind, shapePinLocal, false, true);
             if (near >= 0 && near != other.aim) {
                 return near;
             }
             near = shapeClusterIndex(
                     level, player, job, hand, aimOrigin, FLY_NEAR_SQR, FLY_NEAR_RADIUS,
-                    shapeKind, shapePinLocal, false);
+                    shapeKind, shapePinLocal, false, true);
             if (near >= 0 && near != other.aim) {
                 return near;
             }

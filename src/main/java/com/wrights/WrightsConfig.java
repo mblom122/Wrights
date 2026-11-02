@@ -310,8 +310,9 @@ public final class WrightsConfig {
     /**
      * How many wrights can usefully work this job in parallel. Not 1:1 with blocks —
      * one upgraded wright multi-places a local cluster, so a 3×3 wall needs one wright,
-     * not nine. Capped by horizontal columns (lane splits) and by a share near the
-     * Netherite place burst.
+     * not nine. Caps by: place-burst share, horizontal columns, and how many
+     * non-overlapping place-reach stations fit in the box. Thin beams/pillars need
+     * two full stations of exclusive work before a second wright is worth sending.
      */
     public static int usefulCrewFor(int blocks, int sizeX, int sizeY, int sizeZ) {
         if (blocks <= 0) {
@@ -319,12 +320,27 @@ public final class WrightsConfig {
         }
         // Huge Shape AABBs (or Integer.MAX_VALUE placeholders) must not overflow int math to 1.
         long safeBlocks = Math.max(1L, blocks);
-        int columns = Math.max(1, Math.max(Math.max(1, sizeX), Math.max(1, sizeZ)));
+        int sx = Math.max(1, sizeX);
+        int sy = Math.max(1, sizeY);
+        int sz = Math.max(1, sizeZ);
+        // ~PLACE_NEAR diameter (reach 3 → 7 cells along a line from one hover).
+        int station = 7;
+        int nx = (sx + station - 1) / station;
+        int ny = (sy + station - 1) / station;
+        int nz = (sz + station - 1) / station;
+        int stations = Math.max(1, nx * ny * nz);
+        int ones = (sx == 1 ? 1 : 0) + (sy == 1 ? 1 : 0) + (sz == 1 ? 1 : 0);
+        if (ones >= 2) {
+            // Beam / pillar: one wright walks the line; only split when length covers two stations each.
+            int length = Math.max(sx, Math.max(sy, sz));
+            stations = Math.max(1, (length + 2 * station - 1) / (2 * station));
+        }
+        int columns = Math.max(1, Math.max(sx, sz));
         int share = Math.max(1, WrightTier.placeEighths(WrightTier.NETHERITE) / 8);
         int byShare = (int) Math.min(Integer.MAX_VALUE, (safeBlocks + share - 1L) / share);
         byShare = Math.max(1, byShare);
         int blockCap = (int) Math.min(Integer.MAX_VALUE, safeBlocks);
-        return Math.max(1, Math.min(blockCap, Math.min(columns, byShare)));
+        return Math.max(1, Math.min(blockCap, Math.min(stations, Math.min(columns, byShare))));
     }
 
     public static int maxWrightsCarried() {
