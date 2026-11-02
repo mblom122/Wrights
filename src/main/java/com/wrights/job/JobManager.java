@@ -1535,15 +1535,16 @@ public final class JobManager {
         if (job.waitKind() != BuildJob.WAIT_ITEMS) {
             job.workedTick();
         }
-        int crewN = job.hasCrew() ? Math.max(1, job.hands().size()) : 1;
-        if (!fast && job.hasCrew() && crewN > 1) {
+        // One wright uses the same station targeting as a crew. The old cursor walk
+        // always started at AABB index 0 (a corner) and never picked a place-hover.
+        if (!fast && job.hasCrew()) {
             tickShapeCrew(server, library, level, player, job, usable, fillMode, random, shapeKind, shapePinLocal);
             return;
         }
         int scanBudget = Math.max(1, WrightsConfig.COPY_POSITIONS_PER_TICK.getAsInt());
         int placeBudget = fast
                 ? Math.min(8192, scanBudget)
-                : Math.max(1, WrightsConfig.BLOCKS_PER_TICK.getAsInt()) * crewN;
+                : Math.max(1, WrightsConfig.BLOCKS_PER_TICK.getAsInt());
         int scanned = 0;
         int placed = 0;
         DroneEntity drone = null;
@@ -1874,7 +1875,10 @@ public final class JobManager {
             library.schematic(job.schematicId()).ifPresent(schematic -> BlueprintNetwork.showJobHologram(player, job, schematic));
         }
         library.setDirty();
-        if (job.cursor() >= job.total() || shapeCrewFinished(job)) {
+        // Done only when every scan cell was actually resolved (placed, skipped, or outside
+        // the shape). Hand cursors are not a finish signal — a scoring pass used to walk them
+        // to the end and complete the job after one or two blocks.
+        if (job.cursor() >= job.total()) {
             finishPaste(server, library, player, job);
         }
     }
@@ -1911,33 +1915,41 @@ public final class JobManager {
         }
     }
 
-    private static boolean shapeCrewFinished(BuildJob job) {
-        if (job.hands().isEmpty()) {
-            return job.cursor() >= job.total();
-        }
-        for (BuildJob.Hand hand : job.hands()) {
-            if (hand.cursor < job.total()) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /** Mark an AABB cell processed for job progress and advance this hand past it. */
+    /**
+     * Mark an AABB cell processed. Does not jump {@code hand.cursor} past earlier unresolved
+     * cells — placing the middle of a line must not abandon the ends.
+     */
     private static void resolveShapeCell(BuildJob job, BuildJob.Hand hand, int index, boolean skipped) {
         if (index == hand.aim) {
             hand.aim = -1;
         }
-        if (index >= hand.cursor) {
-            hand.cursor = index + 1;
+        boolean fresh = job.markShapeResolved(index);
+        if (fresh) {
+            job.advance();
+            if (skipped) {
+                job.skippedOne();
+            }
         }
-        if (!job.markShapeResolved(index)) {
-            return;
+        pullShapeCursor(job, hand);
+    }
+
+    /** Move this hand's scan cursor forward only through cells that are already resolved or not owned. */
+    private static void pullShapeCursor(BuildJob job, BuildJob.Hand hand) {
+        int total = job.total();
+        int cursor = Math.max(0, hand.cursor);
+        int guard = 0;
+        while (cursor < total && guard++ < 64) {
+            BlockPos pos = job.scanPosAt(cursor);
+            int lx = pos.getX() - job.min().getX();
+            int ly = pos.getY() - job.min().getY();
+            int lz = pos.getZ() - job.min().getZ();
+            if (!ownsShapeCell(job, hand, lx, ly, lz) || job.isShapeResolved(cursor)) {
+                cursor++;
+                continue;
+            }
+            break;
         }
-        job.advance();
-        if (skipped) {
-            job.skippedOne();
-        }
+        hand.cursor = cursor;
     }
 
     private static void setShapeHandStatus(ServerLevel level, BuildJob.Hand hand, BlockState state, int waitReason) {
@@ -2015,9 +2027,7 @@ public final class JobManager {
                 return hand.aim;
             }
             if (probe == ShapeCell.DONE) {
-                if (hand.aim >= hand.cursor) {
-                    hand.cursor = hand.aim + 1;
-                }
+                pullShapeCursor(job, hand);
                 hand.aim = -1;
             } else if (onlyOwned && probe == ShapeCell.SKIP) {
                 resolveShapeCell(job, hand, hand.aim, true);
@@ -2029,8 +2039,10 @@ public final class JobManager {
                 hand.aim = -1;
             }
         }
-        if (origin != null) {
+        if (origin != null && !shapeOneStation(job, hand)) {
             // Already in place-reach: closest READY (finish this hover, cut fly time).
+            // One-station shares skip this — spawning on the corner must not beat the hover
+            // that covers the whole 1×5 / 2×4 / strip.
             int local = shapeClusterIndex(
                     level, player, job, hand, origin, PLACE_NEAR_SQR, CLUSTER_RADIUS,
                     shapeKind, shapePinLocal, onlyOwned, false);
@@ -2054,6 +2066,14 @@ public final class JobManager {
             return seed;
         }
         return -1;
+    }
+
+    /** This hand's cells fit in one place-AOE hover (short line, small plate, or one beam strip). */
+    private static boolean shapeOneStation(BuildJob job, BuildJob.Hand hand) {
+        int lanes = Math.max(1, hand == null ? 1 : hand.lanes);
+        int total = Math.max(0, job.total());
+        int share = Math.max(1, (total + lanes - 1) / lanes);
+        return share <= WrightsConfig.placeAoeCapacity(job.boxSizeX(), job.boxSizeY(), job.boxSizeZ());
     }
 
     /** Dense hover scoring while this hand's AOE share still fits a couple waves; else closest-first. */
@@ -2084,6 +2104,7 @@ public final class JobManager {
         }
         // Density scoring only while this share / job still fits a couple AOE waves.
         boolean compact = shapeOptimizeRoute(job, hand);
+        pullShapeCursor(job, hand);
         int examined = 0;
         int nearest = -1;
         double nearestDist = Double.MAX_VALUE;
@@ -2096,9 +2117,6 @@ public final class JobManager {
             int ly = pos.getY() - job.min().getY();
             int lz = pos.getZ() - job.min().getZ();
             if (!ownsShapeCell(job, hand, lx, ly, lz)) {
-                if (i >= hand.cursor) {
-                    hand.cursor = i + 1;
-                }
                 continue;
             }
             if (aimedByOther(job, hand, i)) {
@@ -2108,9 +2126,6 @@ public final class JobManager {
             ShapeCell kind = classifyShapeCell(level, player, job, hand, i, shapeKind, shapePinLocal, true);
             examined++;
             if (kind == ShapeCell.DONE) {
-                if (i >= hand.cursor) {
-                    hand.cursor = i + 1;
-                }
                 continue;
             }
             if (kind == ShapeCell.OUT) {
@@ -2138,28 +2153,16 @@ public final class JobManager {
                 break;
             }
         }
-        while (hand.cursor < total) {
-            BlockPos pos = job.scanPosAt(hand.cursor);
-            int lx = pos.getX() - job.min().getX();
-            int ly = pos.getY() - job.min().getY();
-            int lz = pos.getZ() - job.min().getZ();
-            if (ownsShapeCell(job, hand, lx, ly, lz)) {
-                break;
-            }
-            hand.cursor++;
-        }
         if (nearest < 0) {
             return -1;
         }
         if (!compact || candidates == null || candidateCount <= 1) {
             return nearest;
         }
-        // Far / pre-launch, or share fits one place-AOE: densest hover (station center).
-        // Soft-near on larger shares: near-first, denser only within SEED_SLACK_SQR.
-        // Short beams (≤7) used to lock onto the nearest end — slack (~2.8) is smaller than
-        // mid-line distance (3), so they crawled end-to-end instead of one middle hover.
-        int aoe = WrightsConfig.placeAoeCapacity(job.boxSizeX(), job.boxSizeY(), job.boxSizeZ());
-        boolean oneHover = candidateCount <= aoe;
+        // One place-AOE share, far, or pre-launch: densest hover (station center).
+        // Larger shares that are already nearby: near-first, denser only within SEED_SLACK_SQR.
+        boolean oneHover = shapeOneStation(job, hand) || candidateCount <= WrightsConfig.placeAoeCapacity(
+                job.boxSizeX(), job.boxSizeY(), job.boxSizeZ());
         boolean far = origin == null || nearestDist > FLY_NEAR_SQR || oneHover;
         int best = nearest;
         int bestScore = shapeClusterReadyCount(
