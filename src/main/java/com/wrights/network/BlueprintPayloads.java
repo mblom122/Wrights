@@ -988,6 +988,22 @@ public final class BlueprintPayloads {
         }
     }
 
+    /** Jobs card − / +: how many wrights this job should keep assigned (recruits when in range). */
+    public record SetJobQuota(UUID id, int quota) implements CustomPacketPayload {
+        public static final Type<SetJobQuota> TYPE = payloadType("set_job_quota");
+        public static final StreamCodec<RegistryFriendlyByteBuf, SetJobQuota> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    buf.writeUUID(value.id);
+                    buf.writeVarInt(value.quota);
+                },
+                buf -> new SetJobQuota(buf.readUUID(), buf.readVarInt()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public record MoveDrone(UUID unit, UUID job) implements CustomPacketPayload {
         public static final Type<MoveDrone> TYPE = payloadType("move_drone");
         public static final StreamCodec<RegistryFriendlyByteBuf, MoveDrone> STREAM_CODEC = StreamCodec.of(

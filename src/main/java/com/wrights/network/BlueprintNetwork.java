@@ -61,6 +61,7 @@ public final class BlueprintNetwork {
         registrar.playToServer(BlueprintPayloads.SetAssign.TYPE, BlueprintPayloads.SetAssign.STREAM_CODEC, BlueprintNetwork::assign);
         registrar.playToServer(BlueprintPayloads.DeployAsk.TYPE, BlueprintPayloads.DeployAsk.STREAM_CODEC, BlueprintNetwork::deployAsk);
         registrar.playToServer(BlueprintPayloads.SetJobDrones.TYPE, BlueprintPayloads.SetJobDrones.STREAM_CODEC, BlueprintNetwork::jobDrones);
+        registrar.playToServer(BlueprintPayloads.SetJobQuota.TYPE, BlueprintPayloads.SetJobQuota.STREAM_CODEC, BlueprintNetwork::jobQuota);
         registrar.playToServer(BlueprintPayloads.MoveDrone.TYPE, BlueprintPayloads.MoveDrone.STREAM_CODEC, BlueprintNetwork::moveDrone);
         registrar.playToServer(BlueprintPayloads.VisitWright.TYPE, BlueprintPayloads.VisitWright.STREAM_CODEC, BlueprintNetwork::visitWright);
         registrar.playToServer(BlueprintPayloads.HangarEdit.TYPE, BlueprintPayloads.HangarEdit.STREAM_CODEC, BlueprintNetwork::hangar);
@@ -395,6 +396,11 @@ public final class BlueprintNetwork {
     private static void jobDrones(BlueprintPayloads.SetJobDrones payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
         context.enqueueWork(() -> com.wrights.job.JobManager.setJobDrones(player, payload.id(), payload.unit(), payload.add()));
+    }
+
+    private static void jobQuota(BlueprintPayloads.SetJobQuota payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        context.enqueueWork(() -> com.wrights.job.JobManager.setJobQuota(player, payload.id(), payload.quota()));
     }
 
     private static void moveDrone(BlueprintPayloads.MoveDrone payload, IPayloadContext context) {

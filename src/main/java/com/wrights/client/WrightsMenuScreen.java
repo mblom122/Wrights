@@ -3822,7 +3822,7 @@ public class WrightsMenuScreen extends Screen {
         }
     }
 
-    /** Wrights count plus compact − / + to pull one free wright onto the job or send one home. */
+    /** Working N / Assigned M — compact − / + changes how many wrights the job should keep. */
     private void drawCrewAdjust(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, BlueprintPayloads.JobLine job, boolean tool) {
         String text = crewCountText(job);
         int textX = x + 6;
@@ -3830,12 +3830,19 @@ public class WrightsMenuScreen extends Screen {
         graphics.drawString(this.font, text, textX, textY, WrightsUi.MUTED, false);
         int bx = textX + this.font.width(text) + 6;
         int by = y + JOB_BODY + 1;
-        boolean canMinus = tool && !job.crew().isEmpty();
-        boolean canPlus = tool && firstFreeWright(job) != null;
+        int assigned = assignedWrights(job);
+        int cap = jobCrewCap();
+        boolean canMinus = tool && assigned > 0;
+        boolean canPlus = tool && assigned < cap;
         drawCrewStep(graphics, mouseX, mouseY, bx, by, "-", canMinus);
         jobHits.add(new JobHit(bx, by, CREW_STEP, CREW_STEP, job.id(), ACT_CREW_MINUS));
         drawCrewStep(graphics, mouseX, mouseY, bx + CREW_STEP + 2, by, "+", canPlus);
         jobHits.add(new JobHit(bx + CREW_STEP + 2, by, CREW_STEP, CREW_STEP, job.id(), ACT_CREW_PLUS));
+        if (mouseX >= bx && mouseX < bx + CREW_STEP && mouseY >= by && mouseY < by + CREW_STEP) {
+            graphics.renderTooltip(this.font, Component.translatable("menu.wrights.job_crew_remove"), mouseX, mouseY);
+        } else if (mouseX >= bx + CREW_STEP + 2 && mouseX < bx + CREW_STEP * 2 + 2 && mouseY >= by && mouseY < by + CREW_STEP) {
+            graphics.renderTooltip(this.font, Component.translatable("menu.wrights.job_crew_add"), mouseX, mouseY);
+        }
     }
 
     private void trackCrewAdjust(int x, int y, BlueprintPayloads.JobLine job) {
@@ -4006,11 +4013,20 @@ public class WrightsMenuScreen extends Screen {
     }
 
     private String crewCountText(BlueprintPayloads.JobLine job) {
-        int assigned = Math.max(job.crew().size(), job.quota());
+        int assigned = assignedWrights(job);
         if (!job.finished() && assigned > 0) {
             return Component.translatable("menu.wrights.job_drone_queued", job.drones(), assigned).getString();
         }
         return Component.translatable("menu.wrights.job_drone_count", job.crew().size()).getString();
+    }
+
+    private static int assignedWrights(BlueprintPayloads.JobLine job) {
+        return Math.max(job.crew().size(), job.quota());
+    }
+
+    /** Client enable cap — Exchange/Place may use 2×; server clamps per job. */
+    private static int jobCrewCap() {
+        return WrightsConfig.maxWrightsPerJob(true);
     }
 
     private Component jobStatusText(BlueprintPayloads.JobLine job) {
@@ -4290,53 +4306,12 @@ public class WrightsMenuScreen extends Screen {
         if (job == null || job.finished() || job.saving()) {
             return;
         }
-        UUID unit = add ? firstFreeWright(job) : lastCrewWright(job);
-        if (unit == null) {
-            if (this.minecraft.player != null) {
-                this.minecraft.player.displayClientMessage(Component.translatable(add
-                        ? "screen.wrights.drones_none_free"
-                        : "screen.wrights.drones_none_on"), true);
-            }
+        int assigned = assignedWrights(job);
+        int next = WrightsClientState.stepped(assigned, add ? 1 : -1, 0, jobCrewCap());
+        if (next == assigned) {
             return;
         }
-        PacketDistributor.sendToServer(new BlueprintPayloads.SetJobDrones(jobId, unit, add));
-    }
-
-    private UUID firstFreeWright(BlueprintPayloads.JobLine job) {
-        if (this.minecraft == null || this.minecraft.player == null) {
-            return null;
-        }
-        Swarm swarm = Wrightports.swarm(this.minecraft.player);
-        for (Swarm.Unit unit : swarm.units()) {
-            if (job.crew().contains(unit.id())) {
-                continue;
-            }
-            if (wrightBusyElsewhere(unit.id(), job.id())) {
-                continue;
-            }
-            return unit.id();
-        }
-        return null;
-    }
-
-    private static UUID lastCrewWright(BlueprintPayloads.JobLine job) {
-        List<UUID> crew = job.crew();
-        if (crew.isEmpty()) {
-            return null;
-        }
-        return crew.get(crew.size() - 1);
-    }
-
-    private static boolean wrightBusyElsewhere(UUID unit, UUID exceptJob) {
-        for (BlueprintPayloads.JobLine other : WrightsClientState.jobs) {
-            if (other.id().equals(exceptJob) || other.finished() || other.saving()) {
-                continue;
-            }
-            if (other.crew().contains(unit)) {
-                return true;
-            }
-        }
-        return false;
+        PacketDistributor.sendToServer(new BlueprintPayloads.SetJobQuota(jobId, next));
     }
 
     private int[] dronePool() {

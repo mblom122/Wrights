@@ -3709,6 +3709,51 @@ public final class JobManager {
         return changed;
     }
 
+    /**
+     * Jobs card − / +: set how many wrights this job should keep assigned.
+     * Raises wait for recruits in range; lowers send surplus home when the count drops below the live crew.
+     */
+    public static void setJobQuota(ServerPlayer player, UUID id, int wanted) {
+        if (!com.wrights.item.ControllerItem.isHeld(player)) {
+            Messages.actionBar(player, "message.wrights.need_controller");
+            return;
+        }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        bindCrewIds(player, library);
+        BuildJob job = library.job(id).orElse(null);
+        if (job == null || !job.owner().equals(player.getUUID()) || !usesDrones(job) || job.finished()) {
+            BlueprintNetwork.syncJobs(player);
+            return;
+        }
+        int cap = WrightsConfig.maxWrightsPerJob(job);
+        int quota = Math.max(0, Math.min(cap, wanted));
+        int live = assignedCount(job);
+        if (quota == job.crewQuota() && live <= quota) {
+            BlueprintNetwork.syncJobs(player);
+            return;
+        }
+        if (live > quota) {
+            List<UUID> ids = new ArrayList<>(job.crewUnits());
+            while (ids.size() > quota) {
+                ids.remove(ids.size() - 1);
+            }
+            placeCrew(player, library, job, ids);
+            job.setCrewQuota(quota);
+        } else {
+            job.setCrewQuota(quota);
+        }
+        if (quota > assignedCount(job)) {
+            job.setQueued(true);
+            job.setPaused(false);
+            if (job.hold() == BuildJob.HOLD_NO_WRIGHTS) {
+                job.clearHold();
+            }
+            topUpQueued(player, library, job);
+        }
+        library.setDirty();
+        BlueprintNetwork.syncJobs(player);
+    }
+
     public static void setJobDrones(ServerPlayer player, UUID id, UUID unitId, boolean add) {
         if (!com.wrights.item.ControllerItem.isHeld(player)) {
             Messages.actionBar(player, "message.wrights.need_controller");
