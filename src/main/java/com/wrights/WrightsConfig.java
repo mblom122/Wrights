@@ -335,19 +335,9 @@ public final class WrightsConfig {
         return maxWrightsPerJob(job.exchangeJob() || job.placeTool());
     }
 
-    /**
-     * Longest straight run one Netherite operation covers: the occupied cell and one step each way.
-     * Corners of the 3×3×3 are outside the sphere, so a line is 3, not 7.
-     */
-    public static final int PLACE_REACH = 1;
-
     /** Cells along a straight line one hover can cover at this operations tier. Basic is 1; every other tier is 3. */
     public static int placeAoeLine(int ops) {
         return WrightTier.clamp(ops) <= WrightTier.BASE ? 1 : 3;
-    }
-
-    public static int placeAoeLine() {
-        return placeAoeLine(WrightTier.NETHERITE);
     }
 
     /**
@@ -366,39 +356,10 @@ public final class WrightsConfig {
         return burst;
     }
 
-    public static int placeAoeCapacity(int sizeX, int sizeY, int sizeZ) {
-        return placeAoeCapacity(sizeX, sizeY, sizeZ, WrightTier.NETHERITE);
-    }
-
-    /**
-     * True when dense hover scoring is worth it. If {@code blocks} already need more than a couple
-     * full AOE waves from {@code wrights}, prefer closest-first and skip the extra math.
-     * {@code shareBlocks} is this wright's slice when known (else pass the full job size).
-     */
-    public static boolean optimizePlaceRoute(int blocks, int sizeX, int sizeY, int sizeZ, int wrights, int shareBlocks) {
-        return optimizePlaceRoute(blocks, sizeX, sizeY, sizeZ, wrights, shareBlocks, WrightTier.NETHERITE);
-    }
-
-    public static boolean optimizePlaceRoute(int blocks, int sizeX, int sizeY, int sizeZ, int wrights, int shareBlocks, int ops) {
-        if (blocks <= 0) {
-            return false;
-        }
-        int aoe = Math.max(1, placeAoeCapacity(sizeX, sizeY, sizeZ, ops));
-        int crew = Math.max(1, wrights);
-        int share = shareBlocks > 0 ? shareBlocks : blocks;
-        // Own strip fits in ~2 hovers, or the whole job fits in ~2 crew-wide AOE waves.
-        long wave = (long) aoe * (long) crew * 2L;
-        return share <= aoe * 2L || (long) blocks <= wave;
-    }
-
     /**
      * How many wrights can usefully work this job in parallel. Sized by operations stations.
      * At Netherite a 1×9 beam is three stations (3+3+3). Basic covers only the cell it occupies.
      */
-    public static int usefulCrewFor(int blocks, int sizeX, int sizeY, int sizeZ) {
-        return usefulCrewFor(blocks, sizeX, sizeY, sizeZ, WrightTier.NETHERITE);
-    }
-
     public static int usefulCrewFor(int blocks, int sizeX, int sizeY, int sizeZ, int ops) {
         if (blocks <= 0) {
             return 0;

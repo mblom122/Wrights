@@ -104,10 +104,6 @@ public final class ShapeHover {
         PLATE,
         /** The whole shape sits in the sphere of one stand. */
         ONE,
-        /** Solid or hollow 3×3×3 cube: center, then the two opposite faces. */
-        CUBE3,
-        /** 2×2×2: two opposite corners. */
-        PAIR,
         /** Box that fits in 3×3×3: predefined stands, each limited to the reach sphere. */
         SMALL,
         /** Hollow box faces, tiled by 3. */
@@ -154,8 +150,6 @@ public final class ShapeHover {
         return switch (mode) {
             case CELL -> sx * sy * sz;
             case ONE -> 1;
-            case CUBE3 -> 3;
-            case PAIR -> 2;
             case SMALL -> smallPlan(new Query(sx, sy, sz, hollow, kind, reachSqr, cap, 0, 0, sx)).n;
             case LINE -> lineCount(sx, sy, sz, reachSqr);
             case PLATE -> plateCount(sx, sy, sz);
@@ -218,7 +212,7 @@ public final class ShapeHover {
             case CROSS -> currentCross(q, cursor);
             case CELL -> currentPacked(q, cursor, Mode.CELL);
             case SWEEP -> currentPacked(q, cursor, Mode.SWEEP);
-            case LINE, PLATE, ONE, CUBE3, PAIR, SMALL -> currentOrdinal(q, mode, cursor);
+            case LINE, PLATE, ONE, SMALL -> currentOrdinal(q, mode, cursor);
             case SHELL -> currentShell(q, cursor);
         };
     }
@@ -259,7 +253,7 @@ public final class ShapeHover {
             case CELL -> n = put(q, xs, ys, zs, n, limit, stand.x, stand.y, stand.z);
             case LINE -> n = fillLine(q, stand, xs, ys, zs, n, limit);
             case PLATE, SHELL -> n = fillTile(q, stand, xs, ys, zs, n, limit);
-            case ONE, CUBE3, PAIR -> {
+            case ONE -> {
                 for (int i = 0; i < 19 && n < limit; i++) {
                     n = put(q, xs, ys, zs, n, limit, stand.x + BALL_X[i], stand.y + BALL_Y[i], stand.z + BALL_Z[i]);
                 }
@@ -291,8 +285,6 @@ public final class ShapeHover {
             case SHELL -> shellStand(q, index);
             case SWEEP -> sweepStand(q, index);
             case ONE -> oneStand(q, index);
-            case CUBE3 -> cubeStand(q, index);
-            case PAIR -> pairStand(q, index);
             case SMALL -> smallStand(q, index);
             default -> done(mode);
         };
@@ -309,38 +301,6 @@ public final class ShapeHover {
             return done(Mode.ONE);
         }
         return new Stand(x, y, z, 0, false, Mode.ONE);
-    }
-
-    private static Stand cubeStand(Query q, int index) {
-        int[] xs = {1, 0, 2};
-        int seen = 0;
-        for (int i = 0; i < 3; i++) {
-            if (!along(q, xs[i], 1, 1)) {
-                continue;
-            }
-            if (seen == index) {
-                return new Stand(xs[i], 1, 1, index, false, Mode.CUBE3);
-            }
-            seen++;
-        }
-        return done(Mode.CUBE3);
-    }
-
-    private static Stand pairStand(Query q, int index) {
-        int[] xs = {0, 1};
-        int[] ys = {0, 1};
-        int[] zs = {0, 1};
-        int seen = 0;
-        for (int i = 0; i < 2; i++) {
-            if (!along(q, xs[i], ys[i], zs[i])) {
-                continue;
-            }
-            if (seen == index) {
-                return new Stand(xs[i], ys[i], zs[i], index, false, Mode.PAIR);
-            }
-            seen++;
-        }
-        return done(Mode.PAIR);
     }
 
     /**
