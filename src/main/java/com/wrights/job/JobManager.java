@@ -1864,7 +1864,7 @@ public final class JobManager {
                     if (index == PATTERN_PAUSE || hand.hover == -2) {
                         break;
                     }
-                    if (index < 0) {
+                    if (index < 0 && !shapeStaged(job)) {
                         index = nextShapeIndex(
                                 level, player, job, hand, usable, shapeKind, shapePinLocal, false, scanCap);
                     }
@@ -2841,11 +2841,12 @@ public final class JobManager {
             return false;
         }
         for (BuildJob.Hand hand : job.hands()) {
-            if (!hasShapeBox(hand)) {
-                continue;
-            }
-            if (hand.boxX0 < tile.x0 || hand.boxY0 < tile.y0 || hand.boxZ0 < tile.z0
-                    || hand.boxX1 > tile.x1 || hand.boxY1 > tile.y1 || hand.boxZ1 > tile.z1) {
+            if (hasShapeBox(hand)) {
+                if (hand.boxX0 < tile.x0 || hand.boxY0 < tile.y0 || hand.boxZ0 < tile.z0
+                        || hand.boxX1 > tile.x1 || hand.boxY1 > tile.y1 || hand.boxZ1 > tile.z1) {
+                    return true;
+                }
+            } else if (hand.shareFrom >= 0 && hand.shareTo > hand.shareFrom) {
                 return true;
             }
         }
@@ -2867,7 +2868,17 @@ public final class JobManager {
         if (tile == null) {
             return;
         }
-        if (countUnresolvedIn(job, tile, 1) != 0) {
+        boolean any = false;
+        for (BuildJob.Hand hand : job.hands()) {
+            if (!hasShapeBox(hand)) {
+                continue;
+            }
+            any = true;
+            if (hand.hover != -2) {
+                return;
+            }
+        }
+        if (!any || !shapeCubeSettled(job, tile)) {
             return;
         }
         int next = job.shapeCubeIndex() + 1;
@@ -2882,6 +2893,21 @@ public final class JobManager {
             hand.probe = 0;
             hand.idle = false;
         }
+    }
+
+    /** Every cell of this cube is already placed, skipped, or outside the shape. The scan stays inside the cube. */
+    private static boolean shapeCubeSettled(BuildJob job, com.wrights.blueprint.ShapeShares.Part tile) {
+        for (int z = tile.z0; z < tile.z1; z++) {
+            for (int y = tile.y0; y < tile.y1; y++) {
+                for (int x = tile.x0; x < tile.x1; x++) {
+                    int index = shapeLocalIndex(job, x, y, z);
+                    if (index >= 0 && !job.isShapeResolved(index)) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
     }
 
     /**
