@@ -2037,11 +2037,11 @@ public final class JobManager {
             if (local >= 0) {
                 return local;
             }
-            // Soft fly band: still near-first, but nudge to a denser hover within a short slack
-            // (corner vs middle of a 3×3) so one burst can replace several moves.
+            // Soft fly band: closest first. On compact jobs only, nudge within a short slack
+            // to a denser hover (wall center / beam station) so one burst replaces several moves.
             int near = shapeClusterIndex(
                     level, player, job, hand, origin, FLY_NEAR_SQR, FLY_NEAR_RADIUS,
-                    shapeKind, shapePinLocal, onlyOwned, true);
+                    shapeKind, shapePinLocal, onlyOwned, job.total() <= 256);
             if (near >= 0) {
                 return near;
             }
@@ -2058,9 +2058,8 @@ public final class JobManager {
     }
 
     /**
-     * Long-range fly-to for this hand. Near-first when the wright already has a position;
-     * within {@link #SEED_SLACK_SQR} of the nearest READY cell, prefer the hover that covers
-     * the densest place-reach cluster so a small plate finishes in one burst.
+     * Long-range fly-to for this hand. Large jobs stay closest-first (cheap). Small jobs may
+     * nudge to a denser place-reach hover so a short beam/wall is not crawled from a corner.
      */
     private static int shapeBestSeedIndex(
             ServerLevel level,
@@ -2075,11 +2074,12 @@ public final class JobManager {
         if (total <= 0) {
             return -1;
         }
+        // Density scoring is for compact jobs only — big boxes stay nearest-READY.
+        boolean compact = total <= 256;
         int examined = 0;
         int nearest = -1;
         double nearestDist = Double.MAX_VALUE;
-        boolean scoreAll = total <= CREW_SCAN_CAP;
-        int[] candidates = scoreAll ? new int[Math.min(total, scanCap)] : null;
+        int[] candidates = compact ? new int[Math.min(total, scanCap)] : null;
         int candidateCount = 0;
         int from = Math.max(0, hand.cursor);
         for (int i = from; i < total && examined < scanCap; i++) {
@@ -2126,7 +2126,7 @@ public final class JobManager {
             if (candidates != null && candidateCount < candidates.length) {
                 candidates[candidateCount++] = i;
             }
-            if (!scoreAll) {
+            if (!compact) {
                 break;
             }
         }
@@ -2143,54 +2143,36 @@ public final class JobManager {
         if (nearest < 0) {
             return -1;
         }
-        if (!scoreAll || candidates == null || candidateCount <= 1) {
+        if (!compact || candidates == null || candidateCount <= 1) {
             return nearest;
         }
-        // Among cells near the closest READY, pick the densest place-reach hover.
+        // Far / pre-launch: pick densest hover on the whole compact job (station center).
+        // Already soft-near: near-first, denser only within SEED_SLACK_SQR.
+        boolean far = origin == null || nearestDist > FLY_NEAR_SQR;
         int best = nearest;
         int bestScore = shapeClusterReadyCount(
                 level, player, job, hand, Vec3.atCenterOf(job.scanPosAt(nearest)), shapeKind, shapePinLocal, true);
         double bestDist = nearestDist;
+        double cx = job.min().getX() + job.boxSizeX() * 0.5D;
+        double cy = job.min().getY() + job.boxSizeY() * 0.5D;
+        double cz = job.min().getZ() + job.boxSizeZ() * 0.5D;
         for (int c = 0; c < candidateCount; c++) {
             int index = candidates[c];
             BlockPos pos = job.scanPosAt(index);
             double dist = origin == null
-                    ? pos.distToCenterSqr(
-                            job.min().getX() + job.boxSizeX() * 0.5D,
-                            job.min().getY() + job.boxSizeY() * 0.5D,
-                            job.min().getZ() + job.boxSizeZ() * 0.5D)
+                    ? pos.distToCenterSqr(cx, cy, cz)
                     : origin.distanceToSqr(Vec3.atCenterOf(pos));
-            if (origin != null && dist > nearestDist + SEED_SLACK_SQR) {
+            if (!far && dist > nearestDist + SEED_SLACK_SQR) {
                 continue;
             }
             int score = shapeClusterReadyCount(
                     level, player, job, hand, Vec3.atCenterOf(pos), shapeKind, shapePinLocal, true);
-            if (score > bestScore || (score == bestScore && dist < bestDist)
+            if (score > bestScore
+                    || (score == bestScore && dist < bestDist)
                     || (score == bestScore && dist == bestDist && index < best)) {
                 best = index;
                 bestScore = score;
                 bestDist = dist;
-            }
-        }
-        // No live origin (pre-launch): prefer densest hover, then closer to box center.
-        if (origin == null) {
-            best = nearest;
-            bestScore = -1;
-            bestDist = Double.MAX_VALUE;
-            double cx = job.min().getX() + job.boxSizeX() * 0.5D;
-            double cy = job.min().getY() + job.boxSizeY() * 0.5D;
-            double cz = job.min().getZ() + job.boxSizeZ() * 0.5D;
-            for (int c = 0; c < candidateCount; c++) {
-                int index = candidates[c];
-                BlockPos pos = job.scanPosAt(index);
-                int score = shapeClusterReadyCount(
-                        level, player, job, hand, Vec3.atCenterOf(pos), shapeKind, shapePinLocal, true);
-                double dist = pos.distToCenterSqr(cx, cy, cz);
-                if (bestScore < 0 || score > bestScore || (score == bestScore && dist < bestDist)) {
-                    best = index;
-                    bestScore = score;
-                    bestDist = dist;
-                }
             }
         }
         return best;
