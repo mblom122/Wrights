@@ -3822,7 +3822,7 @@ public class WrightsMenuScreen extends Screen {
         }
     }
 
-    /** Working N / Assigned M on the left; − / + stay pinned to the row’s right edge. */
+    /** Working N / Assigned M on the left; − / + sit just past a fixed “100 / 100” slot so they don’t jump. */
     private void drawCrewAdjust(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width, BlueprintPayloads.JobLine job, boolean tool) {
         int by = y + JOB_BODY + 1;
         int bx = crewAdjustX(x, width);
@@ -3856,9 +3856,13 @@ public class WrightsMenuScreen extends Screen {
         jobHits.add(new JobHit(bx + CREW_STEP + 2, by, CREW_STEP, CREW_STEP, job.id(), ACT_CREW_PLUS));
     }
 
-    /** Right edge of the card, same inset as the status label. */
-    private static int crewAdjustX(int x, int width) {
-        return x + width - 8 - (CREW_STEP * 2 + 2);
+    /** Just after a reserved “Working 100 / 100” width — close to the label, stable as counts change. */
+    private int crewAdjustX(int x, int width) {
+        int textX = x + 6;
+        int reserved = this.font.width(Component.translatable("menu.wrights.job_drone_queued", 100, 100).getString());
+        int bx = textX + reserved + 6;
+        int maxBx = x + width - 8 - (CREW_STEP * 2 + 2);
+        return Math.min(bx, maxBx);
     }
 
     private void drawCrewStep(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, String label, boolean enabled) {
