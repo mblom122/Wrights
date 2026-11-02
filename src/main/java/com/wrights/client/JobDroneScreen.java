@@ -86,23 +86,30 @@ public class JobDroneScreen extends Screen {
         int busy = busyCount();
         int free = freeCount();
         int flying = Math.max(0, job.drones());
-        int onJob = crewCount(assigned);
-        int docked = Math.max(0, onJob - flying);
+        int crewNow = crewCount(assigned);
+        // Quota stays after out-of-range dock so the job still shows Assigned N while crew is free.
+        int assignedWanted = Math.max(crewNow, Math.max(0, job.quota()));
+        int docked = Math.max(0, crewNow - flying);
+        int open = Math.max(0, assignedWanted - crewNow);
         Component summary;
-        if (busy == 0) {
-            summary = docked > 0
-                    ? Component.translatable("screen.wrights.drone_split_docked", onJob, flying, docked, free)
-                    : Component.translatable("screen.wrights.drone_split_out", onJob, flying, free);
+        if (open > 0) {
+            summary = busy == 0
+                    ? Component.translatable("screen.wrights.drone_split_open", assignedWanted, flying, open, free)
+                    : Component.translatable("screen.wrights.drone_split_open_busy", assignedWanted, flying, open, free, busy);
+        } else if (docked > 0) {
+            summary = busy == 0
+                    ? Component.translatable("screen.wrights.drone_split_docked", assignedWanted, flying, docked, free)
+                    : Component.translatable("screen.wrights.drone_split_docked_busy", assignedWanted, flying, docked, free, busy);
         } else {
-            summary = docked > 0
-                    ? Component.translatable("screen.wrights.drone_split_docked_busy", onJob, flying, docked, free, busy)
-                    : Component.translatable("screen.wrights.drone_split_out_busy", onJob, flying, free, busy);
+            summary = busy == 0
+                    ? Component.translatable("screen.wrights.drone_split_out", assignedWanted, flying, free)
+                    : Component.translatable("screen.wrights.drone_split_out_busy", assignedWanted, flying, free, busy);
         }
         graphics.drawString(this.font, this.font.plainSubstrByWidth(summary.getString(), panelW - 32), panelX + 16, panelY + 32, WrightsUi.MUTED, false);
 
         Well onJobWell = onJobWell();
         Well available = availableWell();
-        drawSection(graphics, onJobWell, "screen.wrights.drones_on_job", onJob, WrightsUi.COPPER, assigned, onScroll, mouseX, mouseY, true);
+        drawSection(graphics, onJobWell, "screen.wrights.drones_on_job", assignedWanted, WrightsUi.COPPER, assigned, onScroll, mouseX, mouseY, true);
         drawSection(graphics, available, "screen.wrights.drones_available", free, WrightsUi.GREEN, others, otherScroll, mouseX, mouseY, false);
     }
 
@@ -410,21 +417,19 @@ public class JobDroneScreen extends Screen {
             }
         }
         if (assigned.isEmpty()) {
-            assigned.add(Entry.note(Component.translatable("screen.wrights.drones_none_on").getString()));
-        }
-        int free = 0;
-        int dockedOnThis = 0;
-        if (job != null) {
-            for (BlueprintPayloads.CrewHand hand : job.crewHands()) {
-                if (hand != null && !hand.out()) {
-                    dockedOnThis++;
-                }
+            int quota = job == null ? 0 : Math.max(0, job.quota());
+            if (quota > 0 && (job.queued() || job.hold() == com.wrights.job.BuildJob.HOLD_PLAYER_RANGE
+                    || job.hold() == com.wrights.job.BuildJob.HOLD_DIMENSION)) {
+                assigned.add(Entry.note(Component.translatable("screen.wrights.drones_waiting_quota", quota).getString()));
+            } else {
+                assigned.add(Entry.note(Component.translatable("screen.wrights.drones_none_on").getString()));
             }
         }
+        int free = 0;
         List<Entry> busy = new ArrayList<>();
         for (int i = 0; i < swarm.units().size(); i++) {
             Swarm.Unit unit = swarm.units().get(i);
-            // Still on this job's crew (even if docked / not flying) — not free for another job.
+            // Only wrights currently linked to this job's crew are reserved here.
             if (job != null && job.crew().contains(unit.id())) {
                 continue;
             }
@@ -439,11 +444,7 @@ public class JobDroneScreen extends Screen {
             }
         }
         if (free == 0) {
-            if (dockedOnThis > 0) {
-                others.add(0, Entry.note(Component.translatable("screen.wrights.drones_none_free_docked", dockedOnThis).getString()));
-            } else {
-                others.add(0, Entry.note(Component.translatable("screen.wrights.drones_none_free").getString()));
-            }
+            others.add(0, Entry.note(Component.translatable("screen.wrights.drones_none_free").getString()));
         }
         if (!busy.isEmpty()) {
             others.add(Entry.divider(Component.translatable("screen.wrights.drones_on_other_header").getString()));

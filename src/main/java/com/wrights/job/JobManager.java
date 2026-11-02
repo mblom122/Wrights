@@ -1475,9 +1475,9 @@ public final class JobManager {
         }
         if (!inReach(player, library, job)) {
             job.setWaitKind(BuildJob.WAIT_NONE);
-            // Leave flyers in the world so work resumes when you return, but mark them held —
-            // otherwise Manage keeps saying "Working" while progress is frozen.
-            holdCrewFlyers(level, job);
+            if (!releaseCrewOutOfRange(player, library, job)) {
+                holdCrewFlyers(level, job);
+            }
             return;
         }
         if (job.waitKind() != BuildJob.WAIT_ITEMS) {
@@ -2688,7 +2688,9 @@ public final class JobManager {
         if (job.hasCrew()) {
             if (!inReach(player, library, job)) {
                 job.setWaitKind(BuildJob.WAIT_NONE);
-                holdCrewFlyers(level, job);
+                if (!releaseCrewOutOfRange(player, library, job)) {
+                    holdCrewFlyers(level, job);
+                }
                 return;
             }
             if (job.waitKind() != BuildJob.WAIT_ITEMS) {
@@ -2699,7 +2701,9 @@ public final class JobManager {
         }
         if (!inReach(player, library, job)) {
             job.setWaitKind(BuildJob.WAIT_NONE);
-            holdCrewFlyers(level, job);
+            if (!releaseCrewOutOfRange(player, library, job)) {
+                holdCrewFlyers(level, job);
+            }
             return;
         }
         if (job.waitKind() != BuildJob.WAIT_ITEMS) {
@@ -3451,7 +3455,8 @@ public final class JobManager {
                 tellPortAt(player, player.getServer().getLevel(job.dimension()), shown, message, "message.wrights.paused_port_range_named");
             }
             BlueprintNetwork.syncJobs(player);
-        } else if (job.tickMessage()) {
+        } else if (reason != BuildJob.HOLD_PLAYER_RANGE && reason != BuildJob.HOLD_DIMENSION && job.tickMessage()) {
+            // Player-range / wrong-dimension: crew docks silently and the job keeps its quota.
             Messages.actionBar(player, message);
         }
         if (changed) {
@@ -3461,6 +3466,40 @@ public final class JobManager {
             }
         }
         return false;
+    }
+
+    /**
+     * Personal (or mixed) crew left player range: fly everyone home, drop them from the crew so they
+     * are free for other jobs, keep {@link BuildJob#crewQuota()} so the card still shows Assigned N,
+     * and queue the job to refill when someone is in range again. No Manage camera / hangar dock packet.
+     *
+     * @return true when this hold was handled (caller should not freeze flyers in place)
+     */
+    private static boolean releaseCrewOutOfRange(ServerPlayer player, SchematicLibrary library, BuildJob job) {
+        if (player == null || library == null || job == null) {
+            return false;
+        }
+        int hold = job.hold();
+        if (hold != BuildJob.HOLD_PLAYER_RANGE && hold != BuildJob.HOLD_DIMENSION) {
+            return false;
+        }
+        if (!job.hasCrew() && job.crewUnits().isEmpty() && job.droneId() == null) {
+            if (!job.queued() && job.crewQuota() > 0) {
+                job.setQueued(true);
+                library.setDirty();
+            }
+            return true;
+        }
+        int quota = Math.max(job.crewQuota(), assignedCount(job));
+        job.rememberCrewQuota(quota);
+        job.setCrewQuota(Math.max(1, quota));
+        sendHome(player.getServer(), player, job);
+        job.clearAssigned();
+        job.setQueued(true);
+        job.setPaused(false);
+        library.setDirty();
+        BlueprintNetwork.syncJobs(player);
+        return true;
     }
 
     private static boolean ready(ServerPlayer player, ServerLevel level, BlockPos pos, BuildJob job, boolean copy) {
