@@ -79,7 +79,10 @@ import com.wrights.util.Messages;
 @EventBusSubscriber(modid = WrightsMod.MOD_ID)
 public final class JobManager {
     private static final double DRONE_REACH_SQR = 2.25D;
-    /** Same radius as the multi-place budget loop — cells a wright can finish without flying. */
+    /**
+     * Sentinel for a place-reach cluster probe. The legal cells are the operations sphere
+     * ({@link WrightTier#operationReachSqr}), not this euclidean distance. Flight probes use {@link #FLY_NEAR_SQR}.
+     */
     private static final double PLACE_NEAR_SQR = 9.0D;
     /** Soft near band when the local cluster is empty; prefer these before a long index walk. */
     private static final double FLY_NEAR_SQR = 64.0D;
@@ -1836,7 +1839,7 @@ public final class JobManager {
                 }
                 claimAim(job, hand, index);
                 BlockPos cell = job.scanPosAt(index);
-                if (drone.distanceToSqr(Vec3.atCenterOf(cell)) > PLACE_NEAR_SQR) {
+                if (!inOperationReachFromHover(drone.position(), cell, handOps(hand))) {
                     break;
                 }
                 BlockState placeState = shapeNextState(job, usable, fillMode, random);
@@ -2008,8 +2011,7 @@ public final class JobManager {
         if (origin != null && hand.aim >= 0 && hand.aim < job.total()) {
             ShapeCell probe = classifyShapeCell(level, player, job, hand, hand.aim, shapeKind, shapePinLocal, onlyOwned);
             if (probe == ShapeCell.READY) {
-                double aimDist = origin.distanceToSqr(Vec3.atCenterOf(job.scanPosAt(hand.aim)));
-                if (aimDist <= PLACE_NEAR_SQR) {
+                if (inOperationReachFromHover(origin, job.scanPosAt(hand.aim), handOps(hand))) {
                     return hand.aim;
                 }
                 int local = shapeClusterIndex(
@@ -2072,13 +2074,18 @@ public final class JobManager {
         if (hover == null || pos == null) {
             return false;
         }
-        int reach = WrightTier.operationReachSqr(ops);
-        BlockPos from = BlockPos.containing(hover.x, hover.y - 0.85D, hover.z);
-        int dx = Math.abs(from.getX() - pos.getX());
-        int dy = Math.abs(from.getY() - pos.getY());
-        int dz = Math.abs(from.getZ() - pos.getZ());
-        return dx * dx + dy * dy + dz * dz <= Math.max(0, reach)
-                || hover.distanceToSqr(Vec3.atCenterOf(pos)) <= PLACE_NEAR_SQR;
+        return inOperationReachFromCell(BlockPos.containing(hover.x, hover.y - 0.85D, hover.z), pos, ops);
+    }
+
+    /** Sphere around a block the wright would stand in. Corners of the 3×3×3 are outside. */
+    private static boolean inOperationReachFromCell(BlockPos anchor, BlockPos cell, int ops) {
+        if (anchor == null || cell == null) {
+            return false;
+        }
+        int dx = cell.getX() - anchor.getX();
+        int dy = cell.getY() - anchor.getY();
+        int dz = cell.getZ() - anchor.getZ();
+        return dx * dx + dy * dy + dz * dz <= WrightTier.operationReachSqr(ops);
     }
 
     /** This hand's cells fit in one place-AOE hover (short line, small plate, or one beam strip). */
@@ -2229,7 +2236,7 @@ public final class JobManager {
                     if (index < 0 || aimedByOther(job, hand, index)) {
                         continue;
                     }
-                    if (origin.distanceToSqr(Vec3.atCenterOf(pos)) > PLACE_NEAR_SQR) {
+                    if (!inOperationReachFromCell(BlockPos.containing(origin), pos, handOps(hand))) {
                         continue;
                     }
                     if (classifyShapeCell(level, player, job, hand, index, shapeKind, shapePinLocal, onlyOwned)
@@ -2391,7 +2398,11 @@ public final class JobManager {
                         continue;
                     }
                     double dist = origin.distanceToSqr(Vec3.atCenterOf(pos));
-                    if (dist > reachSqr) {
+                    if (reachSqr <= PLACE_NEAR_SQR) {
+                        if (!inOperationReachFromHover(origin, pos, handOps(hand))) {
+                            continue;
+                        }
+                    } else if (dist > reachSqr) {
                         continue;
                     }
                     if (nearest < 0 || dist < nearestDist || (dist == nearestDist && index < nearest)) {
@@ -3211,7 +3222,7 @@ public final class JobManager {
                 }
             }
             drone.setWorkStatus(soloShow, ItemStack.EMPTY, DroneEntity.WAIT_NONE);
-            if (drone.distanceToSqr(Vec3.atCenterOf(pos)) > 9.0D) {
+            if (!inOperationReachFromHover(drone.position(), pos, drone.ops())) {
                 break;
             }
             if (job.outsideClip(entry) || satisfied(level, job, entry)) {
@@ -5268,7 +5279,7 @@ public final class JobManager {
                 Schematic.Entry entry = schematic.entry(at);
                 BlockPos pos = job.min().offset(entry.x(), entry.y(), entry.z());
                 // Out of multi-place reach: claim as the next fly target only after cluster search failed.
-                if (drone.distanceToSqr(Vec3.atCenterOf(pos)) > PLACE_NEAR_SQR) {
+                if (!inOperationReachFromHover(drone.position(), pos, handOps(hand))) {
                     claimAim(job, hand, at);
                     break;
                 }
@@ -5695,9 +5706,8 @@ public final class JobManager {
         Vec3 origin = workOrigin(level, job, hand);
         boolean nearest = origin != null;
         if (nearest && aimStillOpen(level, player, schematic, job, hand, include, false)) {
-            double aimDist = entryDistSqr(job, schematic.entry(hand.aim), origin);
-            // Already in multi-place reach — finish this cell before hunting neighbours.
-            if (aimDist <= PLACE_NEAR_SQR) {
+            Schematic.Entry aimed = schematic.entry(hand.aim);
+            if (inOperationReachFromHover(origin, job.min().offset(aimed.x(), aimed.y(), aimed.z()), handOps(hand))) {
                 return hand.aim;
             }
             // Flying to a distant aim: grab any ready cell we can place without turning around.
@@ -5784,8 +5794,8 @@ public final class JobManager {
     private static int borrowWork(ServerLevel level, ServerPlayer player, Schematic schematic, BuildJob job, BuildJob.Hand hand, boolean takeOwned) {
         Vec3 origin = workOrigin(level, job, hand);
         if (origin != null && aimStillOpen(level, player, schematic, job, hand, null, takeOwned)) {
-            double aimDist = entryDistSqr(job, schematic.entry(hand.aim), origin);
-            if (aimDist <= PLACE_NEAR_SQR) {
+            Schematic.Entry aimed = schematic.entry(hand.aim);
+            if (inOperationReachFromHover(origin, job.min().offset(aimed.x(), aimed.y(), aimed.z()), handOps(hand))) {
                 return hand.aim;
             }
             int local = scanCluster(level, player, schematic, job, hand, origin, PLACE_NEAR_SQR, CLUSTER_RADIUS, null, takeOwned, true);
@@ -5899,7 +5909,12 @@ public final class JobManager {
                         }
                     }
                     double dist = entryDistSqr(job, entry, origin);
-                    if (dist > reachSqr) {
+                    BlockPos cell = job.min().offset(entry.x(), entry.y(), entry.z());
+                    if (reachSqr <= PLACE_NEAR_SQR) {
+                        if (!inOperationReachFromHover(origin, cell, handOps(hand))) {
+                            continue;
+                        }
+                    } else if (dist > reachSqr) {
                         continue;
                     }
                     if (best < 0 || dist < bestDist || (dist == bestDist && i < best)) {
@@ -7069,11 +7084,7 @@ public final class JobManager {
 
     private static int placeBudget(BuildJob.Hand hand) {
         int cap = WrightsConfig.BLOCKS_PER_TICK.getAsInt();
-        int eighths = hand.placeCredit + WrightTier.placeEighths(hand.speed);
-        int budget = Math.min(cap, eighths / 8);
-        int leftover = eighths - budget * 8;
-        hand.placeCredit = leftover >= 8 ? leftover % 8 : leftover;
-        return budget;
+        return Math.min(cap, WrightTier.operationCap(handOps(hand)));
     }
 
     private static double flyStep(int speed, double distanceSqr) {
