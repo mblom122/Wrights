@@ -12,6 +12,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
 
 import com.wrights.WrightsMod;
 import com.wrights.drone.Swarm;
@@ -741,7 +742,63 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record JobLine(UUID id, String name, int done, int total, int skipped, int held, boolean paused, boolean saving, boolean finished, boolean canUndo, boolean undoing, boolean stopped, boolean undone, String dimension, BlockPos anchor, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, List<UUID> crew, int workedTicks, int hold, int waitKind, int source, BlockPos sourcePort, boolean labelPort, boolean queued, int quota, String sourceName, boolean cellMarks) {
+    /**
+     * Live per-wright state for one job (Manage debug rows).
+     * {@code waitReason} matches {@code DroneEntity.WAIT_*}; {@code out} means a flyer is spawned.
+     */
+    public record CrewHand(
+            UUID unit,
+            int waitReason,
+            boolean idle,
+            boolean out,
+            int lane,
+            int lanes,
+            BlockPos at,
+            BlockPos target,
+            ItemStack block) {
+        public void write(RegistryFriendlyByteBuf buf) {
+            buf.writeUUID(unit);
+            buf.writeVarInt(waitReason);
+            buf.writeBoolean(idle);
+            buf.writeBoolean(out);
+            buf.writeVarInt(lane);
+            buf.writeVarInt(lanes);
+            buf.writeBlockPos(at == null ? BlockPos.ZERO : at);
+            buf.writeBlockPos(target == null ? BlockPos.ZERO : target);
+            ItemStack.OPTIONAL_STREAM_CODEC.encode(buf, block == null ? ItemStack.EMPTY : block);
+        }
+
+        public static CrewHand read(RegistryFriendlyByteBuf buf) {
+            return new CrewHand(
+                    buf.readUUID(),
+                    buf.readVarInt(),
+                    buf.readBoolean(),
+                    buf.readBoolean(),
+                    buf.readVarInt(),
+                    buf.readVarInt(),
+                    buf.readBlockPos(),
+                    buf.readBlockPos(),
+                    ItemStack.OPTIONAL_STREAM_CODEC.decode(buf));
+        }
+    }
+
+    public record JobLine(UUID id, String name, int done, int total, int skipped, int held, boolean paused, boolean saving, boolean finished, boolean canUndo, boolean undoing, boolean stopped, boolean undone, String dimension, BlockPos anchor, BlockPos origin, int sizeX, int sizeY, int sizeZ, int drones, List<UUID> crew, int workedTicks, int hold, int waitKind, int source, BlockPos sourcePort, boolean labelPort, boolean queued, int quota, String sourceName, boolean cellMarks, List<CrewHand> crewHands) {
+        public JobLine {
+            crewHands = crewHands == null ? List.of() : List.copyOf(crewHands);
+        }
+
+        public CrewHand crewHand(UUID unit) {
+            if (unit == null || crewHands.isEmpty()) {
+                return null;
+            }
+            for (CrewHand hand : crewHands) {
+                if (unit.equals(hand.unit())) {
+                    return hand;
+                }
+            }
+            return null;
+        }
+
         public void write(RegistryFriendlyByteBuf buf) {
             buf.writeUUID(id);
             buf.writeUtf(name, 48);
@@ -777,6 +834,10 @@ public final class BlueprintPayloads {
             buf.writeVarInt(quota);
             buf.writeUtf(sourceName == null ? "" : sourceName, 32);
             buf.writeBoolean(cellMarks);
+            buf.writeVarInt(crewHands.size());
+            for (CrewHand hand : crewHands) {
+                hand.write(buf);
+            }
         }
 
         public static JobLine read(RegistryFriendlyByteBuf buf) {
@@ -811,7 +872,8 @@ public final class BlueprintPayloads {
                     buf.readBoolean(),
                     buf.readVarInt(),
                     buf.readUtf(32),
-                    buf.readBoolean());
+                    buf.readBoolean(),
+                    readCrewHands(buf));
         }
 
         private static List<UUID> readCrew(RegistryFriendlyByteBuf buf) {
@@ -821,6 +883,15 @@ public final class BlueprintPayloads {
                 crew.add(buf.readUUID());
             }
             return List.copyOf(crew);
+        }
+
+        private static List<CrewHand> readCrewHands(RegistryFriendlyByteBuf buf) {
+            int count = buf.readVarInt();
+            List<CrewHand> hands = new ArrayList<>(count);
+            for (int i = 0; i < count; i++) {
+                hands.add(CrewHand.read(buf));
+            }
+            return List.copyOf(hands);
         }
     }
 

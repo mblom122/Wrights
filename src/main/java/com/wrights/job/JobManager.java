@@ -1789,6 +1789,7 @@ public final class JobManager {
         } else {
             job.setWaitKind(BuildJob.WAIT_NONE);
         }
+        releaseIdleShape(level, player, job);
         if (job.exchangeJob() && job.schematicId() != null && job.total() > 8000
                 && level.getGameTime() % 40L == 0L
                 && job.waitKind() != BuildJob.WAIT_ITEMS
@@ -1798,6 +1799,38 @@ public final class JobManager {
         library.setDirty();
         if (job.cursor() >= job.total() || shapeCrewFinished(job)) {
             finishPaste(server, library, player, job);
+        }
+    }
+
+    /**
+     * When a shape hand has finished scanning its strip ({@code cursor >= total}) and help found
+     * nothing nearby, send it home while others keep working — same idea as {@link #releaseIdle}.
+     * Hands that only went idle for one scan-cap tick (cursor still mid-strip) stay out.
+     */
+    private static void releaseIdleShape(ServerLevel level, ServerPlayer player, BuildJob job) {
+        if (job.hands().size() < 2 || job.cursor() >= job.total()) {
+            return;
+        }
+        boolean busy = false;
+        int going = 0;
+        for (BuildJob.Hand hand : job.hands()) {
+            if (!hand.idle && hand.entityId != null) {
+                busy = true;
+            } else if (hand.idle && hand.entityId != null && hand.cursor >= job.total()) {
+                going++;
+            }
+        }
+        if (!busy || going == 0) {
+            return;
+        }
+        int slot = 0;
+        for (BuildJob.Hand hand : job.hands()) {
+            if (!hand.idle || hand.entityId == null || hand.cursor < job.total()) {
+                continue;
+            }
+            recall(level, player, hand.entityId, slot++, going, hand.homePort);
+            hand.entityId = null;
+            hand.aim = -1;
         }
     }
 
@@ -1901,9 +1934,10 @@ public final class JobManager {
                 return near;
             }
         }
-        // Help mode: only spatial — never walk/resolve another wright's strip.
+        // Help mode: near self first (above), then near busy crew mates, then their aim cells.
+        // Never linear-walk/resolve another strip — that would steal progress accounting.
         if (!onlyOwned) {
-            return -1;
+            return shapeHelpTarget(level, player, job, hand, shapeKind, shapePinLocal, scanCap);
         }
         int total = job.total();
         int examined = 0;
@@ -2080,6 +2114,59 @@ public final class JobManager {
             }
         }
         return false;
+    }
+
+    /**
+     * Find a placeable cell on another wright's strip so an idle hand can help instead of standing by.
+     * Prefers work near busy crew mates, then their current aim.
+     */
+    private static int shapeHelpTarget(
+            ServerLevel level,
+            ServerPlayer player,
+            BuildJob job,
+            BuildJob.Hand hand,
+            com.wrights.blueprint.Shapes.Kind shapeKind,
+            BlockPos shapePinLocal,
+            int scanCap) {
+        for (BuildJob.Hand other : job.hands()) {
+            if (other == hand || other.idle) {
+                continue;
+            }
+            Vec3 otherOrigin = handOrigin(level, other);
+            if (otherOrigin == null) {
+                continue;
+            }
+            int near = shapeClusterIndex(
+                    level, player, job, hand, otherOrigin, FLY_NEAR_SQR, FLY_NEAR_RADIUS,
+                    shapeKind, shapePinLocal, false);
+            if (near >= 0) {
+                return near;
+            }
+        }
+        int examined = 0;
+        for (BuildJob.Hand other : job.hands()) {
+            if (other == hand || other.aim < 0 || other.aim >= job.total()) {
+                continue;
+            }
+            if (examined++ >= scanCap) {
+                break;
+            }
+            // Don't steal the cell they are already flying to — take a neighbour in their cluster.
+            Vec3 aimOrigin = Vec3.atCenterOf(job.scanPosAt(other.aim));
+            int near = shapeClusterIndex(
+                    level, player, job, hand, aimOrigin, PLACE_NEAR_SQR, CLUSTER_RADIUS,
+                    shapeKind, shapePinLocal, false);
+            if (near >= 0 && near != other.aim) {
+                return near;
+            }
+            near = shapeClusterIndex(
+                    level, player, job, hand, aimOrigin, FLY_NEAR_SQR, FLY_NEAR_RADIUS,
+                    shapeKind, shapePinLocal, false);
+            if (near >= 0 && near != other.aim) {
+                return near;
+            }
+        }
+        return -1;
     }
 
     /**

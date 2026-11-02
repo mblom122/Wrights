@@ -1,11 +1,14 @@
 package com.wrights.network;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.Util;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.loading.FMLEnvironment;
@@ -834,10 +837,46 @@ public final class BlueprintNetwork {
                     job.queued(),
                     job.crewQuota(),
                     jobSourceName(player, job),
-                    cellMarks(library, job)));
+                    cellMarks(library, job),
+                    crewHands(player.getServer(), job)));
         }
         PacketDistributor.sendToPlayer(player, new BlueprintPayloads.JobSync(lines));
         PacketDistributor.sendToPlayer(player, new BlueprintPayloads.WrightSpots(com.wrights.job.JobManager.wrightSpots(player)));
+    }
+
+    /** Per-wright status for Manage: wait reason, strip, position, and current target block. */
+    private static List<BlueprintPayloads.CrewHand> crewHands(MinecraftServer server, BuildJob job) {
+        List<UUID> units = job.crewUnits();
+        if (units.isEmpty()) {
+            return List.of();
+        }
+        ServerLevel level = server.getLevel(job.dimension());
+        List<BlueprintPayloads.CrewHand> hands = new ArrayList<>(units.size());
+        for (int i = 0; i < units.size(); i++) {
+            UUID unit = units.get(i);
+            BuildJob.Hand hand = i < job.hands().size() ? job.hands().get(i) : null;
+            DroneEntity drone = null;
+            if (level != null && hand != null && hand.entityId != null
+                    && level.getEntity(hand.entityId) instanceof DroneEntity living && living.isAlive()) {
+                drone = living;
+            }
+            boolean out = drone != null;
+            boolean idle = hand != null && hand.idle;
+            int wait = drone != null ? drone.waitReason()
+                    : (hand != null && hand.sheltering ? DroneEntity.WAIT_SHELTER
+                            : idle ? DroneEntity.WAIT_IDLE : DroneEntity.WAIT_HOME);
+            BlockPos at = drone != null ? drone.blockPosition()
+                    : (hand != null && hand.lastPos != null ? hand.lastPos : BlockPos.ZERO);
+            BlockPos target = BlockPos.ZERO;
+            if (hand != null && hand.aim >= 0 && hand.aim < job.total()) {
+                target = job.scanPosAt(hand.aim);
+            }
+            ItemStack block = drone != null ? drone.currentBlock().copy() : ItemStack.EMPTY;
+            int lane = hand == null ? i : hand.lane;
+            int lanes = hand == null ? Math.max(1, units.size()) : Math.max(1, hand.lanes);
+            hands.add(new BlueprintPayloads.CrewHand(unit, wait, idle, out, lane, lanes, at, target, block));
+        }
+        return hands;
     }
 
     /** Mirror jobs are a sparse set of blocks, so the client marks those cells instead of the bounding box. */

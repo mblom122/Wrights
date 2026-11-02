@@ -6,19 +6,23 @@ import java.util.UUID;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
+import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.drone.Wrightports;
 import com.wrights.drone.Swarm;
 import com.wrights.drone.WrightTier;
+import com.wrights.entity.DroneEntity;
 import com.wrights.network.BlueprintPayloads;
 
 /** Assigns wrights to one job. The window stays put; each list scrolls on its own. */
 public class JobDroneScreen extends Screen {
-    private static final int PREFERRED_W = 372;
+    private static final int PREFERRED_W = 420;
     private static final int ROW = 20;
+    private static final int DETAIL_ROW = 44;
     private static final int HEADER = 52;
     private static final int FOOTER = 36;
     private static final int SECTION_HEAD = 18;
@@ -81,15 +85,17 @@ public class JobDroneScreen extends Screen {
         graphics.drawString(this.font, this.font.plainSubstrByWidth(job.name(), panelW - 32), panelX + 16, panelY + 20, WrightsUi.TEXT, false);
         int busy = busyCount();
         int free = freeCount();
+        int out = Math.max(0, job.drones());
+        int onJob = crewCount(assigned);
         Component summary = busy == 0
-                ? Component.translatable("screen.wrights.drone_split", assigned.size(), free)
-                : Component.translatable("screen.wrights.drone_split_busy", assigned.size(), free, busy);
+                ? Component.translatable("screen.wrights.drone_split_out", onJob, out, free)
+                : Component.translatable("screen.wrights.drone_split_out_busy", onJob, out, free, busy);
         graphics.drawString(this.font, this.font.plainSubstrByWidth(summary.getString(), panelW - 32), panelX + 16, panelY + 32, WrightsUi.MUTED, false);
 
-        Well onJob = onJobWell();
+        Well onJobWell = onJobWell();
         Well available = availableWell();
-        drawSection(graphics, onJob, "screen.wrights.drones_on_job", crewCount(assigned), WrightsUi.COPPER, assigned, onScroll, mouseX, mouseY);
-        drawSection(graphics, available, "screen.wrights.drones_available", free, WrightsUi.GREEN, others, otherScroll, mouseX, mouseY);
+        drawSection(graphics, onJobWell, "screen.wrights.drones_on_job", onJob, WrightsUi.COPPER, assigned, onScroll, mouseX, mouseY, true);
+        drawSection(graphics, available, "screen.wrights.drones_available", free, WrightsUi.GREEN, others, otherScroll, mouseX, mouseY, false);
     }
 
     @Override
@@ -152,7 +158,7 @@ public class JobDroneScreen extends Screen {
 
     private void place() {
         panelW = WrightsUi.fitW(PREFERRED_W, this.width);
-        panelH = WrightsUi.fitH(420, this.height);
+        panelH = WrightsUi.fitH(460, this.height);
         panelX = WrightsUi.centerX(panelW, this.width);
         panelY = WrightsUi.centerY(panelH, this.height);
     }
@@ -160,16 +166,29 @@ public class JobDroneScreen extends Screen {
     private Well onJobWell() {
         int top = panelY + HEADER;
         int body = panelH - HEADER - FOOTER;
-        int height = Math.max(ROW + SECTION_HEAD + 4, (body - 8) / 2);
+        // Give the on-job list more room for the multi-line debug rows.
+        int height = Math.max(DETAIL_ROW + SECTION_HEAD + 4, (body * 3) / 5);
         return new Well(panelX + 12, top, panelW - 24, height);
     }
 
     private Well availableWell() {
         Well onJob = onJobWell();
-        return new Well(onJob.x, onJob.y + onJob.h + 8, onJob.w, onJob.h);
+        int body = panelH - HEADER - FOOTER;
+        int height = Math.max(ROW + SECTION_HEAD + 4, body - onJob.h - 8);
+        return new Well(onJob.x, onJob.y + onJob.h + 8, onJob.w, height);
     }
 
-    private void drawSection(GuiGraphics graphics, Well well, String title, int count, int accent, List<Entry> rows, int scroll, int mouseX, int mouseY) {
+    private void drawSection(
+            GuiGraphics graphics,
+            Well well,
+            String title,
+            int count,
+            int accent,
+            List<Entry> rows,
+            int scroll,
+            int mouseX,
+            int mouseY,
+            boolean detailed) {
         WrightsUi.inset(graphics, well.x, well.y, well.w, well.h);
         graphics.fill(well.x + 1, well.y + 1, well.x + well.w - 1, well.y + SECTION_HEAD, 0xFF15202B);
         graphics.fill(well.x + 1, well.y + 1, well.x + 3, well.y + SECTION_HEAD, accent);
@@ -182,15 +201,17 @@ public class JobDroneScreen extends Screen {
         int listY = well.y + SECTION_HEAD;
         int listW = well.w - 8;
         int listH = well.h - SECTION_HEAD - 4;
-        boolean bar = rows.size() * ROW > listH;
+        boolean bar = contentHeight(rows) > listH;
         int contentRight = listX + listW - (bar ? 8 : 0);
         graphics.enableScissor(listX, listY, contentRight, listY + listH);
         int y = listY - scroll;
         for (int i = 0; i < rows.size(); i++) {
-            if (y + ROW >= listY && y < listY + listH) {
-                drawEntry(graphics, rows.get(i), i, listX, y, contentRight - listX, mouseX, mouseY, listY, listY + listH);
+            Entry entry = rows.get(i);
+            int rowH = rowHeight(entry);
+            if (y + rowH >= listY && y < listY + listH) {
+                drawEntry(graphics, entry, i, listX, y, contentRight - listX, rowH, mouseX, mouseY, listY, listY + listH, detailed);
             }
-            y += ROW;
+            y += rowH;
         }
         graphics.disableScissor();
         if (bar) {
@@ -198,8 +219,20 @@ public class JobDroneScreen extends Screen {
         }
     }
 
-    private void drawEntry(GuiGraphics graphics, Entry entry, int index, int x, int y, int width, int mouseX, int mouseY, int clipTop, int clipBottom) {
-        boolean hover = mouseX >= x && mouseX < x + width && mouseY >= Math.max(y, clipTop) && mouseY < Math.min(y + ROW, clipBottom);
+    private void drawEntry(
+            GuiGraphics graphics,
+            Entry entry,
+            int index,
+            int x,
+            int y,
+            int width,
+            int rowH,
+            int mouseX,
+            int mouseY,
+            int clipTop,
+            int clipBottom,
+            boolean detailed) {
+        boolean hover = mouseX >= x && mouseX < x + width && mouseY >= Math.max(y, clipTop) && mouseY < Math.min(y + rowH, clipBottom);
         if (entry.divider) {
             int labelW = this.font.width(entry.name);
             graphics.drawString(this.font, entry.name, x + 8, y + 6, WrightsUi.MUTED, false);
@@ -207,14 +240,14 @@ public class JobDroneScreen extends Screen {
             return;
         }
         if (hover && entry.unit != null) {
-            graphics.fill(x + 2, y + 1, x + width - 2, y + ROW - 1, 0xFF1C2C3A);
+            graphics.fill(x + 2, y + 1, x + width - 2, y + rowH - 1, 0xFF1C2C3A);
         } else if ((index & 1) == 0 && entry.unit != null) {
-            graphics.fill(x + 2, y + 1, x + width - 2, y + ROW - 1, 0xFF101820);
+            graphics.fill(x + 2, y + 1, x + width - 2, y + rowH - 1, 0xFF101820);
         }
         int buttonX = x + width - 6 - BUTTON_W;
         int textRight = entry.action == null ? x + width - 8 : buttonX - 6;
         int cursor = textRight;
-        if (!entry.detail.isEmpty()) {
+        if (!detailed && !entry.detail.isEmpty()) {
             int detailW = Math.min(this.font.width(entry.detail), Math.max(24, textRight - (x + 8) - 72));
             graphics.drawString(this.font, this.font.plainSubstrByWidth(entry.detail, detailW), textRight - detailW, y + 6, WrightsUi.MUTED, false);
             cursor = textRight - detailW - 6;
@@ -227,9 +260,14 @@ public class JobDroneScreen extends Screen {
         int nameW = Math.max(24, cursor - (x + 8));
         int nameColor = entry.unit == null ? WrightsUi.MUTED : WrightsUi.TEXT;
         graphics.drawString(this.font, this.font.plainSubstrByWidth(entry.name, nameW), x + 8, y + 6, nameColor, false);
+        if (detailed && entry.unit != null) {
+            int statusColor = entry.idle || entry.waitReason == DroneEntity.WAIT_IDLE ? WrightsUi.GOLD : WrightsUi.MUTED;
+            graphics.drawString(this.font, this.font.plainSubstrByWidth(entry.statusLine, Math.max(24, textRight - (x + 8))), x + 8, y + 17, statusColor, false);
+            graphics.drawString(this.font, this.font.plainSubstrByWidth(entry.whereLine, Math.max(24, textRight - (x + 8))), x + 8, y + 28, WrightsUi.MUTED, false);
+        }
         if (entry.action != null) {
             boolean add = "screen.wrights.drone_add".equals(entry.action);
-            int by = y + 3;
+            int by = y + (rowH - 14) / 2;
             boolean onButton = hover && mouseX >= buttonX && mouseX < buttonX + BUTTON_W;
             graphics.fill(buttonX, by, buttonX + BUTTON_W, by + 14, onButton ? 0xFF2C3E52 : 0xFF1A2633);
             int edge = add ? (onButton ? WrightsUi.GREEN : 0xFF2F6A4C) : (onButton ? WrightsUi.RED : 0xFF8E4048);
@@ -260,7 +298,7 @@ public class JobDroneScreen extends Screen {
         int listW = well.w - 8;
         int listH = well.h - SECTION_HEAD - 4;
         int scroll = assignedList ? onScroll : otherScroll;
-        boolean bar = rows.size() * ROW > listH;
+        boolean bar = contentHeight(rows) > listH;
         if (bar && mouseX >= listX + listW - 8) {
             int max = maxScroll(rows, well);
             int thumb = Math.max(12, listH * listH / (listH + max));
@@ -275,21 +313,25 @@ public class JobDroneScreen extends Screen {
             }
             return true;
         }
-        int index = ((int) mouseY - listY + scroll) / ROW;
-        if (index < 0 || index >= rows.size()) {
-            return true;
+        int y = listY - scroll;
+        for (int i = 0; i < rows.size(); i++) {
+            Entry entry = rows.get(i);
+            int rowH = rowHeight(entry);
+            if (mouseY >= y && mouseY < y + rowH) {
+                if (entry.unit == null || entry.action == null) {
+                    return true;
+                }
+                int contentRight = listX + listW - (bar ? 8 : 0);
+                int buttonX = contentRight - 6 - BUTTON_W;
+                if (mouseX < buttonX || mouseX >= buttonX + BUTTON_W) {
+                    return true;
+                }
+                boolean add = "screen.wrights.drone_add".equals(entry.action);
+                PacketDistributor.sendToServer(new BlueprintPayloads.SetJobDrones(id, entry.unit, add));
+                return true;
+            }
+            y += rowH;
         }
-        Entry entry = rows.get(index);
-        if (entry.unit == null || entry.action == null) {
-            return true;
-        }
-        int contentRight = listX + listW - (bar ? 8 : 0);
-        int buttonX = contentRight - 6 - BUTTON_W;
-        if (mouseX < buttonX || mouseX >= buttonX + BUTTON_W) {
-            return true;
-        }
-        boolean add = "screen.wrights.drone_add".equals(entry.action);
-        PacketDistributor.sendToServer(new BlueprintPayloads.SetJobDrones(id, entry.unit, add));
         return true;
     }
 
@@ -313,9 +355,24 @@ public class JobDroneScreen extends Screen {
         }
     }
 
+    private static int rowHeight(Entry entry) {
+        if (entry.divider || entry.unit == null) {
+            return ROW;
+        }
+        return entry.detailed ? DETAIL_ROW : ROW;
+    }
+
+    private static int contentHeight(List<Entry> rows) {
+        int height = 0;
+        for (Entry entry : rows) {
+            height += rowHeight(entry);
+        }
+        return height;
+    }
+
     private static int maxScroll(List<Entry> rows, Well well) {
         int listH = well.h - SECTION_HEAD - 4;
-        return Math.max(0, rows.size() * ROW - listH);
+        return Math.max(0, contentHeight(rows) - listH);
     }
 
     private static boolean inside(double mouseX, double mouseY, Well well) {
@@ -334,7 +391,13 @@ public class JobDroneScreen extends Screen {
                 String label = found == null
                         ? Component.translatable("screen.wrights.drone_missing").getString()
                         : found.title(number).getString();
-                assigned.add(Entry.wright(unit, label, found == null ? 0 : WrightTier.clamp(found.speed()), "", "screen.wrights.drone_remove"));
+                BlueprintPayloads.CrewHand hand = job.crewHand(unit);
+                assigned.add(Entry.assigned(
+                        unit,
+                        label,
+                        found == null ? 0 : WrightTier.clamp(found.speed()),
+                        hand,
+                        "screen.wrights.drone_remove"));
             }
         }
         if (assigned.isEmpty()) {
@@ -441,6 +504,31 @@ public class JobDroneScreen extends Screen {
         return 0;
     }
 
+    private static String waitLabel(int reason, boolean idle, boolean out) {
+        if (!out && (reason == DroneEntity.WAIT_IDLE || idle)) {
+            return Component.translatable("screen.wrights.drone_status_docked").getString();
+        }
+        return switch (reason) {
+            case DroneEntity.WAIT_FLOOR -> Component.translatable("hud.wrights.info_wright_wait_floor").getString();
+            case DroneEntity.WAIT_ITEMS -> Component.translatable("hud.wrights.info_wright_wait_items").getString();
+            case DroneEntity.WAIT_CHUNK -> Component.translatable("hud.wrights.info_wright_wait_chunk").getString();
+            case DroneEntity.WAIT_IDLE -> Component.translatable("hud.wrights.info_wright_idle").getString();
+            case DroneEntity.WAIT_HOME -> Component.translatable("hud.wrights.info_wright_home").getString();
+            case DroneEntity.WAIT_SHELTER -> Component.translatable("hud.wrights.info_wright_shelter").getString();
+            case DroneEntity.WAIT_PAUSED -> Component.translatable("hud.wrights.info_wright_paused").getString();
+            default -> out
+                    ? Component.translatable("screen.wrights.drone_status_working").getString()
+                    : Component.translatable("screen.wrights.drone_status_docked").getString();
+        };
+    }
+
+    private static String coords(BlockPos pos) {
+        if (pos == null || pos.equals(BlockPos.ZERO)) {
+            return "-";
+        }
+        return pos.getX() + " " + pos.getY() + " " + pos.getZ();
+    }
+
     private record Well(int x, int y, int w, int h) {
     }
 
@@ -452,8 +540,25 @@ public class JobDroneScreen extends Screen {
         private final String action;
         private final int tier;
         private final boolean divider;
+        private final boolean detailed;
+        private final boolean idle;
+        private final int waitReason;
+        private final String statusLine;
+        private final String whereLine;
 
-        private Entry(UUID unit, String name, int tier, String tierName, String detail, String action, boolean divider) {
+        private Entry(
+                UUID unit,
+                String name,
+                int tier,
+                String tierName,
+                String detail,
+                String action,
+                boolean divider,
+                boolean detailed,
+                boolean idle,
+                int waitReason,
+                String statusLine,
+                String whereLine) {
             this.unit = unit;
             this.name = name;
             this.tier = tier;
@@ -461,19 +566,79 @@ public class JobDroneScreen extends Screen {
             this.detail = detail == null ? "" : detail;
             this.action = action;
             this.divider = divider;
+            this.detailed = detailed;
+            this.idle = idle;
+            this.waitReason = waitReason;
+            this.statusLine = statusLine == null ? "" : statusLine;
+            this.whereLine = whereLine == null ? "" : whereLine;
         }
 
         private static Entry wright(UUID unit, String name, int tier, String detail, String action) {
             String tierName = tier <= 0 ? "" : Component.translatable(WrightTier.nameKey(tier)).getString();
-            return new Entry(unit, name, tier, tierName, detail, action, false);
+            return new Entry(unit, name, tier, tierName, detail, action, false, false, false, 0, "", "");
+        }
+
+        private static Entry assigned(UUID unit, String name, int tier, BlueprintPayloads.CrewHand hand, String action) {
+            String tierName = tier <= 0 ? "" : Component.translatable(WrightTier.nameKey(tier)).getString();
+            if (hand == null) {
+                return new Entry(
+                        unit,
+                        name,
+                        tier,
+                        tierName,
+                        "",
+                        action,
+                        false,
+                        true,
+                        false,
+                        0,
+                        Component.translatable("screen.wrights.drone_status_unknown").getString(),
+                        "");
+            }
+            String status = waitLabel(hand.waitReason(), hand.idle(), hand.out());
+            ItemStack block = hand.block() == null ? ItemStack.EMPTY : hand.block();
+            String blockName = block.isEmpty() ? "" : block.getHoverName().getString();
+            String target = coords(hand.target());
+            String at = coords(hand.at());
+            String statusLine;
+            if (!blockName.isEmpty() && !target.equals("-")) {
+                statusLine = Component.translatable("screen.wrights.drone_status_block_at", status, blockName, target).getString();
+            } else if (!blockName.isEmpty()) {
+                statusLine = Component.translatable("screen.wrights.drone_status_block", status, blockName).getString();
+            } else if (!target.equals("-")) {
+                statusLine = Component.translatable("screen.wrights.drone_status_target", status, target).getString();
+            } else {
+                statusLine = status;
+            }
+            String whereLine = Component.translatable(
+                    "screen.wrights.drone_status_where",
+                    hand.out()
+                            ? Component.translatable("screen.wrights.drone_status_flying").getString()
+                            : Component.translatable("screen.wrights.drone_status_docked").getString(),
+                    at,
+                    hand.lane() + 1,
+                    Math.max(1, hand.lanes())).getString();
+            return new Entry(
+                    unit,
+                    name,
+                    tier,
+                    tierName,
+                    "",
+                    action,
+                    false,
+                    true,
+                    hand.idle(),
+                    hand.waitReason(),
+                    statusLine,
+                    whereLine);
         }
 
         private static Entry note(String name) {
-            return new Entry(null, name, 0, "", "", null, false);
+            return new Entry(null, name, 0, "", "", null, false, false, false, 0, "", "");
         }
 
         private static Entry divider(String name) {
-            return new Entry(null, name, 0, "", "", null, true);
+            return new Entry(null, name, 0, "", "", null, true, false, false, 0, "", "");
         }
     }
 }
