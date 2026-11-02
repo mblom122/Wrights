@@ -94,6 +94,11 @@ public final class JobManager {
     private static final int CREW_SCAN_CAP = 512;
     /** Shared across all hands for one crew tick — skips of already-done cells, not world scans. */
     private static final int CREW_SKIP_BUDGET = 256;
+    /**
+     * Shape/Exchange crew tiles. Wrights finish a local cube (cluster multi-place) before the next,
+     * instead of everyone chasing one shared scan line through a 200³ box.
+     */
+    private static final int SHAPE_CUBE = 16;
 
     private JobManager() {
     }
@@ -1260,7 +1265,9 @@ public final class JobManager {
         job.setCrewUnits(ids);
         for (int i = 0; i < job.hands().size() && i < units.size(); i++) {
             job.hands().get(i).homePort = units.get(i).homePort();
-            job.hands().get(i).cursor = i;
+            // Each hand walks the AABB from 0; ownership filters which cells it places.
+            job.hands().get(i).cursor = 0;
+            job.hands().get(i).aim = -1;
         }
         job.setCrewQuota(ids.size());
         return job.hasCrew();
@@ -1474,6 +1481,10 @@ public final class JobManager {
             job.workedTick();
         }
         int crewN = job.hasCrew() ? Math.max(1, job.hands().size()) : 1;
+        if (!fast && job.hasCrew() && crewN > 1) {
+            tickShapeCrew(server, library, level, player, job, usable, fillMode, random, shapeKind, shapePinLocal);
+            return;
+        }
         int scanBudget = Math.max(1, WrightsConfig.COPY_POSITIONS_PER_TICK.getAsInt());
         int placeBudget = fast
                 ? Math.min(8192, scanBudget)
@@ -1546,55 +1557,23 @@ public final class JobManager {
                 break;
             }
             statusState = state;
-            BuildJob.Hand actorHand = null;
             if (!fast) {
                 Vec3 hover = Vec3.atCenterOf(pos).add(0.0D, 0.9D, 0.0D);
-                drone = null;
-                if (job.hasCrew() && crewN > 1) {
-                    boolean someoneFlying = false;
-                    for (int h = 0; h < crewN; h++) {
-                        int idx = (placed + h) % crewN;
-                        BuildJob.Hand hand = job.hands().get(idx);
-                        DroneEntity candidate = ensureHand(level, player, job, hand, pos);
-                        if (candidate == null) {
-                            continue;
-                        }
-                        if (candidate.distanceToSqr(hover) <= DRONE_REACH_SQR) {
-                            drone = candidate;
-                            actorHand = hand;
-                            break;
-                        }
-                        double step = candidate.distanceToSqr(hover) > 64.0D ? 0.85D : 0.4D;
-                        candidate.moveToward(hover, step);
-                        hand.lastPos = candidate.blockPosition();
-                        candidate.setWorkStatus(BlockFilters.icon(state), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
-                        someoneFlying = true;
+                drone = ensureDrone(level, player, job, pos);
+                if (drone == null) {
+                    if (job.tickMessage()) {
+                        noteChunk(player, library, job);
                     }
-                    if (drone == null) {
-                        if (!someoneFlying && job.tickMessage()) {
-                            noteChunk(player, library, job);
-                        }
-                        job.setWaitKind(BuildJob.WAIT_NONE);
-                        library.setDirty();
-                        return;
-                    }
-                } else {
-                    drone = ensureDrone(level, player, job, pos);
-                    if (drone == null) {
-                        if (job.tickMessage()) {
-                            noteChunk(player, library, job);
-                        }
-                        return;
-                    }
-                    if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
-                        double step = drone.distanceToSqr(hover) > 64.0D ? 0.85D : 0.4D;
-                        drone.moveToward(hover, step);
-                        job.setLastDronePos(drone.blockPosition());
-                        job.setWaitKind(BuildJob.WAIT_NONE);
-                        drone.setWorkStatus(BlockFilters.icon(state), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
-                        library.setDirty();
-                        return;
-                    }
+                    return;
+                }
+                if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
+                    double step = drone.distanceToSqr(hover) > 64.0D ? 0.85D : 0.4D;
+                    drone.moveToward(hover, step);
+                    job.setLastDronePos(drone.blockPosition());
+                    job.setWaitKind(BuildJob.WAIT_NONE);
+                    drone.setWorkStatus(BlockFilters.icon(state), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
+                    library.setDirty();
+                    return;
                 }
             }
             int dx = pos.getX() - job.min().getX();
@@ -1608,7 +1587,7 @@ public final class JobManager {
                 continue;
             }
             Schematic.Entry entry = new Schematic.Entry((short) dx, (short) dy, (short) dz, state, false);
-            PlaceResult result = placeOne(level, player, job, pos, entry, false, actorHand, drone);
+            PlaceResult result = placeOne(level, player, job, pos, entry, false, null, drone);
             if (result == PlaceResult.PAUSE) {
                 job.setWaitKind(BuildJob.WAIT_CHUNK);
                 publishShapeDroneStatus(level, job, state, DroneEntity.WAIT_CHUNK);
@@ -1659,6 +1638,452 @@ public final class JobManager {
         if (job.cursor() >= job.total()) {
             finishPaste(server, library, player, job);
         }
+    }
+
+    /**
+     * Multi-wright Shape/Exchange: each hand owns a strip of local cubes, finishes that region
+     * (cluster multi-place) before moving on, and may help elsewhere when its strip is done.
+     * Avoids every wright flying to the same shared {@link BuildJob#scanPos()} cell.
+     */
+    private static void tickShapeCrew(
+            MinecraftServer server,
+            SchematicLibrary library,
+            ServerLevel level,
+            ServerPlayer player,
+            BuildJob job,
+            java.util.List<com.wrights.blueprint.ShapeMaterials.Entry> usable,
+            com.wrights.blueprint.ShapeMaterials.FillMode fillMode,
+            java.util.Random random,
+            com.wrights.blueprint.Shapes.Kind shapeKind,
+            BlockPos shapePinLocal) {
+        boolean waitingItems = false;
+        boolean waitingChunk = false;
+        int scanCap = Math.max(64, WrightsConfig.COPY_POSITIONS_PER_TICK.getAsInt());
+        for (BuildJob.Hand hand : job.hands()) {
+            if (hand.sheltering) {
+                setShapeHandStatus(level, hand, null, DroneEntity.WAIT_SHELTER);
+                continue;
+            }
+            int at = nextShapeIndex(level, player, job, hand, usable, shapeKind, shapePinLocal, true, scanCap);
+            if (at < 0) {
+                // Own cubes done or empty — help nearest ready cell on another strip.
+                at = nextShapeIndex(level, player, job, hand, usable, shapeKind, shapePinLocal, false, scanCap);
+            }
+            if (at < 0) {
+                hand.idle = true;
+                hand.aim = -1;
+                setShapeHandStatus(level, hand, null, DroneEntity.WAIT_IDLE);
+                continue;
+            }
+            if (at == NEED_ITEMS) {
+                waitingItems = true;
+                hand.aim = -1;
+                parkForItems(level, player, hand);
+                setShapeHandStatus(level, hand, usable.get(0).state(), DroneEntity.WAIT_ITEMS);
+                continue;
+            }
+            claimAim(job, hand, at);
+            hand.idle = false;
+            BlockPos pos = job.scanPosAt(at);
+            BlockState state = shapeNextState(job, usable, fillMode, random);
+            if (state == null) {
+                waitingItems = true;
+                hand.aim = -1;
+                parkForItems(level, player, hand);
+                setShapeHandStatus(level, hand, usable.get(0).state(), DroneEntity.WAIT_ITEMS);
+                continue;
+            }
+            DroneEntity drone = ensureHand(level, player, job, hand, pos);
+            if (drone != null) {
+                drone.setTier(hand.speed);
+            }
+            if (drone == null) {
+                waitingChunk = true;
+                setShapeHandStatus(level, hand, state, DroneEntity.WAIT_CHUNK);
+                continue;
+            }
+            Vec3 hover = Vec3.atCenterOf(pos).add(0.0D, 0.85D + (hand.lane % 2) * 0.45D, 0.0D);
+            if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
+                drone.moveToward(hover, flyStep(hand.speed, drone.distanceToSqr(hover)));
+                hand.lastPos = drone.blockPosition();
+                drone.setWorkStatus(BlockFilters.icon(state), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
+                continue;
+            }
+            int budget = placeBudget(hand);
+            int placed = 0;
+            int scanned = 0;
+            while (placed < budget && scanned < scanCap && job.cursor() < job.total()) {
+                int index = placed == 0
+                        ? at
+                        : nextShapeIndex(level, player, job, hand, usable, shapeKind, shapePinLocal, true, scanCap);
+                if (index < 0) {
+                    index = nextShapeIndex(level, player, job, hand, usable, shapeKind, shapePinLocal, false, scanCap);
+                }
+                if (index < 0 || index == NEED_ITEMS) {
+                    if (index == NEED_ITEMS) {
+                        waitingItems = true;
+                    }
+                    break;
+                }
+                claimAim(job, hand, index);
+                BlockPos cell = job.scanPosAt(index);
+                if (drone.distanceToSqr(Vec3.atCenterOf(cell)) > PLACE_NEAR_SQR) {
+                    break;
+                }
+                BlockState placeState = shapeNextState(job, usable, fillMode, random);
+                if (placeState == null) {
+                    waitingItems = true;
+                    break;
+                }
+                int dx = cell.getX() - job.min().getX();
+                int dy = cell.getY() - job.min().getY();
+                int dz = cell.getZ() - job.min().getZ();
+                if (dx < Short.MIN_VALUE || dx > Short.MAX_VALUE || dy < Short.MIN_VALUE || dy > Short.MAX_VALUE
+                        || dz < Short.MIN_VALUE || dz > Short.MAX_VALUE) {
+                    resolveShapeCell(job, hand, index, true);
+                    scanned++;
+                    continue;
+                }
+                Schematic.Entry entry = new Schematic.Entry((short) dx, (short) dy, (short) dz, placeState, false);
+                PlaceResult result = placeOne(level, player, job, cell, entry, false, hand, drone);
+                if (result == PlaceResult.PAUSE) {
+                    waitingChunk = true;
+                    job.setWaitKind(BuildJob.WAIT_CHUNK);
+                    setShapeHandStatus(level, hand, placeState, DroneEntity.WAIT_CHUNK);
+                    library.setDirty();
+                    return;
+                }
+                if (result == PlaceResult.WAIT) {
+                    waitingItems = true;
+                    break;
+                }
+                resolveShapeCell(job, hand, index, false);
+                job.shapeOrderAdvance();
+                drone.setWorkStatus(BlockFilters.icon(placeState), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
+                placed++;
+                scanned++;
+            }
+            if (waitingItems) {
+                parkForItems(level, player, hand);
+                setShapeHandStatus(level, hand, usable.get(0).state(), DroneEntity.WAIT_ITEMS);
+            }
+        }
+        if (waitingChunk) {
+            job.setWaitKind(BuildJob.WAIT_CHUNK);
+        } else if (waitingItems) {
+            job.setWaitKind(BuildJob.WAIT_ITEMS);
+            job.setQueued(true);
+            job.setCrewQuota(Math.max(1, job.crewQuota()));
+        } else {
+            job.setWaitKind(BuildJob.WAIT_NONE);
+        }
+        if (job.exchangeJob() && job.schematicId() != null && job.total() > 8000
+                && level.getGameTime() % 40L == 0L
+                && job.waitKind() != BuildJob.WAIT_ITEMS
+                && job.waitKind() != BuildJob.WAIT_CHUNK) {
+            library.schematic(job.schematicId()).ifPresent(schematic -> BlueprintNetwork.showJobHologram(player, job, schematic));
+        }
+        library.setDirty();
+        if (job.cursor() >= job.total() || shapeCrewFinished(job)) {
+            finishPaste(server, library, player, job);
+        }
+    }
+
+    private static boolean shapeCrewFinished(BuildJob job) {
+        if (job.hands().isEmpty()) {
+            return job.cursor() >= job.total();
+        }
+        for (BuildJob.Hand hand : job.hands()) {
+            if (hand.cursor < job.total()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Mark an AABB cell processed for job progress and advance this hand past it. */
+    private static void resolveShapeCell(BuildJob job, BuildJob.Hand hand, int index, boolean skipped) {
+        if (index == hand.aim) {
+            hand.aim = -1;
+        }
+        if (index >= hand.cursor) {
+            hand.cursor = index + 1;
+        }
+        job.advance();
+        if (skipped) {
+            job.skippedOne();
+        }
+    }
+
+    private static void setShapeHandStatus(ServerLevel level, BuildJob.Hand hand, BlockState state, int waitReason) {
+        if (hand == null || hand.entityId == null) {
+            return;
+        }
+        Entity entity = level.getEntity(hand.entityId);
+        if (!(entity instanceof DroneEntity drone) || !drone.isAlive()) {
+            return;
+        }
+        drone.setWorkStatus(state == null ? ItemStack.EMPTY : BlockFilters.icon(state), ItemStack.EMPTY, waitReason);
+    }
+
+    /**
+     * Next placeable shape cell for this hand. Prefers a nearby cluster, then walks the AABB.
+     * {@code onlyOwned} limits to this hand's cube strip; false is help-mode (spatial only, no resolve).
+     * Returns a scan index, {@link #NEED_ITEMS}, or -1.
+     */
+    private static int nextShapeIndex(
+            ServerLevel level,
+            ServerPlayer player,
+            BuildJob job,
+            BuildJob.Hand hand,
+            java.util.List<com.wrights.blueprint.ShapeMaterials.Entry> usable,
+            com.wrights.blueprint.Shapes.Kind shapeKind,
+            BlockPos shapePinLocal,
+            boolean onlyOwned,
+            int scanCap) {
+        if (usable.isEmpty()) {
+            return NEED_ITEMS;
+        }
+        if (!shapeCanPayAny(player, level, job, usable)) {
+            return NEED_ITEMS;
+        }
+        Vec3 origin = handOrigin(level, hand);
+        if (origin != null && hand.aim >= 0 && hand.aim < job.total()) {
+            ShapeCell probe = classifyShapeCell(level, player, job, hand, hand.aim, shapeKind, shapePinLocal, onlyOwned);
+            if (probe == ShapeCell.READY) {
+                double aimDist = origin.distanceToSqr(Vec3.atCenterOf(job.scanPosAt(hand.aim)));
+                if (aimDist <= PLACE_NEAR_SQR) {
+                    return hand.aim;
+                }
+                int local = shapeClusterIndex(level, player, job, hand, origin, PLACE_NEAR_SQR, CLUSTER_RADIUS, shapeKind, shapePinLocal, onlyOwned);
+                if (local >= 0) {
+                    return local;
+                }
+                return hand.aim;
+            }
+            if (onlyOwned && probe == ShapeCell.SKIP) {
+                resolveShapeCell(job, hand, hand.aim, true);
+            } else if (onlyOwned && probe == ShapeCell.OUT) {
+                resolveShapeCell(job, hand, hand.aim, false);
+            }
+            hand.aim = -1;
+        }
+        if (origin != null) {
+            int local = shapeClusterIndex(level, player, job, hand, origin, PLACE_NEAR_SQR, CLUSTER_RADIUS, shapeKind, shapePinLocal, onlyOwned);
+            if (local >= 0) {
+                return local;
+            }
+            int near = shapeClusterIndex(level, player, job, hand, origin, FLY_NEAR_SQR, FLY_NEAR_RADIUS, shapeKind, shapePinLocal, onlyOwned);
+            if (near >= 0) {
+                return near;
+            }
+        }
+        // Help mode: only spatial — never walk/resolve another wright's strip.
+        if (!onlyOwned) {
+            return -1;
+        }
+        int total = job.total();
+        int examined = 0;
+        for (int i = Math.max(0, hand.cursor); i < total && examined < scanCap; i++) {
+            BlockPos pos = job.scanPosAt(i);
+            int lx = pos.getX() - job.min().getX();
+            int ly = pos.getY() - job.min().getY();
+            int lz = pos.getZ() - job.min().getZ();
+            if (!ownsShapeCell(job, hand, lx, ly, lz)) {
+                if (i >= hand.cursor) {
+                    hand.cursor = i + 1;
+                }
+                continue;
+            }
+            if (aimedByOther(job, hand, i)) {
+                examined++;
+                continue;
+            }
+            ShapeCell kind = classifyShapeCell(level, player, job, hand, i, shapeKind, shapePinLocal, true);
+            examined++;
+            if (kind == ShapeCell.OUT) {
+                resolveShapeCell(job, hand, i, false);
+                continue;
+            }
+            if (kind == ShapeCell.SKIP) {
+                resolveShapeCell(job, hand, i, true);
+                continue;
+            }
+            if (kind == ShapeCell.BLOCKED) {
+                continue;
+            }
+            if (kind == ShapeCell.READY) {
+                return i;
+            }
+        }
+        while (hand.cursor < total) {
+            BlockPos pos = job.scanPosAt(hand.cursor);
+            int lx = pos.getX() - job.min().getX();
+            int ly = pos.getY() - job.min().getY();
+            int lz = pos.getZ() - job.min().getZ();
+            if (ownsShapeCell(job, hand, lx, ly, lz)) {
+                break;
+            }
+            hand.cursor++;
+        }
+        return -1;
+    }
+
+    private enum ShapeCell {
+        READY,
+        SKIP,
+        OUT,
+        FOREIGN,
+        BLOCKED
+    }
+
+    private static ShapeCell classifyShapeCell(
+            ServerLevel level,
+            ServerPlayer player,
+            BuildJob job,
+            BuildJob.Hand hand,
+            int index,
+            com.wrights.blueprint.Shapes.Kind shapeKind,
+            BlockPos shapePinLocal,
+            boolean onlyOwned) {
+        if (index < 0 || index >= job.total()) {
+            return ShapeCell.BLOCKED;
+        }
+        BlockPos pos = job.scanPosAt(index);
+        int lx = pos.getX() - job.min().getX();
+        int ly = pos.getY() - job.min().getY();
+        int lz = pos.getZ() - job.min().getZ();
+        if (onlyOwned && !ownsShapeCell(job, hand, lx, ly, lz)) {
+            return ShapeCell.FOREIGN;
+        }
+        if (!com.wrights.blueprint.Shapes.containsWorld(
+                shapeKind,
+                pos,
+                job.shapeCenter(),
+                shapePinLocal,
+                job.shapeSize(),
+                job.shapeHeight(),
+                job.shapeThickness(),
+                job.shapeHollow(),
+                job.shapeAxis(),
+                job.shapeYaw())) {
+            return ShapeCell.OUT;
+        }
+        if (level.isOutsideBuildHeight(pos) || !com.wrights.blueprint.BoxEdits.inWorld(pos)) {
+            return ShapeCell.SKIP;
+        }
+        if (!level.isLoaded(pos)) {
+            return WrightsConfig.REQUIRE_CHUNKS_LOADED.getAsBoolean() ? ShapeCell.BLOCKED : ShapeCell.SKIP;
+        }
+        if (!level.mayInteract(player, pos) || !canBuild(player, level, pos)) {
+            return ShapeCell.SKIP;
+        }
+        BlockState current = level.getBlockState(pos);
+        if (job.exchangeJob()) {
+            if (!exchangeMatches(level, pos, current, job.exchangeFrom())) {
+                return ShapeCell.SKIP;
+            }
+        } else if (!job.voidBlocks() && !current.isAir() && !current.canBeReplaced()) {
+            return ShapeCell.SKIP;
+        }
+        return ShapeCell.READY;
+    }
+
+    private static int shapeClusterIndex(
+            ServerLevel level,
+            ServerPlayer player,
+            BuildJob job,
+            BuildJob.Hand hand,
+            Vec3 origin,
+            double reachSqr,
+            int radius,
+            com.wrights.blueprint.Shapes.Kind shapeKind,
+            BlockPos shapePinLocal,
+            boolean onlyOwned) {
+        BlockPos min = job.min();
+        int cx = (int) Math.floor(origin.x) - min.getX();
+        int cy = (int) Math.floor(origin.y) - min.getY();
+        int cz = (int) Math.floor(origin.z) - min.getZ();
+        int best = -1;
+        double bestDist = Double.MAX_VALUE;
+        for (int dy = -radius; dy <= radius; dy++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    BlockPos pos = min.offset(cx + dx, cy + dy, cz + dz);
+                    int index = job.scanIndex(pos);
+                    if (index < 0 || aimedByOther(job, hand, index)) {
+                        continue;
+                    }
+                    ShapeCell kind = classifyShapeCell(level, player, job, hand, index, shapeKind, shapePinLocal, onlyOwned);
+                    if (kind != ShapeCell.READY) {
+                        continue;
+                    }
+                    double dist = origin.distanceToSqr(Vec3.atCenterOf(pos));
+                    if (dist > reachSqr) {
+                        continue;
+                    }
+                    if (best < 0 || dist < bestDist || (dist == bestDist && index < best)) {
+                        best = index;
+                        bestDist = dist;
+                    }
+                }
+            }
+        }
+        return best;
+    }
+
+    private static boolean shapeCanPayAny(
+            ServerPlayer player,
+            ServerLevel level,
+            BuildJob job,
+            java.util.List<com.wrights.blueprint.ShapeMaterials.Entry> usable) {
+        if (usable == null || usable.isEmpty()) {
+            return false;
+        }
+        for (com.wrights.blueprint.ShapeMaterials.Entry entry : usable) {
+            if (entry != null && shapeCanPay(player, level, job, entry.state())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Cube-strip ownership for streaming shapes. Enough cubes along the long axis → each wright
+     * gets a contiguous run of {@link #SHAPE_CUBE} tiles; otherwise fall back to per-block pizza lanes.
+     */
+    private static boolean ownsShapeCell(BuildJob job, BuildJob.Hand hand, int lx, int ly, int lz) {
+        int lanes = Math.max(1, hand.lanes);
+        if (lanes <= 1) {
+            return true;
+        }
+        int sx = Math.max(1, job.boxSizeX());
+        int sy = Math.max(1, job.boxSizeY());
+        int sz = Math.max(1, job.boxSizeZ());
+        int cube = shapeCubeSize(sx, sy, sz);
+        int nx = Math.max(1, (sx + cube - 1) / cube);
+        int ny = Math.max(1, (sy + cube - 1) / cube);
+        int nz = Math.max(1, (sz + cube - 1) / cube);
+        boolean alongX = nx >= nz && nx >= ny;
+        boolean alongZ = !alongX && nz >= ny;
+        int spanCubes = alongX ? nx : (alongZ ? nz : ny);
+        if (spanCubes >= lanes) {
+            int cx = Math.min(nx - 1, Math.max(0, lx) / cube);
+            int cy = Math.min(ny - 1, Math.max(0, ly) / cube);
+            int cz = Math.min(nz - 1, Math.max(0, lz) / cube);
+            int along = alongX ? cx : (alongZ ? cz : cy);
+            int per = Math.max(1, (spanCubes + lanes - 1) / lanes);
+            return Math.min(lanes - 1, along / per) == hand.lane;
+        }
+        return CrewSplit.lane(lx, ly, lz, lanes, sx, sy, sz) == hand.lane;
+    }
+
+    private static int shapeCubeSize(int sx, int sy, int sz) {
+        int maxSide = Math.max(sx, Math.max(sy, sz));
+        if (maxSide <= SHAPE_CUBE) {
+            return Math.max(1, maxSide);
+        }
+        return SHAPE_CUBE;
     }
 
     /** Next Shape/Exchange cell that still needs a payment block, or null when nothing is left. */

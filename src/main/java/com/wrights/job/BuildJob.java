@@ -1153,12 +1153,30 @@ public final class BuildJob {
     }
 
     public BlockPos scanPos() {
+        return scanPosAt(cursor);
+    }
+
+    /** AABB cell for a linear scan index (same X→Y→Z order as {@link #scanPos()}). */
+    public BlockPos scanPosAt(int index) {
         int width = max.getX() - min.getX() + 1;
         int height = max.getY() - min.getY() + 1;
-        int x = min.getX() + (cursor % width);
-        int y = min.getY() + ((cursor / width) % height);
-        int z = min.getZ() + (cursor / (width * height));
+        int x = min.getX() + (index % width);
+        int y = min.getY() + ((index / width) % height);
+        int z = min.getZ() + (index / (width * height));
         return new BlockPos(x, y, z);
+    }
+
+    /** Linear scan index for a world cell inside this job's box, or -1 when outside. */
+    public int scanIndex(BlockPos pos) {
+        if (pos == null || !contains(pos)) {
+            return -1;
+        }
+        int width = max.getX() - min.getX() + 1;
+        int height = max.getY() - min.getY() + 1;
+        int lx = pos.getX() - min.getX();
+        int ly = pos.getY() - min.getY();
+        int lz = pos.getZ() - min.getZ();
+        return lx + ly * width + lz * width * height;
     }
 
     public boolean contains(BlockPos pos) {
