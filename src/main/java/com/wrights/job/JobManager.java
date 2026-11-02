@@ -1569,6 +1569,13 @@ public final class JobManager {
                     }
                     return;
                 }
+                if (drone.launching()) {
+                    job.setLastDronePos(drone.blockPosition());
+                    job.setWaitKind(BuildJob.WAIT_NONE);
+                    drone.setWorkStatus(BlockFilters.icon(state), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
+                    library.setDirty();
+                    return;
+                }
                 if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
                     double step = drone.distanceToSqr(hover) > 64.0D ? 0.85D : 0.4D;
                     drone.moveToward(hover, step);
@@ -1718,6 +1725,11 @@ public final class JobManager {
                 continue;
             }
             Vec3 hover = Vec3.atCenterOf(pos).add(0.0D, 0.85D + (hand.lane % 2) * 0.45D, 0.0D);
+            if (drone.launching()) {
+                hand.lastPos = drone.blockPosition();
+                drone.setWorkStatus(BlockFilters.icon(state), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
+                continue;
+            }
             if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
                 drone.moveToward(hover, flyStep(hand.speed, drone.distanceToSqr(hover)));
                 hand.lastPos = drone.blockPosition();
@@ -2738,6 +2750,13 @@ public final class JobManager {
         Vec3 hover = Vec3.atCenterOf(nextPos).add(0.0D, 0.9D, 0.0D);
         // Place jobs show the block right away; mine jobs only show haul after the break.
         ItemStack soloShow = job.mining() ? ItemStack.EMPTY : stackFor(schematic, at);
+        if (drone.launching()) {
+            job.setLastDronePos(drone.blockPosition());
+            job.setWaitKind(BuildJob.WAIT_NONE);
+            drone.setWorkStatus(soloShow, ItemStack.EMPTY, DroneEntity.WAIT_NONE);
+            library.setDirty();
+            return;
+        }
         if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
             double step = drone.distanceToSqr(hover) > 64.0D ? 0.85D : 0.4D;
             drone.moveToward(hover, step);
@@ -2857,6 +2876,10 @@ public final class JobManager {
             return;
         }
         Vec3 hover = Vec3.atCenterOf(nextPos).add(0.0D, 0.9D, 0.0D);
+        if (drone.launching()) {
+            job.setLastDronePos(drone.blockPosition());
+            return;
+        }
         if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
             double step = drone.distanceToSqr(hover) > 64.0D ? 0.85D : 0.4D;
             drone.moveToward(hover, step);
@@ -4574,6 +4597,11 @@ public final class JobManager {
                 continue;
             }
             Vec3 hover = Vec3.atCenterOf(nextPos).add(0.0D, 0.85D + (hand.lane % 2) * 0.45D, 0.0D);
+            if (drone.launching()) {
+                hand.lastPos = drone.blockPosition();
+                publishHandStatus(level, player, schematic, job, hand, handStatus);
+                continue;
+            }
             if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
                 drone.moveToward(hover, flyStep(hand.speed, drone.distanceToSqr(hover)));
                 hand.lastPos = drone.blockPosition();
@@ -4742,6 +4770,10 @@ public final class JobManager {
                 continue;
             }
             Vec3 hover = Vec3.atCenterOf(nextPos).add(0.0D, 0.85D + (hand.lane % 2) * 0.45D, 0.0D);
+            if (drone.launching()) {
+                hand.lastPos = drone.blockPosition();
+                continue;
+            }
             if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
                 drone.moveToward(hover, flyStep(hand.speed, drone.distanceToSqr(hover)));
                 hand.lastPos = drone.blockPosition();
@@ -7223,33 +7255,20 @@ public final class JobManager {
                 return null;
             }
         }
-        Vec3 site = Vec3.atCenterOf(workPos).add(0.0D, 1.15D, 0.0D);
-        BlockPos home = job.hands().isEmpty() ? null : job.hands().get(0).homePort;
-        boolean launchFromPlayer = player != null
-                && player.level() == level
-                && (home == null
-                        || player.position().distanceTo(site) <= WrightsConfig.MAX_RANGE.getAsInt() + 8.0D);
-        net.minecraft.world.phys.AABB search = new net.minecraft.world.phys.AABB(workPos).inflate(96.0D);
-        for (DroneEntity drone : level.getEntitiesOfClass(DroneEntity.class, search, entity -> entity.jobId().filter(job.id()::equals).isPresent() && entity.isAlive())) {
-            if (launchFromPlayer) {
-                drone.discard();
-                continue;
-            }
-            job.setDroneId(drone.getUUID());
-            paint(drone, job);
-            bindUnit(job, drone, 0);
-            return drone;
-        }
+        // Never adopt a leftover flyer on the site — that looks like a snap. Always leave from home.
+        discardUnownedJobFlyers(level, job, workPos);
         if (stillFlyingHome(job, 0)) {
             return null;
         }
+        BlockPos home = job.hands().isEmpty() ? null : job.hands().get(0).homePort;
+        Vec3 site = Vec3.atCenterOf(workPos).add(0.0D, 1.15D, 0.0D);
         DroneEntity drone = new DroneEntity(ModEntities.DRONE.get(), level);
         drone.setJobId(job.id());
         bindUnit(job, drone, 0);
-        depart(drone, player, site, 0, 1, home);
         job.setDroneId(drone.getUUID());
-        job.setLastDronePos(drone.blockPosition());
         level.addFreshEntity(drone);
+        depart(drone, player, site, 0, 1, home);
+        job.setLastDronePos(drone.blockPosition());
         paint(drone, job);
         return drone;
     }
@@ -7284,40 +7303,37 @@ public final class JobManager {
             }
             hand.entityId = null;
         }
-        Vec3 site = Vec3.atCenterOf(workPos).add(0.0D, 1.15D, 0.0D);
-        boolean launchFromPlayer = player != null
-                && player.level() == level
-                && (hand.homePort == null
-                        || player.position().distanceTo(site) <= WrightsConfig.MAX_RANGE.getAsInt() + 8.0D);
-        AABB search = new AABB(workPos).inflate(96.0D);
-        for (DroneEntity drone : level.getEntitiesOfClass(DroneEntity.class, search, entity -> entity.isAlive() && entity.jobId().filter(job.id()::equals).isPresent())) {
-            if (job.ownsDrone(drone.getUUID())) {
-                continue;
-            }
-            // Stale flyer still marked for this job on the site — adopting it looks like a snap.
-            // When we should leave from the player, discard it and spawn a fresh cruise.
-            if (launchFromPlayer) {
-                drone.discard();
-                continue;
-            }
-            hand.entityId = drone.getUUID();
-            hand.lastPos = drone.blockPosition();
-            carryStrand(job, hand, drone);
-            bindUnit(job, drone, job.hands().indexOf(hand));
-            return drone;
-        }
+        // Never adopt a leftover flyer on the site — that looks like a snap. Always leave from home.
+        discardUnownedJobFlyers(level, job, workPos);
         if (stillFlyingHome(job, job.hands().indexOf(hand))) {
             return null;
         }
+        Vec3 site = Vec3.atCenterOf(workPos).add(0.0D, 1.15D, 0.0D);
         DroneEntity drone = new DroneEntity(ModEntities.DRONE.get(), level);
         drone.setJobId(job.id());
         bindUnit(job, drone, job.hands().indexOf(hand));
-        depart(drone, player, site, hand.lane, hand.lanes, hand.homePort);
         hand.entityId = drone.getUUID();
-        hand.lastPos = drone.blockPosition();
         carryStrand(job, hand, drone);
         level.addFreshEntity(drone);
+        depart(drone, player, site, hand.lane, hand.lanes, hand.homePort);
+        hand.lastPos = drone.blockPosition();
         return drone;
+    }
+
+    /** Drops stray flyers still tagged for this job so a later spawn cannot reuse them on site. */
+    private static void discardUnownedJobFlyers(ServerLevel level, BuildJob job, BlockPos workPos) {
+        if (level == null || job == null || workPos == null) {
+            return;
+        }
+        AABB search = new AABB(workPos).inflate(96.0D);
+        for (DroneEntity drone : level.getEntitiesOfClass(
+                DroneEntity.class,
+                search,
+                entity -> entity.isAlive() && entity.jobId().filter(job.id()::equals).isPresent())) {
+            if (!job.ownsDrone(drone.getUUID())) {
+                drone.discard();
+            }
+        }
     }
 
     private static void carryStrand(BuildJob job, BuildJob.Hand hand, DroneEntity drone) {
@@ -7545,9 +7561,10 @@ public final class JobManager {
         library.setDirty();
     }
 
-    /** Cruise farther than this from a port with no player nearby snaps above the work so the flyer stays visible. */
-    private static final double JOB_SNAP_BLOCKS = 96.0D;
-
+    /**
+     * Every launch leaves from home: personal → behind the player, placed → wrightport lip.
+     * Never appear on the job first. TELEPORT mode is the only path that starts at the work.
+     */
     private static void depart(DroneEntity drone, ServerPlayer player, Vec3 work, int lane, int lanes, BlockPos homePort) {
         drone.setHomePort(homePort);
         float yaw = player == null ? 0.0F : player.getYRot();
@@ -7557,37 +7574,22 @@ public final class JobManager {
             return;
         }
         boolean playerHere = player != null && player.level() == drone.level();
-        double range = WrightsConfig.MAX_RANGE.getAsInt();
-        boolean playerNearWork = playerHere && player.position().distanceTo(work) <= range + 8.0D;
-        // Personal wrights, and any launch while you are in range of the job, always leave from you
-        // and cruise the whole way. A wrightport sitting on a small build must not win — that read
-        // as a snap onto the site when you walked back into range.
-        if (playerHere && (homePort == null || playerNearWork)) {
-            drone.departFromPlayer(player, work, lane, lanes);
-            if (homePort != null) {
+        if (homePort != null) {
+            if (drone.level() instanceof ServerLevel server && server.isLoaded(homePort)) {
+                drone.departFromBlock(homePort, work, lane, lanes);
+                return;
+            }
+            if (playerHere) {
+                drone.departFromPlayer(player, work, lane, lanes);
                 drone.setHomePort(homePort);
+                return;
             }
+            drone.moveTo(work.x, work.y + 8.0D, work.z, yaw, 0.0F);
+            drone.setYRot(yaw);
             return;
-        }
-        if (homePort != null && playerHere && player.level().isLoaded(homePort)) {
-            Vec3 lip = WrightHomes.lip(homePort);
-            if (lip.distanceTo(work) <= JOB_SNAP_BLOCKS) {
-                drone.departFromBlock(homePort, work, lane, lanes);
-                return;
-            }
-        }
-        if (homePort != null && drone.level() instanceof ServerLevel server && server.isLoaded(homePort)) {
-            Vec3 lip = WrightHomes.lip(homePort);
-            if (lip.distanceTo(work) <= JOB_SNAP_BLOCKS) {
-                drone.departFromBlock(homePort, work, lane, lanes);
-                return;
-            }
         }
         if (playerHere) {
             drone.departFromPlayer(player, work, lane, lanes);
-            if (homePort != null) {
-                drone.setHomePort(homePort);
-            }
             return;
         }
         drone.moveTo(work.x, work.y + 8.0D, work.z, yaw, 0.0F);

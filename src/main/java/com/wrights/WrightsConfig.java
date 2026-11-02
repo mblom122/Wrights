@@ -95,7 +95,7 @@ public final class WrightsConfig {
                     "How a wright comes home when the job is done.",
                     "FLY returns from the job to the wrightport, or to your back.",
                     "TELEPORT appears above the wrightport, or above you, and docks.",
-                    "Even on FLY, a return farther than about 96 blocks snaps high above the dock so the wright stays visible.")
+                    "Even on FLY, a return farther than about 160 blocks (outside tracking / render range) snaps high above the dock.")
             .defineEnum("travelHome", Travel.FLY);
 
     public static final ModConfigSpec.IntValue MAX_PREVIEW_BLOCKS = BUILDER

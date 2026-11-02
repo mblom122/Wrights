@@ -53,6 +53,8 @@ public class DroneEntity extends Entity {
     private boolean manageDock;
     private int returnTicks;
     private int returnLimit;
+    /** Ticks to stay at the hatch after spawn so a launch is visible before the cruise. */
+    private int launchTicks;
     private UUID ownerId;
     private UUID unitId;
     private String unitName = "";
@@ -144,6 +146,7 @@ public class DroneEntity extends Entity {
         setHomePort(null);
         Vec3 from = WrightHomes.behindPlayer(player);
         launchToward(from, work, lane, lanes, player.getYRot());
+        beginLaunch();
     }
 
     /** Leaves a placed wrightport hatch, aimed at the work site. */
@@ -151,6 +154,16 @@ public class DroneEntity extends Entity {
         setHomePort(port);
         Vec3 from = WrightHomes.lip(port);
         launchToward(from, work, lane, lanes, 0.0F);
+        beginLaunch();
+    }
+
+    /** Hold at the hatch so the door opens and the wright is seen leaving before it cruises. */
+    public void beginLaunch() {
+        this.launchTicks = 10;
+    }
+
+    public boolean launching() {
+        return this.launchTicks > 0;
     }
 
     private void launchToward(Vec3 from, Vec3 work, int lane, int lanes, float fallbackYaw) {
@@ -166,13 +179,20 @@ public class DroneEntity extends Entity {
             side = side.normalize();
         }
         double spread = lanes <= 1 ? 0.0D : (lane - (lanes - 1) * 0.5D) * 0.45D;
-        Vec3 start = from.add(toward.scale(0.35D)).add(side.scale(spread));
+        // Start at the hatch, then a short lift so the exit reads as leaving home — not a pop on site.
+        Vec3 start = from.add(0.0D, 0.35D, 0.0D).add(side.scale(spread)).add(toward.scale(0.15D));
         float yaw = (float) (Mth.atan2(toward.z, toward.x) * Mth.RAD_TO_DEG) - 90.0F;
         if (!Float.isFinite(yaw)) {
             yaw = fallbackYaw;
         }
         this.moveTo(start.x, start.y, start.z, yaw, 0.0F);
         this.setYRot(yaw);
+        this.xo = start.x;
+        this.yo = start.y;
+        this.zo = start.z;
+        this.xOld = start.x;
+        this.yOld = start.y;
+        this.zOld = start.z;
     }
 
     /**
@@ -212,10 +232,11 @@ public class DroneEntity extends Entity {
     }
 
     /**
-     * Beyond this, a return skips the long cruise and snaps high above the dock — same idea as Manage-add —
-     * so the flyer is still visible instead of crawling through unloaded / out-of-render space.
+     * Match {@link com.wrights.entity.ModEntities} tracking (10 chunks). Inside this, a return always
+     * flies from the job — ~100 blocks when you leave range must cruise, not snap above you.
+     * Only beyond tracking / practical render range do we snap high above the dock.
      */
-    private static final double HOME_SNAP_BLOCKS = 96.0D;
+    private static final double HOME_SNAP_BLOCKS = 160.0D;
 
     /** Returns to the personal port (behind the player) or a placed wrightport hatch. */
     public void flyHome(ServerPlayer player, int slot, int count, @Nullable BlockPos port) {
@@ -230,7 +251,7 @@ public class DroneEntity extends Entity {
         Vec3 dock = port != null ? WrightHomes.hatch(port) : WrightHomes.behindPlayer(player);
         double dist = this.position().distanceTo(dock);
         // Prefer flying from the job. Snap high above the dock only when teleport mode is on, or the
-        // run home is too far to keep rendered / chunk-loaded the whole way.
+        // run home is outside entity tracking / render range.
         boolean snap = !WrightsConfig.flyHome() || dist > HOME_SNAP_BLOCKS;
         if (snap) {
             Vec3 above = returnAbove(player, port, slot, count, dist > HOME_SNAP_BLOCKS);
@@ -499,6 +520,9 @@ public class DroneEntity extends Entity {
         if (this.unitId != null) {
             com.wrights.job.JobManager.noteFlyer(this.unitId, this);
         }
+        if (this.launchTicks > 0) {
+            this.launchTicks--;
+        }
         if (returning()) {
             if (this.unitId != null) {
                 com.wrights.job.JobManager.holdReturn(this.unitId);
@@ -559,7 +583,8 @@ public class DroneEntity extends Entity {
 
     @Override
     public boolean shouldRenderAtSqrDistance(double distance) {
-        return distance < 128.0D * 128.0D;
+        // Keep pace with clientTrackingRange(10) so a ~100–160 block cruise home stays drawn.
+        return distance < HOME_SNAP_BLOCKS * HOME_SNAP_BLOCKS;
     }
 
     @Override
