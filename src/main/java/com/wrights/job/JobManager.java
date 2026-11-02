@@ -2109,8 +2109,11 @@ public final class JobManager {
             int readyDist = Integer.MAX_VALUE;
             int blocked = -1;
             boolean anchorOpen = false;
+            int ox = hasShapeBox(hand) ? hand.boxX0 : 0;
+            int oy = hasShapeBox(hand) ? hand.boxY0 : 0;
+            int oz = hasShapeBox(hand) ? hand.boxZ0 : 0;
             for (int i = 0; i < cells; i++) {
-                int index = shapeLocalIndex(job, xs[i], ys[i], zs[i]);
+                int index = shapeLocalIndex(job, xs[i] + ox, ys[i] + oy, zs[i] + oz);
                 if (index < 0 || aimedByOther(job, hand, index)) {
                     continue;
                 }
@@ -2211,6 +2214,20 @@ public final class JobManager {
     }
 
     private static com.wrights.blueprint.ShapeHover.Query shapeHoverQuery(BuildJob job, BuildJob.Hand hand) {
+        int ops = handOps(hand);
+        int reach = WrightTier.operationReachSqr(ops);
+        int cap = Math.max(1, WrightTier.operationCap(ops));
+        // Each share is its own little box, so a 2×2×2 is two stands and not a strip of the big cube.
+        // The full box keeps the shape's own pattern (a 3×3×3 sphere is still one stand).
+        if (hasShapeBox(hand)
+                && (hand.boxX0 != 0 || hand.boxY0 != 0 || hand.boxZ0 != 0
+                        || hand.boxX1 != job.boxSizeX() || hand.boxY1 != job.boxSizeY() || hand.boxZ1 != job.boxSizeZ())) {
+            int sx = Math.max(1, hand.boxX1 - hand.boxX0);
+            int sy = Math.max(1, hand.boxY1 - hand.boxY0);
+            int sz = Math.max(1, hand.boxZ1 - hand.boxZ0);
+            return new com.wrights.blueprint.ShapeHover.Query(
+                    sx, sy, sz, false, com.wrights.blueprint.ShapeHover.KIND_BOX, reach, cap, 0, 0, sx);
+        }
         ShapeStrip strip = shapeStrip(job);
         int axis = strip.alongX ? 0 : strip.alongZ ? 2 : 1;
         int span = axis == 0 ? strip.sx : axis == 1 ? strip.sy : strip.sz;
@@ -2220,15 +2237,14 @@ public final class JobManager {
             from = hand.shareFrom;
             to = hand.shareTo;
         }
-        int ops = handOps(hand);
         return new com.wrights.blueprint.ShapeHover.Query(
                 strip.sx,
                 strip.sy,
                 strip.sz,
                 job.shapeHollow(),
                 job.shapeKind(),
-                WrightTier.operationReachSqr(ops),
-                WrightTier.operationCap(ops),
+                reach,
+                cap,
                 axis,
                 from,
                 to);
@@ -2857,39 +2873,40 @@ public final class JobManager {
     }
 
     /**
-     * Assign equal block-axis shares once when a multi-wright shape crew starts.
-     * Hands that join later keep {@code shareFrom < 0} until they claim half of a busy share.
+     * Cut the box by halving its longest side at the middle, then each new piece the same way.
+     * A 4×4×4 with 8 wrights becomes eight 2×2×2 cubes. A piece that fits in one hover is not cut.
      */
     private static void ensureShapeShares(BuildJob job) {
         if (job == null || job.hands().isEmpty()) {
             return;
         }
-        int span = shapeAxisSpan(job);
-        if (span <= 0) {
-            return;
-        }
-        boolean anyAssigned = false;
         for (BuildJob.Hand hand : job.hands()) {
-            if (hand.shareFrom >= 0 && hand.shareTo > hand.shareFrom) {
-                anyAssigned = true;
-                break;
+            if (hasShapeBox(hand) || (hand.shareFrom >= 0 && hand.shareTo > hand.shareFrom)) {
+                return;
             }
         }
-        if (anyAssigned) {
-            return;
+        int sx = Math.max(1, job.boxSizeX());
+        int sy = Math.max(1, job.boxSizeY());
+        int sz = Math.max(1, job.boxSizeZ());
+        int reach = 0;
+        int cap = 1;
+        for (BuildJob.Hand hand : job.hands()) {
+            int ops = handOps(hand);
+            int handCap = Math.max(1, WrightTier.operationCap(ops));
+            int handReach = WrightTier.operationReachSqr(ops);
+            if (handCap > cap || (handCap == cap && handReach > reach)) {
+                cap = handCap;
+                reach = handReach;
+            }
         }
-        int n = job.hands().size();
-        int cross = shapeAxisCrossSection(job);
-        for (int i = 0; i < n; i++) {
+        java.util.List<com.wrights.blueprint.ShapeShares.Part> parts = com.wrights.blueprint.ShapeShares.plan(
+                sx, sy, sz, reach, cap, job.hands().size());
+        for (int i = 0; i < job.hands().size(); i++) {
             BuildJob.Hand hand = job.hands().get(i);
-            hand.shareFrom = i * span / n;
-            hand.shareTo = (i + 1) * span / n;
-            int width = Math.max(0, hand.shareTo - hand.shareFrom);
-            hand.shareRemain = width * cross;
-            if (width <= 0) {
-                hand.shareFrom = -1;
-                hand.shareTo = -1;
-                hand.shareRemain = 0;
+            if (i < parts.size()) {
+                assignShapeBox(hand, parts.get(i));
+            } else {
+                clearShapeBox(hand);
             }
         }
     }
@@ -2914,6 +2931,9 @@ public final class JobManager {
         BuildJob.Hand best = busiestShapeShare(level, player, job, hand, shapeKind, shapePinLocal, scanCap);
         if (best == null) {
             return false;
+        }
+        if (hasShapeBox(best)) {
+            return splitShapeBox(player, library, job, hand, best, level, shapeKind, shapePinLocal);
         }
         int from = best.shareFrom;
         int to = best.shareTo;
@@ -3009,7 +3029,7 @@ public final class JobManager {
             if (other == skip || other.sheltering) {
                 continue;
             }
-            if (other.shareFrom < 0 || other.shareTo <= other.shareFrom) {
+            if (!hasShapeBox(other) && (other.shareFrom < 0 || other.shareTo <= other.shareFrom)) {
                 continue;
             }
             if (!shapeShareHasWork(level, player, job, other, shapeKind, shapePinLocal, scanCap)) {
@@ -3088,7 +3108,13 @@ public final class JobManager {
             com.wrights.blueprint.Shapes.Kind shapeKind,
             BlockPos shapePinLocal,
             int scanCap) {
-        if (hand == null || hand.shareFrom < 0 || hand.shareTo <= hand.shareFrom) {
+        if (hand == null) {
+            return false;
+        }
+        if (hasShapeBox(hand)) {
+            return shapeBoxHasWork(level, player, job, hand, shapeKind, shapePinLocal, scanCap);
+        }
+        if (hand.shareFrom < 0 || hand.shareTo <= hand.shareFrom) {
             return false;
         }
         return shapeShareRangeHasWork(
@@ -3150,10 +3176,116 @@ public final class JobManager {
         return false;
     }
 
-    /** Local block ownership along the long box axis via {@link BuildJob.Hand#shareFrom}/{@code shareTo}. */
+    private static boolean hasShapeBox(BuildJob.Hand hand) {
+        return hand != null
+                && hand.boxX0 >= 0
+                && hand.boxX1 > hand.boxX0
+                && hand.boxY1 > hand.boxY0
+                && hand.boxZ1 > hand.boxZ0;
+    }
+
+    private static void assignShapeBox(BuildJob.Hand hand, com.wrights.blueprint.ShapeShares.Part part) {
+        hand.boxX0 = part.x0;
+        hand.boxY0 = part.y0;
+        hand.boxZ0 = part.z0;
+        hand.boxX1 = part.x1;
+        hand.boxY1 = part.y1;
+        hand.boxZ1 = part.z1;
+        hand.shareFrom = part.x0;
+        hand.shareTo = part.x1;
+        hand.shareRemain = part.volume();
+        hand.hover = -1;
+    }
+
+    private static void clearShapeBox(BuildJob.Hand hand) {
+        hand.boxX0 = -1;
+        hand.boxY0 = -1;
+        hand.boxZ0 = -1;
+        hand.boxX1 = -1;
+        hand.boxY1 = -1;
+        hand.boxZ1 = -1;
+        hand.shareFrom = -1;
+        hand.shareTo = -1;
+        hand.shareRemain = 0;
+    }
+
+    private static boolean sameShapeBox(BuildJob.Hand left, BuildJob.Hand right) {
+        return hasShapeBox(left) && hasShapeBox(right)
+                && left.boxX0 == right.boxX0 && left.boxY0 == right.boxY0 && left.boxZ0 == right.boxZ0
+                && left.boxX1 == right.boxX1 && left.boxY1 == right.boxY1 && left.boxZ1 == right.boxZ1;
+    }
+
+    /** Halve the busiest box on its longest side. A piece that fits in one hover stays with its wright. */
+    private static boolean splitShapeBox(
+            ServerPlayer player,
+            SchematicLibrary library,
+            BuildJob job,
+            BuildJob.Hand hand,
+            BuildJob.Hand best,
+            ServerLevel level,
+            com.wrights.blueprint.Shapes.Kind shapeKind,
+            BlockPos shapePinLocal) {
+        if (sameShapeBox(hand, best)) {
+            return false;
+        }
+        if (shapeShareFitsOneHover(level, player, job, best, shapeKind, shapePinLocal)) {
+            return false;
+        }
+        com.wrights.blueprint.ShapeShares.Part[] halves = com.wrights.blueprint.ShapeShares.halve(
+                new com.wrights.blueprint.ShapeShares.Part(
+                        best.boxX0, best.boxY0, best.boxZ0, best.boxX1, best.boxY1, best.boxZ1));
+        if (halves == null) {
+            return false;
+        }
+        assignShapeBox(best, halves[0]);
+        assignShapeBox(hand, halves[1]);
+        hand.aim = -1;
+        hand.idle = false;
+        hand.probe = 0;
+        noteHistory(player, library, job, JobEventLog.SHARE_SPLIT,
+                Component.translatable("history.wrights.share_split").getString());
+        return true;
+    }
+
+    private static boolean shapeBoxHasWork(
+            ServerLevel level,
+            ServerPlayer player,
+            BuildJob job,
+            BuildJob.Hand hand,
+            com.wrights.blueprint.Shapes.Kind shapeKind,
+            BlockPos shapePinLocal,
+            int scanCap) {
+        int examined = 0;
+        int budget = Math.max(32, scanCap);
+        for (int z = hand.boxZ0; z < hand.boxZ1; z++) {
+            for (int y = hand.boxY0; y < hand.boxY1; y++) {
+                for (int x = hand.boxX0; x < hand.boxX1; x++) {
+                    int index = shapeLocalIndex(job, x, y, z);
+                    if (index < 0 || job.isShapeResolved(index)) {
+                        continue;
+                    }
+                    if (++examined > budget) {
+                        return true;
+                    }
+                    ShapeCell kind = classifyShapeCell(level, player, job, hand, index, shapeKind, shapePinLocal, true);
+                    if (kind == ShapeCell.READY) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Local block ownership. A planned share is a box; older jobs still use one axis strip. */
     private static boolean ownsShapeCell(BuildJob job, BuildJob.Hand hand, int lx, int ly, int lz) {
         if (job.hands().size() <= 1) {
             return true;
+        }
+        if (hasShapeBox(hand)) {
+            return lx >= hand.boxX0 && lx < hand.boxX1
+                    && ly >= hand.boxY0 && ly < hand.boxY1
+                    && lz >= hand.boxZ0 && lz < hand.boxZ1;
         }
         if (hand.shareFrom < 0 || hand.shareTo <= hand.shareFrom) {
             return false;
@@ -3167,6 +3299,9 @@ public final class JobManager {
     private static int firstOwnedShapeScanIndex(BuildJob job, BuildJob.Hand hand) {
         if (job.hands().size() <= 1) {
             return 0;
+        }
+        if (hasShapeBox(hand)) {
+            return shapeLocalIndex(job, hand.boxX0, hand.boxY0, hand.boxZ0);
         }
         if (hand.shareFrom < 0 || hand.shareTo <= hand.shareFrom) {
             return -1;

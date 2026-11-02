@@ -470,6 +470,12 @@ public final class BuildJob {
                 hand.rescan = true;
                 hand.shareFrom = -1;
                 hand.shareTo = -1;
+                hand.boxX0 = -1;
+                hand.boxY0 = -1;
+                hand.boxZ0 = -1;
+                hand.boxX1 = -1;
+                hand.boxY1 = -1;
+                hand.boxZ1 = -1;
                 hand.shareRemain = 0;
             }
             next.add(hand);
@@ -1292,6 +1298,12 @@ public final class BuildJob {
                 handTag.putInt("hover", hand.hover);
                 handTag.putInt("shareFrom", hand.shareFrom);
                 handTag.putInt("shareTo", hand.shareTo);
+                handTag.putInt("boxX0", hand.boxX0);
+                handTag.putInt("boxY0", hand.boxY0);
+                handTag.putInt("boxZ0", hand.boxZ0);
+                handTag.putInt("boxX1", hand.boxX1);
+                handTag.putInt("boxY1", hand.boxY1);
+                handTag.putInt("boxZ1", hand.boxZ1);
                 handTag.putInt("shareRemain", hand.shareRemain);
                 handTag.putBoolean("rescan", hand.rescan);
                 handTag.putBoolean("idle", hand.idle);
@@ -1505,6 +1517,12 @@ public final class BuildJob {
                 hand.hover = handTag.contains("hover") ? handTag.getInt("hover") : -1;
                 hand.shareFrom = handTag.contains("shareFrom") ? handTag.getInt("shareFrom") : -1;
                 hand.shareTo = handTag.contains("shareTo") ? handTag.getInt("shareTo") : -1;
+                hand.boxX0 = handTag.contains("boxX0") ? handTag.getInt("boxX0") : -1;
+                hand.boxY0 = handTag.contains("boxY0") ? handTag.getInt("boxY0") : -1;
+                hand.boxZ0 = handTag.contains("boxZ0") ? handTag.getInt("boxZ0") : -1;
+                hand.boxX1 = handTag.contains("boxX1") ? handTag.getInt("boxX1") : -1;
+                hand.boxY1 = handTag.contains("boxY1") ? handTag.getInt("boxY1") : -1;
+                hand.boxZ1 = handTag.contains("boxZ1") ? handTag.getInt("boxZ1") : -1;
                 hand.shareRemain = Math.max(0, handTag.getInt("shareRemain"));
                 hand.rescan = handTag.getBoolean("rescan");
                 hand.idle = handTag.getBoolean("idle");
@@ -1680,6 +1698,16 @@ public final class BuildJob {
          */
         public int shareFrom = -1;
         public int shareTo = -1;
+        /**
+         * Shape share box, local and exclusive on the high side. {@code boxX0 < 0} means unset.
+         * Built by halving the longest side at its middle. A 4×4×4 with 8 wrights is eight 2×2×2 cubes.
+         */
+        public int boxX0 = -1;
+        public int boxY0 = -1;
+        public int boxZ0 = -1;
+        public int boxX1 = -1;
+        public int boxY1 = -1;
+        public int boxZ1 = -1;
         /** Rough unresolved cells left in this share; used to pick who to join. */
         public int shareRemain;
         /** Leftover eighths of a block, so a fractional place rate stays exact across ticks. */
