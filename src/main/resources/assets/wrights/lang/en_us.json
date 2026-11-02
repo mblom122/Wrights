@@ -555,6 +555,8 @@
   "hud.wrights.wrights_returned": "Wrights returned",
   "hud.wrights.wrights_returned_range": "%s wrights came home — you were too far from the build. They will rejoin when you are in range.",
   "hud.wrights.wrights_returned_dimension": "%s wrights came home — wrong dimension. They will rejoin when you return to the build.",
+  "hud.wrights.wrights_rejoined": "Wrights rejoined",
+  "hud.wrights.wrights_rejoined_detail": "%s wrights are back on the build.",
   "hud.wrights.done_saved": "Saved %s blocks from a box of %s",
   "hud.wrights.done_saved_skipped": "Saved %s blocks from a box of %s, skipped %s",
   "hud.wrights.done_undo": "Removed %s blocks, returned %s items",

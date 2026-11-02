@@ -3996,7 +3996,14 @@ public final class JobManager {
         if (job.queued() && !job.deferSupplies() && job.hasCrew() && job.crewUnits().size() >= quota) {
             job.setQueued(false);
             library.setDirty();
-            Messages.actionBar(player, "message.wrights.queue_ready", job.crewUnits().size());
+            BlueprintNetwork.syncJobs(player);
+            int count = job.crewUnits().size();
+            BlueprintNetwork.jobDone(
+                    player,
+                    Component.translatable("hud.wrights.wrights_rejoined"),
+                    Component.literal(jobCardTitle(job, library)),
+                    Component.translatable("hud.wrights.wrights_rejoined_detail", count),
+                    -1);
         }
     }
 
