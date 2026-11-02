@@ -36,12 +36,13 @@ public final class JobEventLog {
 
     private static final int MAX_EVENTS = 80;
 
-    public record Event(int kind, String jobName, String detail, long gameTime) {
+    public record Event(int kind, String jobName, String detail, String location, long gameTime) {
         public CompoundTag save() {
             CompoundTag tag = new CompoundTag();
             tag.putInt("kind", kind);
             tag.putString("name", jobName == null ? "" : jobName);
             tag.putString("detail", detail == null ? "" : detail);
+            tag.putString("loc", location == null ? "" : location);
             tag.putLong("time", gameTime);
             return tag;
         }
@@ -51,6 +52,7 @@ public final class JobEventLog {
                     tag.getInt("kind"),
                     tag.getString("name"),
                     tag.getString("detail"),
+                    tag.contains("loc") ? tag.getString("loc") : "",
                     tag.getLong("time"));
         }
     }
@@ -62,7 +64,7 @@ public final class JobEventLog {
         return list == null ? List.of() : List.copyOf(list);
     }
 
-    public void record(ServerPlayer player, int kind, String jobName, String detail) {
+    public void record(ServerPlayer player, int kind, String jobName, String detail, String location) {
         if (player == null) {
             return;
         }
@@ -80,7 +82,7 @@ public final class JobEventLog {
                 }
             }
         }
-        list.add(0, new Event(kind, safe(jobName), safe(detail), time));
+        list.add(0, new Event(kind, safe(jobName), safe(detail), safe(location), time));
         int cap = Math.max(MAX_EVENTS, WrightsConfig.maxJobHistory() * 2);
         while (list.size() > cap) {
             list.remove(list.size() - 1);

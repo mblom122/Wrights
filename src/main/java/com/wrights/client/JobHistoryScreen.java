@@ -16,7 +16,7 @@ import com.wrights.network.BlueprintPayloads;
  * No action buttons — Manage keeps those on live / finished job cards.
  */
 public class JobHistoryScreen extends Screen {
-    private static final int ROW = 42;
+    private static final int ROW = 52;
 
     private final Screen parent;
     private final List<BlueprintPayloads.HistoryLine> rows = new ArrayList<>();
@@ -188,6 +188,16 @@ public class JobHistoryScreen extends Screen {
             graphics.drawString(this.font, clipped, nameX, y + 6, WrightsUi.TEXT, false);
         }
 
+        String location = event.location() == null ? "" : event.location();
+        if (!location.isBlank()) {
+            graphics.drawString(
+                    this.font,
+                    this.font.plainSubstrByWidth(location, width - 16),
+                    x + 8,
+                    y + 18,
+                    WrightsUi.MUTED,
+                    false);
+        }
         String detail = event.detail() == null || event.detail().isBlank()
                 ? Component.translatable("history.wrights.detail_none").getString()
                 : event.detail();
@@ -195,7 +205,7 @@ public class JobHistoryScreen extends Screen {
                 this.font,
                 this.font.plainSubstrByWidth(detail, width - 16),
                 x + 8,
-                y + 20,
+                y + (location.isBlank() ? 20 : 30),
                 WrightsUi.MUTED,
                 false);
     }

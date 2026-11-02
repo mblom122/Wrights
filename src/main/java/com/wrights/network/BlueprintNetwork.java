@@ -133,7 +133,8 @@ public final class BlueprintNetwork {
         java.util.List<BlueprintPayloads.HistoryLine> lines = new java.util.ArrayList<>();
         if (events != null) {
             for (com.wrights.job.JobEventLog.Event event : events) {
-                lines.add(new BlueprintPayloads.HistoryLine(event.kind(), event.jobName(), event.detail(), event.gameTime()));
+                lines.add(new BlueprintPayloads.HistoryLine(
+                        event.kind(), event.jobName(), event.detail(), event.location(), event.gameTime()));
             }
         }
         PacketDistributor.sendToPlayer(player, new BlueprintPayloads.HistorySync(lines));

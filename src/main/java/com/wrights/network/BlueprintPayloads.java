@@ -1150,17 +1150,18 @@ public final class BlueprintPayloads {
         }
     }
 
-    /** Info-only History window rows: kind + job name + detail + game time. */
-    public record HistoryLine(int kind, String jobName, String detail, long gameTime) {
+    /** Info-only History window rows: kind + job name + detail + location + game time. */
+    public record HistoryLine(int kind, String jobName, String detail, String location, long gameTime) {
         public void write(RegistryFriendlyByteBuf buf) {
             buf.writeVarInt(kind);
             buf.writeUtf(jobName == null ? "" : jobName, 128);
             buf.writeUtf(detail == null ? "" : detail, 256);
+            buf.writeUtf(location == null ? "" : location, 64);
             buf.writeLong(gameTime);
         }
 
         public static HistoryLine read(RegistryFriendlyByteBuf buf) {
-            return new HistoryLine(buf.readVarInt(), buf.readUtf(128), buf.readUtf(256), buf.readLong());
+            return new HistoryLine(buf.readVarInt(), buf.readUtf(128), buf.readUtf(256), buf.readUtf(64), buf.readLong());
         }
     }
 

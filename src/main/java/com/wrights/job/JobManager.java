@@ -3171,8 +3171,22 @@ public final class JobManager {
         if (player == null || library == null || job == null) {
             return;
         }
-        library.eventLog().record(player, kind, jobCardTitle(job, library), detail == null ? "" : detail);
+        library.eventLog().record(
+                player,
+                kind,
+                jobCardTitle(job, library),
+                detail == null ? "" : detail,
+                historyLocation(job));
         library.setDirty();
+    }
+
+    /** Same coords the Jobs card shows — History needs them to find the site later. */
+    private static String historyLocation(BuildJob job) {
+        BlockPos pos = job.anchor() != null ? job.anchor() : job.min();
+        if (pos == null) {
+            return "";
+        }
+        return Component.translatable("menu.wrights.job_anchor", pos.getX(), pos.getY(), pos.getZ()).getString();
     }
 
     private static Component jobTitle(MinecraftServer server, SchematicLibrary library, BuildJob job, String taskKey) {
