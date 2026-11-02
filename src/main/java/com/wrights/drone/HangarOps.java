@@ -36,12 +36,15 @@ public final class HangarOps {
     public static final int UPGRADE = 8;
     public static final int TAKE = 9;
     public static final int DOWNGRADE = 10;
+    public static final int OPS_UPGRADE = 11;
+    public static final int OPS_DOWNGRADE = 12;
 
     public static final int ADD_COUNT = 1;
     public static final int TO_TIER = 2;
     public static final int MAX_AFFORD = 3;
     public static final int TAKE_MARKED = 4;
     public static final int DOWN_ONE = 5;
+    public static final int OPS_TO_TIER = 6;
 
     public static final int ONE = 0;
     public static final int SIXTEEN = 1;
@@ -109,6 +112,7 @@ public final class HangarOps {
                 case MAX_AFFORD -> raiseMarked(player, swarm, units);
                 case TAKE_MARKED -> takeMarked(player, swarm, units);
                 case DOWN_ONE -> downOne(player, swarm, units);
+                case OPS_TO_TIER -> moveMarkedOps(player, swarm, units, WrightTier.clamp(value));
                 default -> swarm;
             };
         } finally {
@@ -125,7 +129,8 @@ public final class HangarOps {
 
     static boolean targetsUnit(int action) {
         return action == REMOVE || action == SPEED || action == UP || action == DOWN
-                || action == UPGRADE || action == TAKE || action == DOWNGRADE;
+                || action == UPGRADE || action == TAKE || action == DOWNGRADE
+                || action == OPS_UPGRADE || action == OPS_DOWNGRADE;
     }
 
     static boolean awayUnit(ServerPlayer player, Swarm swarm, int unit) {
@@ -174,6 +179,8 @@ public final class HangarOps {
                 case UPGRADE -> upgrade(player, swarm, index);
                 case TAKE -> take(player, swarm, index);
                 case DOWNGRADE -> downgrade(player, swarm, index);
+                case OPS_UPGRADE -> upgradeOps(player, swarm, index);
+                case OPS_DOWNGRADE -> downgradeOps(player, swarm, index);
                 default -> swarm;
             };
         } finally {
@@ -729,6 +736,115 @@ public final class HangarOps {
         refundInstalled(player, tier);
         Messages.actionBar(player, "message.wrights.upgrade_done", Component.translatable(WrightTier.nameKey(nextTier)));
         return swarm.withSpeed(index, nextTier);
+    }
+
+    private static Swarm upgradeOps(ServerPlayer player, Swarm swarm, int index) {
+        if (index < 0 || index >= swarm.units().size()) {
+            return swarm;
+        }
+        int tier = WrightTier.clamp(swarm.units().get(index).power());
+        if (tier >= WrightTier.NETHERITE) {
+            Messages.actionBar(player, "message.wrights.ops_max");
+            return swarm;
+        }
+        int nextTier = tier + 1;
+        Item upgrade = WrightTier.operationItem(nextTier);
+        if (upgrade == null) {
+            Messages.actionBar(player, "message.wrights.ops_need", Component.translatable(WrightTier.nameKey(nextTier)));
+            return swarm;
+        }
+        ItemSource.Take taken = takeUpgrade(player, upgrade, 1);
+        if (taken.result() == ItemSource.Result.CRAFTING) {
+            Messages.actionBar(player, "message.wrights.digital_crafted", Math.max(1, taken.crafted()), new ItemStack(upgrade).getHoverName());
+            return swarm;
+        }
+        if (taken.result() != ItemSource.Result.OK) {
+            if (!DigitalNetworks.craftFailureExplained()) {
+                Messages.actionBar(player, "message.wrights.ops_need", Component.translatable(WrightTier.nameKey(nextTier)));
+            }
+            return swarm;
+        }
+        refundOps(player, tier);
+        Messages.actionBar(player, "message.wrights.ops_done", Component.translatable(WrightTier.nameKey(nextTier)));
+        return swarm.withPower(index, nextTier);
+    }
+
+    private static Swarm downgradeOps(ServerPlayer player, Swarm swarm, int index) {
+        if (index < 0 || index >= swarm.units().size()) {
+            return swarm;
+        }
+        int tier = WrightTier.clamp(swarm.units().get(index).power());
+        if (tier <= WrightTier.BASE) {
+            Messages.actionBar(player, "message.wrights.ops_basic");
+            return swarm;
+        }
+        refundOps(player, tier);
+        Messages.actionBar(player, "message.wrights.ops_down", Component.translatable(WrightTier.nameKey(tier)));
+        return swarm.withPower(index, tier - 1);
+    }
+
+    private static Swarm moveMarkedOps(ServerPlayer player, Swarm swarm, int[] units, int target) {
+        int[] picked = unique(swarm, units);
+        if (picked.length == 0) {
+            return swarm;
+        }
+        target = WrightTier.clamp(target);
+        Swarm next = swarm;
+        int moved = 0;
+        for (int index : picked) {
+            int tier = WrightTier.clamp(next.units().get(index).power());
+            if (tier == target) {
+                continue;
+            }
+            Swarm changed = applyOps(player, next, index, tier, target);
+            if (changed == next) {
+                continue;
+            }
+            next = changed;
+            moved++;
+        }
+        if (moved == 0) {
+            Messages.actionBar(player, "message.wrights.ops_same", Component.translatable(WrightTier.nameKey(target)));
+            return swarm;
+        }
+        Messages.actionBar(player, "message.wrights.ops_done", Component.translatable(WrightTier.nameKey(target)));
+        return next;
+    }
+
+    /** Spends only the destination operations item. Lower steps are not required. */
+    private static Swarm applyOps(ServerPlayer player, Swarm swarm, int index, int tier, int target) {
+        if (target > tier) {
+            Item upgrade = WrightTier.operationItem(target);
+            if (upgrade == null || !canAffordOps(player, target)) {
+                if (upgrade != null && orderCraft(player, upgrade, 1)) {
+                    Messages.actionBar(player, "message.wrights.digital_crafting");
+                } else if (!DigitalNetworks.craftFailureExplained()) {
+                    Messages.actionBar(player, "message.wrights.ops_need", Component.translatable(WrightTier.nameKey(target)));
+                }
+                return swarm;
+            }
+            if (takeUpgrade(player, upgrade, 1).result() != ItemSource.Result.OK) {
+                return swarm;
+            }
+            refundOps(player, tier);
+        } else {
+            for (int step = tier; step > target; step--) {
+                refundOps(player, step);
+            }
+        }
+        return swarm.withPower(index, target);
+    }
+
+    private static boolean canAffordOps(ServerPlayer player, int target) {
+        Item upgrade = WrightTier.operationItem(target);
+        return upgrade == null || afford(player, upgrade, 1);
+    }
+
+    private static void refundOps(ServerPlayer player, int tier) {
+        Item previous = WrightTier.operationItem(tier);
+        if (previous != null) {
+            giveStack(player, new ItemStack(previous));
+        }
     }
 
     static Swarm rename(ServerPlayer player, Swarm swarm, int index, String name) {

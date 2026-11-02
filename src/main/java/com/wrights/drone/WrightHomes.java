@@ -492,6 +492,54 @@ public final class WrightHomes {
         return count;
     }
 
+    /** Highest operations tier among units that pass {@code include}. Netherite when none are visible. */
+    public static int bestOps(Player player, Predicate<UUID> include) {
+        int best = -1;
+        if (player == null) {
+            return WrightTier.NETHERITE;
+        }
+        for (Swarm.Unit unit : Wrightports.swarm(player).units()) {
+            if (include.test(unit.id())) {
+                best = Math.max(best, WrightTier.clamp(unit.power()));
+            }
+        }
+        Level level = player.level();
+        BlockPos center = player.blockPosition();
+        int minX = center.getX() - BLOCK_RANGE;
+        int maxX = center.getX() + BLOCK_RANGE;
+        int minY = center.getY() - 8;
+        int maxY = center.getY() + 8;
+        int minZ = center.getZ() - BLOCK_RANGE;
+        int maxZ = center.getZ() + BLOCK_RANGE;
+        int minChunkX = SectionPos.blockToSectionCoord(minX);
+        int maxChunkX = SectionPos.blockToSectionCoord(maxX);
+        int minChunkZ = SectionPos.blockToSectionCoord(minZ);
+        int maxChunkZ = SectionPos.blockToSectionCoord(maxZ);
+        for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+            for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
+                if (!level.hasChunk(chunkX, chunkZ)) {
+                    continue;
+                }
+                LevelChunk chunk = level.getChunk(chunkX, chunkZ);
+                for (BlockEntity entity : chunk.getBlockEntities().values()) {
+                    if (!(entity instanceof WrightportBlockEntity port) || !ownedBy(port, player)) {
+                        continue;
+                    }
+                    BlockPos pos = entity.getBlockPos();
+                    if (pos.getX() < minX || pos.getX() > maxX || pos.getY() < minY || pos.getY() > maxY || pos.getZ() < minZ || pos.getZ() > maxZ) {
+                        continue;
+                    }
+                    for (Swarm.Unit unit : port.swarm().units()) {
+                        if (include.test(unit.id())) {
+                            best = Math.max(best, WrightTier.clamp(unit.power()));
+                        }
+                    }
+                }
+            }
+        }
+        return best < 0 ? WrightTier.NETHERITE : best;
+    }
+
     public static List<FreeWright> freeNear(ServerPlayer player, Predicate<UUID> free, int limit) {
         List<FreeWright> out = new ArrayList<>();
         if (limit <= 0) {

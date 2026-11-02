@@ -18,6 +18,11 @@ public final class DigitalCatalog {
                 ModItems.UPGRADE_IRON.get(),
                 ModItems.UPGRADE_GOLD.get(),
                 ModItems.UPGRADE_DIAMOND.get(),
-                ModItems.UPGRADE_NETHERITE.get());
+                ModItems.UPGRADE_NETHERITE.get(),
+                ModItems.OPS_COPPER.get(),
+                ModItems.OPS_IRON.get(),
+                ModItems.OPS_GOLD.get(),
+                ModItems.OPS_DIAMOND.get(),
+                ModItems.OPS_NETHERITE.get());
     }
 }

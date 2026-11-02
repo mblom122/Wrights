@@ -453,6 +453,9 @@ public final class BuildJob {
             if (scan) {
                 hand.cursor = 0;
                 hand.rescan = true;
+                hand.shareFrom = -1;
+                hand.shareTo = -1;
+                hand.shareRemain = 0;
             }
             next.add(hand);
         }
@@ -476,6 +479,9 @@ public final class BuildJob {
             hand.lastPos = null;
             hand.rescan = false;
             hand.idle = false;
+            hand.shareFrom = -1;
+            hand.shareTo = -1;
+            hand.shareRemain = 0;
             for (Slice slice : hand.slices) {
                 slice.cursor = 0;
                 slice.probe = 0;
@@ -1253,8 +1259,12 @@ public final class BuildJob {
                 handTag.putInt("lane", hand.lane);
                 handTag.putInt("lanes", hand.lanes);
                 handTag.putInt("speed", hand.speed);
+                handTag.putInt("ops", hand.ops);
                 handTag.putInt("placeCredit", hand.placeCredit);
                 handTag.putInt("cursor", hand.cursor);
+                handTag.putInt("shareFrom", hand.shareFrom);
+                handTag.putInt("shareTo", hand.shareTo);
+                handTag.putInt("shareRemain", hand.shareRemain);
                 handTag.putBoolean("rescan", hand.rescan);
                 handTag.putBoolean("idle", hand.idle);
                 if (!hand.slices.isEmpty()) {
@@ -1459,8 +1469,12 @@ public final class BuildJob {
                 hand.lane = handTag.getInt("lane");
                 hand.lanes = handTag.getInt("lanes");
                 hand.speed = handTag.getInt("speed");
+                hand.ops = handTag.contains("ops") ? handTag.getInt("ops") : hand.speed;
                 hand.placeCredit = handTag.getInt("placeCredit");
                 hand.cursor = handTag.getInt("cursor");
+                hand.shareFrom = handTag.contains("shareFrom") ? handTag.getInt("shareFrom") : -1;
+                hand.shareTo = handTag.contains("shareTo") ? handTag.getInt("shareTo") : -1;
+                hand.shareRemain = Math.max(0, handTag.getInt("shareRemain"));
                 hand.rescan = handTag.getBoolean("rescan");
                 hand.idle = handTag.getBoolean("idle");
                 ListTag slices = handTag.getList("slices", Tag.TAG_COMPOUND);
@@ -1625,6 +1639,17 @@ public final class BuildJob {
         public int lane;
         public int lanes;
         public int speed = 1;
+        /** Operations tier for place/mine reach. Separate from {@link #speed} flight. */
+        public int ops;
+        /**
+         * Shape/Exchange ownership along the long box axis, in local blocks
+         * {@code [shareFrom, shareTo)}. {@code -1} until the crew assigns shares.
+         * Finished hands may claim half of the busiest peer's range.
+         */
+        public int shareFrom = -1;
+        public int shareTo = -1;
+        /** Rough unresolved cells left in this share; used to pick who to join. */
+        public int shareRemain;
         /** Leftover eighths of a block, so a fractional place rate stays exact across ticks. */
         public int placeCredit;
         public int cursor;

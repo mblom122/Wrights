@@ -37,6 +37,17 @@ public final class ModItems {
     public static final DeferredItem<WrightUpgradeItem> UPGRADE_NETHERITE = ITEMS.register("wright_upgrade_netherite",
             () -> new WrightUpgradeItem(new net.minecraft.world.item.Item.Properties().stacksTo(64).rarity(Rarity.UNCOMMON), WrightTier.NETHERITE));
 
+    public static final DeferredItem<WrightUpgradeItem> OPS_COPPER = ITEMS.register("wright_ops_copper",
+            () -> new WrightUpgradeItem(new net.minecraft.world.item.Item.Properties().stacksTo(64), WrightTier.COPPER, true));
+    public static final DeferredItem<WrightUpgradeItem> OPS_IRON = ITEMS.register("wright_ops_iron",
+            () -> new WrightUpgradeItem(new net.minecraft.world.item.Item.Properties().stacksTo(64), WrightTier.IRON, true));
+    public static final DeferredItem<WrightUpgradeItem> OPS_GOLD = ITEMS.register("wright_ops_gold",
+            () -> new WrightUpgradeItem(new net.minecraft.world.item.Item.Properties().stacksTo(64), WrightTier.GOLD, true));
+    public static final DeferredItem<WrightUpgradeItem> OPS_DIAMOND = ITEMS.register("wright_ops_diamond",
+            () -> new WrightUpgradeItem(new net.minecraft.world.item.Item.Properties().stacksTo(64), WrightTier.DIAMOND, true));
+    public static final DeferredItem<WrightUpgradeItem> OPS_NETHERITE = ITEMS.register("wright_ops_netherite",
+            () -> new WrightUpgradeItem(new net.minecraft.world.item.Item.Properties().stacksTo(64).rarity(Rarity.UNCOMMON), WrightTier.NETHERITE, true));
+
     private ModItems() {
     }
 }

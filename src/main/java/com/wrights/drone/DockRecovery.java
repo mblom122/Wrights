@@ -42,16 +42,25 @@ public final class DockRecovery {
      */
     @Nullable
     public static BlockPos recover(ServerLevel level, ServerPlayer player, BlockPos where, @Nullable UUID unitId, int tier, @Nullable String name) {
+        return recover(level, player, where, unitId, tier, tier, name);
+    }
+
+    /**
+     * Saves one wright. {@code power} is its operations tier. Older callers that only know speed
+     * pass that tier again so a wright in flight before the split keeps its reach.
+     */
+    @Nullable
+    public static BlockPos recover(ServerLevel level, ServerPlayer player, BlockPos where, @Nullable UUID unitId, int tier, int power, @Nullable String name) {
         if (level == null || where == null) {
             return null;
         }
-        if (redock(level, player, where, unitId, tier, name)) {
+        if (redock(level, player, where, unitId, tier, power, name)) {
             notice(player, level, null, where, Where.DOCK);
             return where;
         }
         UUID owner = player == null ? null : player.getUUID();
         BlockPos other = WrightHomes.openPort(level, where, owner, null);
-        if (other != null && !other.equals(where) && redock(level, player, other, unitId, tier, name)) {
+        if (other != null && !other.equals(where) && redock(level, player, other, unitId, tier, power, name)) {
             notice(player, level, null, other, Where.DOCK);
             return other;
         }
@@ -66,7 +75,7 @@ public final class DockRecovery {
         return null;
     }
 
-    private static boolean redock(ServerLevel level, ServerPlayer player, BlockPos where, @Nullable UUID unitId, int tier, @Nullable String name) {
+    private static boolean redock(ServerLevel level, ServerPlayer player, BlockPos where, @Nullable UUID unitId, int tier, int power, @Nullable String name) {
         if (!level.isLoaded(where)) {
             return false;
         }

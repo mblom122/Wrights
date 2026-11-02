@@ -255,6 +255,34 @@ public final class WrightsConfig {
             .comment("Binding a digital storage network.")
             .define("link", true);
 
+    public static final ModConfigSpec.BooleanValue ENERGY = BUILDER
+            .comment("Placed and worn wrightports spend Forge Energy for each block a wright places, swaps, mines, or voids.")
+            .define("energy", true);
+    public static final ModConfigSpec.IntValue PORT_ENERGY = BUILDER
+            .comment("Forge Energy buffer on a placed wrightport. A port that has never stored energy starts full, once.")
+            .defineInRange("portEnergy", 1_000_000, 1_000, 1_000_000_000);
+    public static final ModConfigSpec.IntValue PORT_ENERGY_TRANSFER = BUILDER
+            .comment("Forge Energy a placed wrightport can accept or emit per transfer, for cables and batteries.")
+            .defineInRange("portEnergyTransfer", 10_000, 1, 1_000_000_000);
+    public static final ModConfigSpec.IntValue PERSONAL_ENERGY_RATE = BUILDER
+            .comment("Forge Energy one personal-port block may pull from inventory energy items.")
+            .defineInRange("personalEnergyRate", 10_000, 1, 1_000_000_000);
+    public static final ModConfigSpec.IntValue ENERGY_PLACE = BUILDER
+            .comment("Forge Energy to place one block.")
+            .defineInRange("energyPlace", 75, 0, 1_000_000);
+    public static final ModConfigSpec.IntValue ENERGY_MIRROR_PLACE = BUILDER
+            .comment("Forge Energy to place one mirrored copy.")
+            .defineInRange("energyMirrorPlace", 100, 0, 1_000_000);
+    public static final ModConfigSpec.IntValue ENERGY_EXCHANGE = BUILDER
+            .comment("Forge Energy to exchange one block.")
+            .defineInRange("energyExchange", 150, 0, 1_000_000);
+    public static final ModConfigSpec.IntValue ENERGY_MINE = BUILDER
+            .comment("Forge Energy to mine one block.")
+            .defineInRange("energyMine", 125, 0, 1_000_000);
+    public static final ModConfigSpec.IntValue ENERGY_VOID = BUILDER
+            .comment("Forge Energy to void one block. Added on top of a place when the cell is cleared first.")
+            .defineInRange("energyVoid", 250, 0, 1_000_000);
+
     static {
         BUILDER.pop();
     }
@@ -308,32 +336,38 @@ public final class WrightsConfig {
     }
 
     /**
-     * Euclidean place reach in blocks (matches JobManager multi-place {@code PLACE_NEAR_SQR = 9}).
-     * Same for every tier — upgrades change place rate, not reach.
+     * Longest straight run one Netherite operation covers: the occupied cell and one step each way.
+     * Corners of the 3×3×3 are outside the sphere, so a line is 3, not 7.
      */
-    public static final int PLACE_REACH = 3;
+    public static final int PLACE_REACH = 1;
 
-    /** Cells along a straight line one hover can cover ({@code 2 * PLACE_REACH + 1} = 7). */
+    /** Cells along a straight line one hover can cover at this operations tier. Basic is 1; every other tier is 3. */
+    public static int placeAoeLine(int ops) {
+        return WrightTier.clamp(ops) <= WrightTier.BASE ? 1 : 3;
+    }
+
     public static int placeAoeLine() {
-        return 2 * PLACE_REACH + 1;
+        return placeAoeLine(WrightTier.NETHERITE);
     }
 
     /**
-     * Blocks one top-tier wright clears in one hover/op for this footprint: min of Netherite
-     * place burst and what place-reach can actually touch (line 7, plate burst-capped, blob burst).
+     * Blocks one operation of {@code ops} can clear in one hover for this footprint.
+     * A beam is limited to the line length (3 at Copper and above). A plate uses the tier cap inside the sphere.
      */
-    public static int placeAoeCapacity(int sizeX, int sizeY, int sizeZ) {
-        int burst = Math.max(1, WrightTier.placeEighths(WrightTier.NETHERITE) / 8);
+    public static int placeAoeCapacity(int sizeX, int sizeY, int sizeZ, int ops) {
+        int burst = Math.max(1, WrightTier.operationCap(ops));
         int sx = Math.max(1, sizeX);
         int sy = Math.max(1, sizeY);
         int sz = Math.max(1, sizeZ);
         int ones = (sx == 1 ? 1 : 0) + (sy == 1 ? 1 : 0) + (sz == 1 ? 1 : 0);
         if (ones >= 2) {
-            // Beam / pillar: reach along the length only.
-            return Math.min(burst, placeAoeLine());
+            return Math.min(burst, placeAoeLine(ops));
         }
-        // Plate or volume: burst is the usual limit inside the reach ball.
         return burst;
+    }
+
+    public static int placeAoeCapacity(int sizeX, int sizeY, int sizeZ) {
+        return placeAoeCapacity(sizeX, sizeY, sizeZ, WrightTier.NETHERITE);
     }
 
     /**
@@ -342,10 +376,14 @@ public final class WrightsConfig {
      * {@code shareBlocks} is this wright's slice when known (else pass the full job size).
      */
     public static boolean optimizePlaceRoute(int blocks, int sizeX, int sizeY, int sizeZ, int wrights, int shareBlocks) {
+        return optimizePlaceRoute(blocks, sizeX, sizeY, sizeZ, wrights, shareBlocks, WrightTier.NETHERITE);
+    }
+
+    public static boolean optimizePlaceRoute(int blocks, int sizeX, int sizeY, int sizeZ, int wrights, int shareBlocks, int ops) {
         if (blocks <= 0) {
             return false;
         }
-        int aoe = Math.max(1, placeAoeCapacity(sizeX, sizeY, sizeZ));
+        int aoe = Math.max(1, placeAoeCapacity(sizeX, sizeY, sizeZ, ops));
         int crew = Math.max(1, wrights);
         int share = shareBlocks > 0 ? shareBlocks : blocks;
         // Own strip fits in ~2 hovers, or the whole job fits in ~2 crew-wide AOE waves.
@@ -354,29 +392,44 @@ public final class WrightsConfig {
     }
 
     /**
-     * How many wrights can usefully work this job in parallel. Not 1:1 with blocks —
-     * sized by place-AOE stations: {@code ceil(blocks / aoe)} and how many non-overlapping
-     * reach spans fit in the box (1×9 beam → 2). Caps by horizontal columns and block count.
+     * How many wrights can usefully work this job in parallel. Sized by operations stations.
+     * At Netherite a 1×9 beam is three stations (3+3+3). Basic covers only the cell it occupies.
      */
     public static int usefulCrewFor(int blocks, int sizeX, int sizeY, int sizeZ) {
+        return usefulCrewFor(blocks, sizeX, sizeY, sizeZ, WrightTier.NETHERITE);
+    }
+
+    public static int usefulCrewFor(int blocks, int sizeX, int sizeY, int sizeZ, int ops) {
         if (blocks <= 0) {
             return 0;
         }
-        // Huge Shape AABBs (or Integer.MAX_VALUE placeholders) must not overflow int math to 1.
         long safeBlocks = Math.max(1L, blocks);
         int sx = Math.max(1, sizeX);
         int sy = Math.max(1, sizeY);
         int sz = Math.max(1, sizeZ);
-        int station = placeAoeLine();
+        int station = placeAoeLine(ops);
         int nx = (sx + station - 1) / station;
         int ny = (sy + station - 1) / station;
         int nz = (sz + station - 1) / station;
         int stations = Math.max(1, nx * ny * nz);
-        // Spatial stations only: a 5×5 circle fits one hover (stations=1) even if AABB/aoe
-        // math would ask for three. Thin beams still get ceil(length/7).
         int columns = Math.max(1, Math.max(sx, sz));
         int blockCap = (int) Math.min(Integer.MAX_VALUE, safeBlocks);
         return Math.max(1, Math.min(blockCap, Math.min(stations, columns)));
+    }
+
+    /** Forge Energy for the next block. Voiding before a place adds the void cost. Mining-void is void alone. */
+    public static int energyCost(com.wrights.job.BuildJob job, boolean voided, boolean mirrorPlace) {
+        if (job == null || !ENERGY.get()) {
+            return 0;
+        }
+        if (job.mining()) {
+            return job.mineVoid() ? ENERGY_VOID.get() : ENERGY_MINE.get();
+        }
+        if (job.exchangeJob()) {
+            return ENERGY_EXCHANGE.get();
+        }
+        int place = mirrorPlace ? ENERGY_MIRROR_PLACE.get() : ENERGY_PLACE.get();
+        return voided ? place + ENERGY_VOID.get() : place;
     }
 
     public static int maxWrightsCarried() {

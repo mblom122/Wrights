@@ -10,9 +10,8 @@ import com.wrights.item.ModItems;
  * be applied directly with that tier's upgrade item; intermediate steps are not
  * required.
  *
- * <p>Each tier has one Speed score (shown in tooltips). Place rate and near-work
- * flight scale with that score from Basic (200) up to Netherite (1200), matching
- * the rounded Scheme B endpoints.
+ * <p>Speed (Basic 200 through Netherite 1200) only changes flight. How many blocks
+ * one operation can touch is a separate tier, {@link #operationCap(int)}.
  */
 public final class WrightTier {
     public static final int BASE = 0;
@@ -34,10 +33,7 @@ public final class WrightTier {
         return Mth.clamp(tier, BASE, Swarm.MAX_SPEED);
     }
 
-    /**
-     * Single speed score for this tier (Basic 200 … Netherite 1200). Tooltips and
-     * place/fly both use this.
-     */
+    /** Flight score for this tier (Basic 200 … Netherite 1200). Placing does not use it. */
     public static int speed(int tier) {
         return switch (clamp(tier)) {
             case COPPER -> 300;
@@ -82,14 +78,48 @@ public final class WrightTier {
     }
 
     /**
-     * Eighths of a block this tier adds each tick. Basic places one block every
-     * other tick (4 eighths). Scales with {@link #speed(int)} so Netherite reaches
-     * 12.5 blocks/tick (100 eighths).
+     * Old place-rate eighths. Kept so older call sites still compile. New placing uses
+     * {@link #operationCap(int)} and does not read speed.
      */
     public static int placeEighths(int tier) {
         int score = speed(tier);
-        // 200 → 4, 1200 → 100
         return 4 + (100 - 4) * (score - SPEED_BASE) / (SPEED_NETHERITE - SPEED_BASE);
+    }
+
+    /** Blocks one operation may touch. Basic is the occupied cell; Netherite is the full 19-block sphere. */
+    public static int operationCap(int tier) {
+        return switch (clamp(tier)) {
+            case BASE -> 1;
+            case COPPER -> 3;
+            case IRON -> 7;
+            case GOLD -> 11;
+            case DIAMOND -> 15;
+            default -> 19;
+        };
+    }
+
+    /**
+     * Squared block distance from the cell the wright occupies. 0 is that cell, 1 is its six faces,
+     * 2 is the 3×3×3 cube without the eight corners (19 cells). A cell two steps away on a line is 4, outside.
+     */
+    public static int operationReachSqr(int tier) {
+        int mark = clamp(tier);
+        if (mark <= BASE) {
+            return 0;
+        }
+        return mark <= IRON ? 1 : 2;
+    }
+
+    /** Item that sets operations to this tier. Basic has none. */
+    public static Item operationItem(int tier) {
+        return switch (clamp(tier)) {
+            case COPPER -> ModItems.OPS_COPPER.get();
+            case IRON -> ModItems.OPS_IRON.get();
+            case GOLD -> ModItems.OPS_GOLD.get();
+            case DIAMOND -> ModItems.OPS_DIAMOND.get();
+            case NETHERITE -> ModItems.OPS_NETHERITE.get();
+            default -> null;
+        };
     }
 
     /** Flight step in blocks per tick while the wright is within eight blocks of its work. */

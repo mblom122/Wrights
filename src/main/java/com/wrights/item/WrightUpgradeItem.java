@@ -12,10 +12,16 @@ import com.wrights.drone.WrightTier;
 
 public class WrightUpgradeItem extends Item {
     private final int tier;
+    private final boolean operations;
 
     public WrightUpgradeItem(Properties properties, int tier) {
+        this(properties, tier, false);
+    }
+
+    public WrightUpgradeItem(Properties properties, int tier, boolean operations) {
         super(properties);
         this.tier = tier;
+        this.operations = operations;
     }
 
     public int tier() {
@@ -29,6 +35,22 @@ public class WrightUpgradeItem extends Item {
 
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
+        if (operations) {
+            int blocks = WrightTier.operationCap(tier);
+            String reach = switch (WrightTier.operationReachSqr(tier)) {
+                case 0 -> "item.wrights.wright_ops.cell";
+                case 1 -> "item.wrights.wright_ops.faces";
+                default -> "item.wrights.wright_ops.sphere";
+            };
+            tooltip.add(Component.translatable("item.wrights.wright_ops.blocks", blocks)
+                    .withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.translatable(reach).withStyle(ChatFormatting.DARK_GRAY));
+            tooltip.add(Component.translatable(
+                            "item.wrights.wright_ops.hint",
+                            Component.translatable(WrightTier.nameKey(tier)))
+                    .withStyle(ChatFormatting.DARK_GRAY));
+            return;
+        }
         int score = WrightTier.speed(tier);
         int bonus = WrightTier.speedBonusPercent(tier);
         tooltip.add(Component.translatable("item.wrights.wright_upgrade.speed", score, bonus)

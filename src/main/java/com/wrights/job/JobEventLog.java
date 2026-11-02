@@ -33,6 +33,8 @@ public final class JobEventLog {
     public static final int REMOVED = 11;
     public static final int COPY_DONE = 12;
     public static final int UNDOING = 13;
+    /** A wright finished its share and took half of a busier share on the same job. */
+    public static final int SHARE_SPLIT = 14;
 
     private static final int MAX_EVENTS = 80;
 

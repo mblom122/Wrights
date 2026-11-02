@@ -245,13 +245,14 @@ public class JobHistoryScreen extends Screen {
             case JobEventLog.REMOVED -> "history.wrights.removed_title";
             case JobEventLog.COPY_DONE -> "history.wrights.copy_done";
             case JobEventLog.UNDOING -> "history.wrights.undoing_title";
+            case JobEventLog.SHARE_SPLIT -> "history.wrights.share_split_title";
             default -> "history.wrights.event";
         });
     }
 
     private static int kindColor(int kind) {
         return switch (kind) {
-            case JobEventLog.COMPLETED, JobEventLog.COPY_DONE, JobEventLog.REJOINED, JobEventLog.RESUMED, JobEventLog.LAUNCHED -> WrightsUi.GREEN;
+            case JobEventLog.COMPLETED, JobEventLog.COPY_DONE, JobEventLog.REJOINED, JobEventLog.RESUMED, JobEventLog.LAUNCHED, JobEventLog.SHARE_SPLIT -> WrightsUi.GREEN;
             case JobEventLog.STOPPED, JobEventLog.OUT_OF_RANGE, JobEventLog.WRONG_DIMENSION, JobEventLog.REMOVED -> WrightsUi.RED;
             case JobEventLog.STALLED_ITEMS, JobEventLog.PAUSED, JobEventLog.QUEUED, JobEventLog.UNDOING -> WrightsUi.COPPER;
             default -> WrightsUi.MUTED;

@@ -127,7 +127,7 @@ public class DroneEntity extends Entity {
         this.stranded = false;
         ServerPlayer player = this.ownerId == null ? null : server.getServer().getPlayerList().getPlayer(this.ownerId);
         BlockPos where = this.homePort != null ? this.homePort : this.blockPosition();
-        BlockPos docked = com.wrights.drone.DockRecovery.recover(server, player, where, this.unitId, this.tier(), this.unitName);
+        BlockPos docked = com.wrights.drone.DockRecovery.recover(server, player, where, this.unitId, this.tier(), this.ops(), this.unitName);
         if (this.unitId == null) {
             return;
         }
@@ -455,6 +455,22 @@ public class DroneEntity extends Entity {
         this.entityData.set(TIER, com.wrights.drone.WrightTier.clamp(tier));
     }
 
+    /** Operations tier carried only so a lost dock can restore it. -1 means "use the speed tier" (old flights). */
+    private int ops = -1;
+
+    public int ops() {
+        return this.ops < 0 ? tier() : com.wrights.drone.WrightTier.clamp(this.ops);
+    }
+
+    public void setOps(int ops) {
+        this.ops = com.wrights.drone.WrightTier.clamp(ops);
+    }
+
+    /** Operations reach tier. Matches flight tier until ops are stored on the flyer. */
+    public int ops() {
+        return tier();
+    }
+
     public Optional<UUID> jobId() {
         String raw = this.entityData.get(JOB_ID);
         if (raw == null || raw.isEmpty()) {
@@ -595,6 +611,9 @@ public class DroneEntity extends Entity {
         if (tag.contains("Tier")) {
             setTier(tag.getInt("Tier"));
         }
+        if (tag.contains("Ops")) {
+            setOps(tag.getInt("Ops"));
+        }
         setReturning(tag.getBoolean("Returning"));
         if (tag.hasUUID("Owner")) {
             this.ownerId = tag.getUUID("Owner");
@@ -619,6 +638,9 @@ public class DroneEntity extends Entity {
     protected void addAdditionalSaveData(CompoundTag tag) {
         jobId().ifPresent(id -> tag.putUUID("JobId", id));
         tag.putInt("Tier", tier());
+        if (this.ops >= 0) {
+            tag.putInt("Ops", this.ops);
+        }
         tag.putBoolean("Returning", returning());
         if (this.ownerId != null) {
             tag.putUUID("Owner", this.ownerId);
@@ -643,7 +665,7 @@ public class DroneEntity extends Entity {
     private void finishReturn(ServerLevel level, ServerPlayer player, BlockPos where) {
         if (this.stranded) {
             this.stranded = false;
-            BlockPos docked = com.wrights.drone.DockRecovery.recover(level, player, where, this.unitId, this.tier(), this.unitName);
+            BlockPos docked = com.wrights.drone.DockRecovery.recover(level, player, where, this.unitId, this.tier(), this.ops(), this.unitName);
             if (this.unitId != null) {
                 if (docked != null) {
                     com.wrights.job.JobManager.noteDocked(level.getServer(), this.unitId, docked);
