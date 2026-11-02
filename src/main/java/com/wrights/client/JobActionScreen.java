@@ -1,5 +1,6 @@
 package com.wrights.client;
 
+import java.util.List;
 import java.util.UUID;
 
 import net.minecraft.client.gui.GuiGraphics;
@@ -7,15 +8,22 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.network.PacketDistributor;
 
+import com.wrights.drone.Swarm;
+import com.wrights.drone.Wrightports;
 import com.wrights.network.BlueprintPayloads;
 
 public class JobActionScreen extends Screen {
+    private static final int CREW_STEP = 14;
+
     private final UUID id;
     private int panelX;
     private int panelY;
     private int panelW;
     private int panelH;
     private WrightsButton paceButton;
+    private int minusX;
+    private int plusX;
+    private int stepY;
 
     public JobActionScreen(UUID id) {
         super(Component.translatable("screen.wrights.job_controls"));
@@ -77,7 +85,94 @@ public class JobActionScreen extends Screen {
         graphics.drawString(this.font, Component.translatable(status), panelX + 26, panelY + 30, statusColor, false);
         int percent = job.finished() ? 100 : WrightsClientState.percent(job);
         graphics.drawString(this.font, Component.translatable("menu.wrights.job_percent", percent, WrightsUi.count(job.done()), WrightsUi.count(job.total())), panelX + 26, panelY + 42, WrightsUi.MUTED, false);
-        graphics.drawString(this.font, Component.translatable("menu.wrights.job_drone_count", job.crew().size()), panelX + 26, panelY + 54, WrightsUi.TEXT, false);
+        Component crew = Component.translatable("menu.wrights.job_drone_count", job.crew().size());
+        graphics.drawString(this.font, crew, panelX + 26, panelY + 54, WrightsUi.TEXT, false);
+        boolean tool = requireToolSilent();
+        minusX = panelX + 26 + this.font.width(crew) + 6;
+        plusX = minusX + CREW_STEP + 2;
+        stepY = panelY + 51;
+        drawStep(graphics, mouseX, mouseY, minusX, stepY, "-", tool && !job.crew().isEmpty());
+        drawStep(graphics, mouseX, mouseY, plusX, stepY, "+", tool && firstFreeWright(job) != null);
+        if (mouseX >= minusX && mouseX < minusX + CREW_STEP && mouseY >= stepY && mouseY < stepY + CREW_STEP) {
+            graphics.renderTooltip(this.font, Component.translatable("menu.wrights.job_crew_remove"), mouseX, mouseY);
+        } else if (mouseX >= plusX && mouseX < plusX + CREW_STEP && mouseY >= stepY && mouseY < stepY + CREW_STEP) {
+            graphics.renderTooltip(this.font, Component.translatable("menu.wrights.job_crew_add"), mouseX, mouseY);
+        }
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 0) {
+            BlueprintPayloads.JobLine job = live();
+            if (job != null && !job.finished() && !job.saving()) {
+                if (mouseX >= minusX && mouseX < minusX + CREW_STEP && mouseY >= stepY && mouseY < stepY + CREW_STEP) {
+                    adjustCrew(false);
+                    return true;
+                }
+                if (mouseX >= plusX && mouseX < plusX + CREW_STEP && mouseY >= stepY && mouseY < stepY + CREW_STEP) {
+                    adjustCrew(true);
+                    return true;
+                }
+            }
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    private void drawStep(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, String label, boolean enabled) {
+        boolean hover = enabled && mouseX >= x && mouseX < x + CREW_STEP && mouseY >= y && mouseY < y + CREW_STEP;
+        WrightsUi.choice(graphics, x, y, CREW_STEP, CREW_STEP, false, hover, enabled);
+        graphics.drawString(this.font, label, x + (CREW_STEP - this.font.width(label)) / 2, y + 3, enabled ? WrightsUi.TEXT : 0xFF6E7A86, false);
+    }
+
+    private void adjustCrew(boolean add) {
+        if (!requireTool()) {
+            return;
+        }
+        BlueprintPayloads.JobLine job = live();
+        if (job == null) {
+            return;
+        }
+        UUID unit = add ? firstFreeWright(job) : lastCrewWright(job);
+        if (unit == null) {
+            if (this.minecraft != null && this.minecraft.player != null) {
+                this.minecraft.player.displayClientMessage(Component.translatable(add
+                        ? "screen.wrights.drones_none_free"
+                        : "screen.wrights.drones_none_on"), true);
+            }
+            return;
+        }
+        PacketDistributor.sendToServer(new BlueprintPayloads.SetJobDrones(id, unit, add));
+    }
+
+    private UUID firstFreeWright(BlueprintPayloads.JobLine job) {
+        if (this.minecraft == null || this.minecraft.player == null) {
+            return null;
+        }
+        Swarm swarm = Wrightports.swarm(this.minecraft.player);
+        for (Swarm.Unit unit : swarm.units()) {
+            if (job.crew().contains(unit.id()) || busyElsewhere(unit.id())) {
+                continue;
+            }
+            return unit.id();
+        }
+        return null;
+    }
+
+    private static UUID lastCrewWright(BlueprintPayloads.JobLine job) {
+        List<UUID> crew = job.crew();
+        return crew.isEmpty() ? null : crew.get(crew.size() - 1);
+    }
+
+    private boolean busyElsewhere(UUID unit) {
+        for (BlueprintPayloads.JobLine other : WrightsClientState.jobs) {
+            if (other.id().equals(id) || other.finished() || other.saving()) {
+                continue;
+            }
+            if (other.crew().contains(unit)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -111,9 +206,13 @@ public class JobActionScreen extends Screen {
         onClose();
     }
 
+    private boolean requireToolSilent() {
+        return this.minecraft != null && this.minecraft.player != null
+                && com.wrights.item.ControllerItem.isHeld(this.minecraft.player);
+    }
+
     private boolean requireTool() {
-        if (this.minecraft != null && this.minecraft.player != null
-                && com.wrights.item.ControllerItem.isHeld(this.minecraft.player)) {
+        if (requireToolSilent()) {
             return true;
         }
         if (this.minecraft != null && this.minecraft.player != null) {

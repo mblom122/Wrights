@@ -26,6 +26,7 @@ import com.wrights.block.WrightportBlockEntity;
 import com.wrights.WrightsClientConfig;
 import com.wrights.WrightsConfig;
 import com.wrights.drone.Swarm;
+import com.wrights.drone.Wrightports;
 import com.wrights.drone.WrightportPlaces;
 import com.wrights.item.WrightportBlockItem;
 import com.wrights.item.PersonalWrightportItem;
@@ -3396,6 +3397,9 @@ public class WrightsMenuScreen extends Screen {
     private static final int ACT_MARK = -2;
     private static final int ACT_MANAGE_ALL = -3;
     private static final int ACT_CLEAR_MARKS = -4;
+    private static final int ACT_CREW_MINUS = -5;
+    private static final int ACT_CREW_PLUS = -6;
+    private static final int CREW_STEP = 14;
     /** Working rows keep a crew line; finished rows skip it so action buttons fit. */
     private int workStride = JOB_BODY + JOB_CREW + JOB_BUTTON + 6;
     private int doneStride = JOB_BODY + JOB_BUTTON + 6;
@@ -3800,15 +3804,47 @@ public class WrightsMenuScreen extends Screen {
         BlockPos anchor = job.anchor();
         graphics.drawString(this.font, Component.translatable("menu.wrights.job_anchor", anchor.getX(), anchor.getY(), anchor.getZ()), x + 6, y + 37, WrightsUi.MUTED, false);
         drawProgress(graphics, x + 6, y + 48, Math.max(40, width - 12), job);
-        if (!job.finished() && !job.saving()) {
-            graphics.drawString(this.font, crewCountText(job), x + 6, y + JOB_BODY + 4, WrightsUi.MUTED, false);
-        }
         boolean tool = toolHeld();
+        if (!job.finished() && !job.saving()) {
+            drawCrewAdjust(graphics, mouseX, mouseY, x, y, job, tool);
+        }
         for (RowButton button : rowButtons(job, x, y, width)) {
             jobHits.add(new JobHit(button.x(), button.y(), button.width(), 16, job.id(), button.action()));
             drawJobButton(graphics, button.x() + button.width(), button.y(), button.key(), mouseX, mouseY, button.width(), button.border(),
                     !needsController(button.action()) || tool);
         }
+    }
+
+    /** Wrights count plus compact − / + to pull one free wright onto the job or send one home. */
+    private void drawCrewAdjust(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, BlueprintPayloads.JobLine job, boolean tool) {
+        String text = crewCountText(job);
+        int textX = x + 6;
+        int textY = y + JOB_BODY + 4;
+        graphics.drawString(this.font, text, textX, textY, WrightsUi.MUTED, false);
+        int bx = textX + this.font.width(text) + 6;
+        int by = y + JOB_BODY + 1;
+        boolean canMinus = tool && !job.crew().isEmpty();
+        boolean canPlus = tool && firstFreeWright(job) != null;
+        drawCrewStep(graphics, mouseX, mouseY, bx, by, "-", canMinus);
+        jobHits.add(new JobHit(bx, by, CREW_STEP, CREW_STEP, job.id(), ACT_CREW_MINUS));
+        drawCrewStep(graphics, mouseX, mouseY, bx + CREW_STEP + 2, by, "+", canPlus);
+        jobHits.add(new JobHit(bx + CREW_STEP + 2, by, CREW_STEP, CREW_STEP, job.id(), ACT_CREW_PLUS));
+    }
+
+    private void trackCrewAdjust(int x, int y, BlueprintPayloads.JobLine job) {
+        if (job.finished() || job.saving()) {
+            return;
+        }
+        int bx = x + 6 + this.font.width(crewCountText(job)) + 6;
+        int by = y + JOB_BODY + 1;
+        jobHits.add(new JobHit(bx, by, CREW_STEP, CREW_STEP, job.id(), ACT_CREW_MINUS));
+        jobHits.add(new JobHit(bx + CREW_STEP + 2, by, CREW_STEP, CREW_STEP, job.id(), ACT_CREW_PLUS));
+    }
+
+    private void drawCrewStep(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, String label, boolean enabled) {
+        boolean hover = enabled && mouseX >= x && mouseX < x + CREW_STEP && mouseY >= y && mouseY < y + CREW_STEP;
+        WrightsUi.choice(graphics, x, y, CREW_STEP, CREW_STEP, false, hover, enabled);
+        graphics.drawString(this.font, label, x + (CREW_STEP - this.font.width(label)) / 2, y + 3, enabled ? WrightsUi.TEXT : 0xFF6E7A86, false);
     }
 
     /** Highlight / clear-highlights are local; everything else talks to the server with the controller. */
@@ -4174,7 +4210,9 @@ public class WrightsMenuScreen extends Screen {
             int workGutter = workingJobs.size() > workRows ? 16 : 0;
             for (int row = 0; row < workRows && jobScroll + row < workingJobs.size(); row++) {
                 BlueprintPayloads.JobLine job = workingJobs.get(jobScroll + row);
-                for (RowButton button : rowButtons(job, rowX, workListY + row * workStride, jobsPanelW - 8 - workGutter)) {
+                int rowY = workListY + row * workStride;
+                trackCrewAdjust(rowX, rowY, job);
+                for (RowButton button : rowButtons(job, rowX, rowY, jobsPanelW - 8 - workGutter)) {
                     jobHits.add(new JobHit(button.x(), button.y(), button.width(), 16, job.id(), button.action()));
                 }
             }
@@ -4217,9 +4255,76 @@ public class WrightsMenuScreen extends Screen {
             }
             return true;
         }
+        if (hit.action() == ACT_CREW_PLUS || hit.action() == ACT_CREW_MINUS) {
+            adjustJobCrew(hit.jobId(), hit.action() == ACT_CREW_PLUS);
+            return true;
+        }
         UUID id = hit.jobId() == null ? new UUID(0L, 0L) : hit.jobId();
         PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(id, hit.action()));
         return true;
+    }
+
+    private void adjustJobCrew(UUID jobId, boolean add) {
+        if (jobId == null || !requireTool()) {
+            return;
+        }
+        BlueprintPayloads.JobLine job = null;
+        for (BlueprintPayloads.JobLine line : WrightsClientState.jobs) {
+            if (line.id().equals(jobId)) {
+                job = line;
+                break;
+            }
+        }
+        if (job == null || job.finished() || job.saving()) {
+            return;
+        }
+        UUID unit = add ? firstFreeWright(job) : lastCrewWright(job);
+        if (unit == null) {
+            if (this.minecraft.player != null) {
+                this.minecraft.player.displayClientMessage(Component.translatable(add
+                        ? "screen.wrights.drones_none_free"
+                        : "screen.wrights.drones_none_on"), true);
+            }
+            return;
+        }
+        PacketDistributor.sendToServer(new BlueprintPayloads.SetJobDrones(jobId, unit, add));
+    }
+
+    private UUID firstFreeWright(BlueprintPayloads.JobLine job) {
+        if (this.minecraft == null || this.minecraft.player == null) {
+            return null;
+        }
+        Swarm swarm = Wrightports.swarm(this.minecraft.player);
+        for (Swarm.Unit unit : swarm.units()) {
+            if (job.crew().contains(unit.id())) {
+                continue;
+            }
+            if (wrightBusyElsewhere(unit.id(), job.id())) {
+                continue;
+            }
+            return unit.id();
+        }
+        return null;
+    }
+
+    private static UUID lastCrewWright(BlueprintPayloads.JobLine job) {
+        List<UUID> crew = job.crew();
+        if (crew.isEmpty()) {
+            return null;
+        }
+        return crew.get(crew.size() - 1);
+    }
+
+    private static boolean wrightBusyElsewhere(UUID unit, UUID exceptJob) {
+        for (BlueprintPayloads.JobLine other : WrightsClientState.jobs) {
+            if (other.id().equals(exceptJob) || other.finished() || other.saving()) {
+                continue;
+            }
+            if (other.crew().contains(unit)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private int[] dronePool() {
