@@ -196,6 +196,8 @@ public class WrightsMenuScreen extends Screen {
     private int manageAllWidth;
     private int manageAllRight;
     private int manageAllY;
+    private int historyWidth;
+    private int historyRight;
     private boolean clearJobs;
     private int clearJobWidth;
     private int clearJobRight;
@@ -3399,6 +3401,7 @@ public class WrightsMenuScreen extends Screen {
     private static final int ACT_CLEAR_MARKS = -4;
     private static final int ACT_CREW_MINUS = -5;
     private static final int ACT_CREW_PLUS = -6;
+    private static final int ACT_HISTORY = -7;
     private static final int CREW_STEP = 14;
     /** Working rows keep a crew line; finished rows skip it so action buttons fit. */
     private int workStride = JOB_BODY + JOB_CREW + JOB_BUTTON + 6;
@@ -3516,8 +3519,10 @@ public class WrightsMenuScreen extends Screen {
         jobX = insetX + 6;
         jobW = insetW - 12;
         manageAllWidth = jobButtonWidth("menu.wrights.manage_all");
+        historyWidth = jobButtonWidth("menu.wrights.history");
         manageAllRight = jobX + jobW;
         manageAllY = jobsInsetY() + 6;
+        historyRight = manageAllRight - manageAllWidth - 4;
         jobsViewTop = jobsInsetY() + 28;
         jobsViewH = Math.max(JOB_GROUP_MIN, jobsInsetY() + jobsInsetH() - 6 - jobsViewTop);
         int gap = 8;
@@ -3573,7 +3578,7 @@ public class WrightsMenuScreen extends Screen {
         doneRemoveRight = right;
         clearJobs = !WrightsClientState.markedJobs.isEmpty() || !WrightsClientState.markedWrights.isEmpty();
         clearJobWidth = jobButtonWidth("menu.wrights.clear_highlights");
-        clearJobRight = manageAllRight - manageAllWidth - 4;
+        clearJobRight = historyRight - historyWidth - 4;
     }
 
     private int jobGroupHeight(int rows, int stride) {
@@ -3596,12 +3601,14 @@ public class WrightsMenuScreen extends Screen {
         jobHits.clear();
         prepareJobs();
         int[] pool = dronePool();
-        int reserved = manageAllWidth + 8 + (clearJobs ? clearJobWidth + 4 : 0);
+        int reserved = manageAllWidth + historyWidth + 12 + (clearJobs ? clearJobWidth + 4 : 0);
         String drones = this.font.plainSubstrByWidth(Component.translatable("menu.wrights.wrights_available", pool[0], pool[1]).getString(), Math.max(40, jobW - reserved));
         graphics.drawString(this.font, drones, jobX, manageAllY + 4, WrightsUi.TEXT, false);
         boolean tool = toolHeld();
         trackJobButton(manageAllRight, manageAllY, manageAllWidth, null, ACT_MANAGE_ALL);
         drawJobButton(graphics, manageAllRight, manageAllY, "menu.wrights.manage_all", mouseX, mouseY, manageAllWidth, 0, tool);
+        trackJobButton(historyRight, manageAllY, historyWidth, null, ACT_HISTORY);
+        drawJobButton(graphics, historyRight, manageAllY, "menu.wrights.history", mouseX, mouseY, historyWidth, 0, true);
         if (clearJobs) {
             trackJobButton(clearJobRight, manageAllY, clearJobWidth, null, ACT_CLEAR_MARKS);
             drawJobButton(graphics, clearJobRight, manageAllY, "menu.wrights.clear_highlights", mouseX, mouseY, clearJobWidth, 0xFFF2D48A, true);
@@ -3847,9 +3854,9 @@ public class WrightsMenuScreen extends Screen {
         graphics.drawString(this.font, label, x + (CREW_STEP - this.font.width(label)) / 2, y + 3, enabled ? WrightsUi.TEXT : 0xFF6E7A86, false);
     }
 
-    /** Highlight / clear-highlights are local; everything else talks to the server with the controller. */
+    /** Highlight / clear-highlights / History are local; everything else talks to the server with the controller. */
     private static boolean needsController(int action) {
-        return action != ACT_MARK && action != ACT_CLEAR_MARKS;
+        return action != ACT_MARK && action != ACT_CLEAR_MARKS && action != ACT_HISTORY;
     }
 
     private void trackJobButton(int right, int y, int width, UUID jobId, int action) {
@@ -4186,7 +4193,7 @@ public class WrightsMenuScreen extends Screen {
 
     /** Ignore buttons clipped out of the jobs scissor — their hitboxes must not swallow nearby clicks. */
     private boolean jobHitVisible(JobHit hit) {
-        if (hit.action() == ACT_MANAGE_ALL || hit.action() == ACT_CLEAR_MARKS) {
+        if (hit.action() == ACT_MANAGE_ALL || hit.action() == ACT_CLEAR_MARKS || hit.action() == ACT_HISTORY) {
             return true;
         }
         if (hit.y() + hit.h() <= jobsViewTop || hit.y() >= jobsViewTop + jobsViewH) {
@@ -4199,6 +4206,7 @@ public class WrightsMenuScreen extends Screen {
         jobHits.clear();
         prepareJobs();
         trackJobButton(manageAllRight, manageAllY, manageAllWidth, null, ACT_MANAGE_ALL);
+        trackJobButton(historyRight, manageAllY, historyWidth, null, ACT_HISTORY);
         if (clearJobs) {
             trackJobButton(clearJobRight, manageAllY, clearJobWidth, null, ACT_CLEAR_MARKS);
         }
@@ -4247,6 +4255,10 @@ public class WrightsMenuScreen extends Screen {
         }
         if (hit.action() == ACT_MANAGE_ALL) {
             this.minecraft.setScreen(new DroneRosterScreen(null));
+            return true;
+        }
+        if (hit.action() == ACT_HISTORY) {
+            this.minecraft.setScreen(new JobHistoryScreen(this));
             return true;
         }
         if (hit.action() == ACT_MANAGE) {
