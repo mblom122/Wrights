@@ -1,5 +1,6 @@
 package com.wrights.client;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import net.minecraft.ChatFormatting;
@@ -102,6 +103,9 @@ public final class WrightsHud {
             } else if (WrightsClientState.exchangeToolActive()) {
                 line = exchangeStatusLine();
                 sub = Component.translatable("hud.wrights.exchange_explain");
+                if (WrightsClientConfig.shapeMaterials().isEmpty()) {
+                    note = Component.translatable("hud.wrights.shape_pick_material");
+                }
             } else if (WrightsClientState.shapeToolActive()) {
                 line = shapeStatusLine();
                 sub = Component.translatable(shapeFooter(minecraft));
@@ -248,6 +252,9 @@ public final class WrightsHud {
         if (WrightsClientState.placeToolActive() && WrightsClientConfig.placePathStyle()) {
             drawPathModeBanner(graphics, minecraft);
         }
+        if (!showMainModes(minecraft) && !showCtrlHelp(minecraft) && !showModes(minecraft)) {
+            drawMissingSetupBanner(graphics, minecraft);
+        }
         if (showMainModes(minecraft)) {
             drawMainModes(graphics, minecraft);
         } else if (showCtrlHelp(minecraft)) {
@@ -274,6 +281,77 @@ public final class WrightsHud {
         graphics.fill(x, y, x + width, y + height, 0xC0101822);
         graphics.fill(x, y, x + 2, y + height, color);
         graphics.drawCenteredString(minecraft.font, label, graphics.guiWidth() / 2, y + 4, color);
+    }
+
+    /**
+     * Centered cue for the least required missing options (material, anchor, blueprint, …).
+     * Easy to miss in the bottom tip stack — especially when Shape/Place draws nothing without materials.
+     */
+    private static void drawMissingSetupBanner(GuiGraphics graphics, Minecraft minecraft) {
+        List<Component> lines = missingVitalOptions(minecraft);
+        if (lines.isEmpty()) {
+            return;
+        }
+        Component title = Component.translatable("hud.wrights.need_setup");
+        int color = 0xFFF0C14A;
+        int width = minecraft.font.width(title) + 20;
+        for (Component line : lines) {
+            width = Math.max(width, minecraft.font.width(line) + 20);
+        }
+        int height = 10 + (1 + lines.size()) * 12;
+        int x = (graphics.guiWidth() - width) / 2;
+        int y = graphics.guiHeight() / 2 - 28;
+        graphics.fill(x, y, x + width, y + height, 0xC0101822);
+        graphics.fill(x, y, x + 2, y + height, color);
+        int textY = y + 6;
+        graphics.drawCenteredString(minecraft.font, title, graphics.guiWidth() / 2, textY, color);
+        textY += 12;
+        for (Component line : lines) {
+            graphics.drawCenteredString(minecraft.font, line, graphics.guiWidth() / 2, textY, WrightsUi.TEXT);
+            textY += 12;
+        }
+    }
+
+    /** Short, least-required blockers for the active mode — empty when the mode can preview/act. */
+    private static List<Component> missingVitalOptions(Minecraft minecraft) {
+        List<Component> missing = new ArrayList<>(2);
+        if (WrightsClientState.mode == WrightsClientState.Mode.CAPTURE
+                && WrightsClientState.captureStyle == WrightsClientState.CaptureStyle.MOVE
+                && !WrightsClientState.hasBox()) {
+            missing.add(Component.translatable("hud.wrights.need_box"));
+            return missing;
+        }
+        if (WrightsClientState.mode != WrightsClientState.Mode.BUILD) {
+            return missing;
+        }
+        if (WrightsClientState.placeToolActive()
+                || WrightsClientState.shapeToolActive()
+                || WrightsClientState.exchangeToolActive()) {
+            if (com.wrights.blueprint.ShapeMaterials.states(WrightsClientConfig.shapeMaterials()).isEmpty()) {
+                missing.add(Component.translatable("hud.wrights.need_material"));
+            }
+            if (WrightsClientState.shapeToolActive()
+                    && WrightsConfig.allowShapeAnchor()
+                    && WrightsClientConfig.SHAPE_USE_ANCHOR.get()
+                    && minecraft.level != null
+                    && !WrightsClientConfig.shapePlaced(minecraft.level.dimension().location().toString())) {
+                missing.add(Component.translatable("hud.wrights.need_shape_anchor"));
+            }
+            return missing;
+        }
+        if (WrightsClientState.mirrorToolActive()) {
+            if (minecraft.level == null
+                    || !WrightsClientConfig.mirrorPlaced(minecraft.level.dimension().location().toString())) {
+                missing.add(Component.translatable("hud.wrights.need_mirror_anchor"));
+            } else if (!WrightsClientConfig.mirrorBlocks() && WrightsClientState.buildId == null) {
+                missing.add(Component.translatable("hud.wrights.need_blueprint"));
+            }
+            return missing;
+        }
+        if (!WrightsClientState.bindSupply && WrightsClientState.buildId == null) {
+            missing.add(Component.translatable("hud.wrights.need_blueprint"));
+        }
+        return missing;
     }
 
     private static boolean controlDown(Minecraft minecraft) {
