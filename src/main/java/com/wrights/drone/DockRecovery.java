@@ -92,7 +92,7 @@ public final class DockRecovery {
         }
         Swarm next = unitId == null
                 ? port.swarm().addUnit(tier)
-                : port.swarm().adopt(new Swarm.Unit(unitId, tier, 0, name == null ? "" : name));
+                : port.swarm().adopt(new Swarm.Unit(unitId, tier, WrightTier.clamp(power), name == null ? "" : name));
         if (next == port.swarm()) {
             return false;
         }

@@ -1786,6 +1786,7 @@ public final class JobManager {
             DroneEntity drone = ensureHand(level, player, job, hand, pos);
             if (drone != null) {
                 drone.setTier(hand.speed);
+                drone.setOps(handOps(hand));
             }
             if (drone == null) {
                 waitingChunk = true;
@@ -5176,6 +5177,7 @@ public final class JobManager {
             DroneEntity drone = ensureHand(level, player, job, hand, nextPos);
             if (drone != null) {
                 drone.setTier(hand.speed);
+                drone.setOps(handOps(hand));
             }
             if (drone == null) {
                 waitingChunk = true;
@@ -5352,6 +5354,7 @@ public final class JobManager {
             DroneEntity drone = ensureHand(level, player, job, hand, nextPos);
             if (drone != null) {
                 drone.setTier(hand.speed);
+                drone.setOps(handOps(hand));
             }
             if (drone == null) {
                 continue;
@@ -7874,6 +7877,7 @@ public final class JobManager {
     private static void paint(DroneEntity drone, BuildJob job) {
         int tier = job.hands().isEmpty() ? 1 : job.hands().get(0).speed;
         drone.setTier(tier);
+        drone.setOps(job.hands().isEmpty() ? tier : handOps(job.hands().get(0)));
     }
 
     private static DroneEntity ensureHand(ServerLevel level, ServerPlayer player, BuildJob job, BuildJob.Hand hand, BlockPos workPos) {
@@ -8048,7 +8052,7 @@ public final class JobManager {
             BlockPos where = next != null
                     ? next
                     : (drone != null ? drone.blockPosition() : (hand.lastPos != null ? hand.lastPos : job.min()));
-            BlockPos docked = DockRecovery.recover(level, player, where, id, tier, name);
+            BlockPos docked = DockRecovery.recover(level, player, where, id, tier, handOps(hand), name);
             dirty = true;
             if (docked != null) {
                 noteDocked(level.getServer(), id, docked);

@@ -466,11 +466,6 @@ public class DroneEntity extends Entity {
         this.ops = com.wrights.drone.WrightTier.clamp(ops);
     }
 
-    /** Operations reach tier. Matches flight tier until ops are stored on the flyer. */
-    public int ops() {
-        return tier();
-    }
-
     public Optional<UUID> jobId() {
         String raw = this.entityData.get(JOB_ID);
         if (raw == null || raw.isEmpty()) {
