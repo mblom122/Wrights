@@ -1786,22 +1786,18 @@ public final class JobManager {
                 hand.idle = false;
                 continue;
             }
-            // One finished wright per tick may cut a share. The rest go home instead of
-            // all standing in the build scanning for the same leftovers.
-            if (at < 0 && !splitThisTick) {
+            // A finished wright may take half of a share that is still bigger than a 3×3×3.
+            // It is already on the build, so the hop stays there. Sending it home and calling
+            // it back made the crew count bounce (1, then 4, then 10) for the whole job.
+            if (at < 0 && !splitThisTick && hand.entityId != null) {
                 splitThisTick = true;
                 if (tryRebalanceShapeShare(player, library, level, job, hand, usable, shapeKind, shapePinLocal, scanCap)) {
                     at = nextShapeIndex(level, player, job, hand, usable, shapeKind, shapePinLocal, true, scanCap);
                 }
             }
             if (at < 0) {
-                hand.idle = true;
                 hand.aim = -1;
-                // A solo wright stays with the job. Extras are not needed on a small leftover.
-                if (job.hands().size() > 1 && hand.entityId != null) {
-                    setShapeHandStatus(level, hand, null, DroneEntity.WAIT_HOME);
-                    recallHand(level, player, hand);
-                }
+                hand.idle = false;
                 continue;
             }
             if (at == NEED_ITEMS) {
