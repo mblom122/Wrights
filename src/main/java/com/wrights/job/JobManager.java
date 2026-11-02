@@ -1076,8 +1076,20 @@ public final class JobManager {
         com.wrights.blueprint.BlueprintSessions.BlueprintSession session = com.wrights.blueprint.BlueprintSessions.get(player);
         job.setSupply(session.supplyPos(), session.supplyDimension());
         job.setSupplyOrder(supplyOrder);
+        // Exchange: count real swaps before launching. Already-matching cells are not work.
+        Schematic exchangeWork = null;
+        if (exchange && player.level() instanceof ServerLevel preLevel) {
+            exchangeWork = buildExchangeSchematic(preLevel, job);
+            if (exchangeWork == null || exchangeWork.blockCount() <= 0) {
+                Component detail = Component.translatable("message.wrights.exchange_none");
+                Messages.actionBar(player, detail);
+                BlueprintNetwork.jobDone(player, Component.literal(title), detail, 0);
+                return true;
+            }
+        }
+        int workBlocks = exchangeWork != null ? Math.max(1, exchangeWork.blockCount()) : Math.max(1, job.total());
         int room = Math.min(
-                WrightsConfig.usefulCrewFor(Math.max(1, job.total()), job.boxSizeX(), job.boxSizeY(), job.boxSizeZ()),
+                WrightsConfig.usefulCrewFor(workBlocks, job.boxSizeX(), job.boxSizeY(), job.boxSizeZ()),
                 WrightsConfig.maxWrightsPerJob(job));
         int wanted = drones > 0 ? Math.min(drones, room) : room;
         wanted = Math.max(1, wanted);
@@ -1091,7 +1103,7 @@ public final class JobManager {
             job.setQueued(true);
             library.addJob(job);
             if (player.level() instanceof ServerLevel queuedLevel) {
-                attachExchangeHologram(player, library, queuedLevel, job);
+                attachExchangeHologram(player, library, queuedLevel, job, exchangeWork);
             }
             noteQueued(player, job, wanted);
             BlueprintNetwork.syncJobs(player);
@@ -1103,14 +1115,14 @@ public final class JobManager {
         library.addJob(job);
         if (job.deferSupplies()) {
             if (player.level() instanceof ServerLevel deferredLevel) {
-                attachExchangeHologram(player, library, deferredLevel, job);
+                attachExchangeHologram(player, library, deferredLevel, job, exchangeWork);
             }
             noteQueued(player, job, Math.max(1, job.crewQuota()));
             BlueprintNetwork.syncJobs(player);
             return true;
         }
         if (player.level() instanceof ServerLevel level) {
-            attachExchangeHologram(player, library, level, job);
+            attachExchangeHologram(player, library, level, job, exchangeWork);
             if (!instant(player)) {
                 if (job.hasCrew()) {
                     for (BuildJob.Hand hand : job.hands()) {
@@ -1302,10 +1314,19 @@ public final class JobManager {
      * matching cell so queued swaps stay visible until each cell is placed.
      */
     private static void attachExchangeHologram(ServerPlayer player, SchematicLibrary library, ServerLevel level, BuildJob job) {
+        attachExchangeHologram(player, library, level, job, null);
+    }
+
+    private static void attachExchangeHologram(
+            ServerPlayer player,
+            SchematicLibrary library,
+            ServerLevel level,
+            BuildJob job,
+            Schematic prepared) {
         if (player == null || library == null || level == null || job == null || !job.exchangeJob()) {
             return;
         }
-        Schematic schematic = buildExchangeSchematic(level, job);
+        Schematic schematic = prepared != null && prepared.blockCount() > 0 ? prepared : buildExchangeSchematic(level, job);
         if (schematic == null || schematic.blockCount() <= 0) {
             return;
         }
@@ -1400,6 +1421,10 @@ public final class JobManager {
             }
             BlockState state = planned.get(i);
             if (state == null || state.isAir()) {
+                continue;
+            }
+            // Already the destination — not a real swap; do not ghost or send wrights for it.
+            if (level.getBlockState(at).equals(state)) {
                 continue;
             }
             entries.add(new Schematic.Entry((short) dx, (short) dy, (short) dz, state, false));
@@ -1581,7 +1606,16 @@ public final class JobManager {
                 statusState = usable.get(0).state();
                 statusWait = DroneEntity.WAIT_ITEMS;
                 job.setWaitKind(BuildJob.WAIT_ITEMS);
+                noteHistory(player, library, job, JobEventLog.STALLED_ITEMS, Component.translatable("history.wrights.stalled_items").getString());
                 break;
+            }
+            // Exchange already matching — count it without flying out first.
+            if (job.exchangeJob() && current.equals(state)) {
+                job.advance();
+                job.shapeOrderAdvance();
+                job.skippedOne();
+                scanned++;
+                continue;
             }
             statusState = state;
             if (!fast) {
@@ -2117,10 +2151,34 @@ public final class JobManager {
             if (!exchangeMatches(level, pos, current, job.exchangeFrom())) {
                 return ShapeCell.SKIP;
             }
+            // Skip no-op swaps before a wright flies out for them.
+            if (exchangeAlreadyDestination(job, current, index)) {
+                return ShapeCell.SKIP;
+            }
         } else if (!job.voidBlocks() && !current.isAir() && !current.canBeReplaced()) {
             return ShapeCell.SKIP;
         }
         return ShapeCell.READY;
+    }
+
+    /** True when this exchange cell already holds the block we would place there. */
+    private static boolean exchangeAlreadyDestination(BuildJob job, BlockState current, int index) {
+        if (job == null || current == null || !job.exchangeJob()) {
+            return false;
+        }
+        java.util.List<com.wrights.blueprint.ShapeMaterials.Entry> usable = new java.util.ArrayList<>();
+        for (com.wrights.blueprint.ShapeMaterials.Entry entry : com.wrights.blueprint.ShapeMaterials.parse(job.shapeMaterials())) {
+            if (entry != null && entry.state() != null) {
+                usable.add(entry);
+            }
+        }
+        if (usable.isEmpty()) {
+            return false;
+        }
+        com.wrights.blueprint.ShapeMaterials.FillMode fillMode =
+                com.wrights.blueprint.ShapeMaterials.FillMode.byId(job.shapeFillMode());
+        BlockState planned = shapeStateAt(job, usable, fillMode, null, job.shapeOrderIndex(), index);
+        return planned != null && current.equals(planned);
     }
 
     private static int shapeClusterIndex(

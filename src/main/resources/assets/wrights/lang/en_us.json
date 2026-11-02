@@ -37,6 +37,7 @@
   "message.wrights.mine_none": "No mirrored blocks to mine",
   "message.wrights.all_skipped": "Nothing could be placed. Clear those blocks and run it again.",
   "message.wrights.already_built": "That build is already there.",
+  "message.wrights.exchange_none": "Nothing to exchange — those blocks are already in place.",
   "message.wrights.undo_started": "Undoing the build",
   "message.wrights.undo_progress": "Undoing %s/%s, returned %s",
   "message.wrights.undo_done": "Removed %s blocks and returned %s items",
