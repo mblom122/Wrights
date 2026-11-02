@@ -34,5 +34,36 @@ public class PersonalWrightportItem extends Item implements ICurioItem {
         Swarm swarm = Swarm.from(stack);
         tooltip.add(Component.translatable("item.wrights.personal_wrightport.drones", swarm.units().size(), Swarm.capacity()).withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("item.wrights.personal_wrightport.hint").withStyle(ChatFormatting.DARK_GRAY));
+        if (energyView != null) {
+            energyView.tooltip(tooltip);
+        }
+    }
+
+    /** Client hook for the curio slot bar and its energy numbers. The server leaves this unset. */
+    public static EnergyView energyView;
+
+    public interface EnergyView {
+        boolean visible();
+
+        int width();
+
+        int color();
+
+        void tooltip(List<Component> tooltip);
+    }
+
+    @Override
+    public boolean isBarVisible(ItemStack stack) {
+        return energyView != null && energyView.visible();
+    }
+
+    @Override
+    public int getBarWidth(ItemStack stack) {
+        return energyView == null ? 0 : energyView.width();
+    }
+
+    @Override
+    public int getBarColor(ItemStack stack) {
+        return energyView == null ? 0x3D9A62 : energyView.color();
     }
 }

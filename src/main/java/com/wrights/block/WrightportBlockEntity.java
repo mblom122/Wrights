@@ -254,7 +254,11 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
     }
 
     public int energyStored() {
-        return energy.getEnergyStored();
+        return energy.stored();
+    }
+
+    public int energyCapacity() {
+        return energy.limit();
     }
 
     public boolean consumeEnergy(int cost) {

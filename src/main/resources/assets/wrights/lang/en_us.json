@@ -275,6 +275,7 @@
   "menu.wrights.manage": "Manage",
   "menu.wrights.manage_none": "Carry a personal wrightport",
   "menu.wrights.tab_personal": "Personal Wrightport",
+  "menu.wrights.energy": "%s / %s FE",
   "menu.wrights.tab_wrightports": "Wrightports",
   "menu.wrights.placed_none": "No wrightports placed",
   "menu.wrights.placed_missing": "That wrightport is not there anymore",

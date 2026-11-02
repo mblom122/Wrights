@@ -5355,6 +5355,18 @@ public class WrightsMenuScreen extends Screen {
         return portBarY() + 20;
     }
 
+    private int personalEnergyY() {
+        return ports().size() > 1 ? portBarY() + 38 : portBarY() + 20;
+    }
+
+    private void drawPersonalEnergy(GuiGraphics graphics) {
+        if (this.minecraft == null || this.minecraft.player == null) {
+            return;
+        }
+        com.wrights.energy.CarriedEnergy.Amount amount = com.wrights.energy.CarriedEnergy.of(this.minecraft.player);
+        WrightsUi.energyBar(graphics, this.font, portBarX(), personalEnergyY(), portBarW(), amount.stored(), amount.capacity());
+    }
+
     private int placedListTop() {
         return portBarY() + 20;
     }
@@ -5394,9 +5406,10 @@ public class WrightsMenuScreen extends Screen {
         }
         if (spots.size() > 1) {
             drawPortBar(graphics, spots, spot, mouseX, mouseY);
-            if (portListOpen) {
-                drawPortList(graphics, spots, mouseX, mouseY);
-            }
+        }
+        drawPersonalEnergy(graphics);
+        if (spots.size() > 1 && portListOpen) {
+            drawPortList(graphics, spots, mouseX, mouseY);
         }
         if (manage.isOpen()) {
             manage.render(manageHost, graphics, mouseX, mouseY);
@@ -5898,11 +5911,7 @@ public class WrightsMenuScreen extends Screen {
             if (manageTab == 1) {
                 return placedListTop() + placedShown() * 18 + 6;
             }
-            int y = portBarY() + 22;
-            if (ports().size() > 1) {
-                y += 22;
-            }
-            return y;
+            return personalEnergyY() + 16;
         }
 
         @Override

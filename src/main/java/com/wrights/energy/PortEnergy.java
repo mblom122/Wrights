@@ -71,6 +71,16 @@ public final class PortEnergy {
             this.energy = Math.min(this.capacity, this.energy + amount);
         }
 
+        public int stored() {
+            refresh();
+            return this.energy;
+        }
+
+        public int limit() {
+            refresh();
+            return this.capacity;
+        }
+
         private void refresh() {
             int cap = WrightsConfig.portEnergyCapacity();
             int rate = WrightsConfig.portEnergyTransfer();

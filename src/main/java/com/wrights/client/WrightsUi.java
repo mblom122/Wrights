@@ -173,6 +173,41 @@ public final class WrightsUi {
         graphics.fill(x + width - 1, y, x + width, y + height, color);
     }
 
+    /** Filled energy track with the stored / capacity numbers drawn on it. */
+    public static void energyBar(GuiGraphics graphics, Font font, int x, int y, int width, long stored, long capacity) {
+        int height = 12;
+        if (width < 8) {
+            return;
+        }
+        long have = Math.max(0L, stored);
+        long cap = Math.max(0L, capacity);
+        graphics.fill(x, y, x + width, y + height, INSET);
+        border(graphics, x, y, width, height, 0xFF243140);
+        int inner = width - 2;
+        int fill = cap <= 0L ? 0 : (int) Math.min(inner, have * inner / cap);
+        if (fill > 0) {
+            graphics.fill(x + 1, y + 1, x + 1 + fill, y + height - 1, energyColor(have, cap));
+        }
+        String text = font.plainSubstrByWidth(
+                Component.translatable("menu.wrights.energy", count(have), count(cap)).getString(),
+                Math.max(0, width - 6));
+        graphics.drawString(font, text, x + (width - font.width(text)) / 2, y + 2, TEXT, true);
+    }
+
+    /** Green while the buffer is over half, gold under half, copper under a quarter, amber when empty. */
+    public static int energyColor(long stored, long capacity) {
+        if (capacity <= 0L || stored <= 0L) {
+            return 0xFF8C1A;
+        }
+        if (stored * 4L < capacity) {
+            return 0xFFC45A2A;
+        }
+        if (stored * 2L < capacity) {
+            return 0xFFE0B060;
+        }
+        return 0xFF3D9A62;
+    }
+
     public static void inset(GuiGraphics graphics, int x, int y, int width, int height) {
         graphics.fill(x, y, x + width, y + height, INSET);
         border(graphics, x, y, width, height, 0xFF243140);

@@ -5,6 +5,7 @@ import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.core.BlockPos;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.components.events.GuiEventListener;
@@ -25,6 +26,9 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
     private WrightsButton chestButton;
     private EditBox nameBox;
     private String sentName = "";
+    private boolean energyKnown;
+    private int energyStored;
+    private int energyCapacity;
 
     public WrightportScreen(WrightportMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
@@ -229,7 +233,7 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
 
     @Override
     public int areaY() {
-        return topPos + 42;
+        return topPos + 60;
     }
 
     @Override
@@ -239,7 +243,26 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
 
     @Override
     public int areaH() {
-        return Math.max(120, imageHeight - 46);
+        return Math.max(120, imageHeight - 64);
+    }
+
+    public void acceptEnergy(BlockPos pos, int stored, int capacity) {
+        if (pos != null && pos.equals(menu.pos())) {
+            energyKnown = true;
+            energyStored = Math.max(0, stored);
+            energyCapacity = Math.max(0, capacity);
+        }
+    }
+
+    private void drawEnergy(GuiGraphics graphics) {
+        int stored = energyStored;
+        int capacity = energyCapacity;
+        if (!energyKnown && getMinecraft().level != null
+                && getMinecraft().level.getBlockEntity(menu.pos()) instanceof WrightportBlockEntity port) {
+            stored = port.energyStored();
+            capacity = port.energyCapacity();
+        }
+        WrightsUi.energyBar(graphics, this.font, leftPos + 12, topPos + 44, Math.max(40, imageWidth - 24), stored, capacity);
     }
 
     @Override
@@ -268,6 +291,7 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         renderBg(graphics, partialTick, mouseX, mouseY);
         manage.render(this, graphics, mouseX, mouseY);
         drawOwner(graphics);
+        drawEnergy(graphics);
         placeBoundary();
         placeName();
         for (Renderable widget : this.renderables) {

@@ -111,6 +111,7 @@ public final class BlueprintNetwork {
         registrar.playToClient(BlueprintPayloads.PlacedSwarm.TYPE, BlueprintPayloads.PlacedSwarm.STREAM_CODEC, BlueprintNetwork::clientPlacedSwarm);
         registrar.playToClient(BlueprintPayloads.DeployPool.TYPE, BlueprintPayloads.DeployPool.STREAM_CODEC, BlueprintNetwork::clientDeployPool);
         registrar.playToClient(BlueprintPayloads.SupplySync.TYPE, BlueprintPayloads.SupplySync.STREAM_CODEC, BlueprintNetwork::clientSupply);
+        registrar.playToClient(PortEnergySync.TYPE, PortEnergySync.STREAM_CODEC, BlueprintNetwork::clientPortEnergy);
         registrar.playToClient(BlueprintPayloads.DigitalSync.TYPE, BlueprintPayloads.DigitalSync.STREAM_CODEC, BlueprintNetwork::clientDigital);
         registrar.playToClient(BlueprintPayloads.DigitalInfoSync.TYPE, BlueprintPayloads.DigitalInfoSync.STREAM_CODEC, BlueprintNetwork::clientDigitalInfo);
         registrar.playToClient(BlueprintPayloads.DigitalUse.TYPE, BlueprintPayloads.DigitalUse.STREAM_CODEC, BlueprintNetwork::clientDigitalUse);
@@ -657,6 +658,17 @@ public final class BlueprintNetwork {
             return;
         }
         context.enqueueWork(() -> com.wrights.client.WrightsClientState.applyWrightSpots(payload));
+    }
+
+    private static void clientPortEnergy(PortEnergySync payload, IPayloadContext context) {
+        if (FMLEnvironment.dist != Dist.CLIENT) {
+            return;
+        }
+        context.enqueueWork(() -> {
+            if (net.minecraft.client.Minecraft.getInstance().screen instanceof com.wrights.client.WrightportScreen screen) {
+                screen.acceptEnergy(payload.pos(), payload.stored(), payload.capacity());
+            }
+        });
     }
 
     private static void clientSupply(BlueprintPayloads.SupplySync payload, IPayloadContext context) {
