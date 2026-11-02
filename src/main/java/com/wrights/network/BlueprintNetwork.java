@@ -665,7 +665,7 @@ public final class BlueprintNetwork {
         if (FMLEnvironment.dist != Dist.CLIENT) {
             return;
         }
-        context.enqueueWork(() -> com.wrights.client.WrightsClientState.showJobDone(payload.name(), payload.detail(), payload.seconds()));
+        context.enqueueWork(() -> com.wrights.client.WrightsClientState.showJobDone(payload.header(), payload.name(), payload.detail(), payload.seconds()));
     }
 
     private static void clientDockToast(BlueprintPayloads.DockToast payload, IPayloadContext context) {
@@ -1001,9 +1001,19 @@ public final class BlueprintNetwork {
     }
 
     public static void jobDone(ServerPlayer player, net.minecraft.network.chat.Component name, net.minecraft.network.chat.Component detail, int seconds) {
+        jobDone(player, net.minecraft.network.chat.Component.empty(), name, detail, seconds);
+    }
+
+    public static void jobDone(
+            ServerPlayer player,
+            net.minecraft.network.chat.Component header,
+            net.minecraft.network.chat.Component name,
+            net.minecraft.network.chat.Component detail,
+            int seconds) {
         net.minecraft.network.chat.Component title = name == null ? net.minecraft.network.chat.Component.translatable("hud.wrights.tool_build") : name;
         net.minecraft.network.chat.Component line = detail == null ? net.minecraft.network.chat.Component.empty() : detail;
-        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.JobDone(title, line, Math.max(0, seconds)));
+        net.minecraft.network.chat.Component top = header == null ? net.minecraft.network.chat.Component.empty() : header;
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.JobDone(top, title, line, seconds));
     }
 
     public static void undoPrompt(ServerPlayer player, java.util.UUID id, int extra, int drop) {

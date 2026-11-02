@@ -977,14 +977,16 @@ public final class WrightsHud {
         int[] heights = new int[WrightsClientState.jobNotices.size()];
         for (int i = 0; i < WrightsClientState.jobNotices.size(); i++) {
             WrightsClientState.JobNotice notice = WrightsClientState.jobNotices.get(i);
-            Component header = Component.translatable("hud.wrights.job_finished");
+            Component header = noticeHeader(notice);
             Component time = noticeTime(notice);
             int width = minecraft.font.width(header) + 30;
             width = Math.max(width, minecraft.font.width(notice.name) + 18);
             if (hasDetail(notice)) {
                 width = Math.max(width, minecraft.font.width(notice.detail) + 18);
             }
-            width = Math.max(width, minecraft.font.width(time) + 18);
+            if (time != null) {
+                width = Math.max(width, minecraft.font.width(time) + 18);
+            }
             widths[i] = Math.min(280, width);
             heights[i] = noticeHeight(notice);
             maxWidth = Math.max(maxWidth, widths[i]);
@@ -1010,14 +1012,16 @@ public final class WrightsHud {
         int spot = HudAnchor.toastSpot();
         for (int i = 0; i < WrightsClientState.jobNotices.size(); i++) {
             WrightsClientState.JobNotice notice = WrightsClientState.jobNotices.get(i);
-            Component header = Component.translatable("hud.wrights.job_finished");
+            Component header = noticeHeader(notice);
             Component time = noticeTime(notice);
             List<Component> lines = new java.util.ArrayList<>();
             lines.add(notice.name);
             if (hasDetail(notice)) {
                 lines.add(notice.detail);
             }
-            lines.add(time);
+            if (time != null) {
+                lines.add(time);
+            }
             int width = widths[i];
             int x = toastX(spot, stackX, maxWidth, width);
             int alpha = notice.ticks > 20 ? 0xE0 : Math.max(0, 0xE0 * notice.ticks / 20);
@@ -1159,12 +1163,29 @@ public final class WrightsHud {
         return notice.detail != null && !notice.detail.getString().isEmpty();
     }
 
+    private static Component noticeHeader(WrightsClientState.JobNotice notice) {
+        if (notice.header != null && !notice.header.getString().isEmpty()) {
+            return notice.header;
+        }
+        return Component.translatable("hud.wrights.job_finished");
+    }
+
     private static int noticeHeight(WrightsClientState.JobNotice notice) {
-        int lines = hasDetail(notice) ? 3 : 2;
+        int lines = 1;
+        if (hasDetail(notice)) {
+            lines++;
+        }
+        if (noticeTime(notice) != null) {
+            lines++;
+        }
         return 18 + 5 + lines * 11 + 4;
     }
 
+    /** Null when the notice has no elapsed-time line ({@code seconds < 0}). */
     private static Component noticeTime(WrightsClientState.JobNotice notice) {
+        if (notice.seconds < 0) {
+            return null;
+        }
         return notice.seconds < 1
                 ? Component.translatable("hud.wrights.job_time_under")
                 : Component.translatable("hud.wrights.job_time", duration(notice.seconds));

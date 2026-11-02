@@ -1474,9 +1474,18 @@ public final class WrightsClientState {
     }
 
     public static void showJobDone(net.minecraft.network.chat.Component name, net.minecraft.network.chat.Component detail, int seconds) {
+        showJobDone(net.minecraft.network.chat.Component.empty(), name, detail, seconds);
+    }
+
+    public static void showJobDone(
+            net.minecraft.network.chat.Component header,
+            net.minecraft.network.chat.Component name,
+            net.minecraft.network.chat.Component detail,
+            int seconds) {
         net.minecraft.network.chat.Component title = name == null ? net.minecraft.network.chat.Component.translatable("hud.wrights.tool_build") : name;
         net.minecraft.network.chat.Component line = detail == null ? net.minecraft.network.chat.Component.empty() : detail;
-        jobNotices.add(new JobNotice(title, line, Math.max(0, seconds)));
+        net.minecraft.network.chat.Component top = header == null ? net.minecraft.network.chat.Component.empty() : header;
+        jobNotices.add(new JobNotice(top, title, line, seconds));
         while (jobNotices.size() > 3) {
             jobNotices.remove(0);
         }
@@ -3313,12 +3322,24 @@ public final class WrightsClientState {
     }
 
     public static final class JobNotice {
+        /** Empty → HUD uses the default "Job finished" banner. */
+        public final net.minecraft.network.chat.Component header;
         public final net.minecraft.network.chat.Component name;
         public final net.minecraft.network.chat.Component detail;
+        /** Negative → HUD hides the elapsed-time line. */
         public final int seconds;
         public int ticks = 100;
 
         public JobNotice(net.minecraft.network.chat.Component name, net.minecraft.network.chat.Component detail, int seconds) {
+            this(net.minecraft.network.chat.Component.empty(), name, detail, seconds);
+        }
+
+        public JobNotice(
+                net.minecraft.network.chat.Component header,
+                net.minecraft.network.chat.Component name,
+                net.minecraft.network.chat.Component detail,
+                int seconds) {
+            this.header = header == null ? net.minecraft.network.chat.Component.empty() : header;
             this.name = name;
             this.detail = detail;
             this.seconds = seconds;

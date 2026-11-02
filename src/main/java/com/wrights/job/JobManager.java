@@ -3490,7 +3490,8 @@ public final class JobManager {
             }
             return true;
         }
-        int quota = Math.max(job.crewQuota(), assignedCount(job));
+        int recalled = assignedCount(job);
+        int quota = Math.max(job.crewQuota(), recalled);
         job.rememberCrewQuota(quota);
         job.setCrewQuota(Math.max(1, quota));
         sendHome(player.getServer(), player, job);
@@ -3499,6 +3500,14 @@ public final class JobManager {
         job.setPaused(false);
         library.setDirty();
         BlueprintNetwork.syncJobs(player);
+        if (recalled > 0) {
+            Component header = Component.translatable("hud.wrights.crew_returned");
+            Component name = Component.literal(jobCardTitle(job, library));
+            Component detail = hold == BuildJob.HOLD_DIMENSION
+                    ? Component.translatable("hud.wrights.crew_returned_dimension", recalled)
+                    : Component.translatable("hud.wrights.crew_returned_range", recalled);
+            BlueprintNetwork.jobDone(player, header, name, detail, -1);
+        }
         return true;
     }
 

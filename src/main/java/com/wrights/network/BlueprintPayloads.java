@@ -1108,15 +1108,18 @@ public final class BlueprintPayloads {
         }
     }
 
-    public record JobDone(Component name, Component detail, int seconds) implements CustomPacketPayload {
+    /** {@code header} empty → client uses the default "Job finished" banner. {@code seconds < 0} hides the time line. */
+    public record JobDone(Component header, Component name, Component detail, int seconds) implements CustomPacketPayload {
         public static final Type<JobDone> TYPE = payloadType("job_done");
         public static final StreamCodec<RegistryFriendlyByteBuf, JobDone> STREAM_CODEC = StreamCodec.of(
                 (buf, value) -> {
+                    buf.writeJsonWithCodec(ComponentSerialization.CODEC, value.header == null ? Component.empty() : value.header);
                     buf.writeJsonWithCodec(ComponentSerialization.CODEC, value.name);
                     buf.writeJsonWithCodec(ComponentSerialization.CODEC, value.detail == null ? Component.empty() : value.detail);
                     buf.writeVarInt(value.seconds);
                 },
                 buf -> new JobDone(
+                        buf.readJsonWithCodec(ComponentSerialization.CODEC),
                         buf.readJsonWithCodec(ComponentSerialization.CODEC),
                         buf.readJsonWithCodec(ComponentSerialization.CODEC),
                         buf.readVarInt()));
