@@ -607,8 +607,7 @@ final class ShapeMenuPanel {
         return switch (kind) {
             case BOX, SQUARE -> "menu.wrights.shape_width";
             case CUBE, RECTANGLE -> "menu.wrights.shape_size";
-            case CIRCLE -> "menu.wrights.shape_diameter";
-            case CYLINDER, SPHERE, DOME -> "menu.wrights.shape_radius";
+            case CIRCLE, CYLINDER, SPHERE, DOME, RING, PYRAMID -> "menu.wrights.shape_diameter";
             default -> "menu.wrights.shape_size";
         };
     }
@@ -620,11 +619,11 @@ final class ShapeMenuPanel {
             case CUBE -> "menu.wrights.shape_cube_size_hint";
             case RECTANGLE -> "menu.wrights.shape_rectangle_size_hint";
             case CIRCLE -> "menu.wrights.shape_circle_diameter_hint";
-            case CYLINDER -> "menu.wrights.shape_cylinder_radius_hint";
-            case SPHERE -> "menu.wrights.shape_sphere_radius_hint";
-            case DOME -> "menu.wrights.shape_dome_radius_hint";
-            case PYRAMID -> "menu.wrights.shape_pyramid_size_hint";
-            case RING -> "menu.wrights.shape_ring_size_hint";
+            case CYLINDER -> "menu.wrights.shape_cylinder_diameter_hint";
+            case SPHERE -> "menu.wrights.shape_sphere_diameter_hint";
+            case DOME -> "menu.wrights.shape_dome_diameter_hint";
+            case PYRAMID -> "menu.wrights.shape_pyramid_diameter_hint";
+            case RING -> "menu.wrights.shape_ring_diameter_hint";
             default -> "menu.wrights.shape_size_hint";
         };
     }

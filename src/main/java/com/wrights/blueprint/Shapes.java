@@ -206,17 +206,17 @@ public final class Shapes {
         switch (kind) {
             // Size is diameter (full width in blocks), not radius.
             case CIRCLE -> diskDiameter(out, center, r, hollow, AXIS_Y, limit);
-            case RING -> ring(out, center, r, band, h, AXIS_Y, hollow, limit);
+            case RING -> ringDiameter(out, center, r, band, h, AXIS_Y, hollow, limit);
             // Width × Height flat plate (local X × local Z, one block thick).
             case SQUARE -> box(out, center, r, Math.max(1, h), 1, hollow, limit);
             // Size / thickness / height are full block counts: Width × Depth × Height.
             case BOX -> box(out, center, r, band, Math.max(1, h), hollow, limit);
-            case SPHERE -> sphere(out, center, r, hollow, limit);
+            case SPHERE -> sphereDiameter(out, center, r, hollow, limit);
             // Equal edge — Size alone sets Width = Depth = Height.
             case CUBE -> box(out, center, r, r, r, hollow, limit);
-            case CYLINDER -> cylinder(out, center, r, h, hollow, limit);
-            case DOME -> dome(out, center, r, h, hollow, limit);
-            case PYRAMID -> pyramid(out, center, r, h, hollow, limit);
+            case CYLINDER -> cylinderDiameter(out, center, r, h, hollow, limit);
+            case DOME -> domeDiameter(out, center, r, h, hollow, limit);
+            case PYRAMID -> pyramidDiameter(out, center, r, h, hollow, limit);
             // Equal edge flat — Size alone sets Width = Height.
             case RECTANGLE -> box(out, center, r, r, 1, hollow, limit);
         }
@@ -235,21 +235,21 @@ public final class Shapes {
         int r = clampSize(size);
         int h = Math.max(1, clampHeight(height));
         int band = Math.max(1, clampHeight(thickness));
-        long diam = 2L * r + 1L;
+        // Size is full block diameter / edge for round shapes (not radius).
+        long diam = Math.max(1L, r);
         return switch (kind) {
-            case CIRCLE -> (long) r * (long) r;
-            case SQUARE -> (long) r * (long) h;
-            case RECTANGLE -> (long) r * (long) r;
+            case CIRCLE -> diam * diam;
+            case SQUARE -> diam * (long) h;
+            case RECTANGLE -> diam * diam;
             case RING -> {
                 int tall = Math.max(1, h);
                 long along = tall <= 1 ? 1L : (long) tall;
                 yield diam * diam * along;
             }
-            case BOX -> (long) r * (long) band * (long) h;
+            case BOX -> diam * (long) band * (long) h;
             case SPHERE -> diam * diam * diam;
-            case CUBE -> (long) r * (long) r * (long) r;
-            case CYLINDER, DOME -> diam * diam * (long) h;
-            case PYRAMID -> diam * diam * (long) h;
+            case CUBE -> diam * diam * diam;
+            case CYLINDER, DOME, PYRAMID -> diam * diam * (long) h;
         };
     }
 
@@ -298,10 +298,12 @@ public final class Shapes {
                 maxZ = x0 + r - 1;
             }
             case RING -> {
-                minX = -r;
-                maxX = r;
-                minZ = -r;
-                maxZ = r;
+                // Size is outer diameter.
+                int a0 = -(r - 1) / 2;
+                minX = a0;
+                maxX = a0 + r - 1;
+                minZ = a0;
+                maxZ = a0 + r - 1;
                 if (h <= 1) {
                     minY = 0;
                     maxY = 0;
@@ -321,12 +323,14 @@ public final class Shapes {
                 maxZ = z0 + band - 1;
             }
             case SPHERE -> {
-                minX = -r;
-                maxX = r;
-                minY = -r;
-                maxY = r;
-                minZ = -r;
-                maxZ = r;
+                // Size is diameter (full block width).
+                int a0 = -(r - 1) / 2;
+                minX = a0;
+                maxX = a0 + r - 1;
+                minY = a0;
+                maxY = a0 + r - 1;
+                minZ = a0;
+                maxZ = a0 + r - 1;
             }
             case CUBE -> {
                 int x0 = -(r - 1) / 2;
@@ -338,20 +342,24 @@ public final class Shapes {
                 maxZ = x0 + r - 1;
             }
             case CYLINDER, PYRAMID -> {
-                minX = -r;
-                maxX = r;
+                // Size is base / tube diameter.
+                int a0 = -(r - 1) / 2;
+                minX = a0;
+                maxX = a0 + r - 1;
                 minY = 0;
                 maxY = h - 1;
-                minZ = -r;
-                maxZ = r;
+                minZ = a0;
+                maxZ = a0 + r - 1;
             }
             case DOME -> {
-                minX = -r;
-                maxX = r;
+                // Size is floor diameter.
+                int a0 = -(r - 1) / 2;
+                minX = a0;
+                maxX = a0 + r - 1;
                 minY = 0;
                 maxY = h;
-                minZ = -r;
-                maxZ = r;
+                minZ = a0;
+                maxZ = a0 + r - 1;
             }
             default -> {
                 minX = maxX = minY = maxY = minZ = maxZ = 0;
@@ -760,23 +768,37 @@ public final class Shapes {
 
     /**
      * Flat annulus when {@code height} is 1; otherwise a torus (true donut) with elliptical tube
-     * cross-section. {@code thickness} is the tube width in the ring plane; {@code height} is the
-     * tube diameter along the plane normal.
+     * cross-section. {@code diameter} is the outer width in blocks; {@code thickness} is the tube
+     * width in the ring plane; {@code height} is the tube diameter along the plane normal.
      */
-    private static void ring(List<BlockPos> out, BlockPos center, int radius, int thickness, int height, int plane, boolean hollow, int limit) {
-        int band = Mth.clamp(thickness, 1, radius);
+    private static void ringDiameter(
+            List<BlockPos> out,
+            BlockPos center,
+            int diameter,
+            int thickness,
+            int height,
+            int plane,
+            boolean hollow,
+            int limit) {
+        int d = Math.max(1, diameter);
+        int band = Mth.clamp(thickness, 1, Math.max(1, d / 2));
         int tall = Math.max(1, height);
+        int a0 = -(d - 1) / 2;
+        double mid = (d - 1) * 0.5D;
+        double outerR = d * 0.5D;
         if (tall <= 1) {
-            int inner = Math.max(0, radius - band);
-            int r2 = radius * radius;
-            int inner2 = inner * inner;
-            for (int a = -radius; a <= radius; a++) {
-                for (int b = -radius; b <= radius; b++) {
-                    int d2 = a * a + b * b;
-                    if (d2 > r2 || d2 < inner2) {
+            double innerR = Math.max(0.0D, outerR - band);
+            double outerR2 = outerR * outerR;
+            double innerR2 = innerR * innerR;
+            for (int ia = 0; ia < d; ia++) {
+                for (int ib = 0; ib < d; ib++) {
+                    double da = ia - mid;
+                    double db = ib - mid;
+                    double dist2 = da * da + db * db;
+                    if (dist2 > outerR2 + 1.0E-6D || dist2 < innerR2 - 1.0E-6D) {
                         continue;
                     }
-                    if (!take(out, ringCell(center, a, b, 0, plane), limit)) {
+                    if (!take(out, ringCell(center, a0 + ia, a0 + ib, 0, plane), limit)) {
                         return;
                     }
                 }
@@ -786,15 +808,17 @@ public final class Shapes {
         // Major radius to tube centerline; minor radii for elliptical tube section.
         double rx = band * 0.5D;
         double ry = tall * 0.5D;
-        double major = Math.max(rx, radius - rx);
+        double major = Math.max(rx, outerR - rx);
         int alongMax = (tall - 1) / 2;
         int alongMin = -(tall / 2);
-        // Shell thickness in ellipse-parameter space (~one block of the larger minor axis).
         double shell = hollow ? Math.max(0.35D, 1.0D / Math.max(rx, ry)) : 0.0D;
         for (int along = alongMin; along <= alongMax; along++) {
-            for (int a = -radius; a <= radius; a++) {
-                for (int b = -radius; b <= radius; b++) {
-                    double dist = Math.sqrt((double) a * a + (double) b * b);
+            for (int ia = 0; ia < d; ia++) {
+                for (int ib = 0; ib < d; ib++) {
+                    // Prefer continuous coords from the diameter mid so even sizes stay centered.
+                    double ax = ia - mid;
+                    double bz = ib - mid;
+                    double dist = Math.sqrt(ax * ax + bz * bz);
                     double da = dist - major;
                     double nx = da / rx;
                     double ny = along / ry;
@@ -805,7 +829,7 @@ public final class Shapes {
                     if (hollow && q < (1.0D - shell) * (1.0D - shell)) {
                         continue;
                     }
-                    if (!take(out, ringCell(center, a, b, along, plane), limit)) {
+                    if (!take(out, ringCell(center, a0 + ia, a0 + ib, along, plane), limit)) {
                         return;
                     }
                 }
@@ -822,21 +846,27 @@ public final class Shapes {
         };
     }
 
-    private static void sphere(List<BlockPos> out, BlockPos center, int radius, boolean hollow, int limit) {
-        int r2 = radius * radius;
-        int inner = hollow ? Math.max(0, radius - 1) : -1;
-        int inner2 = inner * inner;
-        for (int x = -radius; x <= radius; x++) {
-            for (int y = -radius; y <= radius; y++) {
-                for (int z = -radius; z <= radius; z++) {
-                    int d2 = x * x + y * y + z * z;
-                    if (d2 > r2) {
+    /** Sphere whose {@code diameter} is the full width in blocks (not radius). */
+    private static void sphereDiameter(List<BlockPos> out, BlockPos center, int diameter, boolean hollow, int limit) {
+        int d = Math.max(1, diameter);
+        int o = -(d - 1) / 2;
+        double mid = (d - 1) * 0.5D;
+        double maxR2 = (d * 0.5D) * (d * 0.5D);
+        double innerR2 = hollow && d > 2 ? ((d - 2) * 0.5D) * ((d - 2) * 0.5D) : -1.0D;
+        for (int ix = 0; ix < d; ix++) {
+            for (int iy = 0; iy < d; iy++) {
+                for (int iz = 0; iz < d; iz++) {
+                    double dx = ix - mid;
+                    double dy = iy - mid;
+                    double dz = iz - mid;
+                    double dist2 = dx * dx + dy * dy + dz * dz;
+                    if (dist2 > maxR2 + 1.0E-6D) {
                         continue;
                     }
-                    if (hollow && d2 < inner2) {
+                    if (innerR2 >= 0.0D && dist2 < innerR2 - 1.0E-6D) {
                         continue;
                     }
-                    if (!take(out, center.offset(x, y, z), limit)) {
+                    if (!take(out, center.offset(o + ix, o + iy, o + iz), limit)) {
                         return;
                     }
                 }
@@ -872,19 +902,24 @@ public final class Shapes {
         }
     }
 
-    private static void cylinder(List<BlockPos> out, BlockPos center, int radius, int height, boolean hollow, int limit) {
-        int r2 = radius * radius;
-        int inner = hollow ? Math.max(0, radius - 1) : -1;
-        int inner2 = inner * inner;
+    /** Cylinder tube whose {@code diameter} is the full width in blocks (not radius). */
+    private static void cylinderDiameter(List<BlockPos> out, BlockPos center, int diameter, int height, boolean hollow, int limit) {
+        int d = Math.max(1, diameter);
+        int o = -(d - 1) / 2;
+        double mid = (d - 1) * 0.5D;
+        double maxR2 = (d * 0.5D) * (d * 0.5D);
+        double innerR2 = hollow && d > 2 ? ((d - 2) * 0.5D) * ((d - 2) * 0.5D) : -1.0D;
         int top = Math.max(0, height - 1);
         for (int y = 0; y <= top; y++) {
-            for (int x = -radius; x <= radius; x++) {
-                for (int z = -radius; z <= radius; z++) {
-                    int d2 = x * x + z * z;
-                    if (d2 > r2) {
+            for (int ix = 0; ix < d; ix++) {
+                for (int iz = 0; iz < d; iz++) {
+                    double dx = ix - mid;
+                    double dz = iz - mid;
+                    double dist2 = dx * dx + dz * dz;
+                    if (dist2 > maxR2 + 1.0E-6D) {
                         continue;
                     }
-                    boolean shell = d2 >= inner2;
+                    boolean shell = innerR2 < 0.0D || dist2 >= innerR2 - 1.0E-6D;
                     boolean cap = y == 0 || y == top;
                     if (hollow && !shell && !cap) {
                         continue;
@@ -893,7 +928,7 @@ public final class Shapes {
                         // Hollow keeps the rim on caps, not a filled lid.
                         continue;
                     }
-                    if (!take(out, center.offset(x, y, z), limit)) {
+                    if (!take(out, center.offset(o + ix, y, o + iz), limit)) {
                         return;
                     }
                 }
@@ -901,31 +936,36 @@ public final class Shapes {
         }
     }
 
-    /** Hemisphere ellipsoid: Size is the floor radius, Height is how tall the dome rises. */
-    private static void dome(List<BlockPos> out, BlockPos center, int radius, int height, boolean hollow, int limit) {
+    /** Hemisphere ellipsoid: Size is the floor diameter; Height is how tall the dome rises. */
+    private static void domeDiameter(List<BlockPos> out, BlockPos center, int diameter, int height, boolean hollow, int limit) {
+        int d = Math.max(1, diameter);
+        int o = -(d - 1) / 2;
+        double mid = (d - 1) * 0.5D;
         int tall = Math.max(1, height);
-        long rr = (long) radius * radius;
-        long hh = (long) tall * tall;
-        long ellipse = rr * hh;
-        int innerR = hollow ? Math.max(0, radius - 1) : -1;
-        int innerH = hollow ? Math.max(0, tall - 1) : -1;
-        long innerLimit = hollow ? (long) innerR * innerR * innerH * innerH : -1L;
-        for (int x = -radius; x <= radius; x++) {
+        double rr = (d * 0.5D) * (d * 0.5D);
+        double hh = (double) tall * (double) tall;
+        double ellipse = rr * hh;
+        double innerR = hollow && d > 2 ? ((d - 2) * 0.5D) : -1.0D;
+        double innerH = hollow && tall > 1 ? (tall - 1) : -1.0D;
+        double innerLimit = innerR > 0.0D && innerH > 0.0D ? innerR * innerR * innerH * innerH : -1.0D;
+        for (int ix = 0; ix < d; ix++) {
             for (int y = 0; y <= tall; y++) {
-                for (int z = -radius; z <= radius; z++) {
-                    long d = (long) x * x * hh + (long) z * z * hh + (long) y * y * rr;
-                    if (d > ellipse) {
+                for (int iz = 0; iz < d; iz++) {
+                    double dx = ix - mid;
+                    double dz = iz - mid;
+                    double val = dx * dx * hh + dz * dz * hh + (double) y * y * rr;
+                    if (val > ellipse + 1.0E-6D) {
                         continue;
                     }
-                    if (hollow && innerR > 0 && innerH > 0) {
-                        long inner = (long) x * x * (long) innerH * innerH
-                                + (long) z * z * (long) innerH * innerH
-                                + (long) y * y * (long) innerR * innerR;
-                        if (inner < innerLimit) {
+                    if (innerLimit > 0.0D) {
+                        double inner = dx * dx * innerH * innerH
+                                + dz * dz * innerH * innerH
+                                + (double) y * y * innerR * innerR;
+                        if (inner < innerLimit - 1.0E-6D) {
                             continue;
                         }
                     }
-                    if (!take(out, center.offset(x, y, z), limit)) {
+                    if (!take(out, center.offset(o + ix, y, o + iz), limit)) {
                         return;
                     }
                 }
@@ -933,17 +973,20 @@ public final class Shapes {
         }
     }
 
-    private static void pyramid(List<BlockPos> out, BlockPos center, int radius, int height, boolean hollow, int limit) {
+    /** Pyramid whose base {@code diameter} is the full width in blocks (not half-width). */
+    private static void pyramidDiameter(List<BlockPos> out, BlockPos center, int diameter, int height, boolean hollow, int limit) {
+        int base = Math.max(1, diameter);
         int top = Math.max(1, height);
         for (int y = 0; y < top; y++) {
-            int layer = Math.max(0, radius - (radius * y) / top);
-            for (int x = -layer; x <= layer; x++) {
-                for (int z = -layer; z <= layer; z++) {
-                    boolean edge = Math.abs(x) == layer || Math.abs(z) == layer || y == 0 || y == top - 1;
+            int layerDiam = Math.max(1, base - (base * y) / top);
+            int o = -(layerDiam - 1) / 2;
+            for (int ix = 0; ix < layerDiam; ix++) {
+                for (int iz = 0; iz < layerDiam; iz++) {
+                    boolean edge = ix == 0 || ix == layerDiam - 1 || iz == 0 || iz == layerDiam - 1 || y == 0 || y == top - 1;
                     if (hollow && !edge) {
                         continue;
                     }
-                    if (!take(out, center.offset(x, y, z), limit)) {
+                    if (!take(out, center.offset(o + ix, y, o + iz), limit)) {
                         return;
                     }
                 }
@@ -1205,14 +1248,14 @@ public final class Shapes {
         int band = Math.max(1, clampHeight(thickness));
         return switch (kind) {
             case CIRCLE -> inDiskDiameter(x, y, z, r, hollow);
-            case RING -> inRing(x, y, z, r, band, h, hollow);
+            case RING -> inRingDiameter(x, y, z, r, band, h, hollow);
             case SQUARE -> inBox(x, y, z, r, Math.max(1, h), 1, hollow);
             case BOX -> inBox(x, y, z, r, band, Math.max(1, h), hollow);
-            case SPHERE -> inSphere(x, y, z, r, hollow);
+            case SPHERE -> inSphereDiameter(x, y, z, r, hollow);
             case CUBE -> inBox(x, y, z, r, r, r, hollow);
-            case CYLINDER -> inCylinder(x, y, z, r, h, hollow);
-            case DOME -> inDome(x, y, z, r, h, hollow);
-            case PYRAMID -> inPyramid(x, y, z, r, h, hollow);
+            case CYLINDER -> inCylinderDiameter(x, y, z, r, h, hollow);
+            case DOME -> inDomeDiameter(x, y, z, r, h, hollow);
+            case PYRAMID -> inPyramidDiameter(x, y, z, r, h, hollow);
             case RECTANGLE -> inBox(x, y, z, r, r, 1, hollow);
         };
     }
@@ -1241,29 +1284,37 @@ public final class Shapes {
         return true;
     }
 
-    private static boolean inRing(int x, int y, int z, int radius, int thickness, int height, boolean hollow) {
-        int band = Mth.clamp(thickness, 1, radius);
+    private static boolean inRingDiameter(int x, int y, int z, int diameter, int thickness, int height, boolean hollow) {
+        int d = Math.max(1, diameter);
+        int band = Mth.clamp(thickness, 1, Math.max(1, d / 2));
         int tall = Math.max(1, height);
+        int a0 = -(d - 1) / 2;
+        int ia = x - a0;
+        int ib = z - a0;
+        if (ia < 0 || ia >= d || ib < 0 || ib >= d) {
+            return false;
+        }
+        double mid = (d - 1) * 0.5D;
+        double outerR = d * 0.5D;
+        double ax = ia - mid;
+        double bz = ib - mid;
         if (tall <= 1) {
             if (y != 0) {
                 return false;
             }
-            int inner = Math.max(0, radius - band);
-            int d2 = x * x + z * z;
-            return d2 <= radius * radius && d2 >= inner * inner;
+            double innerR = Math.max(0.0D, outerR - band);
+            double dist2 = ax * ax + bz * bz;
+            return dist2 <= outerR * outerR + 1.0E-6D && dist2 >= innerR * innerR - 1.0E-6D;
         }
         double rx = band * 0.5D;
         double ry = tall * 0.5D;
-        double major = Math.max(rx, radius - rx);
+        double major = Math.max(rx, outerR - rx);
         int alongMax = (tall - 1) / 2;
         int alongMin = -(tall / 2);
         if (y < alongMin || y > alongMax) {
             return false;
         }
-        if (x < -radius || x > radius || z < -radius || z > radius) {
-            return false;
-        }
-        double dist = Math.sqrt((double) x * x + (double) z * z);
+        double dist = Math.sqrt(ax * ax + bz * bz);
         double da = dist - major;
         double nx = da / rx;
         double ny = y / ry;
@@ -1278,14 +1329,27 @@ public final class Shapes {
         return true;
     }
 
-    private static boolean inSphere(int x, int y, int z, int radius, boolean hollow) {
-        int d2 = x * x + y * y + z * z;
-        if (d2 > radius * radius) {
+    private static boolean inSphereDiameter(int x, int y, int z, int diameter, boolean hollow) {
+        int d = Math.max(1, diameter);
+        int o = -(d - 1) / 2;
+        int ix = x - o;
+        int iy = y - o;
+        int iz = z - o;
+        if (ix < 0 || ix >= d || iy < 0 || iy >= d || iz < 0 || iz >= d) {
             return false;
         }
-        if (hollow) {
-            int inner = Math.max(0, radius - 1);
-            return d2 >= inner * inner;
+        double mid = (d - 1) * 0.5D;
+        double maxR2 = (d * 0.5D) * (d * 0.5D);
+        double dx = ix - mid;
+        double dy = iy - mid;
+        double dz = iz - mid;
+        double dist2 = dx * dx + dy * dy + dz * dz;
+        if (dist2 > maxR2 + 1.0E-6D) {
+            return false;
+        }
+        if (hollow && d > 2) {
+            double innerR2 = ((d - 2) * 0.5D) * ((d - 2) * 0.5D);
+            return !(dist2 < innerR2 - 1.0E-6D);
         }
         return true;
     }
@@ -1308,67 +1372,81 @@ public final class Shapes {
         return x == x0 || x == x1 || z == z0 || z == z1 || y == 0 || y == top;
     }
 
-    private static boolean inCylinder(int x, int y, int z, int radius, int height, boolean hollow) {
+    private static boolean inCylinderDiameter(int x, int y, int z, int diameter, int height, boolean hollow) {
         int top = Math.max(0, height - 1);
         if (y < 0 || y > top) {
             return false;
         }
-        int d2 = x * x + z * z;
-        if (d2 > radius * radius) {
+        int d = Math.max(1, diameter);
+        int o = -(d - 1) / 2;
+        int ix = x - o;
+        int iz = z - o;
+        if (ix < 0 || ix >= d || iz < 0 || iz >= d) {
+            return false;
+        }
+        double mid = (d - 1) * 0.5D;
+        double maxR2 = (d * 0.5D) * (d * 0.5D);
+        double dx = ix - mid;
+        double dz = iz - mid;
+        double dist2 = dx * dx + dz * dz;
+        if (dist2 > maxR2 + 1.0E-6D) {
             return false;
         }
         if (!hollow) {
             return true;
         }
-        int inner = Math.max(0, radius - 1);
-        boolean shell = d2 >= inner * inner;
-        boolean cap = y == 0 || y == top;
-        if (shell) {
-            return true;
-        }
-        // Hollow keeps the rim on caps, not a filled lid.
-        return false;
+        double innerR2 = d > 2 ? ((d - 2) * 0.5D) * ((d - 2) * 0.5D) : -1.0D;
+        boolean shell = innerR2 < 0.0D || dist2 >= innerR2 - 1.0E-6D;
+        return shell;
     }
 
-    private static boolean inDome(int x, int y, int z, int radius, int height, boolean hollow) {
+    private static boolean inDomeDiameter(int x, int y, int z, int diameter, int height, boolean hollow) {
+        int d = Math.max(1, diameter);
         int tall = Math.max(1, height);
         if (y < 0 || y > tall) {
             return false;
         }
-        long rr = (long) radius * radius;
-        long hh = (long) tall * tall;
-        long ellipse = rr * hh;
-        long d = (long) x * x * hh + (long) z * z * hh + (long) y * y * rr;
-        if (d > ellipse) {
+        int o = -(d - 1) / 2;
+        int ix = x - o;
+        int iz = z - o;
+        if (ix < 0 || ix >= d || iz < 0 || iz >= d) {
             return false;
         }
-        if (!hollow) {
+        double mid = (d - 1) * 0.5D;
+        double rr = (d * 0.5D) * (d * 0.5D);
+        double hh = (double) tall * (double) tall;
+        double dx = ix - mid;
+        double dz = iz - mid;
+        double val = dx * dx * hh + dz * dz * hh + (double) y * y * rr;
+        if (val > rr * hh + 1.0E-6D) {
+            return false;
+        }
+        if (!hollow || d <= 2 || tall <= 1) {
             return true;
         }
-        int innerR = Math.max(0, radius - 1);
-        int innerH = Math.max(0, tall - 1);
-        if (innerR <= 0 || innerH <= 0) {
-            return true;
-        }
-        long innerLimit = (long) innerR * innerR * innerH * innerH;
-        long inner = (long) x * x * (long) innerH * innerH
-                + (long) z * z * (long) innerH * innerH
-                + (long) y * y * (long) innerR * innerR;
-        return inner >= innerLimit;
+        double innerR = (d - 2) * 0.5D;
+        double innerH = tall - 1;
+        double innerLimit = innerR * innerR * innerH * innerH;
+        double inner = dx * dx * innerH * innerH + dz * dz * innerH * innerH + (double) y * y * innerR * innerR;
+        return !(inner < innerLimit - 1.0E-6D);
     }
 
-    private static boolean inPyramid(int x, int y, int z, int radius, int height, boolean hollow) {
+    private static boolean inPyramidDiameter(int x, int y, int z, int diameter, int height, boolean hollow) {
+        int base = Math.max(1, diameter);
         int top = Math.max(1, height);
         if (y < 0 || y >= top) {
             return false;
         }
-        int layer = Math.max(0, radius - (radius * y) / top);
-        if (x < -layer || x > layer || z < -layer || z > layer) {
+        int layerDiam = Math.max(1, base - (base * y) / top);
+        int o = -(layerDiam - 1) / 2;
+        int ix = x - o;
+        int iz = z - o;
+        if (ix < 0 || ix >= layerDiam || iz < 0 || iz >= layerDiam) {
             return false;
         }
         if (!hollow) {
             return true;
         }
-        return Math.abs(x) == layer || Math.abs(z) == layer || y == 0 || y == top - 1;
+        return ix == 0 || ix == layerDiam - 1 || iz == 0 || iz == layerDiam - 1 || y == 0 || y == top - 1;
     }
 }
