@@ -316,10 +316,14 @@ public final class WrightsConfig {
         if (blocks <= 0) {
             return 0;
         }
+        // Huge Shape AABBs (or Integer.MAX_VALUE placeholders) must not overflow int math to 1.
+        long safeBlocks = Math.max(1L, blocks);
         int columns = Math.max(1, Math.max(Math.max(1, sizeX), Math.max(1, sizeZ)));
         int share = Math.max(1, WrightTier.placeEighths(WrightTier.NETHERITE) / 8);
-        int byShare = Math.max(1, (blocks + share - 1) / share);
-        return Math.max(1, Math.min(blocks, Math.min(columns, byShare)));
+        int byShare = (int) Math.min(Integer.MAX_VALUE, (safeBlocks + share - 1L) / share);
+        byShare = Math.max(1, byShare);
+        int blockCap = (int) Math.min(Integer.MAX_VALUE, safeBlocks);
+        return Math.max(1, Math.min(blockCap, Math.min(columns, byShare)));
     }
 
     public static int maxWrightsCarried() {

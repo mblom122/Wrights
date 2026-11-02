@@ -3586,17 +3586,37 @@ public final class JobManager {
 
     /** Cap crew by useful parallel share (cluster multi-place), not one wright per block. */
     private static int crewRoom(Schematic schematic, BuildJob job) {
-        int blocks = Math.max(0, placeableBlocks(schematic, job));
+        // Shape/Exchange stream with no schematic used to pass Integer.MAX_VALUE into usefulCrewFor,
+        // which overflowed to "1 block" and ejected the whole crew when Manage tried to add one.
+        int blocks;
+        if (job.kind() == BuildJob.Kind.SHAPE || schematic == null) {
+            blocks = Math.max(1, job.total());
+        } else {
+            blocks = Math.max(0, placeableBlocks(schematic, job));
+        }
         if (blocks <= 0) {
             return 0;
         }
-        int sizeX = schematic != null ? schematic.sizeX() : Math.max(1, job.spanX());
-        int sizeY = schematic != null ? schematic.sizeY() : Math.max(1, job.spanY());
-        int sizeZ = schematic != null ? schematic.sizeZ() : Math.max(1, job.spanZ());
-        if (job.clipX() != Integer.MAX_VALUE) {
-            sizeX = Math.min(sizeX, job.clipX());
-            sizeY = Math.min(sizeY, job.clipY());
-            sizeZ = Math.min(sizeZ, job.clipZ());
+        int sizeX;
+        int sizeY;
+        int sizeZ;
+        if (job.kind() == BuildJob.Kind.SHAPE) {
+            sizeX = Math.max(1, job.boxSizeX());
+            sizeY = Math.max(1, job.boxSizeY());
+            sizeZ = Math.max(1, job.boxSizeZ());
+        } else if (schematic != null) {
+            sizeX = schematic.sizeX();
+            sizeY = schematic.sizeY();
+            sizeZ = schematic.sizeZ();
+            if (job.clipX() != Integer.MAX_VALUE) {
+                sizeX = Math.min(sizeX, job.clipX());
+                sizeY = Math.min(sizeY, job.clipY());
+                sizeZ = Math.min(sizeZ, job.clipZ());
+            }
+        } else {
+            sizeX = Math.max(1, job.spanX());
+            sizeY = Math.max(1, job.spanY());
+            sizeZ = Math.max(1, job.spanZ());
         }
         int useful = WrightsConfig.usefulCrewFor(blocks, sizeX, sizeY, sizeZ);
         return Math.min(useful, WrightsConfig.maxWrightsPerJob(job));
@@ -3872,7 +3892,14 @@ public final class JobManager {
         }
         Schematic schematic = job.schematicId() == null ? null : library.schematic(job.schematicId()).orElse(null);
         int room = crewRoom(schematic, job);
-        int limit = room;
+        // Never eject wrights already on the job when Manage adds one — only cap growth.
+        int already = 0;
+        for (UUID unitId : kept) {
+            if (job.crewUnits().contains(unitId)) {
+                already++;
+            }
+        }
+        int limit = Math.max(room, already);
         if (kept.size() > limit) {
             if (kept.size() > room) {
                 Messages.actionBar(player, "message.wrights.drone_block_cap", Math.max(0, room));
