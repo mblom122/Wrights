@@ -67,6 +67,11 @@ public final class BuildJob {
     private UUID resultSchematicId;
     private int cursor;
     private int placed;
+    /**
+     * Place/mine bursts that actually changed the world. One AOE hover that places several
+     * blocks counts as one operation, not one per block.
+     */
+    private int operations;
     private int skipped;
     private int skippedSpecial;
     private UUID droneId;
@@ -235,6 +240,15 @@ public final class BuildJob {
 
     public void placedOne() {
         placed++;
+    }
+
+    public int operations() {
+        return operations;
+    }
+
+    /** Count one build/mine operation (one AOE hover or solo place burst). */
+    public void operationOne() {
+        operations++;
     }
 
     public int skipped() {
@@ -1239,6 +1253,7 @@ public final class BuildJob {
         tag.putInt("total", total);
         tag.putInt("cursor", cursor);
         tag.putInt("placed", placed);
+        tag.putInt("operations", operations);
         tag.putInt("skipped", skipped);
         tag.putInt("skippedSpecial", skippedSpecial);
         if (schematicId != null) {
@@ -1440,6 +1455,7 @@ public final class BuildJob {
         job.phase = Phase.valueOf(tag.getString("phase"));
         job.cursor = tag.getInt("cursor");
         job.placed = tag.getInt("placed");
+        job.operations = Math.max(0, tag.getInt("operations"));
         if (tag.contains("settledGhosts")) {
             for (long key : tag.getLongArray("settledGhosts")) {
                 job.settledGhosts.add(key);

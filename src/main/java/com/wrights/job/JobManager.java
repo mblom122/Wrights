@@ -1697,6 +1697,9 @@ public final class JobManager {
             placed++;
             statusWait = DroneEntity.WAIT_NONE;
         }
+        if (placed > 0) {
+            job.operationOne();
+        }
         if (job.waitKind() != BuildJob.WAIT_ITEMS && job.waitKind() != BuildJob.WAIT_CHUNK) {
             job.setWaitKind(BuildJob.WAIT_NONE);
             statusWait = DroneEntity.WAIT_NONE;
@@ -1887,6 +1890,9 @@ public final class JobManager {
                 drone.setWorkStatus(BlockFilters.icon(placeState), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
                 placed++;
                 scanned++;
+            }
+            if (placed > 0) {
+                job.operationOne();
             }
             if (waitingItems) {
                 parkForItems(level, player, hand);
@@ -3349,7 +3355,8 @@ public final class JobManager {
             return;
         }
         drone.setWorkStatus(soloShow, ItemStack.EMPTY, DroneEntity.WAIT_NONE);
-        int budget = WrightsConfig.BLOCKS_PER_TICK.getAsInt();
+        int budget = Math.min(WrightsConfig.BLOCKS_PER_TICK.getAsInt(), WrightTier.operationCap(drone.ops()));
+        int burst = 0;
         for (int i = 0; i < budget; i++) {
             int index = i == 0 ? at : nextSolo(level, player, schematic, job);
             if (index == SUPPORT_WAIT) {
@@ -3376,7 +3383,11 @@ public final class JobManager {
                 }
             }
             drone.setWorkStatus(soloShow, ItemStack.EMPTY, DroneEntity.WAIT_NONE);
-            if (!inOperationReachFromHover(drone.position(), pos, drone.ops())) {
+            if (i == 0) {
+                if (drone.distanceToSqr(Vec3.atCenterOf(pos)) > PLACE_NEAR_SQR) {
+                    break;
+                }
+            } else if (!inOperationReachFromHover(drone.position(), pos, drone.ops())) {
                 break;
             }
             if (job.outsideClip(entry) || satisfied(level, job, entry)) {
@@ -3408,6 +3419,10 @@ public final class JobManager {
                 return;
             }
             markSolo(job, index);
+            burst++;
+        }
+        if (burst > 0) {
+            job.operationOne();
         }
         if (job.waitKind() != BuildJob.WAIT_ITEMS && job.waitKind() != BuildJob.WAIT_FLOOR) {
             job.setWaitKind(BuildJob.WAIT_NONE);
@@ -3696,7 +3711,7 @@ public final class JobManager {
             } else {
                 detail = Component.translatable("hud.wrights.done_mined", placed, skipped);
             }
-            announce(player, library, job, null, detail);
+            announce(player, library, job, null, withOperations(detail, job));
             return;
         }
         library.schematic(job.schematicId())
@@ -3715,7 +3730,18 @@ public final class JobManager {
         } else {
             detail = Component.translatable("hud.wrights.done_placed", placed, skipped);
         }
-        announce(player, library, job, null, detail);
+        announce(player, library, job, null, withOperations(detail, job));
+    }
+
+    /** Appends " · N operations" when the job recorded at least one AOE/place burst. */
+    private static Component withOperations(Component detail, BuildJob job) {
+        if (detail == null || job == null || job.operations() <= 0 || isNoopFinish(detail)) {
+            return detail;
+        }
+        Component ops = job.operations() == 1
+                ? Component.translatable("hud.wrights.done_operations_one")
+                : Component.translatable("hud.wrights.done_operations", job.operations());
+        return detail.copy().append(Component.literal(" · ")).append(ops);
     }
 
     /** Mode, the sub-modes that were on, and the task. The detail says what the job actually did. */
@@ -5393,6 +5419,7 @@ public final class JobManager {
                 continue;
             }
             int budget = placeBudget(hand);
+            int burst = 0;
             for (int n = 0; n < budget; n++) {
                 int at = nextWork(level, player, schematic, job, hand, skipBudget);
                 if (at == -2) {
@@ -5473,6 +5500,10 @@ public final class JobManager {
                     return;
                 }
                 noteProgress(schematic, job, hand, entry, at);
+                burst++;
+            }
+            if (burst > 0) {
+                job.operationOne();
             }
             publishHandStatus(level, player, schematic, job, hand, handStatus);
         }
@@ -7290,6 +7321,8 @@ public final class JobManager {
                 }
                 done[i] = true;
                 progress = true;
+                // Instant finish has no hover AOE — each successful cell is one operation.
+                job.operationOne();
             }
         }
         for (int i = 0; i < count; i++) {
