@@ -298,7 +298,7 @@ public final class JobManager {
         }
         BlueprintNetwork.showJobHologram(player, job, schematic);
         BlueprintNetwork.syncJobs(player);
-        Messages.actionBar(player, "message.wrights.launched");
+        launched(player, job);
     }
 
     private static void startUndo(ServerPlayer player, SchematicLibrary library, BuildJob job, boolean force) {
@@ -639,6 +639,12 @@ public final class JobManager {
         BuildJob job = BuildJob.copy(player.getUUID(), data.controllerId().orElseThrow(), cornerA.dimension(), min, max);
         library.addJob(job);
         Messages.actionBar(player, "message.wrights.copy_started");
+        noteHistory(
+                player,
+                library,
+                job,
+                JobEventLog.LAUNCHED,
+                Component.translatable("history.wrights.copy_started", Math.max(1, job.total())).getString());
     }
 
     public static void startPaste(ServerPlayer player, ItemStack stack, ControllerData data, GlobalPos origin) {
@@ -706,6 +712,12 @@ public final class JobManager {
         job.setReplaceSchematicId(replaceId);
         library.addJob(job);
         Messages.actionBar(player, "message.wrights.saving");
+        noteHistory(
+                player,
+                library,
+                job,
+                JobEventLog.LAUNCHED,
+                Component.translatable("history.wrights.save_started", Math.max(1, job.total())).getString());
         return true;
     }
 
@@ -779,7 +791,7 @@ public final class JobManager {
                 job.setDeferSupplies(true);
             }
             library.addJob(job);
-            Messages.actionBar(player, "message.wrights.queued", wanted);
+            noteQueued(player, job, wanted);
             BlueprintNetwork.showJobHologram(player, job, schematic);
             BlueprintNetwork.syncJobs(player);
             return true;
@@ -796,7 +808,7 @@ public final class JobManager {
         }
         library.addJob(job);
         if (job.deferSupplies()) {
-            Messages.actionBar(player, "message.wrights.queued", Math.max(1, job.crewQuota()));
+            noteQueued(player, job, Math.max(1, job.crewQuota()));
             BlueprintNetwork.showJobHologram(player, job, schematic);
             BlueprintNetwork.syncJobs(player);
             return true;
@@ -843,7 +855,7 @@ public final class JobManager {
             job.setCrewQuota(room);
             job.setQueued(true);
             library.addJob(job);
-            Messages.actionBar(player, "message.wrights.queued", room);
+            noteQueued(player, job, room);
             BlueprintNetwork.showJobHologram(player, job, schematic);
             BlueprintNetwork.syncJobs(player);
             return true;
@@ -1081,7 +1093,7 @@ public final class JobManager {
             if (player.level() instanceof ServerLevel queuedLevel) {
                 attachExchangeHologram(player, library, queuedLevel, job);
             }
-            Messages.actionBar(player, "message.wrights.queued", wanted);
+            noteQueued(player, job, wanted);
             BlueprintNetwork.syncJobs(player);
             return true;
         }
@@ -1093,7 +1105,7 @@ public final class JobManager {
             if (player.level() instanceof ServerLevel deferredLevel) {
                 attachExchangeHologram(player, library, deferredLevel, job);
             }
-            Messages.actionBar(player, "message.wrights.queued", Math.max(1, job.crewQuota()));
+            noteQueued(player, job, Math.max(1, job.crewQuota()));
             BlueprintNetwork.syncJobs(player);
             return true;
         }
@@ -3164,7 +3176,15 @@ public final class JobManager {
         } else if (job.stopped()) {
             kind = JobEventLog.STOPPED;
         }
-        noteHistory(player, library, job, kind, line.getString());
+        String historyDetail = line.getString();
+        int crew = Math.max(job.crewQuota(), assignedCount(job));
+        if (crew > 0 && (kind == JobEventLog.COMPLETED || kind == JobEventLog.UNDONE)) {
+            String crewBit = Component.translatable(
+                    crew == 1 ? "history.wrights.crew_used_one" : "history.wrights.crew_used",
+                    crew).getString();
+            historyDetail = historyDetail.isBlank() ? crewBit : historyDetail + " · " + crewBit;
+        }
+        noteHistory(player, library, job, kind, historyDetail);
     }
 
     private static void noteHistory(ServerPlayer player, SchematicLibrary library, BuildJob job, int kind, String detail) {
@@ -3623,11 +3643,45 @@ public final class JobManager {
     }
 
     private static void launched(ServerPlayer player, BuildJob job) {
-        if (job.hasCrew() && job.hands().size() > 1) {
-            Messages.actionBar(player, "message.wrights.launched_crew", job.hands().size());
+        int sent = assignedCount(job);
+        if (sent > 1) {
+            Messages.actionBar(player, "message.wrights.launched_crew", sent);
         } else {
             Messages.actionBar(player, "message.wrights.launched");
         }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        noteHistory(player, library, job, JobEventLog.LAUNCHED, launchedHistoryDetail(player, job, sent));
+    }
+
+    /** Queued for crew in range — action bar + History with assigned count. */
+    private static void noteQueued(ServerPlayer player, BuildJob job, int assigned) {
+        int wanted = Math.max(1, assigned);
+        Messages.actionBar(player, "message.wrights.queued", wanted);
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        noteHistory(
+                player,
+                library,
+                job,
+                JobEventLog.QUEUED,
+                Component.translatable(
+                        "history.wrights.queued_detail",
+                        wanted,
+                        Math.max(1, job.total())).getString());
+    }
+
+    private static String launchedHistoryDetail(ServerPlayer player, BuildJob job, int sent) {
+        int blocks = Math.max(1, job.total());
+        int assigned = Math.max(job.crewQuota(), sent);
+        if (instant(player) || sent <= 0) {
+            return Component.translatable("history.wrights.launched_detail_solo", blocks).getString();
+        }
+        if (assigned > sent) {
+            return Component.translatable("history.wrights.launched_detail_partial", sent, assigned, blocks).getString();
+        }
+        if (sent == 1) {
+            return Component.translatable("history.wrights.launched_detail_one", blocks).getString();
+        }
+        return Component.translatable("history.wrights.launched_detail", sent, blocks).getString();
     }
 
     public static int droneSlots(ServerPlayer player, BuildJob job) {
