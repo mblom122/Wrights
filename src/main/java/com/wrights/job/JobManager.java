@@ -1083,7 +1083,7 @@ public final class JobManager {
             if (exchangeWork == null || exchangeWork.blockCount() <= 0) {
                 Component detail = Component.translatable("message.wrights.exchange_none");
                 Messages.actionBar(player, detail);
-                BlueprintNetwork.jobDone(player, detail, Component.empty(), Component.empty(), -1);
+                BlueprintNetwork.jobDone(player, Component.literal(title), detail, 0);
                 return true;
             }
         }
