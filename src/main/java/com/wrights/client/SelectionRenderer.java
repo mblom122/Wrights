@@ -95,6 +95,8 @@ public final class SelectionRenderer {
         drawPortGlow(pose, buffers, camera, minecraft);
         drawMarkedPorts(pose, buffers, camera, minecraft);
         drawMarkedWrights(pose, buffers, camera, minecraft);
+        // Highlighted jobs stay visible without the controller (same as marked ports / wrights).
+        drawMarkedJobs(pose, buffers, camera, minecraft);
         drawMirrorAnchorGlow(pose, buffers, camera, minecraft);
         drawMineMarks(pose, buffers, camera, minecraft);
         boolean placing = minecraft.screen instanceof PlacementScreen;
@@ -125,7 +127,6 @@ public final class SelectionRenderer {
         if (guiOk && WrightsClientState.mode == WrightsClientState.Mode.BUILD && (WrightsClientState.bindSupply || WrightsClientState.supplyBound)) {
             drawSupplyMarkers(pose, buffers, camera, minecraft);
         }
-        drawMarkedJobs(pose, buffers, camera, minecraft);
         drawMirror(pose, buffers, camera, minecraft);
         drawShapeAnchorGlow(pose, buffers, camera, minecraft);
     }
@@ -1013,10 +1014,6 @@ public final class SelectionRenderer {
             }
             AABB box = markedBox(job);
             drawBox(pose, lines, box, camera, 0.98F, 0.86F, 0.32F, pulse);
-            if (markVolume(job) > MARK_SOLID_MAX) {
-                // Second outer wire so huge jobs stay readable from far / while standing inside.
-                drawBox(pose, lines, box.inflate(0.45D), camera, 1.0F, 0.94F, 0.45F, pulse * 0.75F);
-            }
             if (body != null) {
                 drawGuide(pose, lines, camera, body, box, 0.98F, 0.86F, 0.32F, pulse);
             }
