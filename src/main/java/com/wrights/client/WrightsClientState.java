@@ -735,6 +735,7 @@ public final class WrightsClientState {
         rememberedTool = -1;
         rememberedBuild = "";
         resumeSent = false;
+        restorePlacementPending = false;
         bindPort = null;
         clearShapeLookSnap();
         updateFlags();
@@ -767,7 +768,29 @@ public final class WrightsClientState {
         rememberedBuild = "";
     }
 
+    /**
+     * Put the local task away so the next hold always runs {@link #tryResume()} from config.
+     * Server session stays; Resume / CaptureSync brings corners and build draft back.
+     */
     public static void noteUnequipped() {
+        if (mode != Mode.NONE || cornerA != null || cornerB != null || buildId != null || !ghosts.isEmpty()) {
+            if (mode != Mode.NONE) {
+                rememberMode();
+            }
+            mode = Mode.NONE;
+            clearBuildAims();
+            buildId = null;
+            ghosts = List.of();
+            concealed = false;
+            follow = false;
+            cornerA = null;
+            cornerB = null;
+            editingId = null;
+            boxDragging = false;
+            moveGrabbed = false;
+            clearCapturePreview();
+            updateFlags();
+        }
         resumeSent = false;
     }
 
@@ -1217,25 +1240,41 @@ public final class WrightsClientState {
                 cornerB = null;
                 boxDragging = false;
             }
-            mode = incoming;
-            if (incoming != Mode.CAPTURE) {
+            // Jobs / Manage / Info / Link are client-only. A CaptureCancel NONE sync must not
+            // yank the task strip back to Ready right after leaving New.
+            boolean clientOnly = previous == Mode.JOBS || previous == Mode.MANAGE
+                    || previous == Mode.INFO || previous == Mode.LINK;
+            if (incoming == Mode.NONE && clientOnly) {
+                cornerA = null;
+                cornerB = null;
+                editingId = null;
                 boxDragging = false;
-            } else if (previous != Mode.CAPTURE) {
-                styleHudTicks = Math.max(styleHudTicks, STYLE_HUD_TICKS);
-            }
-            if (incoming != Mode.BUILD) {
                 buildId = null;
                 ghosts = List.of();
                 concealed = false;
                 follow = false;
-                if (incoming == Mode.CAPTURE || incoming == Mode.SAVING) {
-                    clearBuildAims();
-                }
-            } else if (previous != Mode.BUILD) {
-                applyLastBuildTool();
-            }
-            if ((incoming != Mode.CAPTURE && incoming != Mode.SAVING) || cornerA == null || cornerB == null) {
                 clearCapturePreview();
+            } else {
+                mode = incoming;
+                if (incoming != Mode.CAPTURE) {
+                    boxDragging = false;
+                } else if (previous != Mode.CAPTURE) {
+                    styleHudTicks = Math.max(styleHudTicks, STYLE_HUD_TICKS);
+                }
+                if (incoming != Mode.BUILD) {
+                    buildId = null;
+                    ghosts = List.of();
+                    concealed = false;
+                    follow = false;
+                    if (incoming == Mode.CAPTURE || incoming == Mode.SAVING) {
+                        clearBuildAims();
+                    }
+                } else if (previous != Mode.BUILD) {
+                    applyLastBuildTool();
+                }
+                if ((incoming != Mode.CAPTURE && incoming != Mode.SAVING) || cornerA == null || cornerB == null) {
+                    clearCapturePreview();
+                }
             }
         }
         updateFlags();

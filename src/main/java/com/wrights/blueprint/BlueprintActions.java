@@ -183,8 +183,24 @@ public final class BlueprintActions {
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
         com.wrights.item.ControllerItem.quietLegacy(player);
         if (session.mode() != BlueprintSessions.Mode.NONE) {
-            BlueprintNetwork.syncCapture(player);
-            return;
+            boolean sameBuild = mode == 2 && session.mode() == BlueprintSessions.Mode.BUILD;
+            boolean sameCapture = mode == 1 && session.mode() == BlueprintSessions.Mode.CAPTURE;
+            if (sameBuild) {
+                // Client suspended on unequip — push draft / empty Build so Place/Shape/Mirror return.
+                if (session.buildId() != null && session.draft() != null) {
+                    BlueprintNetwork.preview(player, session.draft(), true, false);
+                    BlueprintNetwork.syncSupply(player);
+                } else {
+                    BlueprintNetwork.syncCapture(player);
+                }
+                return;
+            }
+            if (sameCapture) {
+                BlueprintNetwork.syncCapture(player);
+                return;
+            }
+            // Requested task differs from the leftover server session — start clean.
+            session.clear();
         }
         if (mode == 2) {
             beginBuild(player, buildId);
