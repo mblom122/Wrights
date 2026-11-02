@@ -367,19 +367,16 @@ public final class WrightsConfig {
         int sx = Math.max(1, sizeX);
         int sy = Math.max(1, sizeY);
         int sz = Math.max(1, sizeZ);
-        int aoe = Math.max(1, placeAoeCapacity(sx, sy, sz));
         int station = placeAoeLine();
         int nx = (sx + station - 1) / station;
         int ny = (sy + station - 1) / station;
         int nz = (sz + station - 1) / station;
         int stations = Math.max(1, nx * ny * nz);
-        int byAoe = (int) Math.min(Integer.MAX_VALUE, (safeBlocks + aoe - 1L) / aoe);
-        byAoe = Math.max(1, byAoe);
-        // Need enough for one AOE wave and enough spatial slots so they are not stacked.
-        int needed = Math.max(byAoe, stations);
+        // Spatial stations only: a 5×5 circle fits one hover (stations=1) even if AABB/aoe
+        // math would ask for three. Thin beams still get ceil(length/7).
         int columns = Math.max(1, Math.max(sx, sz));
         int blockCap = (int) Math.min(Integer.MAX_VALUE, safeBlocks);
-        return Math.max(1, Math.min(blockCap, Math.min(needed, columns)));
+        return Math.max(1, Math.min(blockCap, Math.min(stations, columns)));
     }
 
     public static int maxWrightsCarried() {

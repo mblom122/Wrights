@@ -2154,9 +2154,13 @@ public final class JobManager {
         if (!compact || candidates == null || candidateCount <= 1) {
             return nearest;
         }
-        // Far / pre-launch: pick densest hover on the whole compact job (station center).
-        // Already soft-near: near-first, denser only within SEED_SLACK_SQR.
-        boolean far = origin == null || nearestDist > FLY_NEAR_SQR;
+        // Far / pre-launch, or share fits one place-AOE: densest hover (station center).
+        // Soft-near on larger shares: near-first, denser only within SEED_SLACK_SQR.
+        // Short beams (≤7) used to lock onto the nearest end — slack (~2.8) is smaller than
+        // mid-line distance (3), so they crawled end-to-end instead of one middle hover.
+        int aoe = WrightsConfig.placeAoeCapacity(job.boxSizeX(), job.boxSizeY(), job.boxSizeZ());
+        boolean oneHover = candidateCount <= aoe;
+        boolean far = origin == null || nearestDist > FLY_NEAR_SQR || oneHover;
         int best = nearest;
         int bestScore = shapeClusterReadyCount(
                 level, player, job, hand, Vec3.atCenterOf(job.scanPosAt(nearest)), shapeKind, shapePinLocal, true);
@@ -2389,12 +2393,14 @@ public final class JobManager {
         if (nearest < 0 || !preferDense || denseCandidates == null || denseCount <= 1) {
             return nearest;
         }
+        int aoe = WrightsConfig.placeAoeCapacity(job.boxSizeX(), job.boxSizeY(), job.boxSizeZ());
+        boolean oneHover = denseCount <= aoe;
         int best = nearest;
         int bestScore = shapeClusterReadyCount(
                 level, player, job, hand, Vec3.atCenterOf(job.scanPosAt(nearest)), shapeKind, shapePinLocal, onlyOwned);
         double bestDist = nearestDist;
         for (int i = 0; i < denseCount; i++) {
-            if (denseDists[i] > nearestDist + SEED_SLACK_SQR) {
+            if (!oneHover && denseDists[i] > nearestDist + SEED_SLACK_SQR) {
                 continue;
             }
             int index = denseCandidates[i];
@@ -3392,6 +3398,9 @@ public final class JobManager {
         com.wrights.network.BlueprintNetwork.syncJobs(player);
         if (placed == 0 && skipped > 0) {
             detail = Component.translatable("message.wrights.all_skipped");
+        } else if (placed == 0 && job.kind() == BuildJob.Kind.SHAPE) {
+            // Shape OUT cells advance with no skip count — empty membership used to read as "already built".
+            detail = Component.translatable("message.wrights.shape_nowhere");
         } else if (placed == 0) {
             detail = Component.translatable("message.wrights.already_built");
         } else {
@@ -3443,6 +3452,7 @@ public final class JobManager {
         String text = detail.getString();
         return text.equals(Component.translatable("message.wrights.already_built").getString())
                 || text.equals(Component.translatable("message.wrights.all_skipped").getString())
+                || text.equals(Component.translatable("message.wrights.shape_nowhere").getString())
                 || text.equals(Component.translatable("message.wrights.mine_none").getString())
                 || text.equals(Component.translatable("message.wrights.exchange_none").getString());
     }
