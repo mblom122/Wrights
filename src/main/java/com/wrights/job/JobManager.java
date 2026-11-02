@@ -1751,17 +1751,20 @@ public final class JobManager {
         boolean waitingChunk = false;
         int scanCap = Math.max(64, WrightsConfig.COPY_POSITIONS_PER_TICK.getAsInt());
         ensureShapeShares(job);
+        // At most one strip split per tick — many idle hands used to halve the same share every tick.
+        boolean splitThisTick = false;
         for (BuildJob.Hand hand : job.hands()) {
             if (hand.sheltering) {
                 setShapeHandStatus(level, hand, null, DroneEntity.WAIT_SHELTER);
                 continue;
             }
             int at = nextShapeIndex(level, player, job, hand, usable, shapeKind, shapePinLocal, true, scanCap);
-            if (at < 0 && tryRebalanceShapeShare(player, library, job, hand)) {
+            if (at < 0 && !splitThisTick && tryRebalanceShapeShare(player, library, level, job, hand, usable, shapeKind, shapePinLocal, scanCap)) {
+                splitThisTick = true;
                 at = nextShapeIndex(level, player, job, hand, usable, shapeKind, shapePinLocal, true, scanCap);
             }
             if (at < 0) {
-                // Last thin slices may be shared — help any ready cell nobody else is aiming at.
+                // Leftovers: help near peers, then any unresolved READY cell in the job.
                 at = nextShapeIndex(level, player, job, hand, usable, shapeKind, shapePinLocal, false, scanCap);
             }
             if (at < 0 && job.cursor() < job.total() && hand.cursor >= job.total()) {
@@ -1839,7 +1842,13 @@ public final class JobManager {
                 }
                 claimAim(job, hand, index);
                 BlockPos cell = job.scanPosAt(index);
-                if (!inOperationReachFromHover(drone.position(), cell, handOps(hand))) {
+                // Primary aim: fly-arrive uses DRONE_REACH_SQR (~1.5); ops reach can be 0–2 and
+                // used to reject the cell we just hovered over, leaving one wright "placing" forever.
+                if (placed == 0) {
+                    if (drone.distanceToSqr(Vec3.atCenterOf(cell)) > PLACE_NEAR_SQR) {
+                        break;
+                    }
+                } else if (!inOperationReachFromHover(drone.position(), cell, handOps(hand))) {
                     break;
                 }
                 BlockState placeState = shapeNextState(job, usable, fillMode, random);
@@ -2461,9 +2470,8 @@ public final class JobManager {
     }
 
     /**
-     * Fallback help: prefer work near the busiest share (even if that peer is still busy),
-     * then any leftover aim from idle peers. Exclusive shares are preferred via
-     * {@link #tryRebalanceShapeShare}; this only covers thin shared leftovers.
+     * Fallback help: prefer work near a peer that still has real leftovers, then any
+     * unresolved READY cell in the job (endgame cleanup when shares no longer match reality).
      */
     private static int shapeHelpTarget(
             ServerLevel level,
@@ -2473,7 +2481,7 @@ public final class JobManager {
             com.wrights.blueprint.Shapes.Kind shapeKind,
             BlockPos shapePinLocal,
             int scanCap) {
-        BuildJob.Hand busiest = busiestShapeShare(job, hand);
+        BuildJob.Hand busiest = busiestShapeShare(level, player, job, hand, shapeKind, shapePinLocal, scanCap);
         if (busiest != null) {
             Vec3 otherOrigin = handOrigin(level, busiest);
             if (otherOrigin != null) {
@@ -2494,26 +2502,49 @@ public final class JobManager {
                 }
             }
         }
-        int examined = 0;
         for (BuildJob.Hand other : job.hands()) {
             if (other == hand || other.aim < 0 || other.aim >= job.total()) {
                 continue;
             }
-            if (examined++ >= scanCap) {
-                break;
-            }
             Vec3 aimOrigin = Vec3.atCenterOf(job.scanPosAt(other.aim));
             int near = shapeClusterIndex(
-                    level, player, job, hand, aimOrigin, PLACE_NEAR_SQR, CLUSTER_RADIUS,
-                    shapeKind, shapePinLocal, false, true);
-            if (near >= 0 && near != other.aim) {
-                return near;
-            }
-            near = shapeClusterIndex(
                     level, player, job, hand, aimOrigin, FLY_NEAR_SQR, FLY_NEAR_RADIUS,
                     shapeKind, shapePinLocal, false, true);
             if (near >= 0 && near != other.aim) {
                 return near;
+            }
+        }
+        return shapeAnyReadyIndex(level, player, job, hand, shapeKind, shapePinLocal, scanCap);
+    }
+
+    /** Any unresolved READY cell in the AABB, resolving OUT/SKIP as we go. */
+    private static int shapeAnyReadyIndex(
+            ServerLevel level,
+            ServerPlayer player,
+            BuildJob job,
+            BuildJob.Hand hand,
+            com.wrights.blueprint.Shapes.Kind shapeKind,
+            BlockPos shapePinLocal,
+            int scanCap) {
+        int total = job.total();
+        int examined = 0;
+        int budget = Math.max(scanCap * 4, 256);
+        for (int i = 0; i < total && examined < budget; i++) {
+            if (job.isShapeResolved(i)) {
+                continue;
+            }
+            examined++;
+            if (aimedByOther(job, hand, i)) {
+                continue;
+            }
+            ShapeCell kind = classifyShapeCell(level, player, job, hand, i, shapeKind, shapePinLocal, false);
+            if (kind == ShapeCell.READY) {
+                return i;
+            }
+            if (kind == ShapeCell.OUT) {
+                resolveShapeCell(job, hand, i, false);
+            } else if (kind == ShapeCell.SKIP) {
+                resolveShapeCell(job, hand, i, true);
             }
         }
         return -1;
@@ -2558,18 +2589,23 @@ public final class JobManager {
     }
 
     /**
-     * Finished (or empty-share) wright takes half of the busiest remaining share.
-     * A 1-block-deep share is shared instead of split so both can finish it.
+     * Finished (or empty-share) wright takes half of the busiest share that still has
+     * real READY work. A 1-block-deep share is co-owned instead of split.
      */
     private static boolean tryRebalanceShapeShare(
             ServerPlayer player,
             SchematicLibrary library,
+            ServerLevel level,
             BuildJob job,
-            BuildJob.Hand hand) {
-        if (job == null || hand == null || job.hands().size() < 2 || job.cursor() >= job.total()) {
+            BuildJob.Hand hand,
+            java.util.List<com.wrights.blueprint.ShapeMaterials.Entry> usable,
+            com.wrights.blueprint.Shapes.Kind shapeKind,
+            BlockPos shapePinLocal,
+            int scanCap) {
+        if (job == null || hand == null || level == null || job.hands().size() < 2 || job.cursor() >= job.total()) {
             return false;
         }
-        BuildJob.Hand best = busiestShapeShare(job, hand);
+        BuildJob.Hand best = busiestShapeShare(level, player, job, hand, shapeKind, shapePinLocal, scanCap);
         if (best == null) {
             return false;
         }
@@ -2579,24 +2615,61 @@ public final class JobManager {
         if (width <= 0) {
             return false;
         }
-        int oldRemain = Math.max(best.shareRemain, width);
+        // Already on that strip — do not thrash shares.
+        if (hand.shareFrom == from && hand.shareTo == to) {
+            return false;
+        }
+        int oldRemain = Math.max(0, best.shareRemain);
         if (width >= 2) {
             int mid = from + width / 2;
             if (mid <= from || mid >= to) {
                 return false;
             }
-            best.shareTo = mid;
-            best.shareRemain = Math.max(1, (int) ((long) oldRemain * (mid - from) / width));
-            hand.shareFrom = mid;
-            hand.shareTo = to;
-            hand.shareRemain = Math.max(1, oldRemain - best.shareRemain);
+            boolean leftWork = shapeShareRangeHasWork(
+                    level, player, job, best, from, mid, shapeKind, shapePinLocal, scanCap);
+            boolean rightWork = shapeShareRangeHasWork(
+                    level, player, job, best, mid, to, shapeKind, shapePinLocal, scanCap);
+            if (!leftWork && !rightWork) {
+                return false;
+            }
+            if (leftWork && rightWork) {
+                // Fair split — donor keeps the near half, helper takes the far half.
+                best.shareFrom = from;
+                best.shareTo = mid;
+                hand.shareFrom = mid;
+                hand.shareTo = to;
+            } else if (leftWork) {
+                // Only the near half still has blocks — co-own that half.
+                best.shareFrom = from;
+                best.shareTo = mid;
+                hand.shareFrom = from;
+                hand.shareTo = mid;
+            } else {
+                // Only the far half still has blocks — co-own that half.
+                best.shareFrom = mid;
+                best.shareTo = to;
+                hand.shareFrom = mid;
+                hand.shareTo = to;
+            }
+            boolean shared = hand.shareFrom == best.shareFrom && hand.shareTo == best.shareTo;
+            if (shared) {
+                best.shareRemain = oldRemain;
+                hand.shareRemain = oldRemain;
+            } else {
+                int donorWidth = Math.max(1, best.shareTo - best.shareFrom);
+                int helperWidth = Math.max(1, hand.shareTo - hand.shareFrom);
+                int parts = donorWidth + helperWidth;
+                best.shareRemain = Math.max(0, (int) ((long) oldRemain * donorWidth / parts));
+                hand.shareRemain = Math.max(0, oldRemain - best.shareRemain);
+            }
         } else {
-            // Last slice — both own it until it clears.
+            // Last slice — co-own until it clears.
             hand.shareFrom = from;
             hand.shareTo = to;
             hand.shareRemain = oldRemain;
         }
-        hand.cursor = Math.max(0, firstOwnedShapeScanIndex(job, hand));
+        int ownedStart = firstOwnedShapeScanIndex(job, hand);
+        hand.cursor = ownedStart >= 0 ? ownedStart : 0;
         hand.aim = -1;
         hand.idle = false;
         hand.probe = 0;
@@ -2605,7 +2678,18 @@ public final class JobManager {
         return true;
     }
 
-    private static BuildJob.Hand busiestShapeShare(BuildJob job, BuildJob.Hand skip) {
+    /**
+     * Hand whose owned strip still has placeable work. Ignores stale {@code shareRemain}
+     * volume estimates that kept pointing at empty halves.
+     */
+    private static BuildJob.Hand busiestShapeShare(
+            ServerLevel level,
+            ServerPlayer player,
+            BuildJob job,
+            BuildJob.Hand skip,
+            com.wrights.blueprint.Shapes.Kind shapeKind,
+            BlockPos shapePinLocal,
+            int scanCap) {
         BuildJob.Hand best = null;
         int bestLeft = 0;
         int bestWidth = 0;
@@ -2616,14 +2700,14 @@ public final class JobManager {
             if (other.shareFrom < 0 || other.shareTo <= other.shareFrom) {
                 continue;
             }
-            int width = other.shareTo - other.shareFrom;
-            int left = other.shareRemain;
-            if (left <= 0) {
-                left = other.idle ? 0 : width;
-            }
-            if (left <= 0) {
+            if (!shapeShareHasWork(level, player, job, other, shapeKind, shapePinLocal, scanCap)) {
+                if (other.idle) {
+                    other.shareRemain = 0;
+                }
                 continue;
             }
+            int width = other.shareTo - other.shareFrom;
+            int left = Math.max(1, other.shareRemain > 0 ? other.shareRemain : width);
             if (left > bestLeft || (left == bestLeft && width > bestWidth)) {
                 best = other;
                 bestLeft = left;
@@ -2631,6 +2715,76 @@ public final class JobManager {
             }
         }
         return best;
+    }
+
+    private static boolean shapeShareHasWork(
+            ServerLevel level,
+            ServerPlayer player,
+            BuildJob job,
+            BuildJob.Hand hand,
+            com.wrights.blueprint.Shapes.Kind shapeKind,
+            BlockPos shapePinLocal,
+            int scanCap) {
+        if (hand == null || hand.shareFrom < 0 || hand.shareTo <= hand.shareFrom) {
+            return false;
+        }
+        return shapeShareRangeHasWork(
+                level, player, job, hand, hand.shareFrom, hand.shareTo, shapeKind, shapePinLocal, scanCap);
+    }
+
+    private static boolean shapeShareRangeHasWork(
+            ServerLevel level,
+            ServerPlayer player,
+            BuildJob job,
+            BuildJob.Hand owner,
+            int shareFrom,
+            int shareTo,
+            com.wrights.blueprint.Shapes.Kind shapeKind,
+            BlockPos shapePinLocal,
+            int scanCap) {
+        if (shareFrom < 0 || shareTo <= shareFrom) {
+            return false;
+        }
+        int total = job.total();
+        int examined = 0;
+        int budget = Math.max(32, scanCap);
+        int savedFrom = owner.shareFrom;
+        int savedTo = owner.shareTo;
+        owner.shareFrom = shareFrom;
+        owner.shareTo = shareTo;
+        try {
+            int start = firstOwnedShapeScanIndex(job, owner);
+            if (start < 0) {
+                return false;
+            }
+            for (int i = start; i < total && examined < budget; i++) {
+                BlockPos pos = job.scanPosAt(i);
+                int lx = pos.getX() - job.min().getX();
+                int ly = pos.getY() - job.min().getY();
+                int lz = pos.getZ() - job.min().getZ();
+                if (!ownsShapeCell(job, owner, lx, ly, lz)) {
+                    // Past this strip along the scan order — stop early when we leave the range.
+                    ShapeStrip strip = shapeStrip(job);
+                    int along = strip.alongX ? lx : (strip.alongZ ? lz : ly);
+                    if (along >= shareTo) {
+                        break;
+                    }
+                    continue;
+                }
+                if (job.isShapeResolved(i)) {
+                    continue;
+                }
+                examined++;
+                ShapeCell kind = classifyShapeCell(level, player, job, owner, i, shapeKind, shapePinLocal, true);
+                if (kind == ShapeCell.READY) {
+                    return true;
+                }
+            }
+        } finally {
+            owner.shareFrom = savedFrom;
+            owner.shareTo = savedTo;
+        }
+        return false;
     }
 
     /** Local block ownership along the long box axis via {@link BuildJob.Hand#shareFrom}/{@code shareTo}. */
@@ -5278,8 +5432,10 @@ public final class JobManager {
                 }
                 Schematic.Entry entry = schematic.entry(at);
                 BlockPos pos = job.min().offset(entry.x(), entry.y(), entry.z());
-                // Out of multi-place reach: claim as the next fly target only after cluster search failed.
-                if (!inOperationReachFromHover(drone.position(), pos, handOps(hand))) {
+                // Ops reach is tight (0–2); fly-arrive allows ~1.5 from hover. Near the cell, place it.
+                // Farther AOE candidates wait for another hover.
+                if (!inOperationReachFromHover(drone.position(), pos, handOps(hand))
+                        && drone.distanceToSqr(Vec3.atCenterOf(pos)) > PLACE_NEAR_SQR) {
                     claimAim(job, hand, at);
                     break;
                 }
@@ -5424,7 +5580,11 @@ public final class JobManager {
                 }
                 BuildJob.Refund refund = job.refunds().get(at);
                 BlockPos pos = job.min().offset(refund.x(), refund.y(), refund.z());
-                if (!inOperationReachFromHover(drone.position(), pos, handOps(hand))) {
+                if (n == 0) {
+                    if (drone.distanceToSqr(Vec3.atCenterOf(pos)) > PLACE_NEAR_SQR) {
+                        break;
+                    }
+                } else if (!inOperationReachFromHover(drone.position(), pos, handOps(hand))) {
                     break;
                 }
                 job.takeRefund(at);
