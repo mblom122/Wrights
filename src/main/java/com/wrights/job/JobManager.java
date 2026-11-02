@@ -3498,6 +3498,7 @@ public final class JobManager {
         job.clearAssigned();
         job.setQueued(true);
         job.setPaused(false);
+        job.clearHold();
         library.setDirty();
         BlueprintNetwork.syncJobs(player);
         if (recalled > 0) {
@@ -3947,9 +3948,9 @@ public final class JobManager {
                 }
             }
         }
-        // Personal jobs that docked from player-range must refill from you — not a far-side
-        // wrightport, which looks like a wrong-way pop onto the build.
-        boolean personalOnly = job.crewSource() == 1;
+        // Jobs that had any personal wrights (pure or mixed) refill from you after a range dock —
+        // not from a wrightport on the build, which looks like a snap onto the site.
+        boolean personalOnly = job.crewSource() == 1 || job.crewSource() == 3;
         if (need > 0 && level != null) {
             for (WrightHomes.FreeWright free : freeUnits(player, library, job, Integer.MAX_VALUE)) {
                 UUID id = free.unit().id();
@@ -7222,8 +7223,18 @@ public final class JobManager {
                 return null;
             }
         }
+        Vec3 site = Vec3.atCenterOf(workPos).add(0.0D, 1.15D, 0.0D);
+        BlockPos home = job.hands().isEmpty() ? null : job.hands().get(0).homePort;
+        boolean launchFromPlayer = player != null
+                && player.level() == level
+                && (home == null
+                        || player.position().distanceTo(site) <= WrightsConfig.MAX_RANGE.getAsInt() + 8.0D);
         net.minecraft.world.phys.AABB search = new net.minecraft.world.phys.AABB(workPos).inflate(96.0D);
         for (DroneEntity drone : level.getEntitiesOfClass(DroneEntity.class, search, entity -> entity.jobId().filter(job.id()::equals).isPresent() && entity.isAlive())) {
+            if (launchFromPlayer) {
+                drone.discard();
+                continue;
+            }
             job.setDroneId(drone.getUUID());
             paint(drone, job);
             bindUnit(job, drone, 0);
@@ -7235,8 +7246,6 @@ public final class JobManager {
         DroneEntity drone = new DroneEntity(ModEntities.DRONE.get(), level);
         drone.setJobId(job.id());
         bindUnit(job, drone, 0);
-        Vec3 site = Vec3.atCenterOf(workPos).add(0.0D, 1.15D, 0.0D);
-        BlockPos home = job.hands().isEmpty() ? null : job.hands().get(0).homePort;
         depart(drone, player, site, 0, 1, home);
         job.setDroneId(drone.getUUID());
         job.setLastDronePos(drone.blockPosition());
@@ -7275,9 +7284,20 @@ public final class JobManager {
             }
             hand.entityId = null;
         }
+        Vec3 site = Vec3.atCenterOf(workPos).add(0.0D, 1.15D, 0.0D);
+        boolean launchFromPlayer = player != null
+                && player.level() == level
+                && (hand.homePort == null
+                        || player.position().distanceTo(site) <= WrightsConfig.MAX_RANGE.getAsInt() + 8.0D);
         AABB search = new AABB(workPos).inflate(96.0D);
         for (DroneEntity drone : level.getEntitiesOfClass(DroneEntity.class, search, entity -> entity.isAlive() && entity.jobId().filter(job.id()::equals).isPresent())) {
             if (job.ownsDrone(drone.getUUID())) {
+                continue;
+            }
+            // Stale flyer still marked for this job on the site — adopting it looks like a snap.
+            // When we should leave from the player, discard it and spawn a fresh cruise.
+            if (launchFromPlayer) {
+                drone.discard();
                 continue;
             }
             hand.entityId = drone.getUUID();
@@ -7292,7 +7312,6 @@ public final class JobManager {
         DroneEntity drone = new DroneEntity(ModEntities.DRONE.get(), level);
         drone.setJobId(job.id());
         bindUnit(job, drone, job.hands().indexOf(hand));
-        Vec3 site = Vec3.atCenterOf(workPos).add(0.0D, 1.15D, 0.0D);
         depart(drone, player, site, hand.lane, hand.lanes, hand.homePort);
         hand.entityId = drone.getUUID();
         hand.lastPos = drone.blockPosition();
@@ -7526,7 +7545,7 @@ public final class JobManager {
         library.setDirty();
     }
 
-    /** Cruise farther than this from the chosen origin snaps above the work so the flyer stays visible. */
+    /** Cruise farther than this from a port with no player nearby snaps above the work so the flyer stays visible. */
     private static final double JOB_SNAP_BLOCKS = 96.0D;
 
     private static void depart(DroneEntity drone, ServerPlayer player, Vec3 work, int lane, int lanes, BlockPos homePort) {
@@ -7538,35 +7557,37 @@ public final class JobManager {
             return;
         }
         boolean playerHere = player != null && player.level() == drone.level();
-        // Personal wrights always leave from you and fly the whole way while you are here.
-        // Snapping to the job after a range-return looked like a wrong-way flash then a teleport.
-        if (homePort == null) {
-            if (playerHere) {
-                drone.departFromPlayer(player, work, lane, lanes);
+        double range = WrightsConfig.MAX_RANGE.getAsInt();
+        boolean playerNearWork = playerHere && player.position().distanceTo(work) <= range + 8.0D;
+        // Personal wrights, and any launch while you are in range of the job, always leave from you
+        // and cruise the whole way. A wrightport sitting on a small build must not win — that read
+        // as a snap onto the site when you walked back into range.
+        if (playerHere && (homePort == null || playerNearWork)) {
+            drone.departFromPlayer(player, work, lane, lanes);
+            if (homePort != null) {
+                drone.setHomePort(homePort);
+            }
+            return;
+        }
+        if (homePort != null && playerHere && player.level().isLoaded(homePort)) {
+            Vec3 lip = WrightHomes.lip(homePort);
+            if (lip.distanceTo(work) <= JOB_SNAP_BLOCKS) {
+                drone.departFromBlock(homePort, work, lane, lanes);
                 return;
             }
-            drone.moveTo(work.x, work.y + 8.0D, work.z, yaw, 0.0F);
-            drone.setYRot(yaw);
-            return;
         }
-        Vec3 portLip = null;
-        if (playerHere && player.level().isLoaded(homePort)) {
-            portLip = WrightHomes.lip(homePort);
+        if (homePort != null && drone.level() instanceof ServerLevel server && server.isLoaded(homePort)) {
+            Vec3 lip = WrightHomes.lip(homePort);
+            if (lip.distanceTo(work) <= JOB_SNAP_BLOCKS) {
+                drone.departFromBlock(homePort, work, lane, lanes);
+                return;
+            }
         }
-        double playerDist = playerHere ? player.position().distanceTo(work) : Double.MAX_VALUE;
-        double portDist = portLip == null ? Double.MAX_VALUE : portLip.distanceTo(work);
-        // Prefer the closer visible origin. A far-side wrightport must not win over you when you
-        // just walked back into range — that read as flying the wrong way then appearing on site.
-        if (playerHere && playerDist <= JOB_SNAP_BLOCKS && playerDist <= portDist + 0.5D) {
+        if (playerHere) {
             drone.departFromPlayer(player, work, lane, lanes);
-            return;
-        }
-        if (portLip != null && portDist <= JOB_SNAP_BLOCKS) {
-            drone.departFromBlock(homePort, work, lane, lanes);
-            return;
-        }
-        if (playerHere && playerDist <= JOB_SNAP_BLOCKS) {
-            drone.departFromPlayer(player, work, lane, lanes);
+            if (homePort != null) {
+                drone.setHomePort(homePort);
+            }
             return;
         }
         drone.moveTo(work.x, work.y + 8.0D, work.z, yaw, 0.0F);
