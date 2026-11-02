@@ -219,6 +219,9 @@ public final class WrightsClientState {
     public static final Map<UUID, ActiveBuild> activeBuilds = new LinkedHashMap<>();
     public static final Set<Long> activeCells = new HashSet<>();
     public static final Set<UUID> markedJobs = new HashSet<>();
+    /** Until when the player→job guide line is drawn after a job is highlighted (5s). */
+    private static final Map<UUID, Long> markedJobGuideUntil = new HashMap<>();
+    private static final long MARK_GUIDE_MS = 5_000L;
     public static final Set<UUID> markedWrights = new HashSet<>();
     public static Map<UUID, BlueprintPayloads.WrightSpot> wrightSpots = Map.of();
     public static List<BlueprintPayloads.PlacedPort> placedPorts = List.of();
@@ -289,6 +292,7 @@ public final class WrightsClientState {
         }
         paces.keySet().retainAll(seen);
         markedJobs.retainAll(seen);
+        markedJobGuideUntil.keySet().retainAll(markedJobs);
         // A removed job never sends another clear, so drop outlines that no longer have a job.
         // Finished mirror jobs stay in the list and keep their block marks.
         if (activeBuilds.keySet().removeIf(id -> !seen.contains(id) || (finishedJob(id) && !cellMarksJob(id)))) {
@@ -367,9 +371,36 @@ public final class WrightsClientState {
     }
 
     public static void toggleMark(UUID id) {
+        if (id == null) {
+            return;
+        }
         if (!markedJobs.add(id)) {
             markedJobs.remove(id);
+            markedJobGuideUntil.remove(id);
+            return;
         }
+        markedJobGuideUntil.put(id, System.currentTimeMillis() + MARK_GUIDE_MS);
+    }
+
+    /** True for the first few seconds after a job is highlighted — draws the guide from the player. */
+    public static boolean markGuideActive(UUID id) {
+        if (id == null || !markedJobs.contains(id)) {
+            return false;
+        }
+        Long until = markedJobGuideUntil.get(id);
+        if (until == null) {
+            return false;
+        }
+        if (System.currentTimeMillis() >= until) {
+            markedJobGuideUntil.remove(id);
+            return false;
+        }
+        return true;
+    }
+
+    public static void clearMarkedJobs() {
+        markedJobs.clear();
+        markedJobGuideUntil.clear();
     }
 
     public static void applyWrightSpots(BlueprintPayloads.WrightSpots payload) {

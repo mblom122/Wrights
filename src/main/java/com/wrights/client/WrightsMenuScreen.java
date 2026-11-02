@@ -4232,7 +4232,7 @@ public class WrightsMenuScreen extends Screen {
 
     private boolean activateJobHit(JobHit hit) {
         if (hit.action() == ACT_CLEAR_MARKS) {
-            WrightsClientState.markedJobs.clear();
+            WrightsClientState.clearMarkedJobs();
             WrightsClientState.markedWrights.clear();
             return true;
         }

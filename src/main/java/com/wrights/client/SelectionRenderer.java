@@ -1014,7 +1014,7 @@ public final class SelectionRenderer {
             }
             AABB box = markedBox(job);
             drawBox(pose, lines, box, camera, 0.98F, 0.86F, 0.32F, pulse);
-            if (body != null) {
+            if (body != null && WrightsClientState.markGuideActive(job.id())) {
                 drawGuide(pose, lines, camera, body, box, 0.98F, 0.86F, 0.32F, pulse);
             }
             lined = true;
