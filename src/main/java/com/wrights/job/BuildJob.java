@@ -1683,6 +1683,8 @@ public final class BuildJob {
          * Helpers skip indexes already aimed at so the crew does not pile onto one block.
          */
         public int aim = -1;
+        /** Hover index that already counted as one build operation. Not saved. */
+        public int opStand = Integer.MIN_VALUE;
         public UUID entityId;
         public BlockPos lastPos;
         /** Null = personal wrightport (player back). Set = placed wrightport block. */

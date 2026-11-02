@@ -1281,14 +1281,145 @@ public final class JobManager {
         return true;
     }
 
+    /**
+     * How many hovers this shape needs at {@code ops}. Only for small shapes: a full cover of a
+     * 16³ box is hundreds of milliseconds and would hitch the server. {@code -1} means "too big,
+     * use the cheap grid estimate".
+     */
+    private static int planShapeStations(BuildJob job, int ops) {
+        if (job == null || job.kind() != BuildJob.Kind.SHAPE) {
+            return -1;
+        }
+        int total = job.total();
+        if (total <= 0 || total > 192 || job.shapeCenter() == null) {
+            return -1;
+        }
+        com.wrights.blueprint.Shapes.Kind shapeKind = com.wrights.blueprint.Shapes.Kind.byId(job.shapeKind());
+        BlockPos pin = com.wrights.blueprint.Shapes.pinLocal(
+                shapeKind,
+                job.shapeSize(),
+                job.shapeHeight(),
+                job.shapeThickness(),
+                job.shapeHollow(),
+                job.shapeAxis(),
+                job.shapePivot());
+        int reach = WrightTier.operationReachSqr(ops);
+        int cap = Math.max(1, WrightTier.operationCap(ops));
+        int[] xs = new int[total];
+        int[] ys = new int[total];
+        int[] zs = new int[total];
+        int n = 0;
+        for (int i = 0; i < total; i++) {
+            BlockPos pos = job.scanPosAt(i);
+            if (!com.wrights.blueprint.Shapes.containsWorld(
+                    shapeKind,
+                    pos,
+                    job.shapeCenter(),
+                    pin,
+                    job.shapeSize(),
+                    job.shapeHeight(),
+                    job.shapeThickness(),
+                    job.shapeHollow(),
+                    job.shapeAxis(),
+                    job.shapeYaw())) {
+                continue;
+            }
+            xs[n] = pos.getX();
+            ys[n] = pos.getY();
+            zs[n] = pos.getZ();
+            n++;
+        }
+        if (n == 0) {
+            return 1;
+        }
+        if (reach <= 0) {
+            return n;
+        }
+        boolean[] alive = new boolean[n];
+        java.util.Arrays.fill(alive, true);
+        int left = n;
+        int stations = 0;
+        int cx = job.shapeCenter().getX();
+        int cy = job.shapeCenter().getY();
+        int cz = job.shapeCenter().getZ();
+        while (left > 0 && stations < n) {
+            int bestX = cx;
+            int bestY = cy;
+            int bestZ = cz;
+            int bestN = 0;
+            for (int j = 0; j < n; j++) {
+                if (!alive[j]) {
+                    continue;
+                }
+                int dx = xs[j] - cx;
+                int dy = ys[j] - cy;
+                int dz = zs[j] - cz;
+                if (dx * dx + dy * dy + dz * dz <= reach) {
+                    bestN++;
+                    if (bestN >= cap) {
+                        break;
+                    }
+                }
+            }
+            for (int i = 0; i < n; i++) {
+                if (!alive[i]) {
+                    continue;
+                }
+                int covered = 0;
+                for (int j = 0; j < n; j++) {
+                    if (!alive[j]) {
+                        continue;
+                    }
+                    int dx = xs[j] - xs[i];
+                    int dy = ys[j] - ys[i];
+                    int dz = zs[j] - zs[i];
+                    if (dx * dx + dy * dy + dz * dz <= reach) {
+                        covered++;
+                        if (covered >= cap) {
+                            break;
+                        }
+                    }
+                }
+                if (covered > bestN) {
+                    bestN = covered;
+                    bestX = xs[i];
+                    bestY = ys[i];
+                    bestZ = zs[i];
+                }
+            }
+            int took = 0;
+            for (int j = 0; j < n && took < cap; j++) {
+                if (!alive[j]) {
+                    continue;
+                }
+                int dx = xs[j] - bestX;
+                int dy = ys[j] - bestY;
+                int dz = zs[j] - bestZ;
+                if (dx * dx + dy * dy + dz * dz <= reach) {
+                    alive[j] = false;
+                    left--;
+                    took++;
+                }
+            }
+            if (took == 0) {
+                break;
+            }
+            stations++;
+        }
+        return Math.max(1, stations);
+    }
+
     /** Assign up to {@code requested} free wrights to a streaming Shape / Exchange / Place job. */
     private static boolean assignShapeCrew(ServerPlayer player, BuildJob job, int requested) {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         bindCrewIds(player, library);
-        int room = Math.min(
-                WrightsConfig.usefulCrewFor(Math.max(1, job.total()), job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(),
-                        WrightHomes.bestOps(player, id -> !claimedByOther(player, library, job.id(), id))),
-                WrightsConfig.maxWrightsPerJob(job));
+        int bestOps = WrightHomes.bestOps(player, id -> !claimedByOther(player, library, job.id(), id));
+        int stations = planShapeStations(job, bestOps);
+        int fitted = stations > 0
+                ? stations
+                : WrightsConfig.usefulCrewFor(
+                        Math.max(1, job.total()), job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(), bestOps);
+        int room = Math.min(fitted, WrightsConfig.maxWrightsPerJob(job));
         int wanted = Math.max(1, Math.min(requested > 0 ? requested : room, room));
         List<WrightHomes.FreeWright> units = freeUnits(player, library, job, wanted);
         if (units.isEmpty()) {
@@ -1830,17 +1961,40 @@ public final class JobManager {
             int budget = placeBudget(hand);
             int placed = 0;
             int scanned = 0;
+            boolean usedAnchor = false;
             while (placed < budget && scanned < scanCap && job.cursor() < job.total()) {
-                int index = placed == 0
-                        ? at
-                        : nextShapeIndex(level, player, job, hand, usable, shapeKind, shapePinLocal, true, scanCap);
-                if (index < 0) {
-                    index = nextShapeIndex(level, player, job, hand, usable, shapeKind, shapePinLocal, false, scanCap);
+                int index;
+                if (!usedAnchor) {
+                    index = at;
+                    usedAnchor = true;
+                } else {
+                    index = nextShapeIndex(level, player, job, hand, usable, shapeKind, shapePinLocal, true, scanCap);
+                    if (index < 0) {
+                        index = nextShapeIndex(
+                                level, player, job, hand, usable, shapeKind, shapePinLocal, false, scanCap);
+                    }
                 }
                 if (index < 0 || index == NEED_ITEMS) {
                     if (index == NEED_ITEMS) {
                         waitingItems = true;
                     }
+                    break;
+                }
+                ShapeCell standKind = classifyShapeCell(
+                        level, player, job, hand, index, shapeKind, shapePinLocal, true);
+                if (standKind == ShapeCell.OUT || standKind == ShapeCell.DONE) {
+                    if (standKind == ShapeCell.OUT) {
+                        resolveShapeCell(job, hand, index, false);
+                    }
+                    scanned++;
+                    continue;
+                }
+                if (standKind == ShapeCell.SKIP) {
+                    resolveShapeCell(job, hand, index, true);
+                    scanned++;
+                    continue;
+                }
+                if (standKind != ShapeCell.READY) {
                     break;
                 }
                 claimAim(job, hand, index);
@@ -1891,8 +2045,9 @@ public final class JobManager {
                 placed++;
                 scanned++;
             }
-            if (placed > 0) {
+            if (placed > 0 && hand.opStand != at) {
                 job.operationOne();
+                hand.opStand = at;
             }
             if (waitingItems) {
                 parkForItems(level, player, hand);
@@ -2050,7 +2205,9 @@ public final class JobManager {
                 hand.aim = -1;
             }
         }
-        if (origin != null && !shapeOneStation(job, hand)) {
+        // Small shapes pick the hover that covers the most cells (the middle of a sphere).
+        // Nearest-first is only for large jobs, where scoring every cell would hitch the tick.
+        if (origin != null && !shapeOneStation(job, hand) && job.total() > 512) {
             // Already in place-reach: closest READY (finish this hover, cut fly time).
             // One-station shares skip this — spawning on the corner must not beat the hover
             // that covers the whole 1×5 / 2×4 / strip.
@@ -2198,7 +2355,7 @@ public final class JobManager {
         // Larger shares that are already nearby: near-first, denser only within SEED_SLACK_SQR.
         boolean oneHover = shapeOneStation(job, hand) || candidateCount <= WrightsConfig.placeAoeCapacity(
                 job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(), handOps(hand));
-        boolean far = origin == null || nearestDist > FLY_NEAR_SQR || oneHover;
+        boolean far = origin == null || nearestDist > FLY_NEAR_SQR || oneHover || job.total() <= 512;
         int best = nearest;
         int bestScore = shapeClusterReadyCount(
                 level, player, job, hand, Vec3.atCenterOf(job.scanPosAt(nearest)), shapeKind, shapePinLocal, true);
@@ -2223,6 +2380,17 @@ public final class JobManager {
                 best = index;
                 bestScore = score;
                 bestDist = dist;
+            }
+        }
+        // Hollow shapes: the best hover is the empty middle, which is not itself a block to place.
+        if (job.total() <= 512 && job.shapeCenter() != null) {
+            int centerIndex = job.scanIndex(job.shapeCenter());
+            if (centerIndex >= 0) {
+                int score = shapeClusterReadyCount(
+                        level, player, job, hand, Vec3.atCenterOf(job.shapeCenter()), shapeKind, shapePinLocal, true);
+                if (score > bestScore) {
+                    best = centerIndex;
+                }
             }
         }
         return best;
@@ -5502,8 +5670,9 @@ public final class JobManager {
                 noteProgress(schematic, job, hand, entry, at);
                 burst++;
             }
-            if (burst > 0) {
+            if (burst > 0 && hand.opStand != index) {
                 job.operationOne();
+                hand.opStand = index;
             }
             publishHandStatus(level, player, schematic, job, hand, handStatus);
         }
@@ -7274,8 +7443,9 @@ public final class JobManager {
     }
 
     private static int placeBudget(BuildJob.Hand hand) {
-        int cap = WrightsConfig.BLOCKS_PER_TICK.getAsInt();
-        return Math.min(cap, WrightTier.operationCap(handOps(hand)));
+        // One operation is one hover. The tier cap (Netherite 19) is the lag bound;
+        // clamping it to blocksPerTick split a 19-block sphere into a second tick and a second op.
+        return Math.max(1, WrightTier.operationCap(handOps(hand)));
     }
 
     private static double flyStep(int speed, double distanceSqr) {
