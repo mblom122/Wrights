@@ -1796,8 +1796,9 @@ public final class JobManager {
                 splitThisTick = true;
                 at = nextShapeIndex(level, player, job, hand, usable, shapeKind, shapePinLocal, true, scanCap);
             }
-            if (at < 0) {
-                // Leftovers: help near peers, then any unresolved READY cell in the job.
+            // A finished pattern share stays with its wright when that share still fits in one
+            // hover. Help-scanning those cells aims them without placing and leaves everyone idle.
+            if (at < 0 && hand.hover != -2) {
                 at = nextShapeIndex(level, player, job, hand, usable, shapeKind, shapePinLocal, false, scanCap);
             }
             if (at < 0 && job.cursor() < job.total() && hand.cursor >= job.total()) {
@@ -1805,7 +1806,7 @@ public final class JobManager {
                 if (ownedStart >= 0 && ownedStart < job.total() && !job.isShapeResolved(ownedStart)) {
                     hand.cursor = ownedStart;
                     at = nextShapeIndex(level, player, job, hand, usable, shapeKind, shapePinLocal, true, scanCap);
-                    if (at < 0) {
+                    if (at < 0 && hand.hover != -2) {
                         at = nextShapeIndex(level, player, job, hand, usable, shapeKind, shapePinLocal, false, scanCap);
                     }
                 }
@@ -1895,6 +1896,12 @@ public final class JobManager {
                     resolveShapeCell(job, hand, index, true);
                     scanned++;
                     continue;
+                }
+                if (standKind == ShapeCell.FOREIGN) {
+                    if (hand.aim == index) {
+                        hand.aim = -1;
+                    }
+                    break;
                 }
                 if (standKind != ShapeCell.READY) {
                     break;
@@ -2070,7 +2077,14 @@ public final class JobManager {
             java.util.List<com.wrights.blueprint.ShapeMaterials.Entry> usable,
             com.wrights.blueprint.Shapes.Kind shapeKind,
             BlockPos shapePinLocal) {
-        if (job == null || hand == null || job.kind() != BuildJob.Kind.SHAPE || hand.hover == -2) {
+        if (job == null || hand == null || job.kind() != BuildJob.Kind.SHAPE) {
+            return -1;
+        }
+        if (hand.hover == -2) {
+            int rest = patternRemainder(level, player, job, hand, shapeKind, shapePinLocal);
+            if (rest == PATTERN_PAUSE || rest >= 0) {
+                return rest;
+            }
             return -1;
         }
         com.wrights.blueprint.ShapeHover.Query query = shapeHoverQuery(job, hand);
@@ -2911,6 +2925,10 @@ public final class JobManager {
         if (hand.shareFrom == from && hand.shareTo == to) {
             return false;
         }
+        // The wright already on this share can finish it in one hover. Leave it there.
+        if (shapeShareFitsOneHover(level, player, job, best, shapeKind, shapePinLocal)) {
+            return false;
+        }
         int oldRemain = Math.max(0, best.shareRemain);
         if (width >= 2) {
             int mid = from + width / 2;
@@ -3009,6 +3027,57 @@ public final class JobManager {
             }
         }
         return best;
+    }
+
+    /**
+     * True when every block still left in this share fits in one hover for the wright already on it.
+     * An idle wright must not take a slice of that share.
+     */
+    private static boolean shapeShareFitsOneHover(
+            ServerLevel level,
+            ServerPlayer player,
+            BuildJob job,
+            BuildJob.Hand hand,
+            com.wrights.blueprint.Shapes.Kind shapeKind,
+            BlockPos shapePinLocal) {
+        if (job == null || hand == null) {
+            return true;
+        }
+        int ops = handOps(hand);
+        int cap = Math.max(1, WrightTier.operationCap(ops));
+        int reach = WrightTier.operationReachSqr(ops);
+        int[] xs = new int[cap + 1];
+        int[] ys = new int[cap + 1];
+        int[] zs = new int[cap + 1];
+        int n = 0;
+        int total = job.total();
+        for (int i = 0; i < total; i++) {
+            if (job.isShapeResolved(i)) {
+                continue;
+            }
+            BlockPos pos = job.scanPosAt(i);
+            int lx = pos.getX() - job.min().getX();
+            int ly = pos.getY() - job.min().getY();
+            int lz = pos.getZ() - job.min().getZ();
+            if (!ownsShapeCell(job, hand, lx, ly, lz)) {
+                continue;
+            }
+            ShapeCell kind = classifyShapeCell(level, player, job, hand, i, shapeKind, shapePinLocal, true);
+            if (kind != ShapeCell.READY && kind != ShapeCell.BLOCKED) {
+                continue;
+            }
+            if (n >= cap) {
+                return false;
+            }
+            xs[n] = lx;
+            ys[n] = ly;
+            zs[n] = lz;
+            n++;
+        }
+        if (n == 0) {
+            return true;
+        }
+        return com.wrights.blueprint.HoverPieces.fits(xs, ys, zs, n, reach, cap);
     }
 
     private static boolean shapeShareHasWork(
@@ -6574,13 +6643,23 @@ public final class JobManager {
     }
 
     private static boolean aimedByOther(BuildJob job, BuildJob.Hand hand, int index) {
-        if (index < 0) {
+        if (index < 0 || job == null) {
             return false;
         }
+        BlockPos pos = index < job.total() ? job.scanPosAt(index) : null;
+        int lx = pos == null ? 0 : pos.getX() - job.min().getX();
+        int ly = pos == null ? 0 : pos.getY() - job.min().getY();
+        int lz = pos == null ? 0 : pos.getZ() - job.min().getZ();
+        boolean shape = job.kind() == BuildJob.Kind.SHAPE;
         for (BuildJob.Hand other : job.hands()) {
-            if (other != hand && other.aim == index) {
-                return true;
+            if (other == hand || other.aim != index) {
+                continue;
             }
+            // A helper aiming a cell it does not own must not block the wright who does.
+            if (shape && pos != null && !ownsShapeCell(job, other, lx, ly, lz)) {
+                continue;
+            }
+            return true;
         }
         return false;
     }
@@ -7193,6 +7272,10 @@ public final class JobManager {
                 return;
             }
             BuildJob.Slice donor = fullestPaste(level, job, schematic, receiver);
+            BuildJob.Hand donorHand = handHoldingSlice(job, donor);
+            if (donor != null && donorHand != null && fitsPasteSlice(schematic, donor, handOps(donorHand))) {
+                return;
+            }
             BuildJob.Slice half = donor == null ? null : splitPaste(level, schematic, job, donor);
             if (half == null) {
                 return;
@@ -7504,6 +7587,18 @@ public final class JobManager {
             }
         }
         return donor;
+    }
+
+    private static BuildJob.Hand handHoldingSlice(BuildJob job, BuildJob.Slice slice) {
+        if (job == null || slice == null) {
+            return null;
+        }
+        for (BuildJob.Hand hand : job.hands()) {
+            if (hand.slices.contains(slice)) {
+                return hand;
+            }
+        }
+        return null;
     }
 
     private static BuildJob.Slice fullestRefund(BuildJob job, BuildJob.Hand except) {
