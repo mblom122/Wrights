@@ -1851,14 +1851,14 @@ public final class WrightsClientState {
         return shapeLookSnapLocked && shapeLookSnapPos != null;
     }
 
-    /** Pin look-mode preview to the look-corner (Shape) or the aimed cell (Exchange). */
+    /** Pin look-mode preview to the look-corner (Shape / Place) or the aimed cell (Exchange). */
     public static void lockShapeLookSnap(BlockPos clicked, Direction face) {
         if (clicked == null) {
             return;
         }
         Direction side = face == null ? Direction.UP : face;
-        // Exchange / Place pin on the aimed block; Shape places into the adjacent cell.
-        BlockPos pin = exchangeToolActive() || placeToolActive()
+        // Exchange pins on the aimed solid; Shape / Place pin in the adjacent cell outside that face.
+        BlockPos pin = exchangeToolActive()
                 ? clicked.immutable()
                 : Shapes.lookCorner(clicked, side);
         setShapeLookSnapTarget(pin);
@@ -1889,9 +1889,9 @@ public final class WrightsClientState {
             }
             int style = WrightsClientConfig.placeStyle();
             if (style == 1) {
-                // Preview pin: aimed block (line runs on that axis toward the player's matching coord).
+                // To me: start outside the aimed face (same pin as Shape), then fill toward the player.
                 BlockHitResult aim = shapeLookHit();
-                return aim == null ? null : aim.getBlockPos();
+                return aim == null ? null : Shapes.lookCorner(aim.getBlockPos(), aim.getDirection());
             }
             if (WrightsClientConfig.placePathStyle()) {
                 return placePathCell(minecraft.player);
@@ -1900,7 +1900,10 @@ public final class WrightsClientState {
                 return shapeLookSnapPos;
             }
             BlockHitResult hit = shapeLookHit();
-            return hit == null ? null : hit.getBlockPos();
+            if (hit == null) {
+                return null;
+            }
+            return Shapes.lookCorner(hit.getBlockPos(), hit.getDirection());
         }
         if (shapeLookSnapActive()) {
             return shapeLookSnapPos;
@@ -2126,8 +2129,10 @@ public final class WrightsClientState {
                 return false;
             }
             boolean voidBlocks = WrightsClientConfig.SHAPE_VOID.get() && WrightsConfig.allowShapeVoid();
+            // Start outside the aimed face, same pin as Shape look.
+            BlockPos start = Shapes.lookCorner(aim.getBlockPos(), aim.getDirection());
             if (!sendPlaceCells(
-                    placeToMeCells(minecraft.player, aim.getBlockPos(), aim.getDirection()),
+                    placeToMeCells(minecraft.player, start, aim.getDirection()),
                     voidBlocks,
                     force,
                     "Place - To me")) {
@@ -2136,7 +2141,13 @@ public final class WrightsClientState {
             }
             return true;
         }
-        if (pos == null || face == null) {
+        boolean lookPinned = false;
+        if (shapeLookSnapActive()) {
+            // Snap already stores the outside pin cell — server must not lookCorner again.
+            pos = shapeLookSnapPos;
+            face = shapeLookSnapFace == null ? Direction.UP : shapeLookSnapFace;
+            lookPinned = true;
+        } else if (pos == null || face == null) {
             BlockHitResult aim = shapeLookHit();
             if (aim == null) {
                 minecraft.player.displayClientMessage(Component.translatable("message.wrights.shape_look"), true);
@@ -2161,7 +2172,7 @@ public final class WrightsClientState {
                 false,
                 WrightsClientConfig.SHAPE_VOID.get(),
                 force,
-                false,
+                lookPinned,
                 WrightsClientConfig.SHAPE_FILL_MODE.get(),
                 WrightsClientConfig.SHAPE_ORDER_BATCH.get(),
                 WrightsClientConfig.SHAPE_MATERIALS.get(),
@@ -2172,6 +2183,9 @@ public final class WrightsClientState {
                 WrightsClientConfig.droneCountFor(true),
                 true);
         PacketDistributor.sendToServer(pendingShape);
+        if (lookPinned) {
+            clearShapeLookSnap();
+        }
         return true;
     }
 
@@ -2229,7 +2243,7 @@ public final class WrightsClientState {
     }
 
     /**
-     * To me: from the aimed block, along the face axis, to the player's matching axis value.
+     * To me: from {@code start} (outside the aimed face), along the face axis, to the player's matching axis value.
      * Width / height thicken a rectangular cross-section on the two axes perpendicular to that fill.
      */
     public static java.util.List<BlockPos> placeToMeCells(Player player, BlockPos aim, Direction face) {

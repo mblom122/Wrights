@@ -459,13 +459,14 @@ public final class SelectionRenderer {
             return;
         }
         boolean voidBlocks = WrightsClientConfig.SHAPE_VOID.get() && WrightsConfig.allowShapeVoid();
+        BlockPos start = com.wrights.blueprint.Shapes.lookCorner(aim.getBlockPos(), aim.getDirection());
         drawPlaceCellGhosts(
                 pose,
                 buffers,
                 camera,
                 minecraft,
                 materials,
-                WrightsClientState.placeToMeCells(minecraft.player, aim.getBlockPos(), aim.getDirection()),
+                WrightsClientState.placeToMeCells(minecraft.player, start, aim.getDirection()),
                 voidBlocks);
     }
 
