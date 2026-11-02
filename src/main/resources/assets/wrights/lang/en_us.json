@@ -329,6 +329,8 @@
   "menu.wrights.queue_jobs_hint": "When no wright is free, a new build waits on the job list until enough are free and in range.",
   "menu.wrights.open_build_menu": "Right-click opens menu",
   "menu.wrights.open_build_menu_hint": "When on, plain right-click opens the place menu. Ctrl+Shift+right-click always opens it; Ctrl+right-click pins the build anchor.",
+  "menu.wrights.dock_watch": "Watch docking",
+  "menu.wrights.dock_watch_hint": "When on, Manage closes and switches to third-person back while new wrights fly in to dock, then restores your previous view.",
   "menu.wrights.supply_order": "Take blocks from",
   "menu.wrights.supply_player_first": "Player, then chest",
   "menu.wrights.supply_chest_first": "Chest, then player",

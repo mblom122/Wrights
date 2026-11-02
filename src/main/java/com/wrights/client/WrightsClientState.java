@@ -1442,15 +1442,22 @@ public final class WrightsClientState {
         }
         dockWaitRemaining = next;
         Minecraft minecraft = Minecraft.getInstance();
+        boolean watch = WrightsClientConfig.DOCK_WATCH.get();
         if (next > 0) {
-            if (minecraft.screen instanceof WrightsMenuScreen || minecraft.screen instanceof WrightportScreen) {
-                minecraft.setScreen(null);
+            if (watch) {
+                if (minecraft.screen instanceof WrightsMenuScreen || minecraft.screen instanceof WrightportScreen) {
+                    minecraft.setScreen(null);
+                }
+                beginDockCamera(minecraft);
             }
-            beginDockCamera(minecraft);
             return;
         }
         endDockCamera(minecraft);
-        reopenManageAfterDock(minecraft);
+        if (watch) {
+            reopenManageAfterDock(minecraft);
+        } else {
+            dockReopenHome = 0;
+        }
     }
 
     private static void beginDockCamera(Minecraft minecraft) {

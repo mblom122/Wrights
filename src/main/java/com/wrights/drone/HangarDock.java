@@ -113,7 +113,12 @@ public final class HangarDock {
         }
         PacketDistributor.sendToPlayer(player, encode(0, hangar));
         if (hangar != null && hangar.placed()) {
-            reopenPlaced(player, hangar);
+            // Skip if Manage stayed open (client dockWatch off); reopen only after a closed fly-in.
+            if (!(player.containerMenu instanceof com.wrights.menu.WrightportMenu open)
+                    || hangar.pos() == null
+                    || !open.pos().equals(hangar.pos())) {
+                reopenPlaced(player, hangar);
+            }
         }
     }
 

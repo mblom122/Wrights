@@ -261,6 +261,9 @@ public class WrightsMenuScreen extends Screen {
     private int buildMenuX;
     private int buildMenuY;
     private int buildMenuW;
+    private int dockWatchX;
+    private int dockWatchY;
+    private int dockWatchW;
     private int portOrderX;
     private int portOrderY;
     private int portOrderW;
@@ -1315,6 +1318,11 @@ public class WrightsMenuScreen extends Screen {
         buildMenuX = controls;
         buildMenuY = optionY(local - 3);
         local += 24;
+        Component dockWatchState = Component.translatable(WrightsClientConfig.DOCK_WATCH.get() ? "menu.wrights.on" : "menu.wrights.off");
+        dockWatchW = Math.max(36, this.font.width(dockWatchState) + 16);
+        dockWatchX = controls;
+        dockWatchY = optionY(local - 3);
+        local += 24;
         optionPlaceY = optionY(local);
         local += 16;
         optionOffsetY = optionY(local);
@@ -1390,6 +1398,7 @@ public class WrightsMenuScreen extends Screen {
                 "menu.wrights.queue_jobs",
                 "menu.wrights.port_order",
                 "menu.wrights.open_build_menu",
+                "menu.wrights.dock_watch",
                 "menu.wrights.shape_air_offset",
                 "menu.wrights.supply_order"
         };
@@ -1490,6 +1499,13 @@ public class WrightsMenuScreen extends Screen {
         WrightsUi.choice(graphics, buildMenuX, buildMenuY, buildMenuW, 16, openMenu, false);
         graphics.drawCenteredString(this.font, menuState, buildMenuX + buildMenuW / 2, buildMenuY + 4, WrightsUi.TEXT);
         drawOptionHelp(graphics, mouseX, mouseY, x, buildMenuY + 3, menuLabel, buildMenuX, buildMenuX + buildMenuW, Component.translatable("menu.wrights.open_build_menu_hint"));
+        boolean dockWatch = WrightsClientConfig.DOCK_WATCH.get();
+        Component dockWatchLabel = Component.translatable("menu.wrights.dock_watch");
+        graphics.drawString(this.font, dockWatchLabel, x, dockWatchY + 3, WrightsUi.MUTED, false);
+        Component dockWatchState = Component.translatable(dockWatch ? "menu.wrights.on" : "menu.wrights.off");
+        WrightsUi.choice(graphics, dockWatchX, dockWatchY, dockWatchW, 16, dockWatch, false);
+        graphics.drawCenteredString(this.font, dockWatchState, dockWatchX + dockWatchW / 2, dockWatchY + 4, WrightsUi.TEXT);
+        drawOptionHelp(graphics, mouseX, mouseY, x, dockWatchY + 3, dockWatchLabel, dockWatchX, dockWatchX + dockWatchW, Component.translatable("menu.wrights.dock_watch_hint"));
         Component placeLabel = Component.translatable("menu.wrights.place_offset");
         graphics.drawString(this.font, placeLabel, x, optionPlaceY, WrightsUi.TEXT, false);
         drawOptionHelp(graphics, mouseX, mouseY, x, optionPlaceY, placeLabel, 0, 0, Component.translatable("menu.wrights.place_hint").append("\n").append(Component.translatable("menu.wrights.place_axes")));
@@ -2970,6 +2986,10 @@ public class WrightsMenuScreen extends Screen {
                 }
                 if (mouseX >= buildMenuX && mouseX < buildMenuX + buildMenuW && mouseY >= buildMenuY && mouseY < buildMenuY + 16) {
                     WrightsClientConfig.setBuildMenu(!WrightsClientConfig.BUILD_MENU.get());
+                    return true;
+                }
+                if (mouseX >= dockWatchX && mouseX < dockWatchX + dockWatchW && mouseY >= dockWatchY && mouseY < dockWatchY + 16) {
+                    WrightsClientConfig.setDockWatch(!WrightsClientConfig.DOCK_WATCH.get());
                     return true;
                 }
                 if (mouseX >= supplyOrderX && mouseX < supplyOrderX + supplyOrderW && mouseY >= supplyOrderY && mouseY < supplyOrderY + 16) {

@@ -76,6 +76,9 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.BooleanValue BUILD_MENU = BUILDER
             .comment("When true, right-click in build mode opens the build menu instead of starting the job.")
             .define("buildMenu", false);
+    public static final ModConfigSpec.BooleanValue DOCK_WATCH = BUILDER
+            .comment("When true, Manage closes and switches to third-person back while new wrights fly in to dock, then restores your previous view.")
+            .define("dockWatch", true);
     public static final ModConfigSpec.BooleanValue QUEUE_JOBS = BUILDER
             .comment("When true, a new build waits on the job list if no wright is free. It only takes wrights from a port that can reach the build.")
             .define("queueJobs", true);
@@ -431,6 +434,11 @@ public final class WrightsClientConfig {
 
     public static void setBuildMenu(boolean enabled) {
         BUILD_MENU.set(enabled);
+        save();
+    }
+
+    public static void setDockWatch(boolean enabled) {
+        DOCK_WATCH.set(enabled);
         save();
     }
 
