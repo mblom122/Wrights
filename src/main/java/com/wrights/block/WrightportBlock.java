@@ -70,6 +70,7 @@ public class WrightportBlock extends BaseEntityBlock {
                 port.setLabel(carried);
             }
             port.setSwarm(Swarm.from(stack));
+            port.loadEnergyFromItem(stack);
         }
     }
 
@@ -103,7 +104,22 @@ public class WrightportBlock extends BaseEntityBlock {
                 Swarm.write(stack, swarm);
             }
             com.wrights.item.WrightportBlockItem.writeLabel(stack, port.label());
+            port.saveEnergyToItem(stack);
         }
         return List.of(stack);
+    }
+
+    @Override
+    public ItemStack getCloneItemStack(net.minecraft.world.level.LevelReader level, BlockPos pos, BlockState state) {
+        ItemStack stack = new ItemStack(ModBlocks.WRIGHTPORT_ITEM.get());
+        if (level.getBlockEntity(pos) instanceof WrightportBlockEntity port) {
+            Swarm swarm = port.swarm();
+            if (!swarm.units().isEmpty()) {
+                Swarm.write(stack, swarm);
+            }
+            com.wrights.item.WrightportBlockItem.writeLabel(stack, port.label());
+            port.saveEnergyToItem(stack);
+        }
+        return stack;
     }
 }

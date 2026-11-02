@@ -5363,8 +5363,10 @@ public class WrightsMenuScreen extends Screen {
         if (this.minecraft == null || this.minecraft.player == null) {
             return;
         }
-        com.wrights.energy.CarriedEnergy.Amount amount = com.wrights.energy.CarriedEnergy.of(this.minecraft.player);
-        WrightsUi.energyBar(graphics, this.font, portBarX(), personalEnergyY(), portBarW(), amount.stored(), amount.capacity());
+        net.minecraft.world.item.ItemStack worn = com.wrights.drone.Wrightports.worn(this.minecraft.player);
+        long stored = com.wrights.energy.PortEnergy.itemStored(worn);
+        long capacity = com.wrights.WrightsConfig.portEnergyCapacity();
+        WrightsUi.energyBar(graphics, this.font, portBarX(), personalEnergyY(), portBarW(), stored, capacity);
     }
 
     private int placedListTop() {

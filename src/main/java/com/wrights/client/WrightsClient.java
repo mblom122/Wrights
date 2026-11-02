@@ -7,17 +7,13 @@ import com.wrights.block.WrightportBlockEntity;
 import com.wrights.block.WrightportLamp;
 import com.wrights.drone.Swarm;
 import com.wrights.entity.ModEntities;
-import com.wrights.energy.CarriedEnergy;
 import com.wrights.item.BlueprintFolderItem;
 import com.wrights.item.BlueprintItem;
 import com.wrights.item.ModItems;
-import com.wrights.item.PersonalWrightportItem;
 import com.wrights.menu.ModMenus;
 
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelLayerLocation;
-import net.minecraft.network.chat.Component;
 import net.minecraft.client.renderer.item.ItemProperties;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -48,43 +44,6 @@ public class WrightsClient {
 
     public WrightsClient(ModContainer container) {
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
-        PersonalWrightportItem.energyView = carriedEnergyView();
-    }
-
-    private static PersonalWrightportItem.EnergyView carriedEnergyView() {
-        return new PersonalWrightportItem.EnergyView() {
-            private CarriedEnergy.Amount amount() {
-                Minecraft minecraft = Minecraft.getInstance();
-                return minecraft.player == null ? CarriedEnergy.Amount.EMPTY : CarriedEnergy.of(minecraft.player);
-            }
-
-            @Override
-            public boolean visible() {
-                return amount().capacity() > 0L;
-            }
-
-            @Override
-            public int width() {
-                CarriedEnergy.Amount amount = amount();
-                if (amount.capacity() <= 0L || amount.stored() <= 0L) {
-                    return 0;
-                }
-                return (int) Math.max(1L, Math.min(13L, amount.stored() * 13L / amount.capacity()));
-            }
-
-            @Override
-            public int color() {
-                CarriedEnergy.Amount amount = amount();
-                return WrightsUi.energyColor(amount.stored(), amount.capacity()) & 0xFFFFFF;
-            }
-
-            @Override
-            public void tooltip(java.util.List<Component> tooltip) {
-                CarriedEnergy.Amount amount = amount();
-                tooltip.add(Component.translatable("menu.wrights.energy", WrightsUi.count(amount.stored()), WrightsUi.count(amount.capacity()))
-                        .withStyle(ChatFormatting.GRAY));
-            }
-        };
     }
 
     @SubscribeEvent

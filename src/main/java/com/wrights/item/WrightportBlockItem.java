@@ -11,6 +11,7 @@ import net.minecraft.world.level.block.Block;
 
 import com.wrights.block.WrightportBlockEntity;
 import com.wrights.drone.Swarm;
+import com.wrights.energy.PortEnergy;
 
 public class WrightportBlockItem extends BlockItem {
     public WrightportBlockItem(Block block, Properties properties) {
@@ -49,6 +50,22 @@ public class WrightportBlockItem extends BlockItem {
         if (!swarm.units().isEmpty()) {
             tooltip.add(Component.translatable("item.wrights.personal_wrightport.drones", swarm.units().size(), Swarm.capacity()).withStyle(ChatFormatting.GRAY));
         }
+        PortEnergy.appendItemTooltip(stack, tooltip);
         tooltip.add(Component.translatable("item.wrights.wrightport.hint").withStyle(ChatFormatting.DARK_GRAY));
+    }
+
+    @Override
+    public boolean isBarVisible(ItemStack stack) {
+        return PortEnergy.itemBarVisible(stack);
+    }
+
+    @Override
+    public int getBarWidth(ItemStack stack) {
+        return PortEnergy.itemBarWidth(stack);
+    }
+
+    @Override
+    public int getBarColor(ItemStack stack) {
+        return PortEnergy.itemBarColor(stack) & 0xFFFFFF;
     }
 }

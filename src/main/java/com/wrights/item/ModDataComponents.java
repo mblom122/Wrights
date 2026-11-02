@@ -55,6 +55,12 @@ public final class ModDataComponents {
                     .persistent(Codec.INT)
                     .networkSynchronized(ByteBufCodecs.VAR_INT));
 
+    /** Forge Energy stored on a wrightport / personal wrightport item (0 when empty or newly crafted). */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> PORT_ENERGY =
+            DATA_COMPONENTS.registerComponentType("port_energy", builder -> builder
+                    .persistent(Codec.INT)
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+
     private ModDataComponents() {
     }
 }

@@ -18,7 +18,8 @@ public final class ModItems {
     public static final DeferredItem<PersonalWrightportItem> PERSONAL_WRIGHTPORT = ITEMS.register("personal_wrightport", () -> new PersonalWrightportItem(new net.minecraft.world.item.Item.Properties()
             .stacksTo(1)
             .rarity(Rarity.UNCOMMON)
-            .component(ModDataComponents.SWARM.get(), com.wrights.drone.Swarm.EMPTY)));
+            .component(ModDataComponents.SWARM.get(), com.wrights.drone.Swarm.EMPTY)
+            .component(ModDataComponents.PORT_ENERGY.get(), 0)));
 
     public static final DeferredItem<BlueprintItem> BLUEPRINT = ITEMS.register("blueprint", () -> new BlueprintItem(new net.minecraft.world.item.Item.Properties().stacksTo(16)));
 

@@ -53,6 +53,11 @@ public class WrightsMod {
                 Capabilities.EnergyStorage.BLOCK,
                 ModBlockEntities.WRIGHTPORT.get(),
                 (port, side) -> port.energyStorage());
+        event.registerItem(
+                Capabilities.EnergyStorage.ITEM,
+                (stack, context) -> com.wrights.energy.PortEnergy.itemStorage(stack),
+                ModItems.PERSONAL_WRIGHTPORT.get(),
+                ModBlocks.WRIGHTPORT_ITEM.get());
     }
 
     private static void commonSetup(FMLCommonSetupEvent event) {

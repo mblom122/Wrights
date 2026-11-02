@@ -1,6 +1,10 @@
 package com.wrights.energy;
 
+import java.util.List;
+
+import net.minecraft.ChatFormatting;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
@@ -8,11 +12,13 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.energy.ComponentEnergyStorage;
 import net.neoforged.neoforge.energy.EnergyStorage;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 
 import com.wrights.WrightsConfig;
 import com.wrights.block.WrightportBlockEntity;
+import com.wrights.item.ModDataComponents;
 import com.wrights.job.BuildJob;
 
 import top.theillusivec4.curios.api.CuriosApi;
@@ -22,6 +28,70 @@ import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
 /** Forge Energy for the wrightport that launched a wright. The flying wright does not store any. */
 public final class PortEnergy {
     private PortEnergy() {
+    }
+
+    /** ITEM capability for wrightport / personal wrightport stacks. Capacity follows server config. */
+    public static IEnergyStorage itemStorage(ItemStack stack) {
+        int cap = WrightsConfig.portEnergyCapacity();
+        int rate = WrightsConfig.portEnergyTransfer();
+        return new ComponentEnergyStorage(stack, ModDataComponents.PORT_ENERGY.get(), cap, rate, rate);
+    }
+
+    public static int itemStored(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return 0;
+        }
+        Integer stored = stack.get(ModDataComponents.PORT_ENERGY.get());
+        return stored == null ? 0 : Mth.clamp(stored, 0, WrightsConfig.portEnergyCapacity());
+    }
+
+    public static void writeItem(ItemStack stack, int energy) {
+        if (stack == null || stack.isEmpty()) {
+            return;
+        }
+        stack.set(ModDataComponents.PORT_ENERGY.get(), Mth.clamp(energy, 0, WrightsConfig.portEnergyCapacity()));
+    }
+
+    /** Always {@code stored / capacity}, including {@code 0 / max} for new and JEI stacks. */
+    public static void appendItemTooltip(ItemStack stack, List<Component> tooltip) {
+        if (tooltip == null) {
+            return;
+        }
+        int stored = itemStored(stack);
+        int capacity = WrightsConfig.portEnergyCapacity();
+        tooltip.add(Component.translatable("menu.wrights.energy", format(stored), format(capacity)).withStyle(ChatFormatting.GRAY));
+    }
+
+    public static boolean itemBarVisible(ItemStack stack) {
+        return WrightsConfig.portEnergyCapacity() > 0;
+    }
+
+    public static int itemBarWidth(ItemStack stack) {
+        int capacity = WrightsConfig.portEnergyCapacity();
+        int stored = itemStored(stack);
+        if (capacity <= 0 || stored <= 0) {
+            return 0;
+        }
+        return Math.max(1, Math.min(13, stored * 13 / capacity));
+    }
+
+    public static int itemBarColor(ItemStack stack) {
+        int capacity = WrightsConfig.portEnergyCapacity();
+        int stored = itemStored(stack);
+        if (capacity <= 0 || stored <= 0) {
+            return 0xFF8C1A;
+        }
+        if (stored * 4 < capacity) {
+            return 0xFFC45A2A;
+        }
+        if (stored * 2 < capacity) {
+            return 0xFFE0B060;
+        }
+        return 0xFF3D9A62;
+    }
+
+    private static String format(int value) {
+        return java.text.NumberFormat.getIntegerInstance().format(Math.max(0, value));
     }
 
     /** Placed-port buffer. A new port starts empty and has to be charged. */
@@ -39,6 +109,11 @@ public final class PortEnergy {
             } else {
                 this.energy = 0;
             }
+        }
+
+        public void loadAmount(int amount) {
+            refresh();
+            this.energy = Mth.clamp(amount, 0, this.capacity);
         }
 
         public void save(CompoundTag tag) {

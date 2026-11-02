@@ -10,6 +10,7 @@ import net.minecraft.world.item.TooltipFlag;
 
 import com.wrights.drone.Wrightports;
 import com.wrights.drone.Swarm;
+import com.wrights.energy.PortEnergy;
 
 import top.theillusivec4.curios.api.SlotContext;
 import top.theillusivec4.curios.api.type.capability.ICurioItem;
@@ -33,37 +34,22 @@ public class PersonalWrightportItem extends Item implements ICurioItem {
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         Swarm swarm = Swarm.from(stack);
         tooltip.add(Component.translatable("item.wrights.personal_wrightport.drones", swarm.units().size(), Swarm.capacity()).withStyle(ChatFormatting.GRAY));
+        PortEnergy.appendItemTooltip(stack, tooltip);
         tooltip.add(Component.translatable("item.wrights.personal_wrightport.hint").withStyle(ChatFormatting.DARK_GRAY));
-        if (energyView != null) {
-            energyView.tooltip(tooltip);
-        }
-    }
-
-    /** Client hook for the curio slot bar and its energy numbers. The server leaves this unset. */
-    public static EnergyView energyView;
-
-    public interface EnergyView {
-        boolean visible();
-
-        int width();
-
-        int color();
-
-        void tooltip(List<Component> tooltip);
     }
 
     @Override
     public boolean isBarVisible(ItemStack stack) {
-        return energyView != null && energyView.visible();
+        return PortEnergy.itemBarVisible(stack);
     }
 
     @Override
     public int getBarWidth(ItemStack stack) {
-        return energyView == null ? 0 : energyView.width();
+        return PortEnergy.itemBarWidth(stack);
     }
 
     @Override
     public int getBarColor(ItemStack stack) {
-        return energyView == null ? 0x3D9A62 : energyView.color();
+        return PortEnergy.itemBarColor(stack) & 0xFFFFFF;
     }
 }

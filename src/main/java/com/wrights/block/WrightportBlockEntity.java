@@ -284,6 +284,17 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
         }
     }
 
+    /** Copy the buffer into a dropped / picked wrightport item. */
+    public void saveEnergyToItem(ItemStack stack) {
+        PortEnergy.writeItem(stack, energy.stored());
+    }
+
+    /** Restore the buffer from a placed wrightport item (empty craft / JEI = 0). */
+    public void loadEnergyFromItem(ItemStack stack) {
+        energy.loadAmount(PortEnergy.itemStored(stack));
+        setChanged();
+    }
+
     @Override
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
