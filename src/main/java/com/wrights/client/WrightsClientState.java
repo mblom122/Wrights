@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -1421,6 +1422,9 @@ public final class WrightsClientState {
     private static int dockReopenHome;
     private static int dockReopenKind;
     private static int dockReopenIndex;
+    /** Camera type before a manage-add dock fly-in forced third-person back. */
+    private static CameraType dockSavedCamera;
+    private static boolean dockCameraActive;
 
     public static boolean dockWaiting() {
         return dockWaitRemaining > 0;
@@ -1442,9 +1446,34 @@ public final class WrightsClientState {
             if (minecraft.screen instanceof WrightsMenuScreen || minecraft.screen instanceof WrightportScreen) {
                 minecraft.setScreen(null);
             }
+            beginDockCamera(minecraft);
             return;
         }
+        endDockCamera(minecraft);
         reopenManageAfterDock(minecraft);
+    }
+
+    private static void beginDockCamera(Minecraft minecraft) {
+        if (minecraft == null || minecraft.options == null) {
+            return;
+        }
+        if (!dockCameraActive) {
+            dockSavedCamera = minecraft.options.getCameraType();
+            dockCameraActive = true;
+        }
+        minecraft.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+    }
+
+    private static void endDockCamera(Minecraft minecraft) {
+        if (!dockCameraActive) {
+            return;
+        }
+        dockCameraActive = false;
+        CameraType restore = dockSavedCamera;
+        dockSavedCamera = null;
+        if (minecraft != null && minecraft.options != null && restore != null) {
+            minecraft.options.setCameraType(restore);
+        }
     }
 
     private static void reopenManageAfterDock(Minecraft minecraft) {
