@@ -1669,6 +1669,18 @@ public final class JobManager {
                 // Own cubes done or empty — help nearest ready cell on another strip.
                 at = nextShapeIndex(level, player, job, hand, usable, shapeKind, shapePinLocal, false, scanCap);
             }
+            // Older ceil-split left some lanes with zero cubes and walked cursor to the end.
+            // After a fair split, rewind once to this strip's first cell so the wright can work.
+            if (at < 0 && job.cursor() < job.total() && hand.cursor >= job.total()) {
+                int ownedStart = firstOwnedShapeScanIndex(job, hand);
+                if (ownedStart >= 0 && ownedStart < job.total() && !job.isShapeResolved(ownedStart)) {
+                    hand.cursor = ownedStart;
+                    at = nextShapeIndex(level, player, job, hand, usable, shapeKind, shapePinLocal, true, scanCap);
+                    if (at < 0) {
+                        at = nextShapeIndex(level, player, job, hand, usable, shapeKind, shapePinLocal, false, scanCap);
+                    }
+                }
+            }
             if (at < 0) {
                 hand.idle = true;
                 hand.aim = -1;
@@ -1809,6 +1821,9 @@ public final class JobManager {
         if (index >= hand.cursor) {
             hand.cursor = index + 1;
         }
+        if (!job.markShapeResolved(index)) {
+            return;
+        }
         job.advance();
         if (skipped) {
             job.skippedOne();
@@ -1861,12 +1876,20 @@ public final class JobManager {
                 }
                 return hand.aim;
             }
-            if (onlyOwned && probe == ShapeCell.SKIP) {
+            if (probe == ShapeCell.DONE) {
+                if (hand.aim >= hand.cursor) {
+                    hand.cursor = hand.aim + 1;
+                }
+                hand.aim = -1;
+            } else if (onlyOwned && probe == ShapeCell.SKIP) {
                 resolveShapeCell(job, hand, hand.aim, true);
+                hand.aim = -1;
             } else if (onlyOwned && probe == ShapeCell.OUT) {
                 resolveShapeCell(job, hand, hand.aim, false);
+                hand.aim = -1;
+            } else {
+                hand.aim = -1;
             }
-            hand.aim = -1;
         }
         if (origin != null) {
             int local = shapeClusterIndex(level, player, job, hand, origin, PLACE_NEAR_SQR, CLUSTER_RADIUS, shapeKind, shapePinLocal, onlyOwned);
@@ -1901,6 +1924,12 @@ public final class JobManager {
             }
             ShapeCell kind = classifyShapeCell(level, player, job, hand, i, shapeKind, shapePinLocal, true);
             examined++;
+            if (kind == ShapeCell.DONE) {
+                if (i >= hand.cursor) {
+                    hand.cursor = i + 1;
+                }
+                continue;
+            }
             if (kind == ShapeCell.OUT) {
                 resolveShapeCell(job, hand, i, false);
                 continue;
@@ -1934,7 +1963,9 @@ public final class JobManager {
         SKIP,
         OUT,
         FOREIGN,
-        BLOCKED
+        BLOCKED,
+        /** Already counted toward job progress — move the hand past it without counting again. */
+        DONE
     }
 
     private static ShapeCell classifyShapeCell(
@@ -1948,6 +1979,9 @@ public final class JobManager {
             boolean onlyOwned) {
         if (index < 0 || index >= job.total()) {
             return ShapeCell.BLOCKED;
+        }
+        if (job.isShapeResolved(index)) {
+            return ShapeCell.DONE;
         }
         BlockPos pos = job.scanPosAt(index);
         int lx = pos.getX() - job.min().getX();
@@ -2051,12 +2085,57 @@ public final class JobManager {
     /**
      * Cube-strip ownership for streaming shapes. Enough cubes along the long axis → each wright
      * gets a contiguous run of {@link #SHAPE_CUBE} tiles; otherwise fall back to per-block pizza lanes.
+     * <p>
+     * Strip bounds use {@code lane * span / lanes} so every lane gets at least one cube whenever
+     * {@code spanCubes >= lanes}. The old {@code ceil(span/lanes)} width left high lanes empty
+     * (e.g. 16 cubes / 10 wrights → lanes 8–9 owned nothing and stood by at 1% progress).
      */
     private static boolean ownsShapeCell(BuildJob job, BuildJob.Hand hand, int lx, int ly, int lz) {
         int lanes = Math.max(1, hand.lanes);
         if (lanes <= 1) {
             return true;
         }
+        ShapeStrip strip = shapeStrip(job);
+        if (strip.spanCubes >= lanes) {
+            int along = strip.alongX ? Math.min(strip.nx - 1, Math.max(0, lx) / strip.cube)
+                    : (strip.alongZ ? Math.min(strip.nz - 1, Math.max(0, lz) / strip.cube)
+                            : Math.min(strip.ny - 1, Math.max(0, ly) / strip.cube));
+            int start = hand.lane * strip.spanCubes / lanes;
+            int end = (hand.lane + 1) * strip.spanCubes / lanes;
+            return along >= start && along < end;
+        }
+        return CrewSplit.lane(lx, ly, lz, lanes, strip.sx, strip.sy, strip.sz) == hand.lane;
+    }
+
+    /**
+     * First AABB scan index owned by this hand, or 0 when the whole box is shared.
+     * Used to unstick hands whose cursor was walked past an empty ceil-split strip.
+     */
+    private static int firstOwnedShapeScanIndex(BuildJob job, BuildJob.Hand hand) {
+        int lanes = Math.max(1, hand.lanes);
+        if (lanes <= 1) {
+            return 0;
+        }
+        ShapeStrip strip = shapeStrip(job);
+        if (strip.spanCubes < lanes) {
+            return 0;
+        }
+        int startCube = hand.lane * strip.spanCubes / lanes;
+        int endCube = (hand.lane + 1) * strip.spanCubes / lanes;
+        if (startCube >= endCube) {
+            return -1;
+        }
+        int local = startCube * strip.cube;
+        if (strip.alongX) {
+            return Math.min(job.total() - 1, Math.max(0, local));
+        }
+        if (strip.alongZ) {
+            return Math.min(job.total() - 1, Math.max(0, local) * strip.sx * strip.sy);
+        }
+        return Math.min(job.total() - 1, Math.max(0, local) * strip.sx);
+    }
+
+    private static ShapeStrip shapeStrip(BuildJob job) {
         int sx = Math.max(1, job.boxSizeX());
         int sy = Math.max(1, job.boxSizeY());
         int sz = Math.max(1, job.boxSizeZ());
@@ -2067,15 +2146,12 @@ public final class JobManager {
         boolean alongX = nx >= nz && nx >= ny;
         boolean alongZ = !alongX && nz >= ny;
         int spanCubes = alongX ? nx : (alongZ ? nz : ny);
-        if (spanCubes >= lanes) {
-            int cx = Math.min(nx - 1, Math.max(0, lx) / cube);
-            int cy = Math.min(ny - 1, Math.max(0, ly) / cube);
-            int cz = Math.min(nz - 1, Math.max(0, lz) / cube);
-            int along = alongX ? cx : (alongZ ? cz : cy);
-            int per = Math.max(1, (spanCubes + lanes - 1) / lanes);
-            return Math.min(lanes - 1, along / per) == hand.lane;
-        }
-        return CrewSplit.lane(lx, ly, lz, lanes, sx, sy, sz) == hand.lane;
+        return new ShapeStrip(sx, sy, sz, cube, nx, ny, nz, alongX, alongZ, spanCubes);
+    }
+
+    private record ShapeStrip(
+            int sx, int sy, int sz, int cube, int nx, int ny, int nz,
+            boolean alongX, boolean alongZ, int spanCubes) {
     }
 
     private static int shapeCubeSize(int sx, int sy, int sz) {

@@ -52,6 +52,12 @@ public final class BuildJob {
     /** Local cells whose ghost is done. Placed cells also live in {@link #refunds}. */
     private final Set<Long> settledGhosts = new HashSet<>();
     /**
+     * Shape AABB indexes already counted toward {@link #cursor} / skipped.
+     * Not saved — stops crew helpers and strip rewinds from counting the same cell twice.
+     * Grows with the highest resolved index (~1 bit per cell).
+     */
+    private java.util.BitSet shapeResolved;
+    /**
      * World positions where a falling block was hung without support this paste.
      * Not saved — used only to scrub fall ticks at job end. Packed with {@link BlockPos#asLong()}.
      */
@@ -194,6 +200,33 @@ public final class BuildJob {
 
     public void advance() {
         cursor++;
+    }
+
+    /** True when this shape scan index was already counted (place/skip/out). */
+    public boolean isShapeResolved(int index) {
+        return index >= 0 && shapeResolved != null && shapeResolved.get(index);
+    }
+
+    /**
+     * Marks a shape cell counted. Returns false when it was already marked so the caller
+     * must not advance progress again.
+     */
+    public boolean markShapeResolved(int index) {
+        if (index < 0) {
+            return false;
+        }
+        if (shapeResolved == null) {
+            shapeResolved = new java.util.BitSet(Math.max(64, total));
+        }
+        if (shapeResolved.get(index)) {
+            return false;
+        }
+        shapeResolved.set(index);
+        return true;
+    }
+
+    public void clearShapeResolved() {
+        shapeResolved = null;
     }
 
     public int placed() {
@@ -1135,6 +1168,7 @@ public final class BuildJob {
         pasteProbe = 0;
         placed = 0;
         settledGhosts.clear();
+        clearShapeResolved();
         skipped = 0;
         skippedSpecial = 0;
         droneId = null;
