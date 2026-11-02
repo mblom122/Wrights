@@ -69,6 +69,7 @@ public class ShapeTweakScreen extends Screen {
         int stepW = STEP;
         int fieldW = 40;
         int labelW = Math.max(52, this.font.width(Component.translatable("screen.wrights.shape_tweak_size")));
+        labelW = Math.max(labelW, this.font.width(Component.translatable("screen.wrights.shape_tweak_diameter")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("screen.wrights.shape_tweak_height")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("screen.wrights.shape_tweak_length")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("screen.wrights.shape_tweak_depth")));
@@ -185,7 +186,9 @@ public class ShapeTweakScreen extends Screen {
         boolean line = exchange && WrightsClientConfig.exchangeForm().line();
         boolean pillar = exchange && WrightsClientConfig.exchangeForm() == Shapes.ExchangeForm.PILLAR;
         if (sizeY >= 0) {
-            graphics.drawString(this.font, Component.translatable("screen.wrights.shape_tweak_size"),
+            Shapes.Kind sizeKind = exchange ? WrightsClientConfig.exchangeKind() : Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
+            String sizeKey = usesDiameter(sizeKind) ? "screen.wrights.shape_tweak_diameter" : "screen.wrights.shape_tweak_size";
+            graphics.drawString(this.font, Component.translatable(sizeKey),
                     panelX + PAD, sizeY + 3, WrightsUi.MUTED, false);
             drawValue(graphics, sizeY, WrightsClientConfig.SHAPE_SIZE.get());
         }
@@ -482,6 +485,15 @@ public class ShapeTweakScreen extends Screen {
 
     private void step(int x, int y, String label, Runnable action) {
         addRenderableWidget(new WrightsButton(x, y, STEP, ROW, Component.literal(label), button -> action.run()));
+    }
+
+    private static boolean usesDiameter(Shapes.Kind kind) {
+        return kind == Shapes.Kind.CIRCLE
+                || kind == Shapes.Kind.CYLINDER
+                || kind == Shapes.Kind.SPHERE
+                || kind == Shapes.Kind.DOME
+                || kind == Shapes.Kind.RING
+                || kind == Shapes.Kind.PYRAMID;
     }
 
     @Override

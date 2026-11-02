@@ -1377,6 +1377,7 @@
   "screen.wrights.exchange_tweak_title": "Exchange tweak",
   "screen.wrights.shape_tweak_hint": "Quick size and aim. ± steps: 1 · Ctrl 5 · Shift 10 · Alt 50 · Ctrl+Shift 100. Edit point opens the look/anchor editor. Shift+right-click air clears the world anchor back to Look.",
   "screen.wrights.shape_tweak_size": "Size",
+  "screen.wrights.shape_tweak_diameter": "Diameter",
   "screen.wrights.shape_tweak_height": "Height",
   "screen.wrights.shape_tweak_length": "Length",
   "screen.wrights.shape_tweak_depth": "Depth",
