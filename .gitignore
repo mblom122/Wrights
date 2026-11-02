@@ -52,3 +52,7 @@ art_backup/
 clear-local-configs.bat
 ToDo.txt
 
+### Local plans ###
+*_PLAN.md
+tools/shapeplan/
+
