@@ -117,12 +117,38 @@ public final class BlueprintNetwork {
         registrar.playToClient(BlueprintPayloads.Notice.TYPE, BlueprintPayloads.Notice.STREAM_CODEC, BlueprintNetwork::clientNotice);
         registrar.playToClient(BlueprintPayloads.UndoPrompt.TYPE, BlueprintPayloads.UndoPrompt.STREAM_CODEC, BlueprintNetwork::clientUndoPrompt);
         registrar.playToClient(BlueprintPayloads.JobDone.TYPE, BlueprintPayloads.JobDone.STREAM_CODEC, BlueprintNetwork::clientJobDone);
+        registrar.playToClient(BlueprintPayloads.HistorySync.TYPE, BlueprintPayloads.HistorySync.STREAM_CODEC, BlueprintNetwork::clientHistory);
         registrar.playToClient(BlueprintPayloads.DockToast.TYPE, BlueprintPayloads.DockToast.STREAM_CODEC, BlueprintNetwork::clientDockToast);
         registrar.playToClient(BlueprintPayloads.DockWait.TYPE, BlueprintPayloads.DockWait.STREAM_CODEC, BlueprintNetwork::clientDockWait);
         registrar.playToClient(BlueprintPayloads.BlueprintItemList.TYPE, BlueprintPayloads.BlueprintItemList.STREAM_CODEC, BlueprintNetwork::clientBlueprintItems);
         registrar.playToClient(BlueprintPayloads.FolderItemList.TYPE, BlueprintPayloads.FolderItemList.STREAM_CODEC, BlueprintNetwork::clientFolderItems);
         registrar.playToClient(BlueprintPayloads.ClipboardOffer.TYPE, BlueprintPayloads.ClipboardOffer.STREAM_CODEC, BlueprintNetwork::clientClipboardOffer);
         registrar.playToClient(BlueprintPayloads.ClipboardView.TYPE, BlueprintPayloads.ClipboardView.STREAM_CODEC, BlueprintNetwork::clientClipboardView);
+    }
+
+    public static void syncHistory(ServerPlayer player, java.util.List<com.wrights.job.JobEventLog.Event> events) {
+        if (player == null) {
+            return;
+        }
+        java.util.List<BlueprintPayloads.HistoryLine> lines = new java.util.ArrayList<>();
+        if (events != null) {
+            for (com.wrights.job.JobEventLog.Event event : events) {
+                lines.add(new BlueprintPayloads.HistoryLine(event.kind(), event.jobName(), event.detail(), event.gameTime()));
+            }
+        }
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.HistorySync(lines));
+    }
+
+    public static void syncHistory(ServerPlayer player) {
+        if (player == null || player.getServer() == null) {
+            return;
+        }
+        com.wrights.schematic.SchematicLibrary library = com.wrights.schematic.SchematicLibrary.get(player.getServer());
+        syncHistory(player, library.eventLog().events(player.getUUID()));
+    }
+
+    private static void clientHistory(BlueprintPayloads.HistorySync payload, IPayloadContext context) {
+        context.enqueueWork(() -> com.wrights.client.WrightsClientState.applyHistory(payload));
     }
 
     public static void syncLibrary(ServerPlayer player) {
@@ -849,6 +875,7 @@ public final class BlueprintNetwork {
         }
         PacketDistributor.sendToPlayer(player, new BlueprintPayloads.JobSync(lines));
         PacketDistributor.sendToPlayer(player, new BlueprintPayloads.WrightSpots(com.wrights.job.JobManager.wrightSpots(player)));
+        syncHistory(player, library.eventLog().events(player.getUUID()));
     }
 
     /** Per-wright status for Manage: wait reason, strip, position, and current target block. */

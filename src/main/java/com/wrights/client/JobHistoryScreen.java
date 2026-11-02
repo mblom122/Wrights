@@ -2,28 +2,24 @@ package com.wrights.client;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
-import net.neoforged.neoforge.network.PacketDistributor;
 
+import com.wrights.job.JobEventLog;
 import com.wrights.network.BlueprintPayloads;
 
 /**
- * Scrollable finished-job history opened from Jobs. Each row shows outcome, size, blocks,
- * time, source, and place, with the same undo / redo / mark / visit / remove actions.
+ * Info-only History log: completed jobs, returns, stalls, pauses, and similar events.
+ * No action buttons — Manage keeps those on live / finished job cards.
  */
 public class JobHistoryScreen extends Screen {
-    private static final int ROW = 78;
-    private static final int BTN_H = 16;
+    private static final int ROW = 42;
 
     private final Screen parent;
-    private final List<BlueprintPayloads.JobLine> rows = new ArrayList<>();
-    private final List<Hit> hits = new ArrayList<>();
+    private final List<BlueprintPayloads.HistoryLine> rows = new ArrayList<>();
     private int panelX;
     private int panelY;
     private int panelW;
@@ -65,7 +61,6 @@ public class JobHistoryScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        hits.clear();
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, this.title, panelX + 16, panelY + 10, WrightsUi.COPPER, false);
         Component summary = rows.isEmpty()
@@ -78,9 +73,9 @@ public class JobHistoryScreen extends Screen {
         int contentW = listW - (bar ? 10 : 0);
         graphics.enableScissor(listX, listY, listX + contentW, listY + listH);
         int y = listY - scroll;
-        for (BlueprintPayloads.JobLine job : rows) {
+        for (BlueprintPayloads.HistoryLine event : rows) {
             if (y + ROW >= listY && y < listY + listH) {
-                drawRow(graphics, mouseX, mouseY, listX, y, contentW, job, listY, listY + listH);
+                drawRow(graphics, mouseX, mouseY, listX, y, contentW, event, listY, listY + listH);
             }
             y += ROW;
         }
@@ -89,31 +84,24 @@ public class JobHistoryScreen extends Screen {
             drawBar(graphics, listX + listW - 6, listY, listH, mouseX, mouseY);
         }
         if (rows.isEmpty()) {
-            String empty = Component.translatable("menu.wrights.jobs_finished_empty").getString();
+            String empty = Component.translatable("screen.wrights.job_history_empty").getString();
             graphics.drawString(this.font, empty, listX + (contentW - this.font.width(empty)) / 2, listY + listH / 2 - 4, WrightsUi.MUTED, false);
         }
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 0) {
-            if (maxScroll() > 0 && mouseX >= listX + listW - 8 && mouseX < listX + listW && mouseY >= listY && mouseY < listY + listH) {
-                int max = maxScroll();
-                int thumb = thumbH();
-                int track = Math.max(1, listH - thumb);
-                int thumbY = listY + track * scroll / Math.max(1, max);
-                if (mouseY >= thumbY && mouseY < thumbY + thumb) {
-                    dragGrab = (int) mouseY - thumbY;
-                } else {
-                    scroll = Mth.clamp(mouseY < thumbY ? scroll - listH : scroll + listH, 0, max);
-                }
-                return true;
+        if (button == 0 && maxScroll() > 0 && mouseX >= listX + listW - 8 && mouseX < listX + listW && mouseY >= listY && mouseY < listY + listH) {
+            int max = maxScroll();
+            int thumb = thumbH();
+            int track = Math.max(1, listH - thumb);
+            int thumbY = listY + track * scroll / Math.max(1, max);
+            if (mouseY >= thumbY && mouseY < thumbY + thumb) {
+                dragGrab = (int) mouseY - thumbY;
+            } else {
+                scroll = Mth.clamp(mouseY < thumbY ? scroll - listH : scroll + listH, 0, max);
             }
-            for (Hit hit : hits) {
-                if (mouseX >= hit.x && mouseX < hit.x + hit.w && mouseY >= hit.y && mouseY < hit.y + hit.h) {
-                    return activate(hit);
-                }
-            }
+            return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);
     }
@@ -170,11 +158,7 @@ public class JobHistoryScreen extends Screen {
 
     private void rebuild() {
         rows.clear();
-        for (BlueprintPayloads.JobLine job : WrightsClientState.jobs) {
-            if (job.finished()) {
-                rows.add(job);
-            }
-        }
+        rows.addAll(WrightsClientState.history);
     }
 
     private void drawRow(
@@ -184,7 +168,7 @@ public class JobHistoryScreen extends Screen {
             int x,
             int y,
             int width,
-            BlueprintPayloads.JobLine job,
+            BlueprintPayloads.HistoryLine event,
             int clipTop,
             int clipBottom) {
         int rowH = ROW - 4;
@@ -192,133 +176,28 @@ public class JobHistoryScreen extends Screen {
                 && mouseY >= Math.max(y, clipTop)
                 && mouseY < Math.min(y + rowH, clipBottom);
         graphics.fill(x, y, x + width, y + rowH, hover ? WrightsUi.CARD_HOVER : WrightsUi.SHADE);
-        if (hover) {
-            graphics.fill(x, y, x + 2, y + rowH, statusColor(job));
+        graphics.fill(x, y, x + 2, y + rowH, kindColor(event.kind()));
+
+        Component title = kindTitle(event.kind());
+        String name = event.jobName() == null ? "" : event.jobName();
+        int titleW = this.font.width(title);
+        graphics.drawString(this.font, title, x + 8, y + 6, kindColor(event.kind()), false);
+        if (!name.isBlank()) {
+            int nameX = x + 8 + titleW + 8;
+            String clipped = this.font.plainSubstrByWidth(name, Math.max(24, width - (nameX - x) - 8));
+            graphics.drawString(this.font, clipped, nameX, y + 6, WrightsUi.TEXT, false);
         }
 
-        Component status = statusText(job);
-        int statusW = this.font.width(status);
-        int statusX = x + width - 8 - statusW;
-        int lineEnd = Math.max(x + 6, statusX - this.font.width("   "));
-        String name = this.font.plainSubstrByWidth(job.name(), Math.max(24, lineEnd - (x + 6) - 8));
-        WrightsUi.section(graphics, this.font, x + 6, y + 4, Component.literal(name), lineEnd);
-        graphics.drawString(this.font, status, statusX, y + 4, statusColor(job), false);
-
-        Component size = Component.translatable("menu.wrights.size", job.sizeX(), job.sizeY(), job.sizeZ());
-        Component blocks = Component.translatable("menu.wrights.job_preview_blocks", WrightsUi.count(job.total()));
-        graphics.drawString(this.font, size, x + 6, y + 16, WrightsUi.SIZE, false);
-        int dashX = x + 6 + this.font.width(size);
-        graphics.drawString(this.font, " - ", dashX, y + 16, WrightsUi.MUTED, false);
-        graphics.drawString(this.font, blocks, dashX + this.font.width(" - "), y + 16, WrightsUi.MUTED, false);
-
-        String result = resultLine(job);
-        graphics.drawString(this.font, this.font.plainSubstrByWidth(result, width - 12), x + 6, y + 27, WrightsUi.TEXT, false);
-
-        String meta = metaLine(job);
-        graphics.drawString(this.font, this.font.plainSubstrByWidth(meta, width - 12), x + 6, y + 38, WrightsUi.MUTED, false);
-
-        BlockPos at = job.anchor();
-        String place = Component.translatable("menu.wrights.job_anchor", at.getX(), at.getY(), at.getZ()).getString();
-        if (job.dimension() != null && !job.dimension().isBlank()) {
-            String dim = job.dimension();
-            int slash = dim.lastIndexOf(':');
-            if (slash >= 0 && slash + 1 < dim.length()) {
-                dim = dim.substring(slash + 1);
-            }
-            place = place + " · " + dim;
-        }
-        graphics.drawString(this.font, this.font.plainSubstrByWidth(place, width - 12), x + 6, y + 49, WrightsUi.MUTED, false);
-
-        int btnY = y + rowH - BTN_H - 4;
-        if (btnY + BTN_H > clipTop && btnY < clipBottom) {
-            drawActions(graphics, mouseX, mouseY, x, btnY, width, job);
-        }
-    }
-
-    private void drawActions(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width, BlueprintPayloads.JobLine job) {
-        boolean tool = toolHeld();
-        boolean creative = this.minecraft.player != null
-                && this.minecraft.player.getAbilities().instabuild
-                && !this.minecraft.player.isSpectator();
-        int right = x + width - 6;
-        right = drawAction(graphics, mouseX, mouseY, right, y, "menu.wrights.remove", job.id(), BlueprintPayloads.JobControl.REMOVE, tool);
-        if (creative) {
-            right = drawAction(graphics, mouseX, mouseY, right, y, "menu.wrights.visit", job.id(), BlueprintPayloads.JobControl.VISIT, tool);
-        }
-        boolean marked = WrightsClientState.markedJobs.contains(job.id());
-        right = drawAction(
-                graphics,
-                mouseX,
-                mouseY,
-                right,
-                y,
-                marked ? "menu.wrights.mark_on" : "menu.wrights.mark",
-                job.id(),
-                Hit.MARK,
-                true,
-                marked ? 0xFFF2D48A : 0);
-        if (job.canUndo() && !job.undone() && !job.undoing() && com.wrights.WrightsConfig.allowUndo()) {
-            right = drawAction(graphics, mouseX, mouseY, right, y, "menu.wrights.undo", job.id(), BlueprintPayloads.JobControl.UNDO, tool);
-        }
-        drawAction(graphics, mouseX, mouseY, right, y, "menu.wrights.redo", job.id(), BlueprintPayloads.JobControl.REDO, tool);
-    }
-
-    private int drawAction(
-            GuiGraphics graphics,
-            int mouseX,
-            int mouseY,
-            int right,
-            int y,
-            String key,
-            UUID jobId,
-            int action,
-            boolean enabled) {
-        return drawAction(graphics, mouseX, mouseY, right, y, key, jobId, action, enabled, 0);
-    }
-
-    private int drawAction(
-            GuiGraphics graphics,
-            int mouseX,
-            int mouseY,
-            int right,
-            int y,
-            String key,
-            UUID jobId,
-            int action,
-            boolean enabled,
-            int border) {
-        int width = Math.max(52, this.font.width(Component.translatable(key)) + 10);
-        int x = right - width;
-        boolean hover = enabled && mouseX >= x && mouseX < right && mouseY >= y && mouseY < y + BTN_H;
-        WrightsUi.choice(graphics, x, y, width, BTN_H, false, hover, enabled);
-        if (border != 0) {
-            WrightsUi.border(graphics, x, y, width, BTN_H, border);
-        }
-        Component label = Component.translatable(key);
+        String detail = event.detail() == null || event.detail().isBlank()
+                ? Component.translatable("history.wrights.detail_none").getString()
+                : event.detail();
         graphics.drawString(
                 this.font,
-                label,
-                x + (width - this.font.width(label)) / 2,
-                y + 4,
-                enabled ? WrightsUi.TEXT : 0xFF6E7A86,
+                this.font.plainSubstrByWidth(detail, width - 16),
+                x + 8,
+                y + 20,
+                WrightsUi.MUTED,
                 false);
-        hits.add(new Hit(x, y, width, BTN_H, jobId, action));
-        return x - 4;
-    }
-
-    private boolean activate(Hit hit) {
-        if (hit.action == Hit.MARK) {
-            WrightsClientState.toggleMark(hit.jobId);
-            return true;
-        }
-        if (hit.action != Hit.MARK && !toolHeld()) {
-            if (this.minecraft.player != null) {
-                this.minecraft.player.displayClientMessage(Component.translatable("message.wrights.hold_controller"), true);
-            }
-            return true;
-        }
-        PacketDistributor.sendToServer(new BlueprintPayloads.JobControl(hit.jobId, hit.action));
-        return true;
     }
 
     private void drawBar(GuiGraphics graphics, int x, int y, int h, int mouseX, int mouseY) {
@@ -340,97 +219,32 @@ public class JobHistoryScreen extends Screen {
         return Math.max(0, rows.size() * ROW - listH);
     }
 
-    private static Component statusText(BlueprintPayloads.JobLine job) {
-        return Component.translatable(WrightsClientState.jobStatusKey(job));
+    private static Component kindTitle(int kind) {
+        return Component.translatable(switch (kind) {
+            case JobEventLog.COMPLETED -> "history.wrights.completed";
+            case JobEventLog.STOPPED -> "history.wrights.stopped";
+            case JobEventLog.UNDONE -> "history.wrights.undone";
+            case JobEventLog.PAUSED -> "history.wrights.paused";
+            case JobEventLog.RESUMED -> "history.wrights.resumed_title";
+            case JobEventLog.STALLED_ITEMS -> "history.wrights.stalled";
+            case JobEventLog.OUT_OF_RANGE -> "history.wrights.out_of_range";
+            case JobEventLog.WRONG_DIMENSION -> "history.wrights.wrong_dimension";
+            case JobEventLog.REJOINED -> "history.wrights.rejoined";
+            case JobEventLog.LAUNCHED -> "history.wrights.launched";
+            case JobEventLog.QUEUED -> "history.wrights.queued";
+            case JobEventLog.REMOVED -> "history.wrights.removed_title";
+            case JobEventLog.COPY_DONE -> "history.wrights.copy_done";
+            case JobEventLog.UNDOING -> "history.wrights.undoing_title";
+            default -> "history.wrights.event";
+        });
     }
 
-    private static int statusColor(BlueprintPayloads.JobLine job) {
-        if (job.stopped()) {
-            return WrightsUi.RED;
-        }
-        if (job.undone() || job.undoing()) {
-            return WrightsUi.MUTED;
-        }
-        return WrightsUi.GREEN;
-    }
-
-    private String resultLine(BlueprintPayloads.JobLine job) {
-        int placed = Math.max(0, job.done());
-        int skipped = Math.max(0, job.skipped());
-        StringBuilder line = new StringBuilder();
-        line.append(Component.translatable("screen.wrights.job_history_placed", WrightsUi.count(placed)).getString());
-        if (skipped > 0) {
-            line.append(" · ");
-            line.append(Component.translatable("screen.wrights.job_history_skipped", WrightsUi.count(skipped)).getString());
-        }
-        int seconds = Math.max(0, job.workedTicks() / 20);
-        line.append(" · ");
-        if (seconds <= 0) {
-            line.append(Component.translatable("hud.wrights.job_time_under").getString());
-        } else {
-            line.append(Component.translatable("hud.wrights.job_time", duration(seconds)).getString());
-        }
-        return line.toString();
-    }
-
-    private String metaLine(BlueprintPayloads.JobLine job) {
-        StringBuilder line = new StringBuilder();
-        int wrights = Math.max(job.drones(), Math.max(job.quota(), job.crew().size()));
-        if (wrights > 0) {
-            line.append(Component.translatable("screen.wrights.job_history_wrights", wrights).getString());
-        }
-        Component source = sourceText(job);
-        if (!source.getString().isEmpty()) {
-            if (!line.isEmpty()) {
-                line.append(" · ");
-            }
-            line.append(source.getString());
-        }
-        return line.toString();
-    }
-
-    private static Component sourceText(BlueprintPayloads.JobLine job) {
-        String named = job.sourceName();
-        BlockPos at = job.sourcePort();
-        boolean hasPort = at != null && !at.equals(BlockPos.ZERO);
-        return switch (job.source()) {
-            case 1 -> Component.translatable("menu.wrights.job_from_you");
-            case 2 -> named != null && !named.isBlank()
-                    ? (hasPort
-                            ? Component.translatable("menu.wrights.job_from_port_named_at", named, at.getX(), at.getY(), at.getZ())
-                            : Component.translatable("menu.wrights.job_from_port_named", named))
-                    : (hasPort
-                            ? Component.translatable("menu.wrights.job_from_port_at", at.getX(), at.getY(), at.getZ())
-                            : Component.translatable("menu.wrights.job_from_port"));
-            case 3 -> named != null && !named.isBlank()
-                    ? (hasPort
-                            ? Component.translatable("menu.wrights.job_from_both_named_at", named, at.getX(), at.getY(), at.getZ())
-                            : Component.translatable("menu.wrights.job_from_both_named", named))
-                    : (hasPort
-                            ? Component.translatable("menu.wrights.job_from_both_at", at.getX(), at.getY(), at.getZ())
-                            : Component.translatable("menu.wrights.job_from_both"));
-            default -> Component.translatable("menu.wrights.job_from_you");
+    private static int kindColor(int kind) {
+        return switch (kind) {
+            case JobEventLog.COMPLETED, JobEventLog.COPY_DONE, JobEventLog.REJOINED, JobEventLog.RESUMED, JobEventLog.LAUNCHED -> WrightsUi.GREEN;
+            case JobEventLog.STOPPED, JobEventLog.OUT_OF_RANGE, JobEventLog.WRONG_DIMENSION, JobEventLog.REMOVED -> WrightsUi.RED;
+            case JobEventLog.STALLED_ITEMS, JobEventLog.PAUSED, JobEventLog.QUEUED, JobEventLog.UNDOING -> WrightsUi.COPPER;
+            default -> WrightsUi.MUTED;
         };
-    }
-
-    private static String duration(int seconds) {
-        int hours = seconds / 3600;
-        int minutes = (seconds % 3600) / 60;
-        int rest = seconds % 60;
-        if (hours > 0) {
-            return hours + "h " + minutes + "m";
-        }
-        if (minutes > 0) {
-            return minutes + "m " + rest + "s";
-        }
-        return rest + "s";
-    }
-
-    private boolean toolHeld() {
-        return this.minecraft.player != null && com.wrights.item.ControllerItem.isHeld(this.minecraft.player);
-    }
-
-    private record Hit(int x, int y, int w, int h, UUID jobId, int action) {
-        private static final int MARK = -2;
     }
 }

@@ -40,6 +40,7 @@ public final class SchematicLibrary extends SavedData {
     private final Map<UUID, List<UUID>> jobsByPlayer = new HashMap<>();
     private final Map<UUID, GlobalPos> supplies = new HashMap<>();
     private final Map<UUID, DigitalLink> digitalLinks = new HashMap<>();
+    private final com.wrights.job.JobEventLog eventLog = new com.wrights.job.JobEventLog();
     private int historyClock;
 
     public static SchematicLibrary get(MinecraftServer server) {
@@ -92,6 +93,9 @@ public final class SchematicLibrary extends SavedData {
                 }
             }
         }
+        if (tag.contains("eventLog", Tag.TAG_COMPOUND)) {
+            library.eventLog.load(tag.getCompound("eventLog"));
+        }
         library.pruneAllHistory();
         return library;
     }
@@ -130,7 +134,12 @@ public final class SchematicLibrary extends SavedData {
             digitalLinks.add(link);
         }
         tag.put("digitalLinks", digitalLinks);
+        tag.put("eventLog", eventLog.save());
         return tag;
+    }
+
+    public com.wrights.job.JobEventLog eventLog() {
+        return eventLog;
     }
 
     /** The chest every blueprint for this player draws from, until it is cleared. */

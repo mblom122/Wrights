@@ -207,11 +207,13 @@ public final class JobManager {
             job.noteHold(BuildJob.HOLD_MANUAL, null);
             job.setPaused(true);
             library.setDirty();
+            noteHistory(player, library, job, JobEventLog.PAUSED, Component.translatable("history.wrights.paused_manual").getString());
         } else if (action == com.wrights.network.BlueprintPayloads.JobControl.RESUME && !job.finished()) {
             if (job.queued()) {
                 job.setPaused(false);
                 job.clearHold();
                 library.setDirty();
+                noteHistory(player, library, job, JobEventLog.RESUMED, Component.translatable("history.wrights.resumed").getString());
             } else {
                 bindCrewIds(player, library);
                 if (job.paused() && !restorePausedCrew(player, library, job)) {
@@ -220,6 +222,7 @@ public final class JobManager {
                     job.setPaused(false);
                     job.clearHold();
                     library.setDirty();
+                    noteHistory(player, library, job, JobEventLog.RESUMED, Component.translatable("history.wrights.resumed").getString());
                 }
             }
         } else if (action == com.wrights.network.BlueprintPayloads.JobControl.REDO) {
@@ -265,6 +268,11 @@ public final class JobManager {
         if (tell) {
             Messages.actionBar(player, "message.wrights.stopped");
         }
+        String detail = Component.translatable(
+                "history.wrights.stopped_detail",
+                Math.max(0, job.progressDone()),
+                Math.max(1, job.total())).getString();
+        noteHistory(player, library, job, JobEventLog.STOPPED, detail);
     }
 
     private static void redo(ServerPlayer player, SchematicLibrary library, BuildJob job) {
@@ -321,6 +329,7 @@ public final class JobManager {
         BlueprintNetwork.clearJobHologram(player, job.id());
         BlueprintNetwork.syncJobs(player);
         Messages.actionBar(player, "message.wrights.undo_started");
+        noteHistory(player, library, job, JobEventLog.UNDOING, Component.translatable("history.wrights.undoing").getString());
     }
 
     /** Creative teleport to the session's bound supply chest. */
@@ -450,8 +459,10 @@ public final class JobManager {
                 }
                 if (paused) {
                     job.noteHold(BuildJob.HOLD_MANUAL, null);
+                    noteHistory(player, library, job, JobEventLog.PAUSED, Component.translatable("history.wrights.paused_all").getString());
                 } else {
                     job.clearHold();
+                    noteHistory(player, library, job, JobEventLog.RESUMED, Component.translatable("history.wrights.resumed").getString());
                 }
                 job.setPaused(paused);
                 changed = true;
@@ -484,6 +495,7 @@ public final class JobManager {
     }
 
     private static void removeOneJob(ServerPlayer player, SchematicLibrary library, BuildJob job) {
+        noteHistory(player, library, job, JobEventLog.REMOVED, Component.translatable("history.wrights.removed").getString());
         discardJob(player, library, job);
         BlueprintNetwork.syncJobs(player);
         Messages.actionBar(player, "message.wrights.job_removed");
@@ -1799,6 +1811,7 @@ public final class JobManager {
             job.setWaitKind(BuildJob.WAIT_CHUNK);
         } else if (waitingItems) {
             job.setWaitKind(BuildJob.WAIT_ITEMS);
+            noteHistory(player, library, job, JobEventLog.STALLED_ITEMS, Component.translatable("history.wrights.stalled_items").getString());
             job.setQueued(true);
             job.setCrewQuota(Math.max(1, job.crewQuota()));
         } else {
@@ -2729,6 +2742,7 @@ public final class JobManager {
         }
         if (at == NEED_ITEMS) {
             job.setWaitKind(BuildJob.WAIT_ITEMS);
+            noteHistory(player, library, job, JobEventLog.STALLED_ITEMS, Component.translatable("history.wrights.stalled_items").getString());
             parkSolo(level, player, job);
             releaseStalledHome(player, library, job);
             library.setDirty();
@@ -3142,6 +3156,23 @@ public final class JobManager {
             Messages.actionBar(player, title.copy().append(Component.literal(". ")).append(line));
         }
         BlueprintNetwork.jobDone(player, title, line, job.elapsedSeconds());
+        int kind = JobEventLog.COMPLETED;
+        if ("hud.wrights.task_undo".equals(taskKey)) {
+            kind = JobEventLog.UNDONE;
+        } else if ("hud.wrights.task_save".equals(taskKey)) {
+            kind = JobEventLog.COPY_DONE;
+        } else if (job.stopped()) {
+            kind = JobEventLog.STOPPED;
+        }
+        noteHistory(player, library, job, kind, line.getString());
+    }
+
+    private static void noteHistory(ServerPlayer player, SchematicLibrary library, BuildJob job, int kind, String detail) {
+        if (player == null || library == null || job == null) {
+            return;
+        }
+        library.eventLog().record(player, kind, jobCardTitle(job, library), detail == null ? "" : detail);
+        library.setDirty();
     }
 
     private static Component jobTitle(MinecraftServer server, SchematicLibrary library, BuildJob job, String taskKey) {
@@ -3477,6 +3508,7 @@ public final class JobManager {
             if (shown != null) {
                 tellPortAt(player, player.getServer().getLevel(job.dimension()), shown, message, "message.wrights.paused_port_range_named");
             }
+            noteHistory(player, library, job, JobEventLog.PAUSED, Component.translatable("history.wrights.paused_port").getString());
             BlueprintNetwork.syncJobs(player);
         } else if (reason != BuildJob.HOLD_PLAYER_RANGE && reason != BuildJob.HOLD_DIMENSION && job.tickMessage()) {
             // Player-range / wrong-dimension: crew docks silently and the job keeps its quota.
@@ -3531,6 +3563,12 @@ public final class JobManager {
                     ? Component.translatable("hud.wrights.wrights_returned_dimension", recalled)
                     : Component.translatable("hud.wrights.wrights_returned_range", recalled);
             BlueprintNetwork.jobDone(player, header, name, detail, -1);
+            noteHistory(
+                    player,
+                    library,
+                    job,
+                    hold == BuildJob.HOLD_DIMENSION ? JobEventLog.WRONG_DIMENSION : JobEventLog.OUT_OF_RANGE,
+                    detail.getString());
         }
         return true;
     }
@@ -4067,12 +4105,14 @@ public final class JobManager {
             library.setDirty();
             BlueprintNetwork.syncJobs(player);
             int count = job.crewUnits().size();
+            Component detail = Component.translatable("hud.wrights.wrights_rejoined_detail", count);
             BlueprintNetwork.jobDone(
                     player,
                     Component.translatable("hud.wrights.wrights_rejoined"),
                     Component.literal(jobCardTitle(job, library)),
-                    Component.translatable("hud.wrights.wrights_rejoined_detail", count),
+                    detail,
                     -1);
+            noteHistory(player, library, job, JobEventLog.REJOINED, detail.getString());
         }
     }
 
@@ -4778,6 +4818,7 @@ public final class JobManager {
         }
         job.setWaitKind(reason);
         if (reason == BuildJob.WAIT_ITEMS) {
+            noteHistory(player, library, job, JobEventLog.STALLED_ITEMS, Component.translatable("history.wrights.stalled_items").getString());
             releaseStalledHome(player, library, job);
         }
         if (!working && !scanning && !waiting) {

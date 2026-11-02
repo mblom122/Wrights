@@ -60,6 +60,7 @@ public final class WrightsClientState {
     public static Set<UUID> openFolders = Set.of();
     public static boolean busy;
     public static List<BlueprintPayloads.JobLine> jobs = List.of();
+    public static List<BlueprintPayloads.HistoryLine> history = List.of();
     public static boolean libraryKnown;
     /** False = this world's library. True = shared AppData / global library. */
     public static boolean libraryGlobal;
@@ -276,6 +277,10 @@ public final class WrightsClientState {
         }
         activeBuilds.put(jobId, new ActiveBuild(build.origin(), build.clipX(), build.clipY(), build.clipZ(), next, build.dimension(), build.mine()));
         rebuildActiveCells();
+    }
+
+    public static void applyHistory(BlueprintPayloads.HistorySync payload) {
+        history = payload == null || payload.events() == null ? List.of() : List.copyOf(payload.events());
     }
 
     public static void applyJobs(BlueprintPayloads.JobSync payload) {

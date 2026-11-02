@@ -1150,6 +1150,45 @@ public final class BlueprintPayloads {
         }
     }
 
+    /** Info-only History window rows: kind + job name + detail + game time. */
+    public record HistoryLine(int kind, String jobName, String detail, long gameTime) {
+        public void write(RegistryFriendlyByteBuf buf) {
+            buf.writeVarInt(kind);
+            buf.writeUtf(jobName == null ? "" : jobName, 128);
+            buf.writeUtf(detail == null ? "" : detail, 256);
+            buf.writeLong(gameTime);
+        }
+
+        public static HistoryLine read(RegistryFriendlyByteBuf buf) {
+            return new HistoryLine(buf.readVarInt(), buf.readUtf(128), buf.readUtf(256), buf.readLong());
+        }
+    }
+
+    public record HistorySync(List<HistoryLine> events) implements CustomPacketPayload {
+        public static final Type<HistorySync> TYPE = payloadType("history_sync");
+        public static final StreamCodec<RegistryFriendlyByteBuf, HistorySync> STREAM_CODEC = StreamCodec.of(
+                (buf, value) -> {
+                    List<HistoryLine> lines = value.events == null ? List.of() : value.events;
+                    buf.writeVarInt(lines.size());
+                    for (HistoryLine line : lines) {
+                        line.write(buf);
+                    }
+                },
+                buf -> {
+                    int count = buf.readVarInt();
+                    List<HistoryLine> lines = new ArrayList<>(count);
+                    for (int i = 0; i < count; i++) {
+                        lines.add(HistoryLine.read(buf));
+                    }
+                    return new HistorySync(List.copyOf(lines));
+                });
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public record SetAssign(int count) implements CustomPacketPayload {
         public static final Type<SetAssign> TYPE = payloadType("set_assign");
         public static final StreamCodec<RegistryFriendlyByteBuf, SetAssign> STREAM_CODEC = StreamCodec.of(
