@@ -9,6 +9,7 @@ import net.minecraft.world.level.block.Block;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 import com.wrights.blueprint.Mirror;
+import com.wrights.drone.WrightTier;
 import com.wrights.util.Messages;
 
 public final class WrightsConfig {
@@ -303,6 +304,22 @@ public final class WrightsConfig {
             return maxWrightsPerJob();
         }
         return maxWrightsPerJob(job.exchangeJob() || job.placeTool());
+    }
+
+    /**
+     * How many wrights can usefully work this job in parallel. Not 1:1 with blocks —
+     * one upgraded wright multi-places a local cluster, so a 3×3 wall needs one wright,
+     * not nine. Capped by horizontal columns (lane splits) and by a share near the
+     * Netherite place burst.
+     */
+    public static int usefulCrewFor(int blocks, int sizeX, int sizeY, int sizeZ) {
+        if (blocks <= 0) {
+            return 0;
+        }
+        int columns = Math.max(1, Math.max(Math.max(1, sizeX), Math.max(1, sizeZ)));
+        int share = Math.max(1, WrightTier.placeEighths(WrightTier.NETHERITE) / 8);
+        int byShare = Math.max(1, (blocks + share - 1) / share);
+        return Math.max(1, Math.min(blocks, Math.min(columns, byShare)));
     }
 
     public static int maxWrightsCarried() {

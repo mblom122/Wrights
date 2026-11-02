@@ -1506,7 +1506,7 @@ public final class WrightsClientState {
             return;
         }
         com.wrights.drone.Swarm swarm = com.wrights.drone.Wrightports.swarm(minecraft.player);
-        int next = WrightsClientConfig.deployTarget(freeWrights(), placeableBlocks());
+        int next = WrightsClientConfig.deployTarget(freeWrights(), placeableBlocks(), viewX, viewY, viewZ, exchangeToolActive() || placeToolActive());
         if (next <= 0 || next == swarm.assignCount()) {
             return;
         }
@@ -1542,7 +1542,8 @@ public final class WrightsClientState {
             return 0;
         }
         boolean boosted = exchangeToolActive() || placeToolActive();
-        int ceiling = Math.min(blocks, WrightsConfig.maxWrightsPerJob(boosted));
+        int useful = WrightsConfig.usefulCrewFor(blocks, viewX, viewY, viewZ);
+        int ceiling = Math.min(useful, WrightsConfig.maxWrightsPerJob(boosted));
         return Math.min(Math.max(1, WrightsClientConfig.droneCountFor(boosted)), Math.min(free, ceiling));
     }
 
@@ -1589,7 +1590,8 @@ public final class WrightsClientState {
             return 0;
         }
         boolean boosted = exchangeToolActive() || placeToolActive();
-        int ceiling = Math.min(blocks, WrightsConfig.maxWrightsPerJob(boosted));
+        int useful = WrightsConfig.usefulCrewFor(blocks, viewX, viewY, viewZ);
+        int ceiling = Math.min(useful, WrightsConfig.maxWrightsPerJob(boosted));
         int freeCap = deployCap();
         return freeCap > 0 ? freeCap : ceiling;
     }
@@ -1615,7 +1617,7 @@ public final class WrightsClientState {
         }
         if (!deployChosen) {
             if (deployCap() > 0) {
-                deployCount = WrightsClientConfig.deployTarget(freeWrights(), placeableBlocks());
+                deployCount = WrightsClientConfig.deployTarget(freeWrights(), placeableBlocks(), viewX, viewY, viewZ, exchangeToolActive() || placeToolActive());
             } else {
                 int wanted = WrightsClientConfig.droneCount();
                 deployCount = Math.max(1, wanted);

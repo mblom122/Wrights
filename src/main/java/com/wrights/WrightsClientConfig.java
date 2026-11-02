@@ -68,10 +68,10 @@ public final class WrightsClientConfig {
             .comment("When true, building and undoing finish in one step. When false, the drone places and removes a few blocks at a time.")
             .define("instantJobs", false);
     public static final ModConfigSpec.BooleanValue DRONE_MAX = BUILDER
-            .comment("When true, a new job uses every free drone. It still never uses more drones than the job has blocks, or more than maxWrightsPerJob in the server config.")
+            .comment("When true, a new job uses every free drone. Still limited by useful crew size for the job (not one wright per block), free drones, and maxWrightsPerJob.")
             .define("droneMax", false);
     public static final ModConfigSpec.IntValue DRONE_COUNT = BUILDER
-            .comment("How many drones a new job uses when droneMax is false. Still limited by free drones, by the number of blocks, and by maxWrightsPerJob in the server config.")
+            .comment("How many drones a new job uses when droneMax is false. Still limited by free drones, useful crew size for the job, and maxWrightsPerJob.")
             .defineInRange("droneCount", 5, 1, 512);
     public static final ModConfigSpec.BooleanValue BUILD_MENU = BUILDER
             .comment("When true, right-click in build mode opens the build menu instead of starting the job.")
@@ -549,15 +549,20 @@ public final class WrightsClientConfig {
     }
 
     public static int deployTarget(int freeDrones, int blocks) {
-        return deployTarget(freeDrones, blocks, false);
+        return deployTarget(freeDrones, blocks, 1, 1, 1, false);
     }
 
     public static int deployTarget(int freeDrones, int blocks, boolean exchangeOrPlace) {
+        return deployTarget(freeDrones, blocks, 1, 1, 1, exchangeOrPlace);
+    }
+
+    public static int deployTarget(int freeDrones, int blocks, int sizeX, int sizeY, int sizeZ, boolean exchangeOrPlace) {
         if (freeDrones <= 0 || blocks <= 0) {
             return 0;
         }
         int wanted = droneCountFor(exchangeOrPlace);
-        return Math.max(1, Math.min(wanted, Math.min(freeDrones, Math.min(blocks, WrightsConfig.maxWrightsPerJob(exchangeOrPlace)))));
+        int useful = WrightsConfig.usefulCrewFor(blocks, sizeX, sizeY, sizeZ);
+        return Math.max(1, Math.min(wanted, Math.min(freeDrones, Math.min(useful, WrightsConfig.maxWrightsPerJob(exchangeOrPlace)))));
     }
 
     public static void save() {
