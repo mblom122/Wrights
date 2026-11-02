@@ -87,11 +87,15 @@ public final class PortEnergy {
         if (cost <= 0) {
             return true;
         }
-        if (hand != null && hand.homePort != null && level != null && level.isLoaded(hand.homePort)) {
+        if (hand != null && hand.homePort != null) {
+            if (level == null || !level.isLoaded(hand.homePort)) {
+                return false;
+            }
             BlockEntity entity = level.getBlockEntity(hand.homePort);
             if (entity instanceof WrightportBlockEntity port) {
                 return port.consumeEnergy(cost);
             }
+            return false;
         }
         return player != null && takeFromPlayer(player, cost);
     }
@@ -157,12 +161,9 @@ public final class PortEnergy {
 
     private static int available(ServerPlayer player) {
         int rate = WrightsConfig.personalEnergyRate();
-        int found = pullInventory(player.getInventory(), rate, true);
-        int left = rate - (rate - found);
-        // pullInventory in simulate returns remaining. available is rate - remaining, capped by what we asked.
-        int fromItems = rate - pullInventory(player.getInventory(), rate, true);
-        fromItems += rate - pullCurios(player, rate, true);
-        return Math.min(rate, fromItems);
+        int remaining = pullInventory(player.getInventory(), rate, true);
+        remaining = pullCurios(player, remaining, true);
+        return rate - remaining;
     }
 
     private static int pullInventory(Inventory inventory, int need, boolean simulate) {

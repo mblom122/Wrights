@@ -1518,6 +1518,15 @@ public final class JobManager {
             job.setWaitKind(BuildJob.WAIT_NONE);
             job.setQueued(false);
         }
+        if (job.waitKind() == BuildJob.WAIT_ENERGY && !fast) {
+            int cost = WrightsConfig.energyCost(job, false, mirrorPlace(job));
+            if (!com.wrights.energy.PortEnergy.canFund(level, player, job, cost)) {
+                library.setDirty();
+                return;
+            }
+            job.setWaitKind(BuildJob.WAIT_NONE);
+            job.setQueued(false);
+        }
         if (job.queued()) {
             topUpQueued(player, library, job);
             if (!job.hasCrew() && !instant(player) && job.droneId() == null) {
@@ -1674,6 +1683,10 @@ public final class JobManager {
                 statusWait = DroneEntity.WAIT_ITEMS;
                 job.setWaitKind(BuildJob.WAIT_ITEMS);
                 break;
+            }
+            if (result == PlaceResult.ENERGY) {
+                stallForEnergy(level, player, library, job);
+                return;
             }
             job.advance();
             job.shapeOrderAdvance();
@@ -1852,6 +1865,10 @@ public final class JobManager {
                 if (result == PlaceResult.WAIT) {
                     waitingItems = true;
                     break;
+                }
+                if (result == PlaceResult.ENERGY) {
+                    stallForEnergy(level, player, library, job);
+                    return;
                 }
                 resolveShapeCell(job, hand, index, false);
                 job.shapeOrderAdvance();
@@ -3076,6 +3093,15 @@ public final class JobManager {
             placeAll(level, player, library, job, schematic);
             return;
         }
+        if (job.waitKind() == BuildJob.WAIT_ENERGY) {
+            int cost = WrightsConfig.energyCost(job, false, mirrorPlace(job));
+            if (!com.wrights.energy.PortEnergy.canFund(level, player, job, cost)) {
+                library.setDirty();
+                return;
+            }
+            job.setWaitKind(BuildJob.WAIT_NONE);
+            job.setQueued(false);
+        }
         if (job.queued()) {
             topUpQueued(player, library, job);
             if (!job.hasCrew()) {
@@ -3211,6 +3237,10 @@ public final class JobManager {
                 job.setWaitKind(BuildJob.WAIT_ITEMS);
                 drone.setWorkStatus(soloShow, ItemStack.EMPTY, DroneEntity.WAIT_ITEMS);
                 break;
+            }
+            if (placed == PlaceResult.ENERGY) {
+                stallForEnergy(level, player, library, job);
+                return;
             }
             markSolo(job, index);
         }
@@ -4011,7 +4041,8 @@ public final class JobManager {
     private enum PlaceResult {
         DONE,
         PAUSE,
-        WAIT
+        WAIT,
+        ENERGY
     }
 
     /** A falling block is not ready yet, so the wright should keep working and come back. */
@@ -5269,6 +5300,10 @@ public final class JobManager {
                     handStatus = DroneEntity.WAIT_ITEMS;
                     parkForItems(level, player, hand);
                     break;
+                }
+                if (placed == PlaceResult.ENERGY) {
+                    stallForEnergy(level, player, library, job);
+                    return;
                 }
                 noteProgress(schematic, job, hand, entry, at);
             }
@@ -7075,7 +7110,11 @@ public final class JobManager {
                     library.setDirty();
                     return;
                 }
-                if (placed == PlaceResult.WAIT) {
+                if (placed == PlaceResult.WAIT || placed == PlaceResult.ENERGY) {
+                    if (placed == PlaceResult.ENERGY) {
+                        job.setWaitKind(BuildJob.WAIT_ENERGY);
+                        job.setQueued(true);
+                    }
                     continue;
                 }
                 done[i] = true;
@@ -7138,6 +7177,12 @@ public final class JobManager {
             job.skippedOne();
             clearPlacedGhost(player, job, entry);
             return PlaceResult.DONE;
+        }
+        if (!freePlace(player)) {
+            int cost = WrightsConfig.energyCost(job, false, false);
+            if (cost > 0 && !com.wrights.energy.PortEnergy.tryPay(level, player, hand, cost)) {
+                return PlaceResult.ENERGY;
+            }
         }
         java.util.List<ItemStack> drops = com.wrights.blueprint.MirrorLaunch.harvest(player, level, pos, job.mineTool(), job.mineVoid());
         showCarry(level, job, hand, drops, null);
@@ -7305,6 +7350,14 @@ public final class JobManager {
             }
             suspendFall = FallingBlock.isFree(level.getBlockState(below));
         }
+        int paidEnergy = 0;
+        if (!freePlace(player)) {
+            int cost = WrightsConfig.energyCost(job, clearFirst, mirrorPlace(job));
+            if (cost > 0 && !com.wrights.energy.PortEnergy.tryPay(level, player, hand, cost)) {
+                return PlaceResult.ENERGY;
+            }
+            paidEnergy = cost;
+        }
         // Exchange undo needs the block that was swapped out (voided or harvested).
         BlockState restore = job.exchangeJob() && clearFirst && !existing.isAir() && !existing.canBeReplaced()
                 ? existing
@@ -7339,6 +7392,9 @@ public final class JobManager {
         writePlaced(level, pos, state, suspendFall);
         BlockState after = level.getBlockState(pos);
         if (after.getBlock() != state.getBlock()) {
+            if (paidEnergy > 0) {
+                com.wrights.energy.PortEnergy.refund(level, player, hand, paidEnergy);
+            }
             if (!after.equals(existing)) {
                 level.setBlock(pos, existing, Block.UPDATE_ALL);
             }
@@ -7571,6 +7627,11 @@ public final class JobManager {
             return false;
         }
         return !player.blockActionRestricted(level, pos, player.gameMode.getGameModeForPlayer());
+    }
+
+    private static boolean mirrorPlace(BuildJob job) {
+        return job != null && !job.mining() && !job.exchangeJob()
+                && com.wrights.blueprint.Mirror.marksBlocks(job.blueprintName());
     }
 
     private static boolean freePlace(ServerPlayer player) {
@@ -8185,6 +8246,23 @@ public final class JobManager {
         }
         drone.moveTo(work.x, work.y + 8.0D, work.z, yaw, 0.0F);
         drone.setYRot(yaw);
+    }
+
+    /** Dock the crew, keep the job and its ghost, and wait until the port can pay for another block. */
+    private static void stallForEnergy(ServerLevel level, ServerPlayer player, SchematicLibrary library, BuildJob job) {
+        job.setWaitKind(BuildJob.WAIT_ENERGY);
+        job.setQueued(true);
+        job.setCrewQuota(Math.max(1, Math.max(job.crewQuota(), job.hands().size())));
+        for (BuildJob.Hand hand : job.hands()) {
+            hand.awaitingItems = false;
+            hand.idle = false;
+            recallHand(level, player, hand);
+        }
+        if (job.hands().isEmpty()) {
+            parkSolo(level, player, job);
+        }
+        noteHistory(player, library, job, JobEventLog.STALLED_ITEMS, Component.translatable("history.wrights.stalled_energy").getString());
+        library.setDirty();
     }
 
     private static void parkForItems(ServerLevel level, ServerPlayer player, BuildJob.Hand hand) {

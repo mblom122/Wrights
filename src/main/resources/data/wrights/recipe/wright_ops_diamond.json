@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "GMG",
+    "APA",
+    "GGG"
+  ],
+  "key": {
+    "G": { "item": "minecraft:glass_pane" },
+    "M": { "item": "minecraft:diamond" },
+    "A": { "item": "minecraft:amethyst_shard" },
+    "P": { "item": "wrights:wright_ops_gold" }
+  },
+  "result": { "id": "wrights:wright_ops_diamond", "count": 1 }
+}

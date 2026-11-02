@@ -709,6 +709,7 @@ public final class BuildJob {
     public static final int WAIT_FLOOR = 1;
     public static final int WAIT_CHUNK = 2;
     public static final int WAIT_ITEMS = 3;
+    public static final int WAIT_ENERGY = 4;
 
     private boolean paused;
     private int hold = HOLD_NONE;

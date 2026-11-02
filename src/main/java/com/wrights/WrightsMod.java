@@ -21,6 +21,8 @@ import com.wrights.sound.ModSounds;
 
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 
 import top.theillusivec4.curios.api.CuriosApi;
 
@@ -40,9 +42,17 @@ public class WrightsMod {
         ModCreativeTabs.TABS.register(modBus);
         modBus.addListener(BlueprintNetwork::register);
         modBus.addListener(WrightsMod::commonSetup);
+        modBus.addListener(WrightsMod::registerCapabilities);
         container.registerConfig(ModConfig.Type.SERVER, WrightsConfig.SPEC);
         container.registerConfig(ModConfig.Type.CLIENT, WrightsClientConfig.SPEC);
         LOGGER.info("Wrights 0.1.8 loaded for an isolated NeoForge 1.21.1 test");
+    }
+
+    private static void registerCapabilities(RegisterCapabilitiesEvent event) {
+        event.registerBlockEntity(
+                Capabilities.EnergyStorage.BLOCK,
+                ModBlockEntities.WRIGHTPORT.get(),
+                (port, side) -> port.energyStorage());
     }
 
     private static void commonSetup(FMLCommonSetupEvent event) {

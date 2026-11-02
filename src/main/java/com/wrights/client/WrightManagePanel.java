@@ -28,7 +28,7 @@ import com.wrights.network.BlueprintPayloads;
  */
 final class WrightManagePanel {
     private static final int ROW = 16;
-    private static final int EXPAND = 82;
+    private static final int EXPAND = 148;
     private static final int NONE = 0;
     private static final int ADD = 1;
     private static final int MARKED = 2;
@@ -281,6 +281,26 @@ final class WrightManagePanel {
                         drawMini(graphics, screen, upX(), y + 46, upW(), Component.translatable("screen.wrights.manage_remove_upgrade"), canDowngrade, false, mouseX, mouseY);
                     }
                     drawTiers(graphics, screen, y + 64, tier, mouseX, mouseY, barPad, tool);
+                    int ops = WrightTier.clamp(unit.power());
+                    graphics.drawString(
+                            screen.font(),
+                            Component.translatable("screen.wrights.manage_ops", WrightTier.operationCap(ops)),
+                            listX + 10,
+                            y + 82,
+                            WrightsUi.TEXT,
+                            false);
+                    boolean opsDown = tool && ops > WrightTier.BASE;
+                    if (ops < WrightTier.NETHERITE) {
+                        Component nextOps = Component.translatable(WrightTier.nameKey(ops + 1));
+                        graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_ops_next", nextOps), listX + 10, y + 94, WrightsUi.MUTED, false);
+                        boolean haveOps = tool && canAffordOps(screen, ops + 1);
+                        drawMini(graphics, screen, upX(), y + 108, upW(), Component.translatable("screen.wrights.manage_ops_upgrade", nextOps), haveOps, false, mouseX, mouseY);
+                        drawMini(graphics, screen, downX(barPad), y + 108, downW(barPad), Component.translatable("screen.wrights.manage_ops_remove"), opsDown, false, mouseX, mouseY);
+                    } else {
+                        graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_ops_best"), listX + 10, y + 94, WrightsUi.MUTED, false);
+                        drawMini(graphics, screen, upX(), y + 108, upW(), Component.translatable("screen.wrights.manage_ops_remove"), opsDown, false, mouseX, mouseY);
+                    }
+                    drawTiers(graphics, screen, y + 126, ops, mouseX, mouseY, barPad, tool);
                 }
                 y += EXPAND;
             }
@@ -402,6 +422,31 @@ final class WrightManagePanel {
                     if (picked >= WrightTier.BASE && picked != tier && (picked < tier || canAfford(screen, tier, picked))
                             && screen.requireTool()) {
                         screen.batch(HangarOps.TO_TIER, picked, new int[] { i });
+                    }
+                    return true;
+                }
+                int ops = WrightTier.clamp(swarm.units().get(i).power());
+                if (local >= y + 108 && local < y + 122) {
+                    if (ops < WrightTier.NETHERITE && mouseX >= upX() && mouseX < upX() + upW()) {
+                        if (canAffordOps(screen, ops + 1) && screen.requireTool()) {
+                            screen.edit(HangarOps.OPS_UPGRADE, i);
+                        }
+                        return true;
+                    }
+                    int opsDownX = ops < WrightTier.NETHERITE ? downX(barPad) : upX();
+                    int opsDownW = ops < WrightTier.NETHERITE ? downW(barPad) : upW();
+                    if (ops > WrightTier.BASE && mouseX >= opsDownX && mouseX < opsDownX + opsDownW) {
+                        if (screen.requireTool()) {
+                            screen.edit(HangarOps.OPS_DOWNGRADE, i);
+                        }
+                        return true;
+                    }
+                }
+                if (local >= y + 126 && local < y + 140) {
+                    int pickedOps = tierAt(mouseX, panelX + 18, panelW - 36 - barPad);
+                    if (pickedOps >= WrightTier.BASE && pickedOps != ops && (pickedOps < ops || canAffordOps(screen, pickedOps))
+                            && screen.requireTool()) {
+                        screen.batch(HangarOps.OPS_TO_TIER, pickedOps, new int[] { i });
                     }
                     return true;
                 }
@@ -858,6 +903,18 @@ final class WrightManagePanel {
             return 0;
         }
         return screen.minecraft().player.getInventory().countItem(item);
+    }
+
+    /** Destination operations item only — intermediate steps are not required. */
+    private static boolean canAffordOps(ManageHost screen, int target) {
+        if (target <= WrightTier.BASE) {
+            return true;
+        }
+        if (screen.minecraft().player != null && screen.minecraft().player.getAbilities().instabuild) {
+            return true;
+        }
+        Item upgrade = WrightTier.operationItem(target);
+        return upgrade == null || count(screen, upgrade) > 0 || digitalStock(upgrade) > 0L || digitalCraftable(upgrade);
     }
 
     /** Destination upgrade only — intermediate steps are not required. */

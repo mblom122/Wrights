@@ -30,6 +30,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 
 import com.wrights.drone.Swarm;
+import com.wrights.energy.PortEnergy;
 import com.wrights.entity.DroneEntity;
 import com.wrights.item.ModItems;
 import com.wrights.job.BuildJob;
@@ -44,6 +45,7 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
     private int hatchHold;
     /** Corner lamps. Red until the server has looked at the crew. */
     private int lamp = WrightportLamp.RED;
+    private final PortEnergy.Buffer energy = new PortEnergy.Buffer();
     /** Player who placed this port. Their stored wrights share one limit. */
     private UUID owner;
     private String ownerName = "";
@@ -220,7 +222,8 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
                 busy.addAll(job.crewUnits());
             }
         }
-        int next = WrightportLamp.color(swarm, busy::contains);
+        boolean starved = energy.getEnergyStored() <= 0 && !swarm.units().isEmpty();
+        int next = WrightportLamp.color(swarm, busy::contains, starved);
         if (next != this.lamp) {
             this.lamp = next;
             setChanged();
@@ -246,6 +249,37 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
         return new WrightportMenu(id, inventory, this.getBlockPos());
     }
 
+    public PortEnergy.Buffer energyStorage() {
+        return energy;
+    }
+
+    public int energyStored() {
+        return energy.getEnergyStored();
+    }
+
+    public boolean consumeEnergy(int cost) {
+        boolean wasEmpty = energy.getEnergyStored() <= 0;
+        if (!energy.consume(cost)) {
+            return false;
+        }
+        setChanged();
+        if (!wasEmpty && energy.getEnergyStored() <= 0) {
+            refreshLamp();
+            sync();
+        }
+        return true;
+    }
+
+    public void refundEnergy(int amount) {
+        boolean wasEmpty = energy.getEnergyStored() <= 0;
+        energy.refund(amount);
+        setChanged();
+        if (wasEmpty && energy.getEnergyStored() > 0) {
+            refreshLamp();
+            sync();
+        }
+    }
+
     @Override
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
@@ -263,6 +297,7 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
         if (supplyChest != null) {
             tag.put("SupplyChest", NbtUtils.writeBlockPos(supplyChest));
         }
+        energy.save(tag);
     }
 
     @Override
@@ -282,6 +317,7 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
         }
         label = tag.contains("Label") ? cleanLabel(tag.getString("Label")) : "";
         supplyChest = tag.contains("SupplyChest") ? NbtUtils.readBlockPos(tag, "SupplyChest").orElse(null) : null;
+        energy.load(tag);
     }
 
     @Override

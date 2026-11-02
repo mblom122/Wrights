@@ -432,6 +432,18 @@ public final class WrightsConfig {
         return voided ? place + ENERGY_VOID.get() : place;
     }
 
+    public static int portEnergyCapacity() {
+        return read(PORT_ENERGY, 1_000_000);
+    }
+
+    public static int portEnergyTransfer() {
+        return read(PORT_ENERGY_TRANSFER, 10_000);
+    }
+
+    public static int personalEnergyRate() {
+        return read(PERSONAL_ENERGY_RATE, 10_000);
+    }
+
     public static int maxWrightsCarried() {
         return read(MAX_WRIGHTS_CARRIED, 64);
     }

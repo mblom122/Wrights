@@ -43,6 +43,9 @@ public class WrightportRenderer implements BlockEntityRenderer<WrightportBlockEn
         if (swarm.units().isEmpty()) {
             return port.lampColor();
         }
+        if (port.energyStored() <= 0) {
+            return WrightportLamp.AMBER;
+        }
         return WrightportLamp.color(swarm, id -> {
             for (var job : WrightsClientState.jobs) {
                 if (job.finished() || job.saving()) {

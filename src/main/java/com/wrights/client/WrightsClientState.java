@@ -465,6 +465,9 @@ public final class WrightsClientState {
         if (job.waitKind() == com.wrights.job.BuildJob.WAIT_ITEMS) {
             return "menu.wrights.stalled";
         }
+        if (job.waitKind() == com.wrights.job.BuildJob.WAIT_ENERGY) {
+            return "menu.wrights.stalled_energy";
+        }
         if (job.queued()) {
             return "menu.wrights.queued";
         }
@@ -499,6 +502,7 @@ public final class WrightsClientState {
             case com.wrights.job.BuildJob.WAIT_FLOOR -> "hud.wrights.wait_floor";
             case com.wrights.job.BuildJob.WAIT_CHUNK -> "hud.wrights.wait_chunk";
             case com.wrights.job.BuildJob.WAIT_ITEMS -> "hud.wrights.wait_items";
+            case com.wrights.job.BuildJob.WAIT_ENERGY -> "hud.wrights.wait_energy";
             default -> null;
         };
         return key == null ? null : Component.translatable(key);
@@ -1643,7 +1647,7 @@ public final class WrightsClientState {
             return 0;
         }
         boolean boosted = exchangeToolActive() || placeToolActive();
-        int useful = WrightsConfig.usefulCrewFor(blocks, viewX, viewY, viewZ);
+        int useful = WrightsConfig.usefulCrewFor(blocks, viewX, viewY, viewZ, bestFreeOps());
         int ceiling = Math.min(useful, WrightsConfig.maxWrightsPerJob(boosted));
         return Math.min(Math.max(1, WrightsClientConfig.droneCountFor(boosted)), Math.min(free, ceiling));
     }
@@ -1651,6 +1655,15 @@ public final class WrightsClientState {
     /** Wrights that can leave a worn port or a nearby placed wrightport. */
     public static int freeWrights() {
         return knownFree();
+    }
+
+    /** Best operations tier among free wrights the client can see. Netherite when none are loaded. */
+    private static int bestFreeOps() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null) {
+            return com.wrights.drone.WrightTier.NETHERITE;
+        }
+        return com.wrights.drone.WrightHomes.bestOps(minecraft.player, WrightsClientState::wrightFree);
     }
 
     private static int knownFree() {
@@ -1691,7 +1704,7 @@ public final class WrightsClientState {
             return 0;
         }
         boolean boosted = exchangeToolActive() || placeToolActive();
-        int useful = WrightsConfig.usefulCrewFor(blocks, viewX, viewY, viewZ);
+        int useful = WrightsConfig.usefulCrewFor(blocks, viewX, viewY, viewZ, bestFreeOps());
         int ceiling = Math.min(useful, WrightsConfig.maxWrightsPerJob(boosted));
         int freeCap = deployCap();
         return freeCap > 0 ? freeCap : ceiling;
