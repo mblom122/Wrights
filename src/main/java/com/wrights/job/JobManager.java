@@ -3501,11 +3501,11 @@ public final class JobManager {
         library.setDirty();
         BlueprintNetwork.syncJobs(player);
         if (recalled > 0) {
-            Component header = Component.translatable("hud.wrights.crew_returned");
+            Component header = Component.translatable("hud.wrights.wrights_returned");
             Component name = Component.literal(jobCardTitle(job, library));
             Component detail = hold == BuildJob.HOLD_DIMENSION
-                    ? Component.translatable("hud.wrights.crew_returned_dimension", recalled)
-                    : Component.translatable("hud.wrights.crew_returned_range", recalled);
+                    ? Component.translatable("hud.wrights.wrights_returned_dimension", recalled)
+                    : Component.translatable("hud.wrights.wrights_returned_range", recalled);
             BlueprintNetwork.jobDone(player, header, name, detail, -1);
         }
         return true;
@@ -7514,10 +7514,23 @@ public final class JobManager {
     }
 
     private static void depart(DroneEntity drone, ServerPlayer player, Vec3 work, int lane, int lanes, BlockPos homePort) {
+        drone.setHomePort(homePort);
+        float yaw = player == null ? 0.0F : player.getYRot();
         if (!WrightsConfig.flyToJob()) {
-            drone.setHomePort(homePort);
-            float yaw = player == null ? 0.0F : player.getYRot();
             drone.moveTo(work.x, work.y, work.z, yaw, 0.0F);
+            drone.setYRot(yaw);
+            return;
+        }
+        Vec3 from = null;
+        if (homePort != null && player != null && player.level() == drone.level() && player.level().isLoaded(homePort)) {
+            from = WrightHomes.lip(homePort);
+        } else if (player != null && player.level() == drone.level()) {
+            from = WrightHomes.behindPlayer(player);
+        }
+        // Too far for a full cruise (render / chunk load): appear above the work, do not pop out the
+        // far side of the port and then snap across the map.
+        if (from == null || from.distanceTo(work) > 96.0D) {
+            drone.moveTo(work.x, work.y + 8.0D, work.z, yaw, 0.0F);
             drone.setYRot(yaw);
             return;
         }
@@ -7525,11 +7538,7 @@ public final class JobManager {
             drone.departFromBlock(homePort, work, lane, lanes);
             return;
         }
-        if (player != null && player.level() == drone.level()) {
-            drone.departFromPlayer(player, work, lane, lanes);
-            return;
-        }
-        drone.moveTo(work.x, work.y, work.z, player == null ? 0.0F : player.getYRot(), 0.0F);
+        drone.departFromPlayer(player, work, lane, lanes);
     }
 
     private static void parkForItems(ServerLevel level, ServerPlayer player, BuildJob.Hand hand) {

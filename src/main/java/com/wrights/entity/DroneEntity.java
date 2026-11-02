@@ -211,6 +211,12 @@ public class DroneEntity extends Entity {
         return height;
     }
 
+    /**
+     * Beyond this, a return skips the long cruise and snaps high above the dock — same idea as Manage-add —
+     * so the flyer is still visible instead of crawling through unloaded / out-of-render space.
+     */
+    private static final double HOME_SNAP_BLOCKS = 96.0D;
+
     /** Returns to the personal port (behind the player) or a placed wrightport hatch. */
     public void flyHome(ServerPlayer player, int slot, int count, @Nullable BlockPos port) {
         setReturning(true);
@@ -221,21 +227,35 @@ public class DroneEntity extends Entity {
         clearCurrentBlock();
         setWorkStatus(ItemStack.EMPTY, ItemStack.EMPTY, WAIT_HOME);
         setHomePort(port);
-        if (!WrightsConfig.flyHome()) {
-            int n = Math.max(1, count);
-            double angle = (Math.PI * 2.0D * slot) / n;
-            double radius = n <= 1 ? 0.0D : 0.55D;
-            Vec3 above = port != null
-                    ? WrightHomes.approach(port, slot, count)
-                    : WrightHomes.behindPlayer(player).add(Math.cos(angle) * radius, 4.0D, Math.sin(angle) * radius);
+        Vec3 dock = port != null ? WrightHomes.hatch(port) : WrightHomes.behindPlayer(player);
+        double dist = this.position().distanceTo(dock);
+        // Prefer flying from the job. Snap high above the dock only when teleport mode is on, or the
+        // run home is too far to keep rendered / chunk-loaded the whole way.
+        boolean snap = !WrightsConfig.flyHome() || dist > HOME_SNAP_BLOCKS;
+        if (snap) {
+            Vec3 above = returnAbove(player, port, slot, count, dist > HOME_SNAP_BLOCKS);
             this.moveTo(above.x, above.y, above.z, player.getYRot(), 0.0F);
             this.setYRot(player.getYRot());
         }
-        Vec3 dock = port != null ? WrightHomes.hatch(port) : WrightHomes.behindPlayer(player);
         this.returnLimit = returnBudget(dock);
         if (this.unitId != null && !this.level().isClientSide) {
             com.wrights.job.JobManager.holdReturn(this.unitId);
         }
+    }
+
+    /**
+     * Centered above the dock — never a far-side ring around the port, which reads as a teleport to the
+     * opposite side of the hatch. Far snaps use Manage-add height; near teleport-mode uses a short drop.
+     */
+    private Vec3 returnAbove(ServerPlayer player, @Nullable BlockPos port, int slot, int count, boolean far) {
+        int n = Math.max(1, count);
+        double angle = (Math.PI * 2.0D * slot) / n;
+        double radius = n <= 1 ? 0.0D : 0.55D;
+        double lift = far ? nextDockHeight() : (port != null ? 5.0D : 4.0D);
+        if (port != null) {
+            return WrightHomes.hatch(port).add(Math.cos(angle) * radius, lift, Math.sin(angle) * radius);
+        }
+        return WrightHomes.behindPlayer(player).add(Math.cos(angle) * radius, lift, Math.sin(angle) * radius);
     }
 
     @Override
