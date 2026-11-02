@@ -103,10 +103,10 @@ public final class JobManager {
     /** Shared across all hands for one crew tick — skips of already-done cells, not world scans. */
     private static final int CREW_SKIP_BUDGET = 256;
     /**
-     * Shape/Exchange crew tiles. Wrights finish a local cube (cluster multi-place) before the next,
-     * instead of everyone chasing one shared scan line through a 200³ box.
+     * One chunk section. A shape larger than this is built one cube at a time, and the crew
+     * splits that cube. The older path handed each wright a long slice of these cubes.
      */
-    private static final int SHAPE_CUBE = 16;
+    private static final int SHAPE_CUBE = com.wrights.blueprint.ShapeCubes.EDGE;
 
     private JobManager() {
     }
@@ -1771,6 +1771,7 @@ public final class JobManager {
         boolean waitingItems = false;
         boolean waitingChunk = false;
         int scanCap = Math.max(64, WrightsConfig.COPY_POSITIONS_PER_TICK.getAsInt());
+        advanceFinishedShapeCube(job);
         ensureShapeShares(job);
         sweepHollowInterior(job);
         // At most one strip split per tick — many idle hands used to halve the same share every tick.
@@ -1785,30 +1786,22 @@ public final class JobManager {
                 hand.idle = false;
                 continue;
             }
-            if (at < 0 && !splitThisTick && tryRebalanceShapeShare(player, library, level, job, hand, usable, shapeKind, shapePinLocal, scanCap)) {
+            // One finished wright per tick may cut a share. The rest go home instead of
+            // all standing in the build scanning for the same leftovers.
+            if (at < 0 && !splitThisTick) {
                 splitThisTick = true;
-                at = nextShapeIndex(level, player, job, hand, usable, shapeKind, shapePinLocal, true, scanCap);
-            }
-            // A finished pattern share stays with its wright when that share still fits in one
-            // hover. Help-scanning those cells aims them without placing and leaves everyone idle.
-            if (at < 0 && hand.hover != -2) {
-                at = nextShapeIndex(level, player, job, hand, usable, shapeKind, shapePinLocal, false, scanCap);
-            }
-            if (at < 0 && job.cursor() < job.total() && hand.cursor >= job.total()) {
-                int ownedStart = firstOwnedShapeScanIndex(job, hand);
-                if (ownedStart >= 0 && ownedStart < job.total() && !job.isShapeResolved(ownedStart)) {
-                    hand.cursor = ownedStart;
+                if (tryRebalanceShapeShare(player, library, level, job, hand, usable, shapeKind, shapePinLocal, scanCap)) {
                     at = nextShapeIndex(level, player, job, hand, usable, shapeKind, shapePinLocal, true, scanCap);
-                    if (at < 0 && hand.hover != -2) {
-                        at = nextShapeIndex(level, player, job, hand, usable, shapeKind, shapePinLocal, false, scanCap);
-                    }
                 }
             }
             if (at < 0) {
                 hand.idle = true;
                 hand.aim = -1;
-                hand.shareRemain = 0;
-                setShapeHandStatus(level, hand, null, DroneEntity.WAIT_IDLE);
+                // A solo wright stays with the job. Extras are not needed on a small leftover.
+                if (job.hands().size() > 1 && hand.entityId != null) {
+                    setShapeHandStatus(level, hand, null, DroneEntity.WAIT_HOME);
+                    recallHand(level, player, hand);
+                }
                 continue;
             }
             if (at == NEED_ITEMS) {
@@ -2095,12 +2088,11 @@ public final class JobManager {
         while (budget-- > 0) {
             com.wrights.blueprint.ShapeHover.Stand stand = com.wrights.blueprint.ShapeHover.current(query, cursor);
             if (stand.done()) {
-                int rest = patternRemainder(level, player, job, hand, shapeKind, shapePinLocal);
-                if (rest == PATTERN_PAUSE || rest >= 0) {
-                    return rest;
+                if (hand.hover != -2) {
+                    hand.probe = 0;
+                    hand.hover = -2;
                 }
-                hand.hover = -2;
-                return -1;
+                return patternRemainder(level, player, job, hand, shapeKind, shapePinLocal);
             }
             hand.hover = stand.cursor();
             int cells = com.wrights.blueprint.ShapeHover.fillCells(query, stand, xs, ys, zs);
@@ -2159,8 +2151,11 @@ public final class JobManager {
             }
             int next = com.wrights.blueprint.ShapeHover.advance(query, stand.cursor());
             if (next == stand.cursor()) {
-                hand.hover = -2;
-                return -1;
+                if (hand.hover != -2) {
+                    hand.probe = 0;
+                    hand.hover = -2;
+                }
+                return patternRemainder(level, player, job, hand, shapeKind, shapePinLocal);
             }
             cursor = next;
             hand.hover = cursor;
@@ -2168,7 +2163,52 @@ public final class JobManager {
         return PATTERN_PAUSE;
     }
 
-    /** Unresolved cells the stand list did not own. Small shapes only; a fat volume is already partitioned. */
+    /**
+     * Walk this hand's box across ticks. Resolved cells are skipped cheaply. At most a few dozen
+     * real shape tests per tick, so a 70³ share can finish its tail without hitching the server.
+     */
+    private static int patternBoxRemainder(
+            ServerLevel level,
+            ServerPlayer player,
+            BuildJob job,
+            BuildJob.Hand hand,
+            com.wrights.blueprint.Shapes.Kind shapeKind,
+            BlockPos shapePinLocal) {
+        int sx = Math.max(1, hand.boxX1 - hand.boxX0);
+        int sy = Math.max(1, hand.boxY1 - hand.boxY0);
+        int sz = Math.max(1, hand.boxZ1 - hand.boxZ0);
+        int volume = sx * sy * sz;
+        int n = Math.max(0, hand.probe);
+        int steps = 0;
+        int classified = 0;
+        while (n < volume && steps < 4096 && classified < 32) {
+            steps++;
+            int x = hand.boxX0 + (n % sx);
+            int y = hand.boxY0 + ((n / sx) % sy);
+            int z = hand.boxZ0 + (n / (sx * sy));
+            int index = shapeLocalIndex(job, x, y, z);
+            if (index < 0 || job.isShapeResolved(index)) {
+                n++;
+                continue;
+            }
+            classified++;
+            ShapeCell kind = classifyShapeCell(level, player, job, hand, index, shapeKind, shapePinLocal, true);
+            if (kind == ShapeCell.READY || kind == ShapeCell.BLOCKED) {
+                hand.probe = n;
+                return index;
+            }
+            if (kind == ShapeCell.OUT) {
+                resolveShapeCell(job, hand, index, false);
+            } else if (kind == ShapeCell.SKIP) {
+                resolveShapeCell(job, hand, index, true);
+            }
+            n++;
+        }
+        hand.probe = n;
+        return n < volume ? PATTERN_PAUSE : -1;
+    }
+
+    /** Unresolved cells the stand list did not own. A box share resumes via {@code hand.probe}. */
     private static int patternRemainder(
             ServerLevel level,
             ServerPlayer player,
@@ -2176,6 +2216,9 @@ public final class JobManager {
             BuildJob.Hand hand,
             com.wrights.blueprint.Shapes.Kind shapeKind,
             BlockPos shapePinLocal) {
+        if (hasShapeBox(hand)) {
+            return patternBoxRemainder(level, player, job, hand, shapeKind, shapePinLocal);
+        }
         int total = job.total();
         if (total <= 0 || total > 4096) {
             return -1;
@@ -2726,21 +2769,34 @@ public final class JobManager {
     }
 
     /**
-     * Cut the box by halving its longest side at the middle, then each new piece the same way.
+     * Cut the active cube by halving its longest side at the middle, then each new piece the same way.
      * A 4×4×4 with 8 wrights becomes eight 2×2×2 cubes. A piece that fits in one hover is not cut.
+     * A shape larger than one section is one 16³ cube at a time, so the cut never sees the whole box.
      */
     private static void ensureShapeShares(BuildJob job) {
         if (job == null || job.hands().isEmpty()) {
             return;
+        }
+        int sx = Math.max(1, job.boxSizeX());
+        int sy = Math.max(1, job.boxSizeY());
+        int sz = Math.max(1, job.boxSizeZ());
+        com.wrights.blueprint.ShapeShares.Part tile = com.wrights.blueprint.ShapeCubes.at(sx, sy, sz, job.shapeCubeIndex());
+        if (tile == null) {
+            return;
+        }
+        if (shapeStaged(job) && sharesLeaveCube(job, tile)) {
+            for (BuildJob.Hand hand : job.hands()) {
+                clearShapeBox(hand);
+                hand.hover = -1;
+                hand.aim = -1;
+                hand.probe = 0;
+            }
         }
         for (BuildJob.Hand hand : job.hands()) {
             if (hasShapeBox(hand) || (hand.shareFrom >= 0 && hand.shareTo > hand.shareFrom)) {
                 return;
             }
         }
-        int sx = Math.max(1, job.boxSizeX());
-        int sy = Math.max(1, job.boxSizeY());
-        int sz = Math.max(1, job.boxSizeZ());
         int reach = 0;
         int cap = 1;
         for (BuildJob.Hand hand : job.hands()) {
@@ -2753,14 +2809,78 @@ public final class JobManager {
             }
         }
         java.util.List<com.wrights.blueprint.ShapeShares.Part> parts = com.wrights.blueprint.ShapeShares.plan(
-                sx, sy, sz, reach, cap, job.hands().size());
+                tile.spanX(), tile.spanY(), tile.spanZ(), reach, cap, job.hands().size());
         for (int i = 0; i < job.hands().size(); i++) {
             BuildJob.Hand hand = job.hands().get(i);
             if (i < parts.size()) {
-                assignShapeBox(hand, parts.get(i));
+                com.wrights.blueprint.ShapeShares.Part local = parts.get(i);
+                assignShapeBox(hand, new com.wrights.blueprint.ShapeShares.Part(
+                        tile.x0 + local.x0,
+                        tile.y0 + local.y0,
+                        tile.z0 + local.z0,
+                        tile.x0 + local.x1,
+                        tile.y0 + local.y1,
+                        tile.z0 + local.z1));
             } else {
                 clearShapeBox(hand);
             }
+        }
+    }
+
+    /** True when the shape is bigger than one 16³ section and is built a section at a time. */
+    private static boolean shapeStaged(BuildJob job) {
+        if (job == null) {
+            return false;
+        }
+        return com.wrights.blueprint.ShapeCubes.count(job.boxSizeX(), job.boxSizeY(), job.boxSizeZ()) > 1;
+    }
+
+    /** True when a hand still owns a box from another section. */
+    private static boolean sharesLeaveCube(BuildJob job, com.wrights.blueprint.ShapeShares.Part tile) {
+        if (job == null || tile == null) {
+            return false;
+        }
+        for (BuildJob.Hand hand : job.hands()) {
+            if (!hasShapeBox(hand)) {
+                continue;
+            }
+            if (hand.boxX0 < tile.x0 || hand.boxY0 < tile.y0 || hand.boxZ0 < tile.z0
+                    || hand.boxX1 > tile.x1 || hand.boxY1 > tile.y1 || hand.boxZ1 > tile.z1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * When the current 16³ has nothing left, move the crew to the next one and drop the old shares.
+     * Skipping this used to leave finished wrights inside a huge box looking for a slice of it.
+     */
+    private static void advanceFinishedShapeCube(BuildJob job) {
+        if (!shapeStaged(job)) {
+            return;
+        }
+        int sx = Math.max(1, job.boxSizeX());
+        int sy = Math.max(1, job.boxSizeY());
+        int sz = Math.max(1, job.boxSizeZ());
+        com.wrights.blueprint.ShapeShares.Part tile = com.wrights.blueprint.ShapeCubes.at(sx, sy, sz, job.shapeCubeIndex());
+        if (tile == null) {
+            return;
+        }
+        if (countUnresolvedIn(job, tile, 1) != 0) {
+            return;
+        }
+        int next = job.shapeCubeIndex() + 1;
+        if (com.wrights.blueprint.ShapeCubes.at(sx, sy, sz, next) == null) {
+            return;
+        }
+        job.setShapeCubeIndex(next);
+        for (BuildJob.Hand hand : job.hands()) {
+            clearShapeBox(hand);
+            hand.hover = -1;
+            hand.aim = -1;
+            hand.probe = 0;
+            hand.idle = false;
         }
     }
 
@@ -2782,7 +2902,11 @@ public final class JobManager {
             return false;
         }
         BuildJob.Hand best = busiestShapeShare(level, player, job, hand, shapeKind, shapePinLocal, scanCap);
-        if (best == null) {
+        if (best == null || best == hand) {
+            return false;
+        }
+        // A 3×3×3 (or anything smaller, or 27 blocks left) stays with the wright already on it.
+        if (shareTooSmallToCut(best)) {
             return false;
         }
         if (hasShapeBox(best)) {
@@ -2798,8 +2922,7 @@ public final class JobManager {
         if (hand.shareFrom == from && hand.shareTo == to) {
             return false;
         }
-        // The wright already on this share can finish it in one hover. Leave it there.
-        if (shapeShareFitsOneHover(level, player, job, best, shapeKind, shapePinLocal)) {
+        if (job.total() <= 512 && shapeShareFitsOneHover(level, player, job, best, shapeKind, shapePinLocal)) {
             return false;
         }
         int oldRemain = Math.max(0, best.shareRemain);
@@ -2812,28 +2935,16 @@ public final class JobManager {
                     level, player, job, best, from, mid, shapeKind, shapePinLocal, scanCap);
             boolean rightWork = shapeShareRangeHasWork(
                     level, player, job, best, mid, to, shapeKind, shapePinLocal, scanCap);
-            if (!leftWork && !rightWork) {
+            if (!leftWork || !rightWork) {
+                // One side is empty, or the leftover is a single slice. Leave it. Co-owning
+                // the same cells made both wrights aim the last block and then sit idle.
                 return false;
             }
-            if (leftWork && rightWork) {
-                // Fair split — donor keeps the near half, helper takes the far half.
-                best.shareFrom = from;
-                best.shareTo = mid;
-                hand.shareFrom = mid;
-                hand.shareTo = to;
-            } else if (leftWork) {
-                // Only the near half still has blocks — co-own that half.
-                best.shareFrom = from;
-                best.shareTo = mid;
-                hand.shareFrom = from;
-                hand.shareTo = mid;
-            } else {
-                // Only the far half still has blocks — co-own that half.
-                best.shareFrom = mid;
-                best.shareTo = to;
-                hand.shareFrom = mid;
-                hand.shareTo = to;
-            }
+            // Fair split — donor keeps the near half, helper takes the far half.
+            best.shareFrom = from;
+            best.shareTo = mid;
+            hand.shareFrom = mid;
+            hand.shareTo = to;
             boolean shared = hand.shareFrom == best.shareFrom && hand.shareTo == best.shareTo;
             if (shared) {
                 best.shareRemain = oldRemain;
@@ -2846,10 +2957,8 @@ public final class JobManager {
                 hand.shareRemain = Math.max(0, oldRemain - best.shareRemain);
             }
         } else {
-            // Last slice — co-own until it clears.
-            hand.shareFrom = from;
-            hand.shareTo = to;
-            hand.shareRemain = oldRemain;
+            // One block of strip left. Leave it with the wright already there.
+            return false;
         }
         int ownedStart = firstOwnedShapeScanIndex(job, hand);
         hand.cursor = ownedStart >= 0 ? ownedStart : 0;
@@ -2923,29 +3032,55 @@ public final class JobManager {
         int[] ys = new int[cap + 1];
         int[] zs = new int[cap + 1];
         int n = 0;
-        int total = job.total();
-        for (int i = 0; i < total; i++) {
-            if (job.isShapeResolved(i)) {
-                continue;
+        if (hasShapeBox(hand)) {
+            for (int z = hand.boxZ0; z < hand.boxZ1 && n <= cap; z++) {
+                for (int y = hand.boxY0; y < hand.boxY1 && n <= cap; y++) {
+                    for (int x = hand.boxX0; x < hand.boxX1; x++) {
+                        int index = shapeLocalIndex(job, x, y, z);
+                        if (index < 0 || job.isShapeResolved(index)) {
+                            continue;
+                        }
+                        ShapeCell kind = classifyShapeCell(level, player, job, hand, index, shapeKind, shapePinLocal, true);
+                        if (kind != ShapeCell.READY && kind != ShapeCell.BLOCKED) {
+                            continue;
+                        }
+                        if (n >= cap) {
+                            return false;
+                        }
+                        xs[n] = x;
+                        ys[n] = y;
+                        zs[n] = z;
+                        n++;
+                    }
+                }
             }
-            BlockPos pos = job.scanPosAt(i);
-            int lx = pos.getX() - job.min().getX();
-            int ly = pos.getY() - job.min().getY();
-            int lz = pos.getZ() - job.min().getZ();
-            if (!ownsShapeCell(job, hand, lx, ly, lz)) {
-                continue;
+        } else if (job.total() > 4096) {
+            return false;
+        } else {
+            int total = job.total();
+            for (int i = 0; i < total; i++) {
+                if (job.isShapeResolved(i)) {
+                    continue;
+                }
+                BlockPos pos = job.scanPosAt(i);
+                int lx = pos.getX() - job.min().getX();
+                int ly = pos.getY() - job.min().getY();
+                int lz = pos.getZ() - job.min().getZ();
+                if (!ownsShapeCell(job, hand, lx, ly, lz)) {
+                    continue;
+                }
+                ShapeCell kind = classifyShapeCell(level, player, job, hand, i, shapeKind, shapePinLocal, true);
+                if (kind != ShapeCell.READY && kind != ShapeCell.BLOCKED) {
+                    continue;
+                }
+                if (n >= cap) {
+                    return false;
+                }
+                xs[n] = lx;
+                ys[n] = ly;
+                zs[n] = lz;
+                n++;
             }
-            ShapeCell kind = classifyShapeCell(level, player, job, hand, i, shapeKind, shapePinLocal, true);
-            if (kind != ShapeCell.READY && kind != ShapeCell.BLOCKED) {
-                continue;
-            }
-            if (n >= cap) {
-                return false;
-            }
-            xs[n] = lx;
-            ys[n] = ly;
-            zs[n] = lz;
-            n++;
         }
         if (n == 0) {
             return true;
@@ -3048,6 +3183,8 @@ public final class JobManager {
         hand.shareTo = part.x1;
         hand.shareRemain = part.volume();
         hand.hover = -1;
+        hand.probe = 0;
+        hand.aim = -1;
     }
 
     private static void clearShapeBox(BuildJob.Hand hand) {
@@ -3078,10 +3215,10 @@ public final class JobManager {
             ServerLevel level,
             com.wrights.blueprint.Shapes.Kind shapeKind,
             BlockPos shapePinLocal) {
-        if (sameShapeBox(hand, best)) {
+        if (sameShapeBox(hand, best) || shareTooSmallToCut(best)) {
             return false;
         }
-        if (shapeShareFitsOneHover(level, player, job, best, shapeKind, shapePinLocal)) {
+        if (job.total() <= 512 && shapeShareFitsOneHover(level, player, job, best, shapeKind, shapePinLocal)) {
             return false;
         }
         com.wrights.blueprint.ShapeShares.Part[] halves = com.wrights.blueprint.ShapeShares.halve(
@@ -3090,14 +3227,88 @@ public final class JobManager {
         if (halves == null) {
             return false;
         }
+        com.wrights.blueprint.ShapeShares.Part donor = new com.wrights.blueprint.ShapeShares.Part(
+                best.boxX0, best.boxY0, best.boxZ0, best.boxX1, best.boxY1, best.boxZ1);
+        int open = countUnresolvedIn(job, donor, 28);
+        // Fewer than a 3×3×3 of cells left: the wright already there finishes them.
+        if (open >= 0 && open < 28) {
+            return false;
+        }
+        int leftOpen = countUnresolvedIn(job, halves[0], 1);
+        int rightOpen = countUnresolvedIn(job, halves[1], 1);
+        // A confirmed-empty half must not be handed out. That was the endgame lock:
+        // the helper arrived, found nothing, and sat there looking for another share.
+        if (leftOpen == 0 || rightOpen == 0) {
+            return false;
+        }
+        int remain = Math.max(0, best.shareRemain);
         assignShapeBox(best, halves[0]);
         assignShapeBox(hand, halves[1]);
-        hand.aim = -1;
+        if (remain > 0) {
+            int volume = Math.max(1, halves[0].volume() + halves[1].volume());
+            int kept = (int) ((long) remain * halves[0].volume() / volume);
+            best.shareRemain = Math.max(1, kept);
+            hand.shareRemain = Math.max(1, remain - kept);
+        }
         hand.idle = false;
-        hand.probe = 0;
+        best.idle = false;
         noteHistory(player, library, job, JobEventLog.SHARE_SPLIT,
                 Component.translatable("history.wrights.share_split").getString());
         return true;
+    }
+
+    /** A share that fits in a 3×3×3, or has at most that many blocks left, is not cut. */
+    private static boolean shareTooSmallToCut(BuildJob.Hand hand) {
+        if (hand == null) {
+            return true;
+        }
+        if (hasShapeBox(hand)) {
+            int dx = hand.boxX1 - hand.boxX0;
+            int dy = hand.boxY1 - hand.boxY0;
+            int dz = hand.boxZ1 - hand.boxZ0;
+            if (dx <= 3 && dy <= 3 && dz <= 3) {
+                return true;
+            }
+        } else if (hand.shareTo - hand.shareFrom > 0 && hand.shareTo - hand.shareFrom <= 3) {
+            return true;
+        }
+        return hand.shareRemain > 0 && hand.shareRemain <= 27;
+    }
+
+    /**
+     * Unresolved cells inside a box. {@code 0} means the scan finished and the half is empty.
+     * {@code -1} means the cap was hit before the box ended, so the half may still have work.
+     */
+    private static int countUnresolvedIn(BuildJob job, com.wrights.blueprint.ShapeShares.Part part, int limit) {
+        if (job == null || part == null || part.volume() <= 0) {
+            return 0;
+        }
+        int sx = Math.max(1, job.boxSizeX());
+        int sy = Math.max(1, job.boxSizeY());
+        int start = shapeLocalIndex(job, part.x0, part.y0, part.z0);
+        if (start < 0) {
+            return 0;
+        }
+        int found = 0;
+        int steps = 0;
+        int index = job.nextUnresolved(start);
+        while (index < job.total() && found < limit && steps < 4096) {
+            steps++;
+            int x = index % sx;
+            int y = (index / sx) % sy;
+            int z = index / (sx * sy);
+            if (z >= part.z1) {
+                return found;
+            }
+            if (x >= part.x0 && x < part.x1 && y >= part.y0 && y < part.y1 && z >= part.z0 && z < part.z1) {
+                found++;
+            }
+            index = job.nextUnresolved(index + 1);
+        }
+        if (index >= job.total() || (index < job.total() && index / (sx * sy) >= part.z1)) {
+            return found;
+        }
+        return found >= limit ? found : -1;
     }
 
     private static boolean shapeBoxHasWork(

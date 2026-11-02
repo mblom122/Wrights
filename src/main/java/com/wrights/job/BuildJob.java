@@ -212,6 +212,21 @@ public final class BuildJob {
         return index >= 0 && shapeResolved != null && shapeResolved.get(index);
     }
 
+    /** Next scan index that is not resolved yet, or {@code total} when none remain. */
+    public int nextUnresolved(int from) {
+        if (from < 0) {
+            from = 0;
+        }
+        if (from >= total) {
+            return total;
+        }
+        if (shapeResolved == null) {
+            return from;
+        }
+        int next = shapeResolved.nextClearBit(from);
+        return next >= total ? total : next;
+    }
+
     /**
      * Marks a shape cell counted. Returns false when it was already marked so the caller
      * must not advance progress again.
@@ -894,6 +909,8 @@ public final class BuildJob {
     private boolean shapeHollow;
     /** How far the hollow-interior sweep has walked the AABB. Faces stay for the wrights. */
     private int shapeSweep;
+    /** Which 16³ cube a large shape is building. A shape that fits in one section stays at 0. */
+    private int shapeCubeIndex;
     private BlockPos shapeCenter = BlockPos.ZERO;
     private String shapeMaterials = "";
     /** Exchange replaces matching world blocks instead of only filling air. */
@@ -1039,6 +1056,14 @@ public final class BuildJob {
 
     public void setShapeSweep(int shapeSweep) {
         this.shapeSweep = Math.max(0, shapeSweep);
+    }
+
+    public int shapeCubeIndex() {
+        return shapeCubeIndex;
+    }
+
+    public void setShapeCubeIndex(int shapeCubeIndex) {
+        this.shapeCubeIndex = Math.max(0, shapeCubeIndex);
     }
 
     public BlockPos shapeCenter() {
@@ -1377,6 +1402,7 @@ public final class BuildJob {
             tag.putInt("shapePivot", shapePivot);
             tag.putBoolean("shapeHollow", shapeHollow);
             tag.putInt("shapeSweep", shapeSweep);
+            tag.putInt("shapeCubeIndex", shapeCubeIndex);
             tag.put("shapeCenter", NbtUtils.writeBlockPos(shapeCenter));
             tag.putString("shapeMaterials", shapeMaterials == null ? "" : shapeMaterials);
             tag.putBoolean("exchange", exchange);
@@ -1582,6 +1608,7 @@ public final class BuildJob {
             job.shapePivot = tag.getInt("shapePivot");
             job.shapeHollow = tag.getBoolean("shapeHollow");
             job.shapeSweep = Math.max(0, tag.getInt("shapeSweep"));
+            job.shapeCubeIndex = Math.max(0, tag.getInt("shapeCubeIndex"));
             job.shapeCenter = NbtUtils.readBlockPos(tag, "shapeCenter").orElse(BlockPos.ZERO);
             job.shapeMaterials = tag.getString("shapeMaterials");
             job.exchange = tag.getBoolean("exchange");
