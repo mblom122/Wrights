@@ -1346,7 +1346,9 @@ public final class WrightsClientState {
             if (!(minecraft.screen instanceof BlueprintEditScreen)) {
                 minecraft.setScreen(new BlueprintEditScreen());
             }
-        } else if (payload.forBuild() && (minecraft.screen instanceof WrightsMenuScreen || minecraft.screen instanceof BlueprintAdjustScreen)) {
+        } else if (payload.forBuild() && minecraft.screen instanceof BlueprintAdjustScreen) {
+            // Menu Build already closes itself. Do not dismiss WrightsMenuScreen here —
+            // silent Resume after join would slam shut a menu the player just opened with B.
             minecraft.setScreen(null);
         }
         if (minecraft.screen instanceof WrightsMenuScreen menu) {

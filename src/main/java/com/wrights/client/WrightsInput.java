@@ -126,6 +126,12 @@ public final class WrightsInput {
                 minecraft.setScreen(new WrightsMenuScreen());
                 net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                         new com.wrights.network.BlueprintPayloads.LibraryRequest(WrightsClientState.libraryGlobal));
+                // One press can leave an extra click queued (focus/restart). Drain so
+                // the same tick does not open then immediately close.
+                while (MENU.consumeClick()) {
+                    // drop
+                }
+                break;
             } else if (minecraft.screen instanceof BlockPickerScreen
                     || minecraft.screen instanceof BlueprintMapScreen
                     || minecraft.screen instanceof BlueprintEditScreen
