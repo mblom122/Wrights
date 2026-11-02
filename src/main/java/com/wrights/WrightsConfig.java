@@ -308,12 +308,55 @@ public final class WrightsConfig {
     }
 
     /**
+     * Euclidean place reach in blocks (matches JobManager multi-place {@code PLACE_NEAR_SQR = 9}).
+     * Same for every tier — upgrades change place rate, not reach.
+     */
+    public static final int PLACE_REACH = 3;
+
+    /** Cells along a straight line one hover can cover ({@code 2 * PLACE_REACH + 1} = 7). */
+    public static int placeAoeLine() {
+        return 2 * PLACE_REACH + 1;
+    }
+
+    /**
+     * Blocks one top-tier wright clears in one hover/op for this footprint: min of Netherite
+     * place burst and what place-reach can actually touch (line 7, plate burst-capped, blob burst).
+     */
+    public static int placeAoeCapacity(int sizeX, int sizeY, int sizeZ) {
+        int burst = Math.max(1, WrightTier.placeEighths(WrightTier.NETHERITE) / 8);
+        int sx = Math.max(1, sizeX);
+        int sy = Math.max(1, sizeY);
+        int sz = Math.max(1, sizeZ);
+        int ones = (sx == 1 ? 1 : 0) + (sy == 1 ? 1 : 0) + (sz == 1 ? 1 : 0);
+        if (ones >= 2) {
+            // Beam / pillar: reach along the length only.
+            return Math.min(burst, placeAoeLine());
+        }
+        // Plate or volume: burst is the usual limit inside the reach ball.
+        return burst;
+    }
+
+    /**
+     * True when dense hover scoring is worth it. If {@code blocks} already need more than a couple
+     * full AOE waves from {@code wrights}, prefer closest-first and skip the extra math.
+     * {@code shareBlocks} is this wright's slice when known (else pass the full job size).
+     */
+    public static boolean optimizePlaceRoute(int blocks, int sizeX, int sizeY, int sizeZ, int wrights, int shareBlocks) {
+        if (blocks <= 0) {
+            return false;
+        }
+        int aoe = Math.max(1, placeAoeCapacity(sizeX, sizeY, sizeZ));
+        int crew = Math.max(1, wrights);
+        int share = shareBlocks > 0 ? shareBlocks : blocks;
+        // Own strip fits in ~2 hovers, or the whole job fits in ~2 crew-wide AOE waves.
+        long wave = (long) aoe * (long) crew * 2L;
+        return share <= aoe * 2L || (long) blocks <= wave;
+    }
+
+    /**
      * How many wrights can usefully work this job in parallel. Not 1:1 with blocks —
-     * one upgraded wright multi-places a local cluster, so a 3×3 wall needs one wright,
-     * not nine. Sized by how many non-overlapping place-reach stations fit in the box
-     * (reach 3 → 7 cells along a thin beam), so a 1×9 beam asks for 2 when available
-     * and can finish in one parallel wave. Burst rate is not used as a crew cap: nine
-     * blocks on a line are not one hover even if Netherite could place twelve in a tick.
+     * sized by place-AOE stations: {@code ceil(blocks / aoe)} and how many non-overlapping
+     * reach spans fit in the box (1×9 beam → 2). Caps by horizontal columns and block count.
      */
     public static int usefulCrewFor(int blocks, int sizeX, int sizeY, int sizeZ) {
         if (blocks <= 0) {
@@ -324,15 +367,19 @@ public final class WrightsConfig {
         int sx = Math.max(1, sizeX);
         int sy = Math.max(1, sizeY);
         int sz = Math.max(1, sizeZ);
-        // PLACE_NEAR diameter (euclidean reach 3 → 7 cells on a straight line from one hover).
-        int station = 7;
+        int aoe = Math.max(1, placeAoeCapacity(sx, sy, sz));
+        int station = placeAoeLine();
         int nx = (sx + station - 1) / station;
         int ny = (sy + station - 1) / station;
         int nz = (sz + station - 1) / station;
         int stations = Math.max(1, nx * ny * nz);
+        int byAoe = (int) Math.min(Integer.MAX_VALUE, (safeBlocks + aoe - 1L) / aoe);
+        byAoe = Math.max(1, byAoe);
+        // Need enough for one AOE wave and enough spatial slots so they are not stacked.
+        int needed = Math.max(byAoe, stations);
         int columns = Math.max(1, Math.max(sx, sz));
         int blockCap = (int) Math.min(Integer.MAX_VALUE, safeBlocks);
-        return Math.max(1, Math.min(blockCap, Math.min(stations, columns)));
+        return Math.max(1, Math.min(blockCap, Math.min(needed, columns)));
     }
 
     public static int maxWrightsCarried() {

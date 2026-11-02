@@ -2037,11 +2037,10 @@ public final class JobManager {
             if (local >= 0) {
                 return local;
             }
-            // Soft fly band: closest first. On compact jobs only, nudge within a short slack
-            // to a denser hover (wall center / beam station) so one burst replaces several moves.
+            // Soft fly band: closest first. Density nudge only while AOE×crew still matters.
             int near = shapeClusterIndex(
                     level, player, job, hand, origin, FLY_NEAR_SQR, FLY_NEAR_RADIUS,
-                    shapeKind, shapePinLocal, onlyOwned, job.total() <= 256);
+                    shapeKind, shapePinLocal, onlyOwned, shapeOptimizeRoute(job, hand));
             if (near >= 0) {
                 return near;
             }
@@ -2055,6 +2054,15 @@ public final class JobManager {
             return seed;
         }
         return -1;
+    }
+
+    /** Dense hover scoring while this hand's AOE share still fits a couple waves; else closest-first. */
+    private static boolean shapeOptimizeRoute(BuildJob job, BuildJob.Hand hand) {
+        int lanes = Math.max(1, hand == null ? 1 : hand.lanes);
+        int total = Math.max(0, job.total());
+        int share = Math.max(1, (total + lanes - 1) / lanes);
+        return WrightsConfig.optimizePlaceRoute(
+                total, job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(), lanes, share);
     }
 
     /**
@@ -2074,8 +2082,8 @@ public final class JobManager {
         if (total <= 0) {
             return -1;
         }
-        // Density scoring is for compact jobs only — big boxes stay nearest-READY.
-        boolean compact = total <= 256;
+        // Density scoring only while this share / job still fits a couple AOE waves.
+        boolean compact = shapeOptimizeRoute(job, hand);
         int examined = 0;
         int nearest = -1;
         double nearestDist = Double.MAX_VALUE;
