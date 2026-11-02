@@ -259,7 +259,16 @@ final class WrightManagePanel {
             if (i == expanded) {
                 placeNameBox(screen, swarm, i, y, listTop, listBottom);
                 if (y + EXPAND > listTop && y < listBottom) {
-                    graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_pace"), listX + 10, y + 20, WrightsUi.TEXT, false);
+                    graphics.drawString(
+                            screen.font(),
+                            Component.translatable(
+                                    "screen.wrights.manage_pace",
+                                    WrightTier.speed(tier),
+                                    WrightTier.speedBonusPercent(tier)),
+                            listX + 10,
+                            y + 20,
+                            WrightsUi.TEXT,
+                            false);
                     boolean canDowngrade = tool && tier > WrightTier.BASE;
                     if (tier < WrightTier.NETHERITE) {
                         Component next = Component.translatable(WrightTier.nameKey(tier + 1));

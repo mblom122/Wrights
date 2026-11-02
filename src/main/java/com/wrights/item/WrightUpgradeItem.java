@@ -29,7 +29,15 @@ public class WrightUpgradeItem extends Item {
 
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
-        tooltip.add(Component.translatable("item.wrights.wright_upgrade.hint", Component.translatable(WrightTier.nameKey(tier - 1)))
+        int score = WrightTier.speed(tier);
+        int bonus = WrightTier.speedBonusPercent(tier);
+        tooltip.add(Component.translatable("item.wrights.wright_upgrade.speed", score, bonus)
                 .withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("item.wrights.wright_upgrade.effect")
+                .withStyle(ChatFormatting.DARK_GRAY));
+        tooltip.add(Component.translatable(
+                        "item.wrights.wright_upgrade.hint",
+                        Component.translatable(WrightTier.nameKey(tier - 1)))
+                .withStyle(ChatFormatting.DARK_GRAY));
     }
 }
