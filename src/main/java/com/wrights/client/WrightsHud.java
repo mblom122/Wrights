@@ -980,7 +980,9 @@ public final class WrightsHud {
             Component header = noticeHeader(notice);
             Component time = noticeTime(notice);
             int width = minecraft.font.width(header) + 30;
-            width = Math.max(width, minecraft.font.width(notice.name) + 18);
+            if (hasName(notice)) {
+                width = Math.max(width, minecraft.font.width(notice.name) + 18);
+            }
             if (hasDetail(notice)) {
                 width = Math.max(width, minecraft.font.width(notice.detail) + 18);
             }
@@ -1015,7 +1017,9 @@ public final class WrightsHud {
             Component header = noticeHeader(notice);
             Component time = noticeTime(notice);
             List<Component> lines = new java.util.ArrayList<>();
-            lines.add(notice.name);
+            if (hasName(notice)) {
+                lines.add(notice.name);
+            }
             if (hasDetail(notice)) {
                 lines.add(notice.detail);
             }
@@ -1159,6 +1163,10 @@ public final class WrightsHud {
         drawFooter(graphics, minecraft, how, x + 12, y + height - 20, width - 24, WrightsUi.MUTED);
     }
 
+    private static boolean hasName(WrightsClientState.JobNotice notice) {
+        return notice.name != null && !notice.name.getString().isEmpty();
+    }
+
     private static boolean hasDetail(WrightsClientState.JobNotice notice) {
         return notice.detail != null && !notice.detail.getString().isEmpty();
     }
@@ -1171,24 +1179,25 @@ public final class WrightsHud {
     }
 
     private static int noticeHeight(WrightsClientState.JobNotice notice) {
-        int lines = 1;
+        int lines = 0;
+        if (hasName(notice)) {
+            lines++;
+        }
         if (hasDetail(notice)) {
             lines++;
         }
         if (noticeTime(notice) != null) {
             lines++;
         }
-        return 18 + 5 + lines * 11 + 4;
+        return 18 + 5 + Math.max(0, lines) * 11 + 4;
     }
 
-    /** Null when the notice has no elapsed-time line ({@code seconds < 0}). */
+    /** Null when there is no time line ({@code seconds < 0}) or the job finished in under 2 seconds. */
     private static Component noticeTime(WrightsClientState.JobNotice notice) {
-        if (notice.seconds < 0) {
+        if (notice.seconds < 2) {
             return null;
         }
-        return notice.seconds < 1
-                ? Component.translatable("hud.wrights.job_time_under")
-                : Component.translatable("hud.wrights.job_time", duration(notice.seconds));
+        return Component.translatable("hud.wrights.job_time", duration(notice.seconds));
     }
 
     private static void drawInfoBubble(GuiGraphics graphics, int x, int y, int alpha) {
