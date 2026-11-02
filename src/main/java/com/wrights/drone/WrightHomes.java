@@ -91,12 +91,12 @@ public final class WrightHomes {
     /** Chunks of reach around a placed wrightport, so the area is 7 by 7 chunks with the port in the middle. */
     public static final int PORT_CHUNKS = 3;
 
-    public static boolean playerCovers(ServerPlayer player, ResourceKey<Level> dimension, BlockPos site) {
+    public static boolean playerCovers(net.minecraft.world.entity.player.Player player, ResourceKey<Level> dimension, BlockPos site) {
         return playerCovers(player, dimension, site, site);
     }
 
     /** True when the player is within range of the closest point on the build, not only one corner. */
-    public static boolean playerCovers(ServerPlayer player, ResourceKey<Level> dimension, BlockPos min, BlockPos max) {
+    public static boolean playerCovers(net.minecraft.world.entity.player.Player player, ResourceKey<Level> dimension, BlockPos min, BlockPos max) {
         if (player == null || min == null || dimension == null || !player.level().dimension().equals(dimension)) {
             return false;
         }

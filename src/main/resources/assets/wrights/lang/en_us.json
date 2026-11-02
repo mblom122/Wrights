@@ -828,6 +828,8 @@
   "screen.wrights.drone_make_free": "Free",
   "screen.wrights.drones_on_job": "On this job",
   "screen.wrights.drones_available": "Available",
+  "screen.wrights.drones_available_range": "Available in range",
+  "screen.wrights.drones_none_free_range": "No free wrights in range of this job (%s free elsewhere)",
   "screen.wrights.roster_on_job": "On a job",
   "screen.wrights.roster_split": "Free %s  ·  On a job %s",
   "screen.wrights.roster_pick": "Select a wright, then choose where it goes",

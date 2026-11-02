@@ -12,6 +12,12 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
 
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.world.level.Level;
+
+import com.wrights.drone.WrightHomes;
 import com.wrights.drone.Wrightports;
 import com.wrights.drone.Swarm;
 import com.wrights.drone.WrightTier;
@@ -110,7 +116,7 @@ public class JobDroneScreen extends Screen {
         Well onJobWell = onJobWell();
         Well available = availableWell();
         drawSection(graphics, onJobWell, "screen.wrights.drones_on_job", assignedWanted, WrightsUi.COPPER, assigned, onScroll, mouseX, mouseY, true);
-        drawSection(graphics, available, "screen.wrights.drones_available", free, WrightsUi.GREEN, others, otherScroll, mouseX, mouseY, false);
+        drawSection(graphics, available, "screen.wrights.drones_available_range", free, WrightsUi.GREEN, others, otherScroll, mouseX, mouseY, false);
     }
 
     @Override
@@ -426,6 +432,8 @@ public class JobDroneScreen extends Screen {
             }
         }
         int free = 0;
+        int freeElsewhere = 0;
+        boolean inRange = job != null && playerCoversJob(job);
         List<Entry> busy = new ArrayList<>();
         for (int i = 0; i < swarm.units().size(); i++) {
             Swarm.Unit unit = swarm.units().get(i);
@@ -437,14 +445,23 @@ public class JobDroneScreen extends Screen {
             String label = unit.title(i + 1).getString();
             int tier = WrightTier.clamp(unit.speed());
             if (other == null) {
-                others.add(Entry.wright(unit.id(), label, tier, "", "screen.wrights.drone_add"));
-                free++;
+                // Worn-port wrights reach the job only while you are in range of it.
+                if (inRange) {
+                    others.add(Entry.wright(unit.id(), label, tier, "", "screen.wrights.drone_add"));
+                    free++;
+                } else {
+                    freeElsewhere++;
+                }
             } else {
                 busy.add(Entry.wright(unit.id(), label, tier, Component.translatable("screen.wrights.drone_on_other", other).getString(), null));
             }
         }
         if (free == 0) {
-            others.add(0, Entry.note(Component.translatable("screen.wrights.drones_none_free").getString()));
+            if (freeElsewhere > 0) {
+                others.add(0, Entry.note(Component.translatable("screen.wrights.drones_none_free_range", freeElsewhere).getString()));
+            } else {
+                others.add(0, Entry.note(Component.translatable("screen.wrights.drones_none_free").getString()));
+            }
         }
         if (!busy.isEmpty()) {
             others.add(Entry.divider(Component.translatable("screen.wrights.drones_on_other_header").getString()));
@@ -494,6 +511,30 @@ public class JobDroneScreen extends Screen {
             }
         }
         return null;
+    }
+
+    /** Same reach rule as the server: player within maxRange of the closest point on the job box. */
+    private boolean playerCoversJob(BlueprintPayloads.JobLine job) {
+        if (this.minecraft == null || this.minecraft.player == null || this.minecraft.level == null || job == null) {
+            return false;
+        }
+        ResourceLocation dimId = ResourceLocation.tryParse(job.dimension());
+        if (dimId == null) {
+            return false;
+        }
+        ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, dimId);
+        BlockPos min = job.origin();
+        BlockPos far = min.offset(Math.max(0, job.sizeX() - 1), Math.max(0, job.sizeY() - 1), Math.max(0, job.sizeZ() - 1));
+        BlockPos anchor = job.anchor() == null ? min : job.anchor();
+        BlockPos boxMin = new BlockPos(
+                Math.min(min.getX(), Math.min(far.getX(), anchor.getX())),
+                Math.min(min.getY(), Math.min(far.getY(), anchor.getY())),
+                Math.min(min.getZ(), Math.min(far.getZ(), anchor.getZ())));
+        BlockPos boxMax = new BlockPos(
+                Math.max(min.getX(), Math.max(far.getX(), anchor.getX())),
+                Math.max(min.getY(), Math.max(far.getY(), anchor.getY())),
+                Math.max(min.getZ(), Math.max(far.getZ(), anchor.getZ())));
+        return WrightHomes.playerCovers(this.minecraft.player, dimension, boxMin, boxMax);
     }
 
     private BlueprintPayloads.JobLine live() {
