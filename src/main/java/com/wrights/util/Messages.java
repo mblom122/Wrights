@@ -19,6 +19,18 @@ public final class Messages {
             return;
         }
         player.displayClientMessage(text, true);
-        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.Notice(text));
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.Notice(text, false));
+    }
+
+    /** Short white mid-screen tip for no-op / nothing-to-do feedback — not a job toast. */
+    public static void centerTip(ServerPlayer player, String key, Object... args) {
+        centerTip(player, Component.translatable(key, args));
+    }
+
+    public static void centerTip(ServerPlayer player, Component text) {
+        if (player == null || text == null) {
+            return;
+        }
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.Notice(text, true));
     }
 }

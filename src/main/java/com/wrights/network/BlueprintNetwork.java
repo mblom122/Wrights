@@ -684,7 +684,13 @@ public final class BlueprintNetwork {
         if (FMLEnvironment.dist != Dist.CLIENT) {
             return;
         }
-        context.enqueueWork(() -> com.wrights.client.WrightsClientState.showNotice(payload.text()));
+        context.enqueueWork(() -> {
+            if (payload.center()) {
+                com.wrights.client.WrightsClientState.showCenterTip(payload.text());
+            } else {
+                com.wrights.client.WrightsClientState.showNotice(payload.text());
+            }
+        });
     }
 
     private static void clientDigitalUse(BlueprintPayloads.DigitalUse payload, IPayloadContext context) {

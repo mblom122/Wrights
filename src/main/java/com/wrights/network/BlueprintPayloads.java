@@ -2086,12 +2086,22 @@ public final class BlueprintPayloads {
         }
     }
 
-    /** Shown on top of an open manage window. The vanilla action bar sits behind that window. */
-    public record Notice(Component text) implements CustomPacketPayload {
+    /**
+     * Client tip. {@code center} draws short white text mid-screen; otherwise it is for Manage
+     * (vanilla action bar sits behind that window).
+     */
+    public record Notice(Component text, boolean center) implements CustomPacketPayload {
+        public Notice(Component text) {
+            this(text, false);
+        }
+
         public static final Type<Notice> TYPE = payloadType("notice");
         public static final StreamCodec<RegistryFriendlyByteBuf, Notice> STREAM_CODEC = StreamCodec.of(
-                (buf, value) -> buf.writeJsonWithCodec(ComponentSerialization.CODEC, value.text == null ? Component.empty() : value.text),
-                buf -> new Notice(buf.readJsonWithCodec(ComponentSerialization.CODEC)));
+                (buf, value) -> {
+                    buf.writeJsonWithCodec(ComponentSerialization.CODEC, value.text == null ? Component.empty() : value.text);
+                    buf.writeBoolean(value.center);
+                },
+                buf -> new Notice(buf.readJsonWithCodec(ComponentSerialization.CODEC), buf.readBoolean()));
 
         @Override
         public Type<? extends CustomPacketPayload> type() {

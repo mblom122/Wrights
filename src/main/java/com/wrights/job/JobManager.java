@@ -1081,9 +1081,7 @@ public final class JobManager {
         if (exchange && player.level() instanceof ServerLevel preLevel) {
             exchangeWork = buildExchangeSchematic(preLevel, job);
             if (exchangeWork == null || exchangeWork.blockCount() <= 0) {
-                Component detail = Component.translatable("message.wrights.exchange_none");
-                Messages.actionBar(player, detail);
-                BlueprintNetwork.jobDone(player, Component.literal(title), detail, 0);
+                Messages.centerTip(player, "message.wrights.exchange_none");
                 return true;
             }
         }
@@ -3220,12 +3218,16 @@ public final class JobManager {
         }
         Component title = jobTitle(player.getServer(), library, job, taskKey);
         Component line = detail == null ? Component.empty() : detail;
-        if (line.getString().isEmpty()) {
+        // Nothing changed — short mid-screen tip instead of a Job done toast.
+        if (isNoopFinish(line)) {
+            Messages.centerTip(player, line);
+        } else if (line.getString().isEmpty()) {
             Messages.actionBar(player, title);
+            BlueprintNetwork.jobDone(player, title, line, job.elapsedSeconds());
         } else {
             Messages.actionBar(player, title.copy().append(Component.literal(". ")).append(line));
+            BlueprintNetwork.jobDone(player, title, line, job.elapsedSeconds());
         }
-        BlueprintNetwork.jobDone(player, title, line, job.elapsedSeconds());
         int kind = JobEventLog.COMPLETED;
         if ("hud.wrights.task_undo".equals(taskKey)) {
             kind = JobEventLog.UNDONE;
@@ -3243,6 +3245,17 @@ public final class JobManager {
             historyDetail = historyDetail.isBlank() ? crewBit : historyDetail + " · " + crewBit;
         }
         noteHistory(player, library, job, kind, historyDetail);
+    }
+
+    private static boolean isNoopFinish(Component detail) {
+        if (detail == null) {
+            return false;
+        }
+        String text = detail.getString();
+        return text.equals(Component.translatable("message.wrights.already_built").getString())
+                || text.equals(Component.translatable("message.wrights.all_skipped").getString())
+                || text.equals(Component.translatable("message.wrights.mine_none").getString())
+                || text.equals(Component.translatable("message.wrights.exchange_none").getString());
     }
 
     private static void noteHistory(ServerPlayer player, SchematicLibrary library, BuildJob job, int kind, String detail) {

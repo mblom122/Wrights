@@ -158,6 +158,9 @@ public final class WrightsClientState {
     public static long digitalUseUntil;
     public static Component notice = Component.empty();
     public static long noticeUntil;
+    /** Brief white mid-screen tip (no-op exchange / already done). */
+    public static Component centerTip = Component.empty();
+    public static long centerTipUntil;
     public static BlockPos anchor;
     public static int pivotX;
     public static int pivotY;
@@ -2745,6 +2748,11 @@ public final class WrightsClientState {
     public static void showNotice(Component text) {
         notice = text == null ? Component.empty() : text;
         noticeUntil = notice.getString().isEmpty() ? 0L : System.currentTimeMillis() + 6000L;
+    }
+
+    public static void showCenterTip(Component text) {
+        centerTip = text == null ? Component.empty() : text;
+        centerTipUntil = centerTip.getString().isEmpty() ? 0L : System.currentTimeMillis() + 2200L;
     }
 
     public static void applyDigitalInfo(BlueprintPayloads.DigitalInfoSync payload) {

@@ -41,6 +41,7 @@ public final class WrightsHud {
         }
         drawDockWait(event.getGuiGraphics(), minecraft);
         drawJobNotices(event.getGuiGraphics(), minecraft);
+        drawCenterTip(event.getGuiGraphics(), minecraft);
         if (minecraft.screen != null || !com.wrights.item.ControllerItem.isHeld(minecraft.player)) {
             return;
         }
@@ -962,6 +963,27 @@ public final class WrightsHud {
         int y = minecraft.getWindow().getGuiScaledHeight() / 2 - 12;
         graphics.fill(x - 8, y - 6, x + width + 8, y + 14, 0xAA060C14);
         graphics.drawString(minecraft.font, line, x, y, 0xFFE8DCC8, false);
+    }
+
+    /** Short white mid-screen line for no-op tips (nothing to exchange, already built, …). */
+    private static void drawCenterTip(GuiGraphics graphics, Minecraft minecraft) {
+        if (WrightsClientState.centerTip == null || WrightsClientState.centerTip.getString().isEmpty()) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (now >= WrightsClientState.centerTipUntil) {
+            WrightsClientState.centerTip = Component.empty();
+            return;
+        }
+        long left = WrightsClientState.centerTipUntil - now;
+        int alpha = left > 400L ? 0xFF : Math.max(0, (int) (0xFF * left / 400L));
+        int color = (alpha << 24) | 0xFFFFFF;
+        graphics.drawCenteredString(
+                minecraft.font,
+                WrightsClientState.centerTip,
+                graphics.guiWidth() / 2,
+                graphics.guiHeight() / 2 - 12,
+                color);
     }
 
     private static void drawJobNotices(GuiGraphics graphics, Minecraft minecraft) {
