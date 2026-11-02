@@ -407,14 +407,11 @@ public final class WrightsConfig {
         int sx = Math.max(1, sizeX);
         int sy = Math.max(1, sizeY);
         int sz = Math.max(1, sizeZ);
-        int station = placeAoeLine(ops);
-        int nx = (sx + station - 1) / station;
-        int ny = (sy + station - 1) / station;
-        int nz = (sz + station - 1) / station;
-        int stations = Math.max(1, nx * ny * nz);
-        int columns = Math.max(1, Math.max(sx, sz));
+        int reach = WrightTier.operationReachSqr(ops);
+        int cap = Math.max(1, WrightTier.operationCap(ops));
+        int hovers = com.wrights.blueprint.ShapeHover.count(sx, sy, sz, false, com.wrights.blueprint.ShapeHover.KIND_BOX, reach, cap);
         int blockCap = (int) Math.min(Integer.MAX_VALUE, safeBlocks);
-        return Math.max(1, Math.min(blockCap, Math.min(stations, columns)));
+        return Math.max(1, Math.min(blockCap, hovers));
     }
 
     /** Forge Energy for the next block. Voiding before a place adds the void cost. Mining-void is void alone. */

@@ -1,6 +1,6 @@
 # Shape hover plan
 
-Isolated measurement of how a wright should stand and how many blocks one hover should place. Nothing here is wired into `JobManager` yet. The numbers come from `tools/shapeplan/ShapePlanSim.java`, run on the same sphere the game uses.
+Isolated measurement of how a wright should stand and how many blocks one hover should place. Nothing here replaces the place loop. `ShapeHover` chooses the next stand, and `HoverPieces` cuts a blueprint into one-hover shares up to the wright cap. A finished wright still takes half of the share with the most blocks left.
 
 Netherite, which is the default this study holds fixed:
 

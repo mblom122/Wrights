@@ -466,6 +466,7 @@ public final class BuildJob {
             hand.speed = com.wrights.drone.WrightTier.clamp(speeds.get(i));
             if (scan) {
                 hand.cursor = 0;
+                hand.hover = -1;
                 hand.rescan = true;
                 hand.shareFrom = -1;
                 hand.shareTo = -1;
@@ -885,6 +886,8 @@ public final class BuildJob {
     private int shapeYaw;
     private int shapePivot;
     private boolean shapeHollow;
+    /** How far the hollow-interior sweep has walked the AABB. Faces stay for the wrights. */
+    private int shapeSweep;
     private BlockPos shapeCenter = BlockPos.ZERO;
     private String shapeMaterials = "";
     /** Exchange replaces matching world blocks instead of only filling air. */
@@ -1022,6 +1025,14 @@ public final class BuildJob {
 
     public boolean shapeHollow() {
         return shapeHollow;
+    }
+
+    public int shapeSweep() {
+        return shapeSweep;
+    }
+
+    public void setShapeSweep(int shapeSweep) {
+        this.shapeSweep = Math.max(0, shapeSweep);
     }
 
     public BlockPos shapeCenter() {
@@ -1278,6 +1289,7 @@ public final class BuildJob {
                 handTag.putInt("ops", hand.ops);
                 handTag.putInt("placeCredit", hand.placeCredit);
                 handTag.putInt("cursor", hand.cursor);
+                handTag.putInt("hover", hand.hover);
                 handTag.putInt("shareFrom", hand.shareFrom);
                 handTag.putInt("shareTo", hand.shareTo);
                 handTag.putInt("shareRemain", hand.shareRemain);
@@ -1352,6 +1364,7 @@ public final class BuildJob {
             tag.putInt("shapeYaw", shapeYaw);
             tag.putInt("shapePivot", shapePivot);
             tag.putBoolean("shapeHollow", shapeHollow);
+            tag.putInt("shapeSweep", shapeSweep);
             tag.put("shapeCenter", NbtUtils.writeBlockPos(shapeCenter));
             tag.putString("shapeMaterials", shapeMaterials == null ? "" : shapeMaterials);
             tag.putBoolean("exchange", exchange);
@@ -1489,6 +1502,7 @@ public final class BuildJob {
                 hand.ops = handTag.contains("ops") ? handTag.getInt("ops") : hand.speed;
                 hand.placeCredit = handTag.getInt("placeCredit");
                 hand.cursor = handTag.getInt("cursor");
+                hand.hover = handTag.contains("hover") ? handTag.getInt("hover") : -1;
                 hand.shareFrom = handTag.contains("shareFrom") ? handTag.getInt("shareFrom") : -1;
                 hand.shareTo = handTag.contains("shareTo") ? handTag.getInt("shareTo") : -1;
                 hand.shareRemain = Math.max(0, handTag.getInt("shareRemain"));
@@ -1549,6 +1563,7 @@ public final class BuildJob {
             job.shapeYaw = tag.getInt("shapeYaw");
             job.shapePivot = tag.getInt("shapePivot");
             job.shapeHollow = tag.getBoolean("shapeHollow");
+            job.shapeSweep = Math.max(0, tag.getInt("shapeSweep"));
             job.shapeCenter = NbtUtils.readBlockPos(tag, "shapeCenter").orElse(BlockPos.ZERO);
             job.shapeMaterials = tag.getString("shapeMaterials");
             job.exchange = tag.getBoolean("exchange");
@@ -1685,6 +1700,11 @@ public final class BuildJob {
         public int aim = -1;
         /** Hover index that already counted as one build operation. Not saved. */
         public int opStand = Integer.MIN_VALUE;
+        /**
+         * Next shape stand for this wright. {@code -1} starts the pattern, {@code -2} means the
+         * share has been walked. Saved so a reload continues the same diagonal.
+         */
+        public int hover = -1;
         public UUID entityId;
         public BlockPos lastPos;
         /** Null = personal wrightport (player back). Set = placed wrightport block. */
