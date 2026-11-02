@@ -276,6 +276,9 @@ public class WrightsMenuScreen extends Screen {
     private int optionPlaceY;
     private int optionOffsetY;
     private int optionShapeAirY;
+    private int jobDoneMinY;
+    private int jobDoneMinusX;
+    private int jobDonePlusX;
     private int hudPlaceX;
     private int hudPlaceY;
     private int hudPlaceW;
@@ -1345,6 +1348,10 @@ public class WrightsMenuScreen extends Screen {
         local += 34;
         messageHeadY = optionY(local);
         local += 18;
+        jobDoneMinY = optionY(local - 3);
+        jobDoneMinusX = controls;
+        jobDonePlusX = jobDoneMinusX + 36;
+        local += 24;
         Component moveMessages = Component.translatable("menu.wrights.hud_place");
         Component moveModes = Component.translatable("menu.wrights.mode_place");
         hudPlaceW = Math.max(120, this.font.width(moveMessages) + 16);
@@ -1403,7 +1410,8 @@ public class WrightsMenuScreen extends Screen {
                 "menu.wrights.open_build_menu",
                 "menu.wrights.dock_watch",
                 "menu.wrights.shape_air_offset",
-                "menu.wrights.supply_order"
+                "menu.wrights.supply_order",
+                "menu.wrights.job_done_min"
         };
         int widest = 0;
         for (String key : keys) {
@@ -1530,6 +1538,16 @@ public class WrightsMenuScreen extends Screen {
                 x, supplyOrderY + 20, WrightsUi.MUTED, false);
         drawOptionHelp(graphics, mouseX, mouseY, x, supplyOrderY + 3, supplyLabel, supplyOrderX, supplyOrderX + supplyOrderW, Component.translatable("menu.wrights.supply_order_hint"));
         drawOptionSection(graphics, x, messageHeadY, "menu.wrights.section_messages", lineEnd);
+        Component jobDoneLabel = Component.translatable("menu.wrights.job_done_min");
+        graphics.drawString(this.font, jobDoneLabel, x, jobDoneMinY + 3, WrightsUi.MUTED, false);
+        WrightsUi.choice(graphics, jobDoneMinusX, jobDoneMinY, 16, 16, false, false);
+        graphics.drawCenteredString(this.font, "-", jobDoneMinusX + 8, jobDoneMinY + 4, WrightsUi.TEXT);
+        String jobDoneCount = Integer.toString(WrightsClientConfig.jobDoneMinSeconds());
+        graphics.drawCenteredString(this.font, jobDoneCount, jobDoneMinusX + 26, jobDoneMinY + 4, WrightsUi.TEXT);
+        WrightsUi.choice(graphics, jobDonePlusX, jobDoneMinY, 16, 16, false, false);
+        graphics.drawCenteredString(this.font, "+", jobDonePlusX + 8, jobDoneMinY + 4, WrightsUi.TEXT);
+        graphics.drawString(this.font, Component.translatable("menu.wrights.job_done_min_unit"), jobDonePlusX + 22, jobDoneMinY + 4, WrightsUi.MUTED, false);
+        drawOptionHelp(graphics, mouseX, mouseY, x, jobDoneMinY + 3, jobDoneLabel, jobDoneMinusX, jobDonePlusX + 40, Component.translatable("menu.wrights.job_done_min_hint"));
         WrightsUi.choice(graphics, hudPlaceX, hudPlaceY, hudPlaceW, 16, true, false);
         graphics.drawCenteredString(this.font, Component.translatable("menu.wrights.hud_place"), hudPlaceX + hudPlaceW / 2, hudPlaceY + 4, WrightsUi.TEXT);
         drawOptionHelp(graphics, mouseX, mouseY, hudPlaceX + hudPlaceW + 2, hudPlaceY + 2, Component.empty(), 0, 0, Component.translatable("menu.wrights.hud_place_hint"));
@@ -2998,6 +3016,19 @@ public class WrightsMenuScreen extends Screen {
                 if (mouseX >= supplyOrderX && mouseX < supplyOrderX + supplyOrderW && mouseY >= supplyOrderY && mouseY < supplyOrderY + 16) {
                     this.minecraft.setScreen(new ShapePriorityScreen(this));
                     return true;
+                }
+                if (mouseY >= jobDoneMinY && mouseY < jobDoneMinY + 16) {
+                    int step = 0;
+                    if (mouseX >= jobDoneMinusX && mouseX < jobDoneMinusX + 16) {
+                        step = -1;
+                    } else if (mouseX >= jobDonePlusX && mouseX < jobDonePlusX + 16) {
+                        step = 1;
+                    }
+                    if (step != 0) {
+                        int current = WrightsClientConfig.jobDoneMinSeconds();
+                        WrightsClientConfig.setJobDoneMinSeconds(WrightsClientState.stepped(current, step, 0, 120));
+                        return true;
+                    }
                 }
                 if (mouseX >= hudPlaceX && mouseX < hudPlaceX + hudPlaceW && mouseY >= hudPlaceY && mouseY < hudPlaceY + 16) {
                     this.minecraft.setScreen(new HudPlaceScreen());

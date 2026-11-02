@@ -166,6 +166,9 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.BooleanValue SUPPLY_PLAYER_FIRST = BUILDER
             .comment("When true, a build takes blocks from your inventory before a bound chest. When false, the chest is used first.")
             .define("supplyPlayerFirst", true);
+    public static final ModConfigSpec.IntValue JOB_DONE_MIN_SECONDS = BUILDER
+            .comment("Minimum job length in seconds before a Job done toast is shown. 0 shows every finish. Default 3.")
+            .defineInRange("jobDoneMinSeconds", 3, 0, 120);
     public static final ModConfigSpec.IntValue HUD_HINT = BUILDER
             .comment("Where the mode title and short help sit. 0 top, 1 above hotbar and health/hunger (default), 2 left, 3 right, 4 middle, 5 a dragged spot.")
             .defineInRange("hudHint", 1, 0, 5);
@@ -434,6 +437,15 @@ public final class WrightsClientConfig {
 
     public static void setBuildMenu(boolean enabled) {
         BUILD_MENU.set(enabled);
+        save();
+    }
+
+    public static int jobDoneMinSeconds() {
+        return clamp(JOB_DONE_MIN_SECONDS.get(), 0, 120);
+    }
+
+    public static void setJobDoneMinSeconds(int seconds) {
+        JOB_DONE_MIN_SECONDS.set(clamp(seconds, 0, 120));
         save();
     }
 

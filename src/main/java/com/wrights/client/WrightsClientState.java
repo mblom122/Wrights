@@ -1487,6 +1487,11 @@ public final class WrightsClientState {
             net.minecraft.network.chat.Component name,
             net.minecraft.network.chat.Component detail,
             int seconds) {
+        // Timed job finishes under the Options minimum are skipped to avoid toast spam.
+        // seconds < 0 is a status notice (return / rejoin / etc.) and always shows.
+        if (seconds >= 0 && seconds < com.wrights.WrightsClientConfig.jobDoneMinSeconds()) {
+            return;
+        }
         net.minecraft.network.chat.Component title = name == null ? net.minecraft.network.chat.Component.translatable("hud.wrights.tool_build") : name;
         net.minecraft.network.chat.Component line = detail == null ? net.minecraft.network.chat.Component.empty() : detail;
         net.minecraft.network.chat.Component top = header == null ? net.minecraft.network.chat.Component.empty() : header;
