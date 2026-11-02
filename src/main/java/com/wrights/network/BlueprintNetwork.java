@@ -867,6 +867,14 @@ public final class BlueprintNetwork {
             int wait = drone != null ? drone.waitReason()
                     : (hand != null && hand.sheltering ? DroneEntity.WAIT_SHELTER
                             : idle ? DroneEntity.WAIT_IDLE : DroneEntity.WAIT_NONE);
+            // Range/dimension hold freezes placement; surface that even if the flyer still has stale WAIT_NONE.
+            if (out && wait == DroneEntity.WAIT_NONE
+                    && (job.paused()
+                            || job.hold() == BuildJob.HOLD_PLAYER_RANGE
+                            || job.hold() == BuildJob.HOLD_DIMENSION
+                            || job.hold() == BuildJob.HOLD_PORT_RANGE)) {
+                wait = DroneEntity.WAIT_PAUSED;
+            }
             BlockPos at = drone != null ? drone.blockPosition()
                     : (hand != null && hand.lastPos != null ? hand.lastPos : BlockPos.ZERO);
             BlockPos target = BlockPos.ZERO;

@@ -85,11 +85,19 @@ public class JobDroneScreen extends Screen {
         graphics.drawString(this.font, this.font.plainSubstrByWidth(job.name(), panelW - 32), panelX + 16, panelY + 20, WrightsUi.TEXT, false);
         int busy = busyCount();
         int free = freeCount();
-        int out = Math.max(0, job.drones());
+        int flying = Math.max(0, job.drones());
         int onJob = crewCount(assigned);
-        Component summary = busy == 0
-                ? Component.translatable("screen.wrights.drone_split_out", onJob, out, free)
-                : Component.translatable("screen.wrights.drone_split_out_busy", onJob, out, free, busy);
+        int docked = Math.max(0, onJob - flying);
+        Component summary;
+        if (busy == 0) {
+            summary = docked > 0
+                    ? Component.translatable("screen.wrights.drone_split_docked", onJob, flying, docked, free)
+                    : Component.translatable("screen.wrights.drone_split_out", onJob, flying, free);
+        } else {
+            summary = docked > 0
+                    ? Component.translatable("screen.wrights.drone_split_docked_busy", onJob, flying, docked, free, busy)
+                    : Component.translatable("screen.wrights.drone_split_out_busy", onJob, flying, free, busy);
+        }
         graphics.drawString(this.font, this.font.plainSubstrByWidth(summary.getString(), panelW - 32), panelX + 16, panelY + 32, WrightsUi.MUTED, false);
 
         Well onJobWell = onJobWell();
@@ -397,6 +405,7 @@ public class JobDroneScreen extends Screen {
                         label,
                         found == null ? 0 : WrightTier.clamp(found.speed()),
                         hand,
+                        job.hold(),
                         "screen.wrights.drone_remove"));
             }
         }
@@ -404,9 +413,18 @@ public class JobDroneScreen extends Screen {
             assigned.add(Entry.note(Component.translatable("screen.wrights.drones_none_on").getString()));
         }
         int free = 0;
+        int dockedOnThis = 0;
+        if (job != null) {
+            for (BlueprintPayloads.CrewHand hand : job.crewHands()) {
+                if (hand != null && !hand.out()) {
+                    dockedOnThis++;
+                }
+            }
+        }
         List<Entry> busy = new ArrayList<>();
         for (int i = 0; i < swarm.units().size(); i++) {
             Swarm.Unit unit = swarm.units().get(i);
+            // Still on this job's crew (even if docked / not flying) — not free for another job.
             if (job != null && job.crew().contains(unit.id())) {
                 continue;
             }
@@ -421,7 +439,11 @@ public class JobDroneScreen extends Screen {
             }
         }
         if (free == 0) {
-            others.add(0, Entry.note(Component.translatable("screen.wrights.drones_none_free").getString()));
+            if (dockedOnThis > 0) {
+                others.add(0, Entry.note(Component.translatable("screen.wrights.drones_none_free_docked", dockedOnThis).getString()));
+            } else {
+                others.add(0, Entry.note(Component.translatable("screen.wrights.drones_none_free").getString()));
+            }
         }
         if (!busy.isEmpty()) {
             others.add(Entry.divider(Component.translatable("screen.wrights.drones_on_other_header").getString()));
@@ -504,12 +526,21 @@ public class JobDroneScreen extends Screen {
         return 0;
     }
 
-    private static String waitLabel(int reason, boolean idle, boolean out) {
+    private static String waitLabel(int reason, boolean idle, boolean out, int hold) {
         if (!out) {
             if (idle || reason == DroneEntity.WAIT_IDLE) {
                 return Component.translatable("screen.wrights.drone_status_idle_docked").getString();
             }
             return Component.translatable("screen.wrights.drone_status_docked").getString();
+        }
+        if (hold == com.wrights.job.BuildJob.HOLD_PLAYER_RANGE) {
+            return Component.translatable("screen.wrights.drone_status_player_range").getString();
+        }
+        if (hold == com.wrights.job.BuildJob.HOLD_DIMENSION) {
+            return Component.translatable("screen.wrights.drone_status_dimension").getString();
+        }
+        if (hold == com.wrights.job.BuildJob.HOLD_PORT_RANGE) {
+            return Component.translatable("screen.wrights.drone_status_port_range").getString();
         }
         return switch (reason) {
             case DroneEntity.WAIT_FLOOR -> Component.translatable("hud.wrights.info_wright_wait_floor").getString();
@@ -579,7 +610,7 @@ public class JobDroneScreen extends Screen {
             return new Entry(unit, name, tier, tierName, detail, action, false, false, false, 0, "", "");
         }
 
-        private static Entry assigned(UUID unit, String name, int tier, BlueprintPayloads.CrewHand hand, String action) {
+        private static Entry assigned(UUID unit, String name, int tier, BlueprintPayloads.CrewHand hand, int hold, String action) {
             String tierName = tier <= 0 ? "" : Component.translatable(WrightTier.nameKey(tier)).getString();
             if (hand == null) {
                 return new Entry(
@@ -596,13 +627,20 @@ public class JobDroneScreen extends Screen {
                         Component.translatable("screen.wrights.drone_status_unknown").getString(),
                         "");
             }
-            String status = waitLabel(hand.waitReason(), hand.idle(), hand.out());
+            String status = waitLabel(hand.waitReason(), hand.idle(), hand.out(), hold);
             ItemStack block = hand.block() == null ? ItemStack.EMPTY : hand.block();
             String blockName = block.isEmpty() ? "" : block.getHoverName().getString();
             String target = coords(hand.target());
             String at = coords(hand.at());
+            // While held out of range, don't imply they are still placing the last target.
             String statusLine;
-            if (!blockName.isEmpty() && !target.equals("-")) {
+            boolean held = hand.out() && (hold == com.wrights.job.BuildJob.HOLD_PLAYER_RANGE
+                    || hold == com.wrights.job.BuildJob.HOLD_DIMENSION
+                    || hold == com.wrights.job.BuildJob.HOLD_PORT_RANGE
+                    || hand.waitReason() == DroneEntity.WAIT_PAUSED);
+            if (held) {
+                statusLine = status;
+            } else if (!blockName.isEmpty() && !target.equals("-")) {
                 statusLine = Component.translatable("screen.wrights.drone_status_block_at", status, blockName, target).getString();
             } else if (!blockName.isEmpty()) {
                 statusLine = Component.translatable("screen.wrights.drone_status_block", status, blockName).getString();

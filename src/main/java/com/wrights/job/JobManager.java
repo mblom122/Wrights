@@ -1475,6 +1475,9 @@ public final class JobManager {
         }
         if (!inReach(player, library, job)) {
             job.setWaitKind(BuildJob.WAIT_NONE);
+            // Leave flyers in the world so work resumes when you return, but mark them held —
+            // otherwise Manage keeps saying "Working" while progress is frozen.
+            holdCrewFlyers(level, job);
             return;
         }
         if (job.waitKind() != BuildJob.WAIT_ITEMS) {
@@ -1872,6 +1875,32 @@ public final class JobManager {
             return;
         }
         drone.setWorkStatus(state == null ? ItemStack.EMPTY : BlockFilters.icon(state), ItemStack.EMPTY, waitReason);
+    }
+
+    /**
+     * Player/port range hold stops placement ticks but used to leave flyers on WAIT_NONE, so Manage
+     * still said "Working" with a frozen target. Mark every linked flyer as paused/held instead.
+     */
+    private static void holdCrewFlyers(ServerLevel level, BuildJob job) {
+        if (level == null || job == null) {
+            return;
+        }
+        ItemStack cargo = ItemStack.EMPTY;
+        for (BuildJob.Hand hand : job.hands()) {
+            if (hand.entityId == null) {
+                continue;
+            }
+            if (!(level.getEntity(hand.entityId) instanceof DroneEntity drone) || !drone.isAlive()) {
+                continue;
+            }
+            if (cargo.isEmpty() && !drone.currentBlock().isEmpty()) {
+                cargo = drone.currentBlock().copy();
+            }
+            drone.setWorkStatus(cargo.isEmpty() ? drone.currentBlock() : cargo, ItemStack.EMPTY, DroneEntity.WAIT_PAUSED);
+        }
+        if (job.droneId() != null && level.getEntity(job.droneId()) instanceof DroneEntity solo && solo.isAlive()) {
+            solo.setWorkStatus(solo.currentBlock(), ItemStack.EMPTY, DroneEntity.WAIT_PAUSED);
+        }
     }
 
     /**
@@ -2659,6 +2688,7 @@ public final class JobManager {
         if (job.hasCrew()) {
             if (!inReach(player, library, job)) {
                 job.setWaitKind(BuildJob.WAIT_NONE);
+                holdCrewFlyers(level, job);
                 return;
             }
             if (job.waitKind() != BuildJob.WAIT_ITEMS) {
@@ -2669,6 +2699,7 @@ public final class JobManager {
         }
         if (!inReach(player, library, job)) {
             job.setWaitKind(BuildJob.WAIT_NONE);
+            holdCrewFlyers(level, job);
             return;
         }
         if (job.waitKind() != BuildJob.WAIT_ITEMS) {
