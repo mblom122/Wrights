@@ -1,5 +1,10 @@
 package com.wrights.blueprint;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 /**
  * Where a wright stands while placing a shape, and how many stands that takes.
  * Closed form: no block list, no world lookups. Kind ids match {@link Shapes.Kind} ordinals.
@@ -8,6 +13,12 @@ package com.wrights.blueprint;
  * <p>Reach 2 (gold and above) places the flat 3×3 on a wall or floor, and on a solid volume
  * the 11-block diagonal lattice {@code x + y + 4z ≡ 0 (mod 11)}. A 3×3×3 sphere is the one
  * stand at its center. Reach 0 is one block per cell.
+ *
+ * <p>Anything that fits in a 3×3×3 uses the small-box cheatsheet instead of the lattice.
+ * A stand only owns cells inside its reach: at reach 2 that is the 19-block sphere, so the
+ * eight corners of a solid 3×3×3 are a different stand. The same table is used when a larger
+ * job is cut down to a piece of that size. Reach 1 cannot touch a diagonal, so a 3×3 floor
+ * is three rows, not one stamp.
  */
 public final class ShapeHover {
     public static final int KIND_BOX = -1;
@@ -97,6 +108,8 @@ public final class ShapeHover {
         CUBE3,
         /** 2×2×2: two opposite corners. */
         PAIR,
+        /** Box that fits in 3×3×3: predefined stands, each limited to the reach sphere. */
+        SMALL,
         /** Hollow box faces, tiled by 3. */
         SHELL,
         /** Fat volume, reach 2: 11-block diagonal lattice. */
@@ -143,6 +156,7 @@ public final class ShapeHover {
             case ONE -> 1;
             case CUBE3 -> 3;
             case PAIR -> 2;
+            case SMALL -> smallPlan(new Query(sx, sy, sz, hollow, kind, reachSqr, cap, 0, 0, sx)).n;
             case LINE -> lineCount(sx, sy, sz, reachSqr);
             case PLATE -> plateCount(sx, sy, sz);
             case SHELL -> shellCount(sx, sy, sz);
@@ -163,11 +177,9 @@ public final class ShapeHover {
         if (oneBall(sx, sy, sz, hollow, kind, reachSqr)) {
             return Mode.ONE;
         }
-        if (sx == 3 && sy == 3 && sz == 3 && reachSqr >= 2) {
-            return Mode.CUBE3;
-        }
-        if (sx == 2 && sy == 2 && sz == 2 && reachSqr >= 2) {
-            return Mode.PAIR;
+        // A piece or a job that fits in 3×3×3. The 19-block sphere (reach 2) is the limit.
+        if (sx <= 3 && sy <= 3 && sz <= 3) {
+            return Mode.SMALL;
         }
         int thin = (sx == 1 ? 1 : 0) + (sy == 1 ? 1 : 0) + (sz == 1 ? 1 : 0);
         if (thin >= 2) {
@@ -206,7 +218,7 @@ public final class ShapeHover {
             case CROSS -> currentCross(q, cursor);
             case CELL -> currentPacked(q, cursor, Mode.CELL);
             case SWEEP -> currentPacked(q, cursor, Mode.SWEEP);
-            case LINE, PLATE, ONE, CUBE3, PAIR -> currentOrdinal(q, mode, cursor);
+            case LINE, PLATE, ONE, CUBE3, PAIR, SMALL -> currentOrdinal(q, mode, cursor);
             case SHELL -> currentShell(q, cursor);
         };
     }
@@ -252,6 +264,7 @@ public final class ShapeHover {
                     n = put(q, xs, ys, zs, n, limit, stand.x + BALL_X[i], stand.y + BALL_Y[i], stand.z + BALL_Z[i]);
                 }
             }
+            case SMALL -> n = fillSmall(q, stand, xs, ys, zs, n, limit);
             case LATTICE -> {
                 for (int i = 0; i < LATTICE && n < limit; i++) {
                     n = put(q, xs, ys, zs, n, limit, stand.x + REP_X[i], stand.y + REP_Y[i], stand.z + REP_Z[i]);
@@ -280,6 +293,7 @@ public final class ShapeHover {
             case ONE -> oneStand(q, index);
             case CUBE3 -> cubeStand(q, index);
             case PAIR -> pairStand(q, index);
+            case SMALL -> smallStand(q, index);
             default -> done(mode);
         };
     }
@@ -327,6 +341,351 @@ public final class ShapeHover {
             seen++;
         }
         return done(Mode.PAIR);
+    }
+
+    /**
+     * Predefined stands for a box that fits in 3×3×3. Each stand owns only cells inside its
+     * reach sphere (19 blocks at reach 2; the 6 neighbors at reach 1). Cached per query.
+     */
+    private static final class SmallPlan {
+        final int n;
+        final int[] x;
+        final int[] y;
+        final int[] z;
+        final int[][] cx;
+        final int[][] cy;
+        final int[][] cz;
+
+        SmallPlan(int n, int[] x, int[] y, int[] z, int[][] cx, int[][] cy, int[][] cz) {
+            this.n = n;
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.cx = cx;
+            this.cy = cy;
+            this.cz = cz;
+        }
+
+        int bursts(int cap) {
+            int limit = Math.max(1, cap);
+            int ops = 0;
+            for (int i = 0; i < n; i++) {
+                int cells = cx[i].length;
+                ops += (cells + limit - 1) / limit;
+            }
+            return ops;
+        }
+    }
+
+    private static final Map<Long, SmallPlan> SMALL_PLANS = new HashMap<>();
+
+    private static long smallKey(Query q) {
+        long key = q.sx;
+        key = key * 8 + q.sy;
+        key = key * 8 + q.sz;
+        key = key * 2 + (q.hollow ? 1 : 0);
+        key = key * 16 + Math.max(0, q.reachSqr);
+        key = key * 64 + Math.max(1, q.cap);
+        key = key * 4 + q.axis;
+        key = key * 16 + (q.from + 2);
+        key = key * 16 + q.to;
+        key = key * 32 + (q.kind + 8);
+        return key;
+    }
+
+    private static SmallPlan smallPlan(Query q) {
+        long key = smallKey(q);
+        SmallPlan cached = SMALL_PLANS.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        SmallPlan plan = buildSmall(q);
+        SMALL_PLANS.put(key, plan);
+        return plan;
+    }
+
+    private static SmallPlan buildSmall(Query q) {
+        SmallPlan balls = coverByBall(q);
+        SmallPlan lines = coverByLines(q);
+        if (lines.n == 0) {
+            return balls;
+        }
+        int cap = Math.max(1, q.cap);
+        if (lines.bursts(cap) < balls.bursts(cap)) {
+            return lines;
+        }
+        return balls;
+    }
+
+    /** Cells this share still has to place. Hollow box shells skip the interior. */
+    private static List<int[]> smallCells(Query q) {
+        List<int[]> cells = new ArrayList<>();
+        boolean shell = q.hollow && boxShell(q.kind);
+        for (int z = 0; z < q.sz; z++) {
+            for (int y = 0; y < q.sy; y++) {
+                for (int x = 0; x < q.sx; x++) {
+                    if (!along(q, x, y, z)) {
+                        continue;
+                    }
+                    if (shell && !onBoxShell(x, y, z, q.sx, q.sy, q.sz)) {
+                        continue;
+                    }
+                    cells.add(new int[] {x, y, z});
+                }
+            }
+        }
+        return cells;
+    }
+
+    /**
+     * Repeatedly stand where the reach sphere still covers the most remaining cells.
+     * At reach 2 that sphere is the 19-block shape, so a solid 3×3×3 is the center plus
+     * the two face centers that pick up the eight corners.
+     */
+    private static SmallPlan coverByBall(Query q) {
+        List<int[]> cells = smallCells(q);
+        int reach = Math.max(0, q.reachSqr);
+        boolean[] used = new boolean[cells.size()];
+        List<Integer> sx = new ArrayList<>();
+        List<Integer> sy = new ArrayList<>();
+        List<Integer> sz = new ArrayList<>();
+        List<int[]> ownX = new ArrayList<>();
+        List<int[]> ownY = new ArrayList<>();
+        List<int[]> ownZ = new ArrayList<>();
+        int guard = cells.size() + 1;
+        while (guard-- > 0) {
+            int best = -1;
+            int bestCount = 0;
+            int bestCenter = Integer.MAX_VALUE;
+            int bx = 0;
+            int by = 0;
+            int bz = 0;
+            for (int i = 0; i < cells.size(); i++) {
+                // The stand may be a block this shape already placed. The face centers of a
+                // 3×3×3 are inside the center sphere, and the corners are reached from there.
+                int[] stand = cells.get(i);
+                int count = 0;
+                for (int j = 0; j < cells.size(); j++) {
+                    if (used[j]) {
+                        continue;
+                    }
+                    if (dist2(stand, cells.get(j)) <= reach) {
+                        count++;
+                    }
+                }
+                int center = centerDist(q, stand[0], stand[1], stand[2]);
+                if (count > bestCount || (count == bestCount && count > 0 && center < bestCenter)) {
+                    best = i;
+                    bestCount = count;
+                    bestCenter = center;
+                    bx = stand[0];
+                    by = stand[1];
+                    bz = stand[2];
+                }
+            }
+            if (best < 0 || bestCount <= 0) {
+                break;
+            }
+            int[] xs = new int[bestCount];
+            int[] ys = new int[bestCount];
+            int[] zs = new int[bestCount];
+            int n = 0;
+            for (int j = 0; j < cells.size(); j++) {
+                if (used[j]) {
+                    continue;
+                }
+                int[] cell = cells.get(j);
+                if (dist2(bx, by, bz, cell[0], cell[1], cell[2]) > reach) {
+                    continue;
+                }
+                used[j] = true;
+                xs[n] = cell[0];
+                ys[n] = cell[1];
+                zs[n] = cell[2];
+                n++;
+            }
+            orderToward(xs, ys, zs, n, bx, by, bz);
+            sx.add(bx);
+            sy.add(by);
+            sz.add(bz);
+            ownX.add(xs);
+            ownY.add(ys);
+            ownZ.add(zs);
+        }
+        return packSmall(sx, sy, sz, ownX, ownY, ownZ);
+    }
+
+    /** Rows of at most three. Reach 1 cannot take the corners of a 3×3 from the middle. */
+    private static SmallPlan coverByLines(Query q) {
+        int reach = Math.max(0, q.reachSqr);
+        int radius = 0;
+        while ((radius + 1) * (radius + 1) <= reach) {
+            radius++;
+        }
+        int span = Math.min(Math.max(1, q.cap), radius == 0 ? 1 : radius * 2 + 1);
+        SmallPlan best = null;
+        int bestBursts = Integer.MAX_VALUE;
+        for (int axis = 0; axis < 3; axis++) {
+            SmallPlan plan = linesOn(q, axis, span);
+            int bursts = plan.bursts(q.cap);
+            if (plan.n > 0 && bursts < bestBursts) {
+                bestBursts = bursts;
+                best = plan;
+            }
+        }
+        return best == null ? new SmallPlan(0, new int[0], new int[0], new int[0], new int[0][], new int[0][], new int[0][]) : best;
+    }
+
+    private static SmallPlan linesOn(Query q, int axis, int span) {
+        List<int[]> cells = smallCells(q);
+        boolean[] used = new boolean[cells.size()];
+        List<Integer> sx = new ArrayList<>();
+        List<Integer> sy = new ArrayList<>();
+        List<Integer> sz = new ArrayList<>();
+        List<int[]> ownX = new ArrayList<>();
+        List<int[]> ownY = new ArrayList<>();
+        List<int[]> ownZ = new ArrayList<>();
+        for (int i = 0; i < cells.size(); i++) {
+            if (used[i]) {
+                continue;
+            }
+            int[] start = cells.get(i);
+            int[] xs = new int[span];
+            int[] ys = new int[span];
+            int[] zs = new int[span];
+            int n = 0;
+            for (int step = 0; step < span; step++) {
+                int x = start[0] + (axis == 0 ? step : 0);
+                int y = start[1] + (axis == 1 ? step : 0);
+                int z = start[2] + (axis == 2 ? step : 0);
+                int found = -1;
+                for (int j = 0; j < cells.size(); j++) {
+                    if (used[j]) {
+                        continue;
+                    }
+                    int[] cell = cells.get(j);
+                    if (cell[0] == x && cell[1] == y && cell[2] == z) {
+                        found = j;
+                        break;
+                    }
+                }
+                if (found < 0) {
+                    break;
+                }
+                used[found] = true;
+                xs[n] = x;
+                ys[n] = y;
+                zs[n] = z;
+                n++;
+            }
+            int mid = n / 2;
+            int[] ox = new int[n];
+            int[] oy = new int[n];
+            int[] oz = new int[n];
+            System.arraycopy(xs, 0, ox, 0, n);
+            System.arraycopy(ys, 0, oy, 0, n);
+            System.arraycopy(zs, 0, oz, 0, n);
+            orderToward(ox, oy, oz, n, ox[mid], oy[mid], oz[mid]);
+            sx.add(ox[0]);
+            sy.add(oy[0]);
+            sz.add(oz[0]);
+            ownX.add(ox);
+            ownY.add(oy);
+            ownZ.add(oz);
+        }
+        return packSmall(sx, sy, sz, ownX, ownY, ownZ);
+    }
+
+    private static SmallPlan packSmall(
+            List<Integer> sx,
+            List<Integer> sy,
+            List<Integer> sz,
+            List<int[]> ownX,
+            List<int[]> ownY,
+            List<int[]> ownZ) {
+        int n = sx.size();
+        int[] x = new int[n];
+        int[] y = new int[n];
+        int[] z = new int[n];
+        int[][] cx = new int[n][];
+        int[][] cy = new int[n][];
+        int[][] cz = new int[n][];
+        for (int i = 0; i < n; i++) {
+            x[i] = sx.get(i);
+            y[i] = sy.get(i);
+            z[i] = sz.get(i);
+            cx[i] = ownX.get(i);
+            cy[i] = ownY.get(i);
+            cz[i] = ownZ.get(i);
+        }
+        return new SmallPlan(n, x, y, z, cx, cy, cz);
+    }
+
+    private static int dist2(int[] a, int[] b) {
+        return dist2(a[0], a[1], a[2], b[0], b[1], b[2]);
+    }
+
+    private static int dist2(int ax, int ay, int az, int bx, int by, int bz) {
+        int dx = ax - bx;
+        int dy = ay - by;
+        int dz = az - bz;
+        return dx * dx + dy * dy + dz * dz;
+    }
+
+    private static int centerDist(Query q, int x, int y, int z) {
+        int dx = x * 2 - (q.sx - 1);
+        int dy = y * 2 - (q.sy - 1);
+        int dz = z * 2 - (q.sz - 1);
+        return dx * dx + dy * dy + dz * dz;
+    }
+
+    /** Stand cell first, then the rest of its sphere, nearest first. */
+    private static void orderToward(int[] xs, int[] ys, int[] zs, int n, int sx, int sy, int sz) {
+        for (int i = 1; i < n; i++) {
+            int x = xs[i];
+            int y = ys[i];
+            int z = zs[i];
+            int d = dist2(x, y, z, sx, sy, sz);
+            int j = i;
+            while (j > 0 && dist2(xs[j - 1], ys[j - 1], zs[j - 1], sx, sy, sz) > d) {
+                xs[j] = xs[j - 1];
+                ys[j] = ys[j - 1];
+                zs[j] = zs[j - 1];
+                j--;
+            }
+            xs[j] = x;
+            ys[j] = y;
+            zs[j] = z;
+        }
+    }
+
+    private static Stand smallStand(Query q, int index) {
+        if (index < 0) {
+            index = 0;
+        }
+        SmallPlan plan = smallPlan(q);
+        if (index >= plan.n) {
+            return done(Mode.SMALL);
+        }
+        return new Stand(plan.x[index], plan.y[index], plan.z[index], index, false, Mode.SMALL);
+    }
+
+    private static int fillSmall(Query q, Stand stand, int[] xs, int[] ys, int[] zs, int n, int limit) {
+        SmallPlan plan = smallPlan(q);
+        int index = stand.cursor();
+        if (index < 0 || index >= plan.n) {
+            return n;
+        }
+        int[] cx = plan.cx[index];
+        int[] cy = plan.cy[index];
+        int[] cz = plan.cz[index];
+        for (int i = 0; i < cx.length && n < limit; i++) {
+            xs[n] = cx[i];
+            ys[n] = cy[i];
+            zs[n] = cz[i];
+            n++;
+        }
+        return n;
     }
 
     private static Stand cellStand(Query q, int index) {
@@ -1246,7 +1605,67 @@ public final class ShapeHover {
         coverCells(4, 3, 2);
         coverSweep(6, 4, 3);
         coverShell(6);
+        expect(count(3, 1, 3, false, KIND_BOX, 2, 19), 1, "floor 3");
+        expect(count(3, 3, 1, false, SQUARE, 2, 19), 1, "wall 3");
+        expect(count(2, 2, 2, false, KIND_BOX, 2, 19), 2, "cube 2");
+        expect(count(3, 1, 3, false, KIND_BOX, 1, 7), 3, "floor 3 reach 1");
+        Query floor = new Query(3, 1, 3, false, KIND_BOX, 2, 19, 0, 0, 3);
+        Stand floorStand = current(floor, -1);
+        if (floorStand.done || floorStand.x != 1 || floorStand.y != 0 || floorStand.z != 1) {
+            throw new IllegalStateException("floor stand " + floorStand);
+        }
+        coverSmall(3, 3, 3, 2, 19, 3);
+        coverSmall(3, 2, 2, 2, 19, -1);
+        coverSmall(2, 3, 2, 2, 19, -1);
+        coverSmall(3, 3, 2, 2, 19, -1);
+        coverSmall(3, 1, 3, 1, 7, 3);
         System.out.println("ShapeHover checks passed");
+    }
+
+    /** Every cell of a small box belongs to one stand, and that stand can actually touch it. */
+    private static void coverSmall(int sx, int sy, int sz, int reach, int cap, int expectStands) {
+        Query q = new Query(sx, sy, sz, false, KIND_BOX, reach, cap, 0, 0, sx);
+        boolean[] hit = new boolean[sx * sy * sz];
+        int cursor = -1;
+        int stands = 0;
+        int[] xs = new int[27];
+        int[] ys = new int[27];
+        int[] zs = new int[27];
+        int guard = sx * sy * sz + 2;
+        while (guard-- > 0) {
+            Stand stand = current(q, cursor);
+            if (stand.done()) {
+                break;
+            }
+            stands++;
+            int cells = fillCells(q, stand, xs, ys, zs);
+            for (int i = 0; i < cells; i++) {
+                int d = (xs[i] - stand.x()) * (xs[i] - stand.x())
+                        + (ys[i] - stand.y()) * (ys[i] - stand.y())
+                        + (zs[i] - stand.z()) * (zs[i] - stand.z());
+                if (d > reach) {
+                    throw new IllegalStateException("stand cannot touch " + xs[i] + "," + ys[i] + "," + zs[i]);
+                }
+                int id = xs[i] + ys[i] * sx + zs[i] * sx * sy;
+                if (hit[id]) {
+                    throw new IllegalStateException("cell twice " + xs[i] + "," + ys[i] + "," + zs[i]);
+                }
+                hit[id] = true;
+            }
+            int next = advance(q, stand.cursor());
+            if (next == stand.cursor()) {
+                throw new IllegalStateException("small cursor stuck");
+            }
+            cursor = next;
+        }
+        for (int i = 0; i < hit.length; i++) {
+            if (!hit[i]) {
+                throw new IllegalStateException("small missed " + sx + "x" + sy + "x" + sz + " #" + i);
+            }
+        }
+        if (expectStands >= 0 && stands != expectStands) {
+            throw new IllegalStateException(sx + "x" + sy + "x" + sz + " stands " + stands);
+        }
     }
 
     private static void coverCube(int n) {

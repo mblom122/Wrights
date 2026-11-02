@@ -1846,17 +1846,23 @@ public final class JobManager {
                 setShapeHandStatus(level, hand, state, DroneEntity.WAIT_CHUNK);
                 continue;
             }
-            Vec3 hover = Vec3.atCenterOf(pos).add(0.0D, 0.85D + (hand.lane % 2) * 0.45D, 0.0D);
+            // Fly to the stand, not to whichever cell is next. A 3×3 floor is one operation
+            // only when the feet are on the middle block; arriving a block in front sees 5.
+            BlockPos stand = shapePatternAnchor(job, hand);
+            BlockPos fly = stand != null ? stand : pos;
+            Vec3 hover = Vec3.atCenterOf(fly).add(0.0D, 0.85D + (hand.lane % 2) * 0.45D, 0.0D);
             if (drone.launching()) {
                 hand.lastPos = drone.blockPosition();
                 drone.setWorkStatus(BlockFilters.icon(state), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
                 continue;
             }
-            if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
+            if (!wrightOnStand(drone, fly)) {
                 drone.moveToward(hover, flyStep(hand.speed, drone.distanceToSqr(hover)));
                 hand.lastPos = drone.blockPosition();
                 drone.setWorkStatus(BlockFilters.icon(state), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
-                continue;
+                if (!wrightOnStand(drone, fly)) {
+                    continue;
+                }
             }
             int budget = placeBudget(hand);
             int placed = 0;
@@ -2211,6 +2217,31 @@ public final class JobManager {
             return PATTERN_PAUSE;
         }
         return -1;
+    }
+
+    /** World block the pattern wants this wright standing on, or null when the cell is a leftover. */
+    private static BlockPos shapePatternAnchor(BuildJob job, BuildJob.Hand hand) {
+        if (job == null || hand == null || hand.hover < 0) {
+            return null;
+        }
+        com.wrights.blueprint.ShapeHover.Query query = shapeHoverQuery(job, hand);
+        com.wrights.blueprint.ShapeHover.Stand stand = com.wrights.blueprint.ShapeHover.current(query, hand.hover);
+        if (stand.done()) {
+            return null;
+        }
+        int ox = hasShapeBox(hand) ? hand.boxX0 : 0;
+        int oy = hasShapeBox(hand) ? hand.boxY0 : 0;
+        int oz = hasShapeBox(hand) ? hand.boxZ0 : 0;
+        return job.min().offset(stand.x() + ox, stand.y() + oy, stand.z() + oz);
+    }
+
+    /** True when the block under the wright is {@code stand}. Reach is measured from that block. */
+    private static boolean wrightOnStand(DroneEntity drone, BlockPos stand) {
+        if (drone == null || stand == null) {
+            return false;
+        }
+        BlockPos foot = BlockPos.containing(drone.getX(), drone.getY() - 0.85D, drone.getZ());
+        return foot.equals(stand);
     }
 
     private static com.wrights.blueprint.ShapeHover.Query shapeHoverQuery(BuildJob job, BuildJob.Hand hand) {
