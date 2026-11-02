@@ -842,6 +842,7 @@
   "screen.wrights.drone_split_out_busy": "Assigned %s  ·  Out %s  ·  Free %s  ·  On another job %s",
   "screen.wrights.drone_status_working": "Working",
   "screen.wrights.drone_status_docked": "At dock (not flying)",
+  "screen.wrights.drone_status_idle_docked": "Standing by at dock",
   "screen.wrights.drone_status_flying": "Flying",
   "screen.wrights.drone_status_unknown": "No status yet",
   "screen.wrights.drone_status_block": "%s · placing %s",

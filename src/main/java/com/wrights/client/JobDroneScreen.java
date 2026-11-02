@@ -505,7 +505,10 @@ public class JobDroneScreen extends Screen {
     }
 
     private static String waitLabel(int reason, boolean idle, boolean out) {
-        if (!out && (reason == DroneEntity.WAIT_IDLE || idle)) {
+        if (!out) {
+            if (idle || reason == DroneEntity.WAIT_IDLE) {
+                return Component.translatable("screen.wrights.drone_status_idle_docked").getString();
+            }
             return Component.translatable("screen.wrights.drone_status_docked").getString();
         }
         return switch (reason) {
@@ -516,9 +519,7 @@ public class JobDroneScreen extends Screen {
             case DroneEntity.WAIT_HOME -> Component.translatable("hud.wrights.info_wright_home").getString();
             case DroneEntity.WAIT_SHELTER -> Component.translatable("hud.wrights.info_wright_shelter").getString();
             case DroneEntity.WAIT_PAUSED -> Component.translatable("hud.wrights.info_wright_paused").getString();
-            default -> out
-                    ? Component.translatable("screen.wrights.drone_status_working").getString()
-                    : Component.translatable("screen.wrights.drone_status_docked").getString();
+            default -> Component.translatable("screen.wrights.drone_status_working").getString();
         };
     }
 

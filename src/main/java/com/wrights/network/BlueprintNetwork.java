@@ -862,9 +862,11 @@ public final class BlueprintNetwork {
             }
             boolean out = drone != null;
             boolean idle = hand != null && hand.idle;
+            // Only report WAIT_HOME while a flyer is actually linked. After recall clears entityId,
+            // the wright is docked/assigned — not "Flying home".
             int wait = drone != null ? drone.waitReason()
                     : (hand != null && hand.sheltering ? DroneEntity.WAIT_SHELTER
-                            : idle ? DroneEntity.WAIT_IDLE : DroneEntity.WAIT_HOME);
+                            : idle ? DroneEntity.WAIT_IDLE : DroneEntity.WAIT_NONE);
             BlockPos at = drone != null ? drone.blockPosition()
                     : (hand != null && hand.lastPos != null ? hand.lastPos : BlockPos.ZERO);
             BlockPos target = BlockPos.ZERO;
