@@ -60,12 +60,19 @@ final class HangarBay {
     }
 
     /**
+     * Extra X fine-tune per column (1-based: col1/col3 +1 right, col5 −1 left).
+     * Applied on top of the corner lerp.
+     */
+    private static final int[] HANGAR_COL_X_TWEAK = {1, 0, 1, 0, -1};
+
+    /**
      * Textured hangar bay X: uniform grid plus a left-nudge that lerps from 1px (col 0)
-     * to 2px (col 4), so middle columns sit between the corner offsets.
+     * to 2px (col 4), then the per-column tweak above.
      */
     static int hangarSlotX(int originX, int index, int slot, int gapX) {
         int col = index % COLS;
         int dx = -Math.round(1.0F + col * (1.0F / (COLS - 1)));
+        dx += HANGAR_COL_X_TWEAK[col];
         return slotX(originX, index, slot, gapX) + dx;
     }
 

@@ -12,6 +12,7 @@
     "cols": 5,
     "rows": 2,
     "nudge_left_cols": [1, 1, 2, 2, 2],
+    "nudge_x_tweak": [1, 0, 1, 0, -1],
     "nudge_down_rows": [2, 1]
   },
   "HARDWARE": {
