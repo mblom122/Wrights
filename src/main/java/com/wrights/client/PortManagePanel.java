@@ -94,6 +94,7 @@ final class PortManagePanel {
         }
         if (s.manage.isOpen()) {
             s.manage.render(s.manageHost, graphics, mouseX, mouseY);
+            s.manage.renderOverlay(s.manageHost, graphics, mouseX, mouseY);
         }
     }
 
@@ -140,6 +141,7 @@ final class PortManagePanel {
         }
         if (s.manage.isOpen()) {
             s.manage.render(s.manageHost, graphics, mouseX, mouseY);
+            s.manage.renderOverlay(s.manageHost, graphics, mouseX, mouseY);
         }
     }
 

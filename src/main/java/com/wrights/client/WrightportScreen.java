@@ -343,16 +343,6 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         manage.render(this, graphics, mouseX, mouseY);
         drawEnergy(graphics);
         drawPortButtons(graphics, mouseX, mouseY);
-        // Supply warning only when no notice tip is already on the strip (manage draws notices).
-        if ((manage.tipLine() == null || manage.tipLine().getString().isEmpty())
-                && canRename() && !portHasSupply()) {
-            HangarGui.drawTipStrip(graphics, this.font, leftPos, topPos,
-                    Component.translatable("message.wrights.port_need_supply").withStyle(net.minecraft.ChatFormatting.RED));
-        }
-        Component portTip = portButtonTip(mouseX, mouseY);
-        if (portTip != null) {
-            graphics.renderTooltip(this.font, portTip, mouseX, mouseY);
-        }
         graphics.pose().pushPose();
         graphics.pose().translate(leftPos, topPos, 0.0F);
         this.hoveredSlot = null;
@@ -377,6 +367,16 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
             graphics.renderItem(carried, mouseX - 8, mouseY - 8);
             graphics.renderItemDecorations(this.font, carried, mouseX - 8, mouseY - 8);
             graphics.pose().popPose();
+        }
+        // Dialog + tip last so hangar/inventory do not show through; tip stays readable.
+        manage.renderOverlay(this, graphics, mouseX, mouseY);
+        if (canRename() && !portHasSupply() && manage.showingMarkHint()) {
+            HangarGui.drawTipStrip(graphics, this.font, leftPos, topPos,
+                    Component.translatable("message.wrights.port_need_supply").withStyle(net.minecraft.ChatFormatting.RED));
+        }
+        Component portTip = portButtonTip(mouseX, mouseY);
+        if (portTip != null) {
+            graphics.renderTooltip(this.font, portTip, mouseX, mouseY);
         }
         this.renderTooltip(graphics, mouseX, mouseY);
     }

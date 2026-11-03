@@ -108,6 +108,12 @@ final class WrightManagePanel {
         return tipLine == null ? Component.empty() : tipLine;
     }
 
+    /** True when the strip is the default mark hint (not a notice). */
+    boolean showingMarkHint() {
+        Component tip = tipLine();
+        return tip.getString().equals(Component.translatable("screen.wrights.hangar_hint").getString());
+    }
+
     void toggle(ManageHost screen) {
         open = !open;
         scroll = 0;
@@ -221,16 +227,37 @@ final class WrightManagePanel {
         }
 
         drawHardware(graphics, screen, swarm, mouseX, mouseY);
-        drawPartTooltip(graphics, screen, swarm, mouseX, mouseY);
-        // Ephemeral notices only — never the always-on hangar_hint (that stacked with port tips).
-        tipLine = noticeTip();
-        if (!tipLine.getString().isEmpty()) {
-            HangarGui.drawTipStrip(graphics, screen.font(), panelX, panelY, tipLine);
+        if (dialog == NONE) {
+            drawPartTooltip(graphics, screen, swarm, mouseX, mouseY);
         }
+        tipLine = chromeTip();
+    }
 
+    /** Dialog dim + panel, then tip strip on top so the hint stays readable. */
+    void renderOverlay(ManageHost screen, GuiGraphics graphics, int mouseX, int mouseY) {
+        if (!open) {
+            return;
+        }
+        place(screen);
+        Swarm swarm = screen.swarm();
         if (dialog != NONE) {
             renderDialog(screen, graphics, swarm, mouseX, mouseY);
         }
+        Component tip = tipLine();
+        if (tip.getString().isEmpty()) {
+            tip = chromeTip();
+        }
+        if (!tip.getString().isEmpty()) {
+            HangarGui.drawTipStrip(graphics, screen.font(), panelX, panelY, tip);
+        }
+    }
+
+    private Component chromeTip() {
+        Component notice = noticeTip();
+        if (!notice.getString().isEmpty()) {
+            return notice;
+        }
+        return Component.translatable("screen.wrights.hangar_hint");
     }
 
     private void drawHardware(GuiGraphics graphics, ManageHost screen, Swarm swarm, int mouseX, int mouseY) {
@@ -584,7 +611,8 @@ final class WrightManagePanel {
         int dh = dialog == ADD ? 110 : MARKED_TOP + PartSlot.values().length * MARKED_ROW + 84;
         int dx = (screen.screenWidth() - dw) / 2;
         int dy = (screen.screenHeight() - dh) / 2;
-        graphics.fill(0, 0, screen.screenWidth(), screen.screenHeight(), 0x88060C14);
+        // Opaque enough that hangar icons / gauges do not read through the upgrade panel.
+        graphics.fill(0, 0, screen.screenWidth(), screen.screenHeight(), 0xF00A1018);
         WrightsUi.panel(graphics, dx, dy, dw, dh);
         if (dialog == ADD) {
             graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_add_title"), dx + 12, dy + 12, WrightsUi.COPPER, false);
@@ -607,8 +635,9 @@ final class WrightManagePanel {
             PartSlot[] slots = PartSlot.values();
             for (int k = 0; k < slots.length; k++) {
                 int top = dy + MARKED_TOP + k * MARKED_ROW;
+                int lowest = lowestMarkedTier(screen, swarm, slots[k]);
                 graphics.drawString(screen.font(), Component.translatable(slots[k].nameKey()), dx + 12, top, WrightsUi.TEXT, false);
-                drawTierChoices(graphics, screen, dx + 12, top + 10, dw - 24, slots[k], -1, mouseX, mouseY, tool);
+                drawTierChoices(graphics, screen, dx + 12, top + 10, dw - 24, slots[k], lowest, mouseX, mouseY, tool);
             }
             int buttons = dy + MARKED_TOP + slots.length * MARKED_ROW;
             drawMini(graphics, screen, dx + 12, buttons, dw - 24, Component.translatable("screen.wrights.manage_best_parts"), tool, false, mouseX, mouseY);
@@ -624,9 +653,22 @@ final class WrightManagePanel {
         int chip = (width - gap * steps) / (steps + 1);
         for (int tier = WrightTier.BASIC; tier <= WrightTier.APEX; tier++) {
             int chipX = x + (tier - WrightTier.BASIC) * (chip + gap);
-            boolean enabled = tool && tier != current && (current < WrightTier.BASIC || have(screen, slot, tier));
-            drawMini(graphics, screen, chipX, y, chip, Component.translatable(WrightTier.nameKey(tier)), enabled || tier == current, tier == current, mouseX, mouseY);
+            boolean selected = tier == current;
+            boolean enabled = tool && (selected || have(screen, slot, tier));
+            drawMini(graphics, screen, chipX, y, chip, Component.translatable(WrightTier.nameKey(tier)), enabled, selected, mouseX, mouseY);
         }
+    }
+
+    /** Lowest fitted tier for {@code slot} among marked (home) wrights, or -1. */
+    private int lowestMarkedTier(ManageHost screen, Swarm swarm, PartSlot slot) {
+        int min = Integer.MAX_VALUE;
+        for (int index : marked(screen, swarm)) {
+            if (index < 0 || index >= swarm.units().size()) {
+                continue;
+            }
+            min = Math.min(min, swarm.units().get(index).parts().tier(slot));
+        }
+        return min == Integer.MAX_VALUE ? -1 : min;
     }
 
     private int tierAt(double mouseX) {
