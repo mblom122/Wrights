@@ -79,15 +79,25 @@ public final class WrightTier {
     }
 
     /**
-     * Squared block distance from the cell the wright occupies. 0 is that cell, 1 is its six faces,
-     * 2 is the 3×3×3 cube without the eight corners (19 cells). A cell two steps away on a line is 4, outside.
+     * Squared block distance from the cell the wright occupies.
+     * 0 = standing cell (1), 1 = cell + six faces (7), 2 = 3×3×3 minus corners (19).
      */
     public static int operationReachSqr(int tier) {
-        int mark = clamp(tier);
-        if (mark <= BASIC) {
-            return 0;
-        }
-        return mark <= RANGER ? 1 : 2;
+        return switch (clamp(tier)) {
+            case BASIC -> 0;
+            case SCOUT -> 1;
+            case RANGER, VECTOR, TEMPEST, APEX -> 2;
+            default -> 0;
+        };
+    }
+
+    /** How many cells {@link #operationReachSqr} covers at this fabricator tier. */
+    public static int operationReachCells(int tier) {
+        return switch (operationReachSqr(tier)) {
+            case 0 -> 1;
+            case 1 -> 7;
+            default -> 19;
+        };
     }
 
     /** Flight step in blocks per tick while the wright is within eight blocks of its work. */

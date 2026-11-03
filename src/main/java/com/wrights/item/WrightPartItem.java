@@ -10,6 +10,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 
+import com.wrights.WrightsConfig;
 import com.wrights.drone.PartSlot;
 import com.wrights.drone.WrightTier;
 
@@ -50,11 +51,14 @@ public class WrightPartItem extends Item {
 
     /** Bullet lines for this part (Manage, wright tooltip, part tooltip). */
     public static List<Component> stats(PartSlot slot, int tier) {
-        List<Component> lines = new ArrayList<>(2);
+        List<Component> lines = new ArrayList<>(3);
         switch (slot) {
             case ROTOR -> lines.add(Component.translatable("item.wrights.rotor.speed", WrightTier.flyRateLabel(tier)));
             case FABRICATOR -> {
+                // Energy is paid once per block in CellPlacement — Apex 19 blocks = 19 charges, not one.
+                int perBlock = WrightsConfig.ENERGY.get() ? WrightsConfig.ENERGY_PLACE.get() : 0;
                 lines.add(Component.translatable("item.wrights.fabricator.actions", WrightTier.operationCap(tier)));
+                lines.add(Component.translatable("item.wrights.fabricator.energy", perBlock));
                 lines.add(Component.translatable(reachKey(tier)));
             }
             case CORE -> lines.add(Component.translatable("item.wrights.core.rating", WrightTier.rotorDraw(tier)));
@@ -71,11 +75,15 @@ public class WrightPartItem extends Item {
         return Component.translatable(WrightTier.nameKey(tier)).withColor(WrightTier.textColor(tier) & 0xFFFFFF);
     }
 
+    /** Reach copy is per fabricator tier so Scout…Apex do not share one string. */
     public static String reachKey(int tier) {
-        return switch (WrightTier.operationReachSqr(tier)) {
-            case 0 -> "item.wrights.fabricator.cell";
-            case 1 -> "item.wrights.fabricator.faces";
-            default -> "item.wrights.fabricator.sphere";
+        return switch (WrightTier.clamp(tier)) {
+            case WrightTier.BASIC -> "item.wrights.fabricator.reach_basic";
+            case WrightTier.SCOUT -> "item.wrights.fabricator.reach_scout";
+            case WrightTier.RANGER -> "item.wrights.fabricator.reach_ranger";
+            case WrightTier.VECTOR -> "item.wrights.fabricator.reach_vector";
+            case WrightTier.TEMPEST -> "item.wrights.fabricator.reach_tempest";
+            default -> "item.wrights.fabricator.reach_apex";
         };
     }
 }
