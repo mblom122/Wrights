@@ -124,7 +124,8 @@ public final class SelectionRenderer {
             drawMirrorBlockGhosts(pose, buffers, camera, minecraft);
             drawMirrorMine(pose, buffers, camera, minecraft);
         }
-        if (guiOk && WrightsClientState.mode == WrightsClientState.Mode.BUILD && (WrightsClientState.bindSupply || WrightsClientState.supplyBound)) {
+        if (guiOk && WrightsClientState.mode == WrightsClientState.Mode.BUILD
+                && (WrightsClientState.bindSupply || WrightsClientState.portChestAim() || WrightsClientState.supplyBound)) {
             drawSupplyMarkers(pose, buffers, camera, minecraft);
         }
         drawMirror(pose, buffers, camera, minecraft);
@@ -908,7 +909,9 @@ public final class SelectionRenderer {
             return;
         }
         BlockPos bound = WrightsClientState.supplyBound ? WrightsClientState.supplyPos : null;
-        BlockPos aim = WrightsClientState.bindSupply ? supplyTarget(minecraft) : null;
+        BlockPos aim = WrightsClientState.bindSupply || WrightsClientState.portChestAim()
+                ? supplyTarget(minecraft)
+                : null;
         if (bound != null && !level.isLoaded(bound)) {
             bound = null;
         }

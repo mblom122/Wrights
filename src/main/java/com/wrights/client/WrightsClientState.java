@@ -676,7 +676,7 @@ public final class WrightsClientState {
         if (shapeAim) {
             return 2;
         }
-        if (bindSupply) {
+        if (bindSupply || bindPort != null) {
             return 3;
         }
         if (exchangeAim) {
@@ -731,6 +731,7 @@ public final class WrightsClientState {
         bridgeActive = false;
         bindSupply = false;
         bindFromMenu = false;
+        bindPort = null;
     }
 
     /** Restore Mirror / Shape / Exchange / Bind inventory after Build mode comes back. */
@@ -1750,18 +1751,32 @@ public final class WrightsClientState {
         return Mth.clamp(current + Integer.signum(direction) * step, min, max);
     }
 
-    /** Leave the wrightport screen and aim a chest for that port (HUD: Right-click a chest…). */
-    public static void beginPortChest(BlockPos port) {
-        clearBuildAims();
-        bindPort = port == null ? null : port.immutable();
-        if (bindPort != null) {
-            styleHudTicks = STYLE_HUD_TICKS;
-            styleAnnounce = true;
-            Minecraft minecraft = Minecraft.getInstance();
-            if (minecraft.player != null) {
-                minecraft.player.displayClientMessage(Component.translatable("hud.wrights.port_chest"), true);
-            }
+    /**
+     * Close the wrightport UI and put the held controller into Bind mode for that port
+     * (right-click a chest inside the boundary; sneak-click to cancel).
+     */
+    public static boolean beginPortChest(BlockPos port) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null) {
+            return false;
         }
+        if (!ControllerItem.isHeld(minecraft.player)) {
+            minecraft.player.displayClientMessage(Component.translatable("message.wrights.need_controller"), true);
+            return false;
+        }
+        if (port == null) {
+            bindPort = null;
+            return false;
+        }
+        leaveCapture();
+        clearBuildAims();
+        mode = Mode.BUILD;
+        bindPort = port.immutable();
+        styleHudTicks = STYLE_HUD_TICKS;
+        styleAnnounce = true;
+        updateFlags();
+        minecraft.player.displayClientMessage(Component.translatable("hud.wrights.port_chest"), true);
+        return true;
     }
 
     public static void finishPortChest(BlockPos chest) {
@@ -1771,6 +1786,11 @@ public final class WrightsClientState {
         }
         PacketDistributor.sendToServer(new BlueprintPayloads.BindPortChest(bindPort, chest, false));
         bindPort = null;
+    }
+
+    /** True while aiming a wrightport supply chest (controller Bind tool for that port). */
+    public static boolean portChestAim() {
+        return bindPort != null;
     }
 
     public static void finishSupplyBind(BlockPos pos) {
@@ -2589,7 +2609,7 @@ public final class WrightsClientState {
             return Math.min(offset, styleSteps() - 1);
         }
         int slot = styleSteps();
-        if (mode == Mode.BUILD && !bindSupply && !mirrorAim && !shapeAim && !exchangeAim && !placeAim) {
+        if (mode == Mode.BUILD && !bindSupply && bindPort == null && !mirrorAim && !shapeAim && !exchangeAim && !placeAim) {
             return slot;
         }
         slot++;
@@ -2617,7 +2637,7 @@ public final class WrightsClientState {
             }
             slot++;
         }
-        if (mode == Mode.BUILD && bindSupply) {
+        if (mode == Mode.BUILD && (bindSupply || bindPort != null)) {
             return slot;
         }
         return styleSteps();

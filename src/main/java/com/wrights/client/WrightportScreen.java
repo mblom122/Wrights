@@ -57,7 +57,7 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
             }
         });
         addRenderableWidget(boundaryButton);
-        chestButton = new WrightsButton(0, 0, 88, 16, Component.translatable("screen.wrights.port_chest"), button -> {
+        chestButton = new WrightsButton(0, 0, 100, 16, Component.translatable("screen.wrights.port_chest"), button -> {
             if (getMinecraft().player != null && net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
                 if (!controllerHeld()) {
                     getMinecraft().player.displayClientMessage(
@@ -67,9 +67,10 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
                 PacketDistributor.sendToServer(new BlueprintPayloads.BindPortChest(menu.pos(), net.minecraft.core.BlockPos.ZERO, true));
                 return;
             }
-            // Close the port UI and enter controller bind-chest aim for this wrightport.
-            WrightsClientState.beginPortChest(menu.pos());
-            getMinecraft().setScreen(null);
+            // Close the port UI and put the held controller into Bind Chest aim for this wrightport.
+            if (WrightsClientState.beginPortChest(menu.pos())) {
+                getMinecraft().setScreen(null);
+            }
         });
         addRenderableWidget(chestButton);
         nameBox = new EditBox(this.font, 0, 0, 140, 16, Component.translatable("screen.wrights.name"));

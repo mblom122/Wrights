@@ -449,6 +449,10 @@ public final class WrightsHud {
         if (!look.isEmpty()) {
             return true;
         }
+        // Wrightport Bind Chest aim is live even before Build mode was already selected.
+        if (WrightsClientState.portChestAim()) {
+            return line != null;
+        }
         if (WrightsClientState.mode == WrightsClientState.Mode.SAVING) {
             return true;
         }
@@ -462,7 +466,7 @@ public final class WrightsHud {
                     || WrightsClientState.mirrorToolActive()) {
                 return line != null;
             }
-            if (WrightsClientState.bindSupply || WrightsClientState.bindPort != null) {
+            if (WrightsClientState.bindSupply) {
                 return line != null;
             }
             // Armed blueprint name line is status; "pick a blueprint" is a tip.
@@ -475,6 +479,9 @@ public final class WrightsHud {
     }
 
     private static Component taskLine() {
+        if (WrightsClientState.portChestAim()) {
+            return Component.translatable("hud.wrights.task_build_tool", Component.translatable("hud.wrights.tool_bind"));
+        }
         if (WrightsClientState.mode == WrightsClientState.Mode.CAPTURE) {
             return Component.translatable("hud.wrights.task_new", Component.translatable(styleKey(WrightsClientState.captureStyle)));
         }
@@ -652,7 +659,8 @@ public final class WrightsHud {
             yAfterNew = subY + row * 3;
         }
         int toolY = yAfterNew;
-        drawToolRow(graphics, minecraft, x, toolY, width, building && !WrightsClientState.bindSupply && !WrightsClientState.mirrorAim && !WrightsClientState.shapeAim && !WrightsClientState.exchangeAim && !WrightsClientState.placeAim, use, selected);
+        boolean bindOn = building && (WrightsClientState.bindSupply || WrightsClientState.portChestAim());
+        drawToolRow(graphics, minecraft, x, toolY, width, building && !bindOn && !WrightsClientState.mirrorAim && !WrightsClientState.shapeAim && !WrightsClientState.exchangeAim && !WrightsClientState.placeAim, use, selected);
         toolY += row;
         if (showPlace) {
             drawToolRow(graphics, minecraft, x, toolY, width, building && WrightsClientState.placeAim, place, placeMark);
@@ -670,7 +678,7 @@ public final class WrightsHud {
             drawToolRow(graphics, minecraft, x, toolY, width, building && WrightsClientState.shapeAim, shape, shapeMark);
             toolY += row;
         }
-        drawToolRow(graphics, minecraft, x, toolY, width, building && WrightsClientState.bindSupply, bind, selected);
+        drawToolRow(graphics, minecraft, x, toolY, width, bindOn, bind, selected);
         int foot = WrightsClientState.styleAnnounce ? 0xFFF2C14E : WrightsUi.MUTED;
         drawFooter(graphics, minecraft, how, x + 12, y + height - footer + 4, textWidth, foot);
     }
@@ -947,7 +955,7 @@ public final class WrightsHud {
         if (WrightsClientState.mirrorAim) {
             return "hud.wrights.tool_mirror";
         }
-        if (WrightsClientState.bindSupply) {
+        if (WrightsClientState.bindSupply || WrightsClientState.portChestAim()) {
             return "hud.wrights.tool_bind";
         }
         return "hud.wrights.tool_build";
