@@ -1,4 +1,6 @@
 {
   "parent": "minecraft:item/generated",
-  "textures": { "layer0": "wrights:item/wright_upgrade_copper" }
+  "textures": {
+    "layer0": "wrights:item/wright_ops_copper"
+  }
 }
