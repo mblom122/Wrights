@@ -1494,7 +1494,8 @@ public final class JobManager {
         Component detail = removed <= 0
                 ? Component.translatable("message.wrights.undo_none")
                 : Component.translatable("hud.wrights.done_undo", removed, returned);
-        JobAnnouncements.announce(player, library, job, "hud.wrights.task_undo", detail);
+        JobAnnouncements.announce(
+                player, library, job, "hud.wrights.task_undo", JobAnnouncements.withOperations(detail, job));
     }
 
     static void finishPaste(MinecraftServer server, SchematicLibrary library, ServerPlayer player, BuildJob job) {
@@ -2036,7 +2037,7 @@ public final class JobManager {
                 working = true;
                 continue;
             }
-            int index = WorkPicker.refundIndex(job, hand);
+            int index = WorkPicker.refundIndex(level, job, hand);
             if (index < 0) {
                 hand.idle = true;
                 continue;
@@ -2064,8 +2065,9 @@ public final class JobManager {
                 continue;
             }
             int budget = CellPlacement.placeBudget(hand);
+            int removed = 0;
             for (int n = 0; n < budget; n++) {
-                int at = WorkPicker.refundIndex(job, hand);
+                int at = WorkPicker.refundIndex(level, job, hand);
                 if (at < 0) {
                     hand.idle = true;
                     break;
@@ -2092,6 +2094,11 @@ public final class JobManager {
                     continue;
                 }
                 removeOne(level, player, job, pos, refund, false);
+                removed++;
+            }
+            if (removed > 0 && hand.opStand != index) {
+                job.operationOne();
+                hand.opStand = index;
             }
         }
         if (!job.hungFalls().isEmpty()) {
@@ -2100,7 +2107,7 @@ public final class JobManager {
         HandSlices.shareUndo(job);
         if (!working) {
             for (BuildJob.Hand hand : job.hands()) {
-                if (WorkPicker.refundIndex(job, hand) >= 0) {
+                if (WorkPicker.refundIndex(level, job, hand) >= 0) {
                     working = true;
                     break;
                 }

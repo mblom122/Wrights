@@ -1160,6 +1160,11 @@ public final class BuildJob {
         returned = 0;
         skipped = 0;
         cursor = 0;
+        // Fresh op count for the undo pass — do not keep the place job's bursts.
+        operations = 0;
+        for (Hand hand : hands) {
+            hand.opStand = Integer.MIN_VALUE;
+        }
         return true;
     }
 

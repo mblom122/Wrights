@@ -938,15 +938,44 @@ public final class WorkPicker {
         job.setPasteProbe(index + 1);
     }
 
-    static int refundIndex(BuildJob job, BuildJob.Hand hand) {
+    /**
+     * Next undo cell for this hand. Prefer a refund still inside the current hover's place
+     * reach (same AOE as build); otherwise the nearest owned refund. The old "last in the
+     * list" walk ignored the hover, so a wright removed one block and flew for the next.
+     */
+    static int refundIndex(ServerLevel level, BuildJob job, BuildJob.Hand hand) {
         List<BuildJob.Refund> refunds = job.refunds();
+        if (refunds.isEmpty()) {
+            return -1;
+        }
+        Vec3 origin = level == null ? null : handOrigin(level, hand);
+        int ops = ShapeJobs.handOps(hand);
+        int near = -1;
+        double nearDist = Double.MAX_VALUE;
+        int closest = -1;
+        double closestDist = Double.MAX_VALUE;
         for (int i = refunds.size() - 1; i >= 0; i--) {
             BuildJob.Refund refund = refunds.get(i);
-            if (ownsRefund(hand, job, refund)) {
+            if (!ownsRefund(hand, job, refund)) {
+                continue;
+            }
+            if (origin == null) {
                 return i;
             }
+            BlockPos pos = job.min().offset(refund.x(), refund.y(), refund.z());
+            double dist = origin.distanceToSqr(Vec3.atCenterOf(pos));
+            boolean inHover = ShapeJobs.inOperationReachFromHover(origin, pos, ops)
+                    || dist <= JobManager.PLACE_NEAR_SQR;
+            if (inHover && (near < 0 || dist < nearDist || (dist == nearDist && i > near))) {
+                near = i;
+                nearDist = dist;
+            }
+            if (closest < 0 || dist < closestDist || (dist == closestDist && i > closest)) {
+                closest = i;
+                closestDist = dist;
+            }
         }
-        return -1;
+        return near >= 0 ? near : closest;
     }
 
     private static boolean ownsRefund(BuildJob.Hand hand, BuildJob job, BuildJob.Refund refund) {
