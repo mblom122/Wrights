@@ -132,7 +132,7 @@ public final class HangarOps {
                 case ADD_COUNT -> insertCount(player, owner, swarm, value);
                 case ADD_STOCK -> insertStock(player, owner, swarm, value);
                 case ADD_CRAFT -> insertCraft(player, owner, swarm, value);
-                case BEST_PARTS -> bestParts(player, swarm, units);
+                case BEST_PARTS -> bestParts(player, swarm, units, value != 0);
                 case TAKE_MARKED -> takeMarked(player, swarm, units);
                 case STRIP_MARKED -> stripMarked(player, swarm, units);
                 default -> {
@@ -561,8 +561,11 @@ public final class HangarOps {
         return next;
     }
 
-    /** Fits every marked wright with the best part of each slot that is on hand. Orders crafts when none is. */
-    private static Swarm bestParts(ServerPlayer player, Swarm swarm, int[] units) {
+    /**
+     * Fits every marked wright with the best part of each slot that is on hand.
+     * When {@code allowCraft} is set, orders digital crafts for upgrades that are not stocked.
+     */
+    private static Swarm bestParts(ServerPlayer player, Swarm swarm, int[] units, boolean allowCraft) {
         int[] picked = unique(swarm, units);
         if (picked.length == 0) {
             return swarm;
@@ -595,6 +598,10 @@ public final class HangarOps {
         if (raised > 0) {
             Messages.actionBar(player, "message.wrights.marked_raised", raised);
             return next;
+        }
+        if (!allowCraft) {
+            Messages.actionBar(player, "message.wrights.marked_raised_none");
+            return swarm;
         }
         boolean ordered = false;
         for (PartSlot slot : PartSlot.values()) {

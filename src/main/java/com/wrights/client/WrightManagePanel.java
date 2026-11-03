@@ -13,6 +13,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.drone.HangarOps;
 import com.wrights.drone.Loadout;
@@ -32,6 +33,7 @@ final class WrightManagePanel {
     /** Marked dialog: first part row, and the height of each. */
     private static final int MARKED_TOP = 70;
     private static final int MARKED_ROW = 30;
+    private static final int MARKED_FOOT = 102;
     private static final int NONE = 0;
     private static final int ADD = 1;
     private static final int MARKED = 2;
@@ -45,6 +47,8 @@ final class WrightManagePanel {
     private int scroll;
     private int expanded = -1;
     private int dialog;
+    /** When set, BEST_PARTS may order crafts from digital storage. */
+    private boolean craftDigital;
     private final Set<UUID> checked = new HashSet<>();
     private int panelX;
     private int panelY;
@@ -521,6 +525,12 @@ final class WrightManagePanel {
             return;
         }
         dialog = MARKED;
+        craftDigital = false;
+        PacketDistributor.sendToServer(new BlueprintPayloads.DigitalInfoRequest());
+    }
+
+    private static int markedDialogH() {
+        return MARKED_TOP + PartSlot.values().length * MARKED_ROW + MARKED_FOOT;
     }
 
     private void removeSelected(ManageHost screen) {
@@ -544,7 +554,7 @@ final class WrightManagePanel {
 
     private boolean dialogClick(ManageHost screen, double mouseX, double mouseY) {
         int dw = Math.min(312, Math.max(220, screen.screenWidth() - 24));
-        int dh = dialog == ADD ? 110 : MARKED_TOP + PartSlot.values().length * MARKED_ROW + 84;
+        int dh = dialog == ADD ? 110 : markedDialogH();
         int dx = (screen.screenWidth() - dw) / 2;
         int dy = (screen.screenHeight() - dh) / 2;
         if (mouseX < dx || mouseY < dy || mouseX >= dx + dw || mouseY >= dy + dh) {
@@ -594,7 +604,7 @@ final class WrightManagePanel {
         }
         int buttons = dy + MARKED_TOP + slots.length * MARKED_ROW;
         if (hit(mouseX, mouseY, dx + 12, buttons, dw - 24, 16)) {
-            screen.batch(HangarOps.BEST_PARTS, 0, marked(screen, screen.swarm()));
+            screen.batch(HangarOps.BEST_PARTS, craftDigital ? 1 : 0, marked(screen, screen.swarm()));
             closeTop();
             return true;
         }
@@ -603,12 +613,17 @@ final class WrightManagePanel {
             closeTop();
             return true;
         }
+        if (canCraftDigitalUpgrades(screen, screen.swarm())
+                && hit(mouseX, mouseY, dx + 12, buttons + 44, dw - 24, 14)) {
+            craftDigital = !craftDigital;
+            return true;
+        }
         return true;
     }
 
     private void renderDialog(ManageHost screen, GuiGraphics graphics, Swarm swarm, int mouseX, int mouseY) {
         int dw = Math.min(312, Math.max(220, screen.screenWidth() - 24));
-        int dh = dialog == ADD ? 110 : MARKED_TOP + PartSlot.values().length * MARKED_ROW + 84;
+        int dh = dialog == ADD ? 110 : markedDialogH();
         int dx = (screen.screenWidth() - dw) / 2;
         int dy = (screen.screenHeight() - dh) / 2;
         // Opaque enough that hangar icons / gauges do not read through the upgrade panel.
@@ -642,8 +657,38 @@ final class WrightManagePanel {
             int buttons = dy + MARKED_TOP + slots.length * MARKED_ROW;
             drawMini(graphics, screen, dx + 12, buttons, dw - 24, Component.translatable("screen.wrights.manage_best_parts"), tool, false, mouseX, mouseY);
             drawMini(graphics, screen, dx + 12, buttons + 22, dw - 24, Component.translatable("screen.wrights.manage_strip"), tool, false, mouseX, mouseY);
+            boolean canCraft = canCraftDigitalUpgrades(screen, swarm);
+            if (!canCraft) {
+                craftDigital = false;
+            }
+            int checkY = buttons + 44;
+            drawCheck(graphics, dx + 12, checkY + 2, craftDigital, canCraft, mouseX, mouseY);
+            graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_craft_digital"),
+                    dx + 26, checkY + 3, canCraft ? WrightsUi.TEXT : 0xFF6E7A86, false);
         }
         drawMini(graphics, screen, dx + dw - 78, dy + dh - 26, 66, Component.translatable("screen.wrights.manage_cancel"), true, false, mouseX, mouseY);
+    }
+
+    /** True when digital storage can craft at least one upgrade for a marked wright. */
+    private boolean canCraftDigitalUpgrades(ManageHost screen, Swarm swarm) {
+        if (!WrightsClientState.digitalOnline) {
+            return false;
+        }
+        for (int index : marked(screen, swarm)) {
+            if (index < 0 || index >= swarm.units().size()) {
+                continue;
+            }
+            Loadout parts = swarm.units().get(index).parts();
+            for (PartSlot slot : PartSlot.values()) {
+                int tier = parts.tier(slot);
+                for (int step = tier + 1; step <= WrightTier.APEX; step++) {
+                    if (digitalCraftable(slot.item(step))) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private void drawTierChoices(GuiGraphics graphics, ManageHost screen, int x, int y, int width, PartSlot slot, int current,
