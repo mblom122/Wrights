@@ -1,36 +1,45 @@
 {
-  "TEX_W": 512,
-  "TEX_H": 286,
+  "TEX_W": 2752,
+  "TEX_H": 1536,
+  "LAYOUT_W": 512,
+  "LAYOUT_H": 286,
+  "SCALE": 0.75,
   "STORAGE": {
-    "ox": 174,
-    "oy": 207,
+    "ox": 173,
+    "oy": 209,
     "slot": 28,
     "gap": 6,
+    "gap_y": 5,
     "cols": 5,
     "rows": 2
   },
   "HARDWARE": {
     "ox": 147,
-    "oy": 122,
+    "oy": 123,
     "slot": 34,
     "gap": 57,
+    "side_nudge": 1,
     "cols": 3,
     "rows": 1
   },
   "BUTTONS": {
-    "ox": 448,
-    "oy": 68,
-    "slot": 20,
-    "gap": 6,
+    "ox": 463,
+    "oy": 60,
+    "slot": 31,
+    "gap": 8,
     "cols": 1,
     "rows": 3
   },
-  "TITLE": [
-    170,
-    8,
-    340,
-    28
-  ],
+  "GAUGE": {
+    "ox": 36,
+    "oy": 92,
+    "w": 12,
+    "h": 91
+  },
+  "INV": {
+    "slot_left_screen": 112,
+    "slot_top_screen": 247
+  },
   "BTN_SIZE": 145,
   "BTN_ATLAS_GAP": 2,
   "BTN_ATLAS_W": 439,

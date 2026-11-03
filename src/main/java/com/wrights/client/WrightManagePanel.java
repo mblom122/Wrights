@@ -194,7 +194,7 @@ final class WrightManagePanel {
         int bayY = bayY();
         for (int i = 0; i < HangarBay.SLOTS; i++) {
             int sx = HangarBay.slotX(bayX, i, HangarGui.BAY_SLOT, HangarGui.BAY_GAP);
-            int sy = HangarBay.slotY(bayY, i, HangarGui.BAY_SLOT, HangarGui.BAY_GAP);
+            int sy = HangarBay.slotY(bayY, i, HangarGui.BAY_SLOT, HangarGui.BAY_GAP_Y);
             boolean hovered = mouseX >= sx && mouseX < sx + HangarGui.BAY_SLOT
                     && mouseY >= sy && mouseY < sy + HangarGui.BAY_SLOT;
             if (i < swarm.units().size()) {
@@ -255,10 +255,6 @@ final class WrightManagePanel {
                 }
             }
         }
-        if (selected && parts != null) {
-            graphics.drawString(screen.font(), WrightItem.energyLine(parts),
-                    panelX + HangarGui.ENERGY_LINE_X, panelY + HangarGui.ENERGY_LINE_Y, WrightsUi.TEXT, false);
-        }
     }
 
     private Component noticeTip() {
@@ -300,7 +296,7 @@ final class WrightManagePanel {
         if (partHit >= 0) {
             return hardwareClick(screen, swarm, PartSlot.values()[partHit]);
         }
-        int bayHit = HangarBay.hit(bayX(), bayY(), mouseX, mouseY, HangarGui.BAY_SLOT, HangarGui.BAY_GAP);
+        int bayHit = HangarBay.hit(bayX(), bayY(), mouseX, mouseY, HangarGui.BAY_SLOT, HangarGui.BAY_GAP, HangarGui.BAY_GAP_Y);
         if (bayHit >= 0) {
             return hangarClick(screen, swarm, bayHit, mouseX, mouseY);
         }
@@ -356,7 +352,7 @@ final class WrightManagePanel {
             Swarm.Unit unit = swarm.units().get(slot);
             boolean locked = away(screen, swarm, slot);
             int sx = HangarBay.slotX(bayX(), slot, HangarGui.BAY_SLOT, HangarGui.BAY_GAP);
-            int sy = HangarBay.slotY(bayY(), slot, HangarGui.BAY_SLOT, HangarGui.BAY_GAP);
+            int sy = HangarBay.slotY(bayY(), slot, HangarGui.BAY_SLOT, HangarGui.BAY_GAP_Y);
             if (!locked && hit(mouseX, mouseY, sx + 2, sy + 2, 8, 8)) {
                 toggle(unit.id());
                 return true;

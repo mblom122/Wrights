@@ -51,23 +51,27 @@ final class HangarBay {
         return slotY(originY, index, SLOT, GAP);
     }
 
-    static int slotX(int originX, int index, int slot, int gap) {
-        return originX + (index % COLS) * (slot + gap);
+    static int slotX(int originX, int index, int slot, int gapX) {
+        return originX + (index % COLS) * (slot + gapX);
     }
 
-    static int slotY(int originY, int index, int slot, int gap) {
-        return originY + (index / COLS) * (slot + gap);
+    static int slotY(int originY, int index, int slot, int gapY) {
+        return originY + (index / COLS) * (slot + gapY);
     }
 
     /** Hangar index under the cursor, or -1. */
     static int hit(int originX, int originY, double mouseX, double mouseY) {
-        return hit(originX, originY, mouseX, mouseY, SLOT, GAP);
+        return hit(originX, originY, mouseX, mouseY, SLOT, GAP, GAP);
     }
 
     static int hit(int originX, int originY, double mouseX, double mouseY, int slot, int gap) {
+        return hit(originX, originY, mouseX, mouseY, slot, gap, gap);
+    }
+
+    static int hit(int originX, int originY, double mouseX, double mouseY, int slot, int gapX, int gapY) {
         for (int i = 0; i < SLOTS; i++) {
-            int x = slotX(originX, i, slot, gap);
-            int y = slotY(originY, i, slot, gap);
+            int x = slotX(originX, i, slot, gapX);
+            int y = slotY(originY, i, slot, gapY);
             if (mouseX >= x && mouseX < x + slot && mouseY >= y && mouseY < y + slot) {
                 return i;
             }

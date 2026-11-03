@@ -28,20 +28,22 @@ final class HangarGui {
     static final int INV_GAP = HangarLayout.INV_GAP;
     static final int SCREEN_H = HangarLayout.SCREEN_H;
 
-    static final int BAY_X = HangarLayout.sx(174);
-    static final int BAY_Y = HangarLayout.sx(207);
+    /** Storage bay — nudged so corner wells match the painted frames (UL -1/+2, UR -2/+2, DL -1/+1, DR -2/+1). */
+    static final int BAY_X = HangarLayout.sx(173);
+    static final int BAY_Y = HangarLayout.sx(209);
     static final int BAY_SLOT = HangarLayout.sx(28);
     static final int BAY_GAP = Math.max(1, HangarLayout.sx(6));
+    static final int BAY_GAP_Y = Math.max(1, HangarLayout.sx(5));
 
     static final int PART_X = HangarLayout.sx(147);
-    static final int PART_Y = HangarLayout.sx(122);
+    static final int PART_Y = HangarLayout.sx(122) + 1;
     static final int PART_SLOT = HangarLayout.sx(34);
     static final int PART_GAP = HangarLayout.sx(57);
 
     /** Defaults — live values come from {@link #EDIT}. */
-    static final int BTN_X = HangarLayout.sx(457);
-    static final int BTN_Y = HangarLayout.sx(50);
-    static final int BTN_SLOT = HangarLayout.sx(30);
+    static final int BTN_X = HangarLayout.sx(463);
+    static final int BTN_Y = HangarLayout.sx(60);
+    static final int BTN_SLOT = HangarLayout.sx(31);
     static final int BTN_GAP = HangarLayout.sx(8);
     /** Source cell size in hangar_buttons.png (145×145, 2px gutters, flush to sheet edges). */
     static final int BTN_ATLAS = 145;
@@ -49,13 +51,10 @@ final class HangarGui {
     static final int BTN_SHEET_W = 3 * BTN_ATLAS + 2 * BTN_ATLAS_GAP;
     static final int BTN_SHEET_H = 5 * BTN_ATLAS + 4 * BTN_ATLAS_GAP;
 
-    static final int GAUGE_BAR_X = HangarLayout.sx(18);
-    static final int GAUGE_BAR_Y = HangarLayout.sx(48);
-    static final int GAUGE_BAR_W = Math.max(8, HangarLayout.sx(12));
-    static final int GAUGE_BAR_H = HangarLayout.sx(90);
-
-    static final int ENERGY_LINE_X = HangarLayout.sx(18);
-    static final int ENERGY_LINE_Y = HangarLayout.sx(148);
+    static final int GAUGE_BAR_X = HangarLayout.sx(36);
+    static final int GAUGE_BAR_Y = HangarLayout.sx(92);
+    static final int GAUGE_BAR_W = Math.max(1, HangarLayout.sx(12));
+    static final int GAUGE_BAR_H = HangarLayout.sx(91);
 
     /** Live layout tweaks from the in-GUI editor (Copy → clipboard). After defaults above. */
     static final HangarLayoutEdit EDIT = new HangarLayoutEdit();
@@ -143,7 +142,12 @@ final class HangarGui {
     }
 
     static int partSlotX(int left, int index) {
-        return left + PART_X + index * (PART_SLOT + PART_GAP);
+        // Left/right wells sit 1px right of a uniform grid; middle stays put.
+        int x = left + PART_X + index * (PART_SLOT + PART_GAP);
+        if (index != 1) {
+            x += 1;
+        }
+        return x;
     }
 
     static int partSlotY(int top) {

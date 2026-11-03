@@ -55,14 +55,14 @@ final class HangarLayoutEdit {
     private static final int HANDLE = 6;
 
     void reset() {
-        btnX = HangarLayout.sx(457);
-        btnY = HangarLayout.sx(50);
-        btnSlot = HangarLayout.sx(30);
+        btnX = HangarLayout.sx(463);
+        btnY = HangarLayout.sx(60);
+        btnSlot = HangarLayout.sx(31);
         btnGap = HangarLayout.sx(8);
-        gaugeX = HangarLayout.sx(18);
-        gaugeY = HangarLayout.sx(48);
-        gaugeW = Math.max(8, HangarLayout.sx(12));
-        gaugeH = HangarLayout.sx(90);
+        gaugeX = HangarLayout.sx(36);
+        gaugeY = HangarLayout.sx(92);
+        gaugeW = Math.max(1, HangarLayout.sx(12));
+        gaugeH = HangarLayout.sx(91);
         invSlotLeft = HangarLayout.invSlotLeft();
         invSlotTop = HangarLayout.invSlotTop();
         selected = Region.NONE;
