@@ -990,7 +990,7 @@
   "screen.wrights.manage_bulk": "1 · Ctrl 5 · Shift 10 · Alt 50 · Ctrl+Shift 100",
   "screen.wrights.manage_add": "Add",
   "screen.wrights.manage_remove": "Remove",
-  "screen.wrights.manage_parts_marked": "Parts for marked",
+  "screen.wrights.manage_parts_marked": "Upgrade marked",
   "screen.wrights.manage_remove_marked": "Remove marked",
   "screen.wrights.manage_add_title": "Add wrights",
   "screen.wrights.manage_add_room": "Room for %s more. %s ready in inventory or the network.",

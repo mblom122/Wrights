@@ -128,13 +128,13 @@ final class WrightManagePanel {
 
     void addWidgets(ManageHost screen) {
         place(screen);
-        // Tip strip owns most of the chrome; only Parts (when marked) and Back remain as buttons.
+        // Tip strip owns most of the chrome; Upgrade marked (when checked) and Back sit right-aligned.
         int chromeY = panelY + HangarGui.HEIGHT + 2;
-        partsButton = new WrightsButton(panelX + HangarGui.WIDTH - 200, chromeY, 120, 14,
+        partsButton = new WrightsButton(0, chromeY, UPGRADE_MARKED_W, 14,
                 Component.translatable("screen.wrights.manage_parts_marked"), button -> openMarked(screen));
         partsButton.active = false;
         screen.addButton(partsButton);
-        backButton = new WrightsButton(panelX + HangarGui.WIDTH - 72, chromeY, 64, 14,
+        backButton = new WrightsButton(0, chromeY, BACK_W, 14,
                 Component.translatable("screen.wrights.back"), button -> close(screen));
         screen.addButton(backButton);
         countBox = new EditBox(screen.font(), 0, 0, 80, 16, Component.translatable("screen.wrights.manage_add_count"));
@@ -145,17 +145,26 @@ final class WrightManagePanel {
         layoutChrome(screen);
     }
 
+    private static final int UPGRADE_MARKED_W = 88;
+    private static final int BACK_W = 52;
+    private static final int CHROME_RIGHT = 8;
+    private static final int CHROME_GAP = 4;
+
     void layoutChrome(ManageHost screen) {
         place(screen);
         int y = panelY + HangarGui.HEIGHT + 2;
-        if (partsButton != null) {
-            partsButton.setX(panelX + HangarGui.WIDTH - 200);
-            partsButton.setY(y);
-            partsButton.setWidth(120);
-        }
+        int right = panelX + HangarGui.WIDTH - CHROME_RIGHT;
         if (backButton != null) {
-            backButton.setX(panelX + HangarGui.WIDTH - 72);
+            backButton.setWidth(BACK_W);
+            backButton.setX(right - BACK_W);
             backButton.setY(y);
+        }
+        if (partsButton != null) {
+            partsButton.setWidth(UPGRADE_MARKED_W);
+            boolean showBack = !screen.embedded();
+            int upgradeRight = showBack ? right - BACK_W - CHROME_GAP : right;
+            partsButton.setX(upgradeRight - UPGRADE_MARKED_W);
+            partsButton.setY(y);
         }
     }
 
