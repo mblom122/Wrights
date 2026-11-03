@@ -313,6 +313,9 @@ public final class WrightsClientConfig {
     public static final ModConfigSpec.BooleanValue EXCHANGE_WALL_EQUAL = BUILDER
             .comment("When true, Wall uses one Size for both sides. When false, Width and Height are separate.")
             .define("exchangeWallEqual", true);
+    public static final ModConfigSpec.BooleanValue SHAPE_EQUAL_SIDES = BUILDER
+            .comment("When true, Shape Square and Box use one Size for every edge. When false, Width / Depth / Height stay separate.")
+            .define("shapeEqualSides", true);
 
     static final ModConfigSpec SPEC = BUILDER.build();
 
@@ -1000,13 +1003,16 @@ public final class WrightsClientConfig {
 
     public static void setShapeKind(int kind) {
         SHAPE_KIND.set(clamp(kind, 0, com.wrights.blueprint.Shapes.Kind.values().length - 1));
+        if (shapeEqualSides()) {
+            syncEqualSideDims();
+        }
         save();
     }
 
     public static void setShapeSize(int size) {
         SHAPE_SIZE.set(com.wrights.blueprint.Shapes.clampSize(size));
-        if (exchangeEqualSides()) {
-            SHAPE_HEIGHT.set(SHAPE_SIZE.get());
+        if (exchangeEqualSides() || shapeEqualSides()) {
+            syncEqualSideDims();
         }
         save();
     }
@@ -1297,6 +1303,20 @@ public final class WrightsClientConfig {
         };
     }
 
+    /** Shape Square / Box Equal sides. Other kinds ignore this flag. */
+    public static boolean shapeEqualSides() {
+        com.wrights.blueprint.Shapes.Kind kind = com.wrights.blueprint.Shapes.Kind.byId(SHAPE_KIND.get());
+        return kind.equalSidesOption() && SHAPE_EQUAL_SIDES.get();
+    }
+
+    public static void setShapeEqualSides(boolean equal) {
+        SHAPE_EQUAL_SIDES.set(equal);
+        if (equal) {
+            syncShapeEqualDims();
+        }
+        save();
+    }
+
     public static void setExchangeFloorEqual(boolean equal) {
         EXCHANGE_FLOOR_EQUAL.set(equal);
         if (equal) {
@@ -1428,8 +1448,27 @@ public final class WrightsClientConfig {
 
     /** Keep Height = Size while Floor/Wall equal-sides is on. */
     public static void syncExchangeEqualDims() {
-        if (exchangeEqualSides() && SHAPE_HEIGHT.get() != SHAPE_SIZE.get()) {
-            setShapeHeight(SHAPE_SIZE.get());
+        if (exchangeEqualSides()) {
+            syncEqualSideDims();
+        }
+    }
+
+    /** Keep Square / Box edges matched while Shape Equal sides is on. */
+    public static void syncShapeEqualDims() {
+        if (shapeEqualSides()) {
+            syncEqualSideDims();
+        }
+    }
+
+    /** Copy Size onto Height (and Box Depth) without re-entering {@link #setShapeSize}. */
+    private static void syncEqualSideDims() {
+        int size = SHAPE_SIZE.get();
+        if (SHAPE_HEIGHT.get() != size) {
+            SHAPE_HEIGHT.set(size);
+        }
+        com.wrights.blueprint.Shapes.Kind kind = com.wrights.blueprint.Shapes.Kind.byId(SHAPE_KIND.get());
+        if (kind == com.wrights.blueprint.Shapes.Kind.BOX && SHAPE_THICKNESS.get() != size) {
+            SHAPE_THICKNESS.set(size);
         }
     }
 

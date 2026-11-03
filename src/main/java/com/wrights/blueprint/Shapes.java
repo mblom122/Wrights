@@ -46,6 +46,14 @@ public final class Shapes {
             return usesHeight;
         }
 
+        /**
+         * True for Square (Width×Height) and Box (Width×Depth×Height). Those can lock every
+         * edge to one Size, the same way Exchange Floor / Wall lock Equal sides.
+         */
+        public boolean equalSidesOption() {
+            return this == SQUARE || this == BOX;
+        }
+
         public static Kind byId(int id) {
             Kind[] all = values();
             return all[Mth.clamp(id, 0, all.length - 1)];

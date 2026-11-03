@@ -1068,7 +1068,7 @@
   "menu.wrights.exchange_form_beam": "Beam",
   "menu.wrights.exchange_form_circle": "Circle",
   "menu.wrights.exchange_equal": "Equal sides",
-  "menu.wrights.exchange_equal_hint": "On: one Size for both sides. Off: set Width and Height separately.",
+  "menu.wrights.exchange_equal_hint": "On: one Size for every side. Off: set Width, Depth, and Height separately.",
   "menu.wrights.exchange_beam_length": "Length",
   "menu.wrights.exchange_pillar_height_hint": "How tall the 1×1 pillar is.",
   "menu.wrights.exchange_beam_length_hint": "How long the 1-thick horizontal beam is.",

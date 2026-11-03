@@ -91,9 +91,15 @@ public class ShapeTweakScreen extends Screen {
         boolean anchors = WrightsConfig.allowShapeAnchor();
         boolean line = exchange && WrightsClientConfig.exchangeForm().line();
         Shapes.Kind kind = exchange ? WrightsClientConfig.exchangeKind() : Shapes.Kind.byId(WrightsClientConfig.SHAPE_KIND.get());
+        boolean equal = exchange
+                ? WrightsClientConfig.exchangeForm().plate() && WrightsClientConfig.exchangeEqualSides()
+                : WrightsClientConfig.shapeEqualSides();
+        if (!exchange && equal) {
+            WrightsClientConfig.syncShapeEqualDims();
+        }
         boolean showSize = !line;
-        boolean showAlong = line || kind.usesHeight();
-        boolean showThickness = !line && (kind == Shapes.Kind.BOX || kind == Shapes.Kind.RING);
+        boolean showAlong = (line || kind.usesHeight()) && !equal;
+        boolean showThickness = !line && !equal && (kind == Shapes.Kind.BOX || kind == Shapes.Kind.RING);
         boolean showLookLock = !exchange && anchors && !WrightsClientConfig.SHAPE_USE_ANCHOR.get();
         int rows = 1 // title
                 + (showSize ? 1 : 0)
@@ -406,6 +412,8 @@ public class ShapeTweakScreen extends Screen {
         WrightsClientConfig.setShapeSize(WrightsClientConfig.SHAPE_SIZE.get() + step);
         if (exchange && WrightsClientConfig.exchangeForm().plate()) {
             WrightsClientConfig.syncExchangeEqualDims();
+        } else if (!exchange) {
+            WrightsClientConfig.syncShapeEqualDims();
         }
     }
 

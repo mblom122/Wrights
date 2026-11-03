@@ -811,6 +811,9 @@ public final class WrightsHud {
         int size = WrightsClientConfig.SHAPE_SIZE.get();
         int height = WrightsClientConfig.SHAPE_HEIGHT.get();
         int thickness = WrightsClientConfig.SHAPE_THICKNESS.get();
+        if (kind.equalSidesOption() && WrightsClientConfig.shapeEqualSides()) {
+            return Component.translatable("hud.wrights.dim_size", size);
+        }
         return switch (kind) {
             case SQUARE -> Component.translatable("hud.wrights.dim_wh", size, height);
             case BOX -> Component.translatable("hud.wrights.dim_wdh", size, thickness, height);

@@ -774,6 +774,12 @@ final class ShapeMenuPanel {
                 }
                 yield true;
             }
+            case "shape_equal" -> {
+                if (!formPresets()) {
+                    WrightsClientConfig.setShapeEqualSides(!WrightsClientConfig.SHAPE_EQUAL_SIDES.get());
+                }
+                yield true;
+            }
             case "hollow" -> {
                 if (WrightsConfig.allowShapeHollow()) {
                     WrightsClientConfig.setShapeHollow(!WrightsClientConfig.SHAPE_HOLLOW.get());
@@ -1214,17 +1220,28 @@ final class ShapeMenuPanel {
             drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.exchangeLineLength(), SLIDER_HEIGHT);
             return y + 18;
         }
+        boolean shapeEqual = !formPresets() && kind.equalSidesOption();
+        boolean equal = exchangePlate
+                ? WrightsClientConfig.exchangeEqualSides()
+                : shapeEqual && WrightsClientConfig.shapeEqualSides();
         if (exchangePlate) {
-            boolean equal = WrightsClientConfig.exchangeEqualSides();
             y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, equal,
                     "menu.wrights.exchange_equal", "menu.wrights.exchange_equal_hint", "exchange_equal");
+        } else if (shapeEqual) {
+            WrightsClientConfig.syncShapeEqualDims();
+            y = drawToggle(graphics, mouseX, mouseY, x, y, leftW, equal,
+                    "menu.wrights.exchange_equal", "menu.wrights.exchange_equal_hint", "shape_equal");
         }
-        drawField(graphics, mouseX, mouseY, x, y, sizeLabel(kind, axis), sizeHint(kind, axis));
+        String sizeKey = equal && kind.equalSidesOption() ? "menu.wrights.shape_size" : sizeLabel(kind, axis);
+        String sizeTip = equal && kind.equalSidesOption()
+                ? (box ? "menu.wrights.shape_cube_size_hint" : "menu.wrights.shape_rectangle_size_hint")
+                : sizeHint(kind, axis);
+        drawField(graphics, mouseX, mouseY, x, y, sizeKey, sizeTip);
         y += 12;
         sizeY = y;
         drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, WrightsClientConfig.SHAPE_SIZE.get(), SLIDER_SIZE);
         y += 18;
-        if (ring || box) {
+        if ((ring || box) && !equal) {
             drawField(graphics, mouseX, mouseY, x, y,
                     box ? "menu.wrights.shape_depth" : "menu.wrights.shape_thickness",
                     box ? "menu.wrights.shape_depth_hint" : "menu.wrights.shape_thickness_hint");
@@ -1234,7 +1251,7 @@ final class ShapeMenuPanel {
             drawDimSlider(graphics, mouseX, mouseY, x, y, leftW, thickness, SLIDER_THICKNESS);
             y += 18;
         }
-        if (kind.usesHeight()) {
+        if (kind.usesHeight() && !equal) {
             drawField(graphics, mouseX, mouseY, x, y, alongLabel(kind, axis), alongHint(kind, axis));
             y += 12;
             heightY = y;
