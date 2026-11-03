@@ -1250,27 +1250,20 @@ public final class JobManager {
         }
         Schematic.Entry next = schematic.entry(at);
         BlockPos nextPos = job.min().offset(next.x(), next.y(), next.z());
-        DroneEntity drone = DroneFleet.ensureDrone(level, player, job, nextPos);
+        BlockPos stand = HoverWork.pasteStand(level, player, schematic, job, null, at);
+        if (stand == null) {
+            stand = nextPos;
+        }
+        DroneEntity drone = DroneFleet.ensureDrone(level, player, job, stand);
         if (drone == null) {
             if (job.tickMessage()) {
                 noteChunk(player, library, job);
             }
             return;
         }
-        Vec3 hover = Vec3.atCenterOf(nextPos).add(0.0D, 0.9D, 0.0D);
         // Place jobs show the block right away; mine jobs only show haul after the break.
         ItemStack soloShow = job.mining() ? ItemStack.EMPTY : stackFor(schematic, at);
-        if (drone.launching()) {
-            job.setLastDronePos(drone.blockPosition());
-            job.setWaitKind(BuildJob.WAIT_NONE);
-            drone.setWorkStatus(soloShow, ItemStack.EMPTY, DroneEntity.WAIT_NONE);
-            library.setDirty();
-            return;
-        }
-        if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
-            double step = drone.distanceToSqr(hover) > 64.0D ? 0.85D : 0.4D;
-            drone.moveToward(hover, step);
-            job.setLastDronePos(drone.blockPosition());
+        if (HoverWork.approachStand(drone, null, stand, job)) {
             job.setWaitKind(BuildJob.WAIT_NONE);
             drone.setWorkStatus(soloShow, ItemStack.EMPTY, DroneEntity.WAIT_NONE);
             library.setDirty();
@@ -1390,45 +1383,30 @@ public final class JobManager {
             finishUndo(server, library, player, job);
             return;
         }
-        BlockPos nextPos = job.lastRefundPos();
-        DroneEntity drone = DroneFleet.ensureDrone(level, player, job, nextPos);
+        int near = HoverWork.nearestRefund(job, job.lastDronePos() != null
+                ? Vec3.atCenterOf(job.lastDronePos())
+                : Vec3.atCenterOf(job.lastRefundPos()));
+        if (near < 0) {
+            finishUndo(server, library, player, job);
+            return;
+        }
+        BuildJob.Refund peek = job.refunds().get(near);
+        BlockPos stand = job.min().offset(peek.x(), peek.y(), peek.z());
+        DroneEntity drone = DroneFleet.ensureDrone(level, player, job, stand);
         if (drone == null) {
             if (job.tickMessage()) {
                 noteChunk(player, library, job);
             }
             return;
         }
-        Vec3 hover = Vec3.atCenterOf(nextPos).add(0.0D, 0.9D, 0.0D);
-        if (drone.launching()) {
-            job.setLastDronePos(drone.blockPosition());
+        if (HoverWork.approachStand(drone, null, stand, job)) {
             return;
         }
-        if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
-            double step = drone.distanceToSqr(hover) > 64.0D ? 0.85D : 0.4D;
-            drone.moveToward(hover, step);
-            job.setLastDronePos(drone.blockPosition());
+        if (HoverWork.burstRemove(level, player, library, job, null, drone, stand) == HoverWork.Result.CHUNK) {
+            if (job.tickMessage()) {
+                noteChunk(player, library, job);
+            }
             return;
-        }
-        int budget = WrightsConfig.BLOCKS_PER_TICK.getAsInt();
-        for (int i = 0; i < budget && job.hasRefunds(); i++) {
-            BuildJob.Refund refund = job.pollRefund();
-            BlockPos pos = job.min().offset(refund.x(), refund.y(), refund.z());
-            if (!ShapeJobs.inOperationReachFromHover(drone.position(), pos, drone.ops())) {
-                job.restoreRefund(refund);
-                break;
-            }
-            if (!level.isLoaded(pos)) {
-                if (WrightsConfig.REQUIRE_CHUNKS_LOADED.getAsBoolean()) {
-                    job.restoreRefund(refund);
-                    if (job.tickMessage()) {
-                        noteChunk(player, library, job);
-                    }
-                    return;
-                }
-                job.skippedOne();
-                continue;
-            }
-            removeOne(level, player, job, pos, refund, false);
         }
         if (!job.hungFalls().isEmpty()) {
             CellPlacement.scrubHangRegion(level, job);
@@ -1857,7 +1835,11 @@ public final class JobManager {
             int handStatus = job.paused() ? DroneEntity.WAIT_PAUSED : DroneEntity.WAIT_NONE;
             Schematic.Entry next = schematic.entry(index);
             BlockPos nextPos = job.min().offset(next.x(), next.y(), next.z());
-            DroneEntity drone = DroneFleet.ensureHand(level, player, job, hand, nextPos);
+            BlockPos stand = HoverWork.pasteStand(level, player, schematic, job, hand, index);
+            if (stand == null) {
+                stand = nextPos;
+            }
+            DroneEntity drone = DroneFleet.ensureHand(level, player, job, hand, stand);
             if (drone != null) {
                 drone.setTier(hand.speed);
                 drone.setOps(ShapeJobs.handOps(hand));
@@ -1867,15 +1849,7 @@ public final class JobManager {
                 publishHandStatus(level, player, schematic, job, hand, DroneEntity.WAIT_CHUNK);
                 continue;
             }
-            Vec3 hover = Vec3.atCenterOf(nextPos).add(0.0D, 0.85D + (hand.lane % 2) * 0.45D, 0.0D);
-            if (drone.launching()) {
-                hand.lastPos = drone.blockPosition();
-                publishHandStatus(level, player, schematic, job, hand, handStatus);
-                continue;
-            }
-            if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
-                drone.moveToward(hover, CellPlacement.flyStep(hand.speed, drone.distanceToSqr(hover)));
-                hand.lastPos = drone.blockPosition();
+            if (HoverWork.approachStand(drone, hand, stand)) {
                 publishHandStatus(level, player, schematic, job, hand, handStatus);
                 continue;
             }
@@ -1920,10 +1894,13 @@ public final class JobManager {
                 }
                 Schematic.Entry entry = schematic.entry(at);
                 BlockPos pos = job.min().offset(entry.x(), entry.y(), entry.z());
-                // Ops reach is tight (0–2); fly-arrive allows ~1.5 from hover. Near the cell, place it.
-                // Farther AOE candidates wait for another hover.
-                if (!ShapeJobs.inOperationReachFromHover(drone.position(), pos, ShapeJobs.handOps(hand))
-                        && drone.distanceToSqr(Vec3.atCenterOf(pos)) > PLACE_NEAR_SQR) {
+                // First cell may be near the stand foot; further cells use ops-reach AOE.
+                if (n == 0) {
+                    if (drone.distanceToSqr(Vec3.atCenterOf(pos)) > PLACE_NEAR_SQR) {
+                        WorkPicker.claimAim(job, hand, at);
+                        break;
+                    }
+                } else if (!ShapeJobs.inOperationReachFromHover(drone.position(), pos, ShapeJobs.handOps(hand))) {
                     WorkPicker.claimAim(job, hand, at);
                     break;
                 }
@@ -1963,9 +1940,8 @@ public final class JobManager {
                 noteProgress(schematic, job, hand, entry, at);
                 burst++;
             }
-            if (burst > 0 && hand.opStand != index) {
-                job.operationOne();
-                hand.opStand = index;
+            if (burst > 0) {
+                HoverWork.countOp(job, hand, stand);
             }
             publishHandStatus(level, player, schematic, job, hand, handStatus);
         }
@@ -2045,8 +2021,8 @@ public final class JobManager {
             hand.idle = false;
             working = true;
             BuildJob.Refund peek = job.refunds().get(index);
-            BlockPos nextPos = job.min().offset(peek.x(), peek.y(), peek.z());
-            DroneEntity drone = DroneFleet.ensureHand(level, player, job, hand, nextPos);
+            BlockPos stand = job.min().offset(peek.x(), peek.y(), peek.z());
+            DroneEntity drone = DroneFleet.ensureHand(level, player, job, hand, stand);
             if (drone != null) {
                 drone.setTier(hand.speed);
                 drone.setOps(ShapeJobs.handOps(hand));
@@ -2054,51 +2030,14 @@ public final class JobManager {
             if (drone == null) {
                 continue;
             }
-            Vec3 hover = Vec3.atCenterOf(nextPos).add(0.0D, 0.85D + (hand.lane % 2) * 0.45D, 0.0D);
-            if (drone.launching()) {
-                hand.lastPos = drone.blockPosition();
+            if (HoverWork.approachStand(drone, hand, stand)) {
                 continue;
             }
-            if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
-                drone.moveToward(hover, CellPlacement.flyStep(hand.speed, drone.distanceToSqr(hover)));
-                hand.lastPos = drone.blockPosition();
-                continue;
-            }
-            int budget = CellPlacement.placeBudget(hand);
-            int removed = 0;
-            for (int n = 0; n < budget; n++) {
-                int at = WorkPicker.refundIndex(level, job, hand);
-                if (at < 0) {
-                    hand.idle = true;
-                    break;
+            if (HoverWork.burstRemove(level, player, library, job, hand, drone, stand) == HoverWork.Result.CHUNK) {
+                if (job.tickMessage()) {
+                    noteChunk(player, library, job);
                 }
-                BuildJob.Refund refund = job.refunds().get(at);
-                BlockPos pos = job.min().offset(refund.x(), refund.y(), refund.z());
-                if (n == 0) {
-                    if (drone.distanceToSqr(Vec3.atCenterOf(pos)) > PLACE_NEAR_SQR) {
-                        break;
-                    }
-                } else if (!ShapeJobs.inOperationReachFromHover(drone.position(), pos, ShapeJobs.handOps(hand))) {
-                    break;
-                }
-                job.takeRefund(at);
-                if (!level.isLoaded(pos)) {
-                    if (WrightsConfig.REQUIRE_CHUNKS_LOADED.getAsBoolean()) {
-                        job.restoreRefund(at, refund);
-                        if (job.tickMessage()) {
-                            noteChunk(player, library, job);
-                        }
-                        return;
-                    }
-                    job.skippedOne();
-                    continue;
-                }
-                removeOne(level, player, job, pos, refund, false);
-                removed++;
-            }
-            if (removed > 0 && hand.opStand != index) {
-                job.operationOne();
-                hand.opStand = index;
+                return;
             }
         }
         if (!job.hungFalls().isEmpty()) {

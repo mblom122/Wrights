@@ -1057,25 +1057,12 @@ public final class ShapeJobs {
                 setShapeHandStatus(level, hand, state, DroneEntity.WAIT_CHUNK);
                 continue;
             }
-            // A 3×3 floor is one operation only when the feet are on the middle block.
+            // Stand on the stamp (small box) or the aim cell, then AOE from there — same as paste/undo.
             BlockPos fly = smallBoxStand(level, player, job, hand, shapeKind, shapePinLocal);
             if (fly == null) {
                 fly = pos;
             }
-            Vec3 hover = Vec3.atCenterOf(fly).add(0.0D, 0.85D + (hand.lane % 2) * 0.45D, 0.0D);
-            if (drone.launching()) {
-                hand.lastPos = drone.blockPosition();
-                drone.setWorkStatus(BlockFilters.icon(state), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
-                continue;
-            }
-            // Help targets sit on another strip. Standing one block off that cell is already
-            // inside place reach; waiting for the exact hover left pairs swapping forever.
-            boolean onHover = drone.distanceToSqr(hover) <= JobManager.DRONE_REACH_SQR;
-            boolean canReachCell = drone.distanceToSqr(Vec3.atCenterOf(pos)) <= JobManager.PLACE_NEAR_SQR
-                    && inOperationReachFromHover(drone.position(), pos, handOps(hand));
-            if (!onHover && !canReachCell) {
-                drone.moveToward(hover, CellPlacement.flyStep(hand.speed, drone.distanceToSqr(hover)));
-                hand.lastPos = drone.blockPosition();
+            if (HoverWork.approachStand(drone, hand, fly)) {
                 drone.setWorkStatus(BlockFilters.icon(state), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
                 continue;
             }
@@ -1177,9 +1164,8 @@ public final class ShapeJobs {
                 placed++;
                 scanned++;
             }
-            if (placed > 0 && hand.opStand != at) {
-                job.operationOne();
-                hand.opStand = at;
+            if (placed > 0) {
+                HoverWork.countOp(job, hand, fly);
             }
             if (waitingItems) {
                 DroneFleet.parkForItems(level, player, hand);
@@ -1550,12 +1536,7 @@ public final class ShapeJobs {
             setShapeHandStatus(level, hand, state, DroneEntity.WAIT_CHUNK);
             return JobManager.PATTERN_CHUNK;
         }
-        Vec3 hover = Vec3.atCenterOf(fly).add(0.0D, 0.85D + (hand.lane % 2) * 0.45D, 0.0D);
-        if (drone.launching() || !wrightOnStand(drone, fly)) {
-            if (!drone.launching()) {
-                drone.moveToward(hover, CellPlacement.flyStep(hand.speed, drone.distanceToSqr(hover)));
-            }
-            hand.lastPos = drone.blockPosition();
+        if (HoverWork.approachStand(drone, hand, fly)) {
             drone.setWorkStatus(BlockFilters.icon(state), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
             return JobManager.PATTERN_DONE;
         }
@@ -1631,9 +1612,8 @@ public final class ShapeJobs {
             drone.setWorkStatus(BlockFilters.icon(placeState), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
             placed++;
         }
-        if (placed > 0 && hand.opStand != anchor) {
-            job.operationOne();
-            hand.opStand = anchor;
+        if (placed > 0) {
+            HoverWork.countOp(job, hand, anchor);
         }
         if (anchor >= 0 && smallStandHasReady(
                 level, player, job, hand, piece, shapeKind, shapePinLocal, stand, reach)) {
@@ -1668,15 +1648,6 @@ public final class ShapeJobs {
                 }
             }
         }
-    }
-
-    /** True when the block under the wright is {@code stand}. Reach is measured from that block. */
-    private static boolean wrightOnStand(DroneEntity drone, BlockPos stand) {
-        if (drone == null || stand == null) {
-            return false;
-        }
-        BlockPos foot = BlockPos.containing(drone.getX(), drone.getY() - 0.85D, drone.getZ());
-        return foot.equals(stand);
     }
 
     /** Predefined stand count for a small shape. {@code 0} leaves crew sizing alone. */
