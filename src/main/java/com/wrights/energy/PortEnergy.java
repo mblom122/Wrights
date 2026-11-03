@@ -92,7 +92,7 @@ public final class PortEnergy {
         if (stored * 2 < capacity) {
             return 0xFFE0B060;
         }
-        return 0xFF3D9A62;
+        return 0xFF3CFE9A;
     }
 
     private static String format(int value) {

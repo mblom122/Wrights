@@ -206,7 +206,7 @@ public final class WrightsUi {
         if (stored * 2L < capacity) {
             return 0xFFE0B060;
         }
-        return 0xFF3D9A62;
+        return 0xFF3CFE9A;
     }
 
     public static void inset(GuiGraphics graphics, int x, int y, int width, int height) {
