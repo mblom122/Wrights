@@ -31,7 +31,8 @@
     340,
     28
   ],
-  "BTN_SIZE": 32,
-  "BTN_ATLAS_W": 96,
-  "BTN_ATLAS_H": 160
+  "BTN_SIZE": 145,
+  "BTN_ATLAS_GAP": 2,
+  "BTN_ATLAS_W": 439,
+  "BTN_ATLAS_H": 733
 }

@@ -43,7 +43,11 @@ final class HangarGui {
     static final int BTN_Y = HangarLayout.sx(50);
     static final int BTN_SLOT = HangarLayout.sx(30);
     static final int BTN_GAP = HangarLayout.sx(8);
-    static final int BTN_ATLAS = 32;
+    /** Source cell size in hangar_buttons.png (145×145, 2px gutters, flush to sheet edges). */
+    static final int BTN_ATLAS = 145;
+    static final int BTN_ATLAS_GAP = 2;
+    static final int BTN_SHEET_W = 3 * BTN_ATLAS + 2 * BTN_ATLAS_GAP;
+    static final int BTN_SHEET_H = 5 * BTN_ATLAS + 4 * BTN_ATLAS_GAP;
 
     static final int GAUGE_BAR_X = HangarLayout.sx(18);
     static final int GAUGE_BAR_Y = HangarLayout.sx(48);
@@ -181,9 +185,9 @@ final class HangarGui {
         int x = buttonX(left);
         int y = buttonY(top, button);
         int size = btnSlot();
-        float u = button * BTN_ATLAS;
-        float v = state * BTN_ATLAS;
-        graphics.blit(BUTTONS, x, y, size, size, u, v, BTN_ATLAS, BTN_ATLAS, BTN_ATLAS * 3, BTN_ATLAS * 5);
+        float u = button * (BTN_ATLAS + BTN_ATLAS_GAP);
+        float v = state * (BTN_ATLAS + BTN_ATLAS_GAP);
+        graphics.blit(BUTTONS, x, y, size, size, u, v, BTN_ATLAS, BTN_ATLAS, BTN_SHEET_W, BTN_SHEET_H);
     }
 
     static int buttonState(boolean enabled, boolean active, boolean hover) {
