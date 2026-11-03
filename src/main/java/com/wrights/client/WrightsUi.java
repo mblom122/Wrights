@@ -229,11 +229,20 @@ public final class WrightsUi {
 
     /** Draws a stack centered in a slot of {@code size} (item scales with the slot). */
     public static void slotItem(GuiGraphics graphics, Font font, ItemStack stack, int x, int y, int size) {
+        slotItem(graphics, font, stack, x, y, size, 1.0F);
+    }
+
+    /**
+     * Like {@link #slotItem(GuiGraphics, Font, ItemStack, int, int, int)} but {@code fill}
+     * multiplies the icon size (1 = normal; e.g. 1.25 = a bit larger inside the same slot).
+     */
+    public static void slotItem(GuiGraphics graphics, Font font, ItemStack stack, int x, int y, int size, float fill) {
         if (stack == null || stack.isEmpty()) {
             return;
         }
-        float scale = size / 18.0F;
-        int pad = Math.max(1, Math.round(size * 1.0F / 18.0F));
+        float scale = (size / 18.0F) * Math.max(0.5F, fill);
+        float drawn = 16.0F * scale;
+        float pad = (size - drawn) * 0.5F;
         graphics.pose().pushPose();
         graphics.pose().translate(x + pad, y + pad, 100.0F);
         graphics.pose().scale(scale, scale, 1.0F);

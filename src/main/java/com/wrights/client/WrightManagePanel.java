@@ -253,7 +253,7 @@ final class WrightManagePanel {
                 }
             }
             if (!stack.isEmpty()) {
-                WrightsUi.slotItem(graphics, screen.font(), stack, x, y, HangarGui.PART_SLOT);
+                WrightsUi.slotItem(graphics, screen.font(), stack, x, y, HangarGui.PART_SLOT, 1.28F);
                 if (locked) {
                     graphics.fill(x + 1, y + 1, x + HangarGui.PART_SLOT - 1, y + HangarGui.PART_SLOT - 1, 0x88060C14);
                 }
