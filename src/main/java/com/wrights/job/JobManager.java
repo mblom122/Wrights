@@ -1960,7 +1960,12 @@ public final class JobManager {
                 drone.setWorkStatus(BlockFilters.icon(state), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
                 continue;
             }
-            if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
+            // Help targets sit on another strip. Standing one block off that cell is already
+            // inside place reach; waiting for the exact hover left pairs swapping forever.
+            boolean onHover = drone.distanceToSqr(hover) <= DRONE_REACH_SQR;
+            boolean canReachCell = drone.distanceToSqr(Vec3.atCenterOf(pos)) <= PLACE_NEAR_SQR
+                    && inOperationReachFromHover(drone.position(), pos, handOps(hand));
+            if (!onHover && !canReachCell) {
                 drone.moveToward(hover, flyStep(hand.speed, drone.distanceToSqr(hover)));
                 hand.lastPos = drone.blockPosition();
                 drone.setWorkStatus(BlockFilters.icon(state), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
@@ -1988,8 +1993,14 @@ public final class JobManager {
                     }
                     break;
                 }
+                // onlyOwned first. A help target is FOREIGN to this strip; place it anyway.
+                // Breaking there used to leave the wright "placing" the same leftover forever.
                 ShapeCell standKind = classifyShapeCell(
                         level, player, job, hand, index, shapeKind, shapePinLocal, true);
+                if (standKind == ShapeCell.FOREIGN) {
+                    standKind = classifyShapeCell(
+                            level, player, job, hand, index, shapeKind, shapePinLocal, false);
+                }
                 if (standKind == ShapeCell.OUT || standKind == ShapeCell.DONE) {
                     if (standKind == ShapeCell.OUT) {
                         resolveShapeCell(job, hand, index, false);
