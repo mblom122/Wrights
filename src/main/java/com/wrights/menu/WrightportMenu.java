@@ -15,9 +15,15 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.block.ModBlocks;
 import com.wrights.block.WrightportBlockEntity;
+import com.wrights.hangar.HangarLayout;
 import com.wrights.network.PortEnergySync;
 
 public class WrightportMenu extends AbstractContainerMenu {
+    /** Hidden swarm-data slot; player inventory starts after this. */
+    public static final int PLAYER_INV_START = 1;
+    public static final int PLAYER_INV_END = PLAYER_INV_START + 27;
+    public static final int HOTBAR_END = PLAYER_INV_END + 9;
+
     private final BlockPos pos;
     private final ContainerLevelAccess access;
     private final Player player;
@@ -53,6 +59,16 @@ public class WrightportMenu extends AbstractContainerMenu {
                 return false;
             }
         });
+        int left = HangarLayout.invSlotLeft();
+        int top = HangarLayout.invSlotTop();
+        for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 9; col++) {
+                addSlot(new Slot(inventory, col + (row + 1) * 9, left + col * 18, top + row * 18));
+            }
+        }
+        for (int col = 0; col < 9; col++) {
+            addSlot(new Slot(inventory, col, left + col * 18, top + 58));
+        }
     }
 
     public BlockPos pos() {
@@ -87,6 +103,27 @@ public class WrightportMenu extends AbstractContainerMenu {
 
     @Override
     public ItemStack quickMoveStack(Player player, int index) {
-        return ItemStack.EMPTY;
+        ItemStack copy = ItemStack.EMPTY;
+        Slot slot = this.slots.get(index);
+        if (slot == null || !slot.hasItem() || index < PLAYER_INV_START) {
+            return ItemStack.EMPTY;
+        }
+        ItemStack stack = slot.getItem();
+        copy = stack.copy();
+        if (index < PLAYER_INV_END) {
+            if (!moveItemStackTo(stack, PLAYER_INV_END, HOTBAR_END, true)) {
+                return ItemStack.EMPTY;
+            }
+        } else if (index < HOTBAR_END) {
+            if (!moveItemStackTo(stack, PLAYER_INV_START, PLAYER_INV_END, false)) {
+                return ItemStack.EMPTY;
+            }
+        }
+        if (stack.isEmpty()) {
+            slot.setByPlayer(ItemStack.EMPTY);
+        } else {
+            slot.setChanged();
+        }
+        return copy;
     }
 }

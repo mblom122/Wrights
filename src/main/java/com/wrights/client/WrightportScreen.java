@@ -31,14 +31,16 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
     public WrightportScreen(WrightportMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
         this.imageWidth = HangarGui.WIDTH;
-        this.imageHeight = HangarGui.PANEL_H;
+        this.imageHeight = HangarGui.SCREEN_H;
     }
 
     @Override
     protected void init() {
         this.imageWidth = HangarGui.WIDTH;
-        this.imageHeight = HangarGui.PANEL_H;
+        this.imageHeight = HangarGui.SCREEN_H;
         super.init();
+        // Sit a bit higher than dead-center so hangar + inventory clear the hotbar area.
+        this.topPos = Math.max(4, (this.height - this.imageHeight) / 3);
         if (WrightsClientState.dockWaiting()) {
             if (getMinecraft().player != null) {
                 getMinecraft().player.displayClientMessage(Component.translatable("message.wrights.dock_wait_busy"), true);
@@ -344,6 +346,7 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
     @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
         HangarGui.blitPanel(graphics, leftPos, topPos);
+        HangarGui.drawInventoryPanel(graphics, leftPos, topPos);
     }
 
     @Override
@@ -363,10 +366,33 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
                     WrightsUi.RED,
                     false);
         }
+        graphics.pose().pushPose();
+        graphics.pose().translate(leftPos, topPos, 0.0F);
+        this.hoveredSlot = null;
+        for (var slot : this.menu.slots) {
+            if (!slot.isActive()) {
+                continue;
+            }
+            this.renderSlot(graphics, slot);
+            if (this.isHovering(slot.x, slot.y, 16, 16, mouseX, mouseY)) {
+                this.hoveredSlot = slot;
+                AbstractContainerScreen.renderSlotHighlight(graphics, slot.x, slot.y, 0);
+            }
+        }
+        graphics.pose().popPose();
         for (Renderable widget : this.renderables) {
             widget.render(graphics, mouseX, mouseY, partialTick);
         }
+        var carried = this.menu.getCarried();
+        if (!carried.isEmpty()) {
+            graphics.pose().pushPose();
+            graphics.pose().translate(0.0F, 0.0F, 232.0F);
+            graphics.renderItem(carried, mouseX - 8, mouseY - 8);
+            graphics.renderItemDecorations(this.font, carried, mouseX - 8, mouseY - 8);
+            graphics.pose().popPose();
+        }
         manage.drawDigitalTip(this, graphics, mouseX, mouseY);
+        this.renderTooltip(graphics, mouseX, mouseY);
         drawTooltips(graphics, mouseX, mouseY);
     }
 
@@ -387,30 +413,25 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
                 return true;
             }
         }
-        if (mouseX >= leftPos && mouseX < leftPos + imageWidth && mouseY >= topPos && mouseY < topPos + imageHeight) {
-            return true;
-        }
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        for (GuiEventListener child : this.children()) {
-            if (child.mouseReleased(mouseX, mouseY, button)) {
-                return true;
-            }
-        }
-        return true;
+        return super.mouseReleased(mouseX, mouseY, button);
     }
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        return true;
+        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        return manage.mouseScrolled(this, mouseX, mouseY, scrollY);
+        if (manage.mouseScrolled(this, mouseX, mouseY, scrollY)) {
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
     @Override
