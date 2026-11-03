@@ -16,6 +16,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
 
+import com.wrights.WrightsConfig;
 import com.wrights.drone.Loadout;
 import com.wrights.drone.PartSlot;
 import com.wrights.drone.Swarm;
@@ -24,10 +25,21 @@ import com.wrights.drone.WrightTier;
 /**
  * A wright stored as an item. It keeps its fitted parts ({@link Loadout}) and its name, so it comes back out
  * of a wrightport exactly as it went in.
+ * <p>
+ * Player inventory and chests stack up to 64 when the fitted parts match (Basic with no parts component,
+ * or the same upgrade loadout). A custom name is also a stack key, so differently named wrights stay apart.
+ * Hangar bays hold one wright per slot.
  */
 public class WrightItem extends Item {
     public WrightItem(Properties properties) {
         super(properties);
+    }
+
+    /** Same item and same fitted parts, ignoring custom names. */
+    public static boolean sameUpgrades(ItemStack a, ItemStack b) {
+        return a != null && b != null && !a.isEmpty() && !b.isEmpty()
+                && a.getItem() instanceof WrightItem && b.getItem() instanceof WrightItem
+                && parts(a).equals(parts(b));
     }
 
     public static ItemStack stack(Loadout parts, String name, int count) {
@@ -130,13 +142,20 @@ public class WrightItem extends Item {
         tooltip.add(Component.translatable("item.wrights.wright.hint").withStyle(ChatFormatting.DARK_GRAY));
     }
 
-    /** "Energy: 87% of the block cost", green below 100%, red above. */
+    /**
+     * Place cost after this wright's rotor/core drain, plus the same cost for a full
+     * actions/tick burst. Green below base, red above.
+     */
     public static Component energyLine(Loadout parts) {
+        int base = WrightsConfig.ENERGY.get() ? WrightsConfig.ENERGY_PLACE.get() : 0;
+        int perAction = WrightTier.energyCost(base, parts.rotor(), parts.core());
+        int fullTick = perAction * WrightTier.actionsPerTick(parts.fabricator());
         int percent = parts.energyPercent();
         ChatFormatting color = percent < 100 ? ChatFormatting.GREEN : percent > 100 ? ChatFormatting.RED : ChatFormatting.GRAY;
-        String key = parts.rotor() == parts.core() && parts.rotor() > WrightTier.BASIC
-                ? "item.wrights.wright.energy_matched" : "item.wrights.wright.energy";
-        return Component.translatable(key, Component.literal(percent + "%").withStyle(color)).withStyle(ChatFormatting.GRAY);
+        return Component.translatable(
+                "item.wrights.wright.energy",
+                Component.literal(Integer.toString(perAction)).withStyle(color),
+                Component.literal(Integer.toString(fullTick)).withStyle(color)).withStyle(ChatFormatting.GRAY);
     }
 
     /** Right-click a part onto a wright: fits it, and the part it replaces goes to the cursor. */
