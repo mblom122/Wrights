@@ -261,6 +261,7 @@
   "menu.wrights.drag_many": "%s selected",
   "menu.wrights.delete_confirm": "Confirm",
   "menu.wrights.build": "Build",
+  "menu.wrights.use": "Use",
   "menu.wrights.queue": "Queue",
   "menu.wrights.queued": "Queued",
   "menu.wrights.close": "Close",

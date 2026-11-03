@@ -612,6 +612,8 @@ public class WrightsMenuScreen extends Screen {
         placeShelfButtons(building, any);
         buildButton.visible = building || toolModePage;
         buildButton.active = toolModePage ? tool : blueprint && tool && !many;
+        // Mirror arms a tool; "Build" reads like starting a paste job.
+        buildButton.setMessage(Component.translatable(mirrorPage ? "menu.wrights.use" : "menu.wrights.build"));
         renameButton.visible = building;
         discardButton.visible = building && (capture || WrightsClientState.mode == WrightsClientState.Mode.SAVING);
         resumeButton.visible = building && capture;
