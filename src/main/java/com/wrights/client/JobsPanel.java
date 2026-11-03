@@ -414,7 +414,17 @@ final class JobsPanel {
         graphics.drawString(s.font(), size, sizeX, y + 15, WrightsUi.SIZE, false);
         int dashX = sizeX + s.font().width(size);
         graphics.drawString(s.font(), " - ", dashX, y + 15, WrightsUi.MUTED, false);
-        graphics.drawString(s.font(), blocks, dashX + s.font().width(" - "), y + 15, WrightsUi.MUTED, false);
+        int blocksX = dashX + s.font().width(" - ");
+        graphics.drawString(s.font(), blocks, blocksX, y + 15, WrightsUi.MUTED, false);
+        // Finished cards show how long the active work took (same clock History uses).
+        if (job.finished() && job.workedTicks() >= 20) {
+            String took = Component.translatable(
+                    "history.wrights.took",
+                    WrightsClientState.formatSeconds(job.workedTicks() / 20)).getString();
+            int tookX = blocksX + s.font().width(blocks) + s.font().width(" · ");
+            graphics.drawString(s.font(), " · ", blocksX + s.font().width(blocks), y + 15, WrightsUi.MUTED, false);
+            graphics.drawString(s.font(), took, tookX, y + 15, WrightsUi.MUTED, false);
+        }
         Component source = jobSource(job);
         if (!source.getString().isEmpty()) {
             graphics.drawString(s.font(), s.font().plainSubstrByWidth(source.getString(), Math.max(40, width - 12)), x + 6, y + 26, WrightsUi.MUTED, false);

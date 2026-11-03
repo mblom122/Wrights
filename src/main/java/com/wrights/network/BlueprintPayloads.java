@@ -1150,18 +1150,43 @@ public final class BlueprintPayloads {
         }
     }
 
-    /** Info-only History window rows: kind + job name + detail + location + game time. */
-    public record HistoryLine(int kind, String jobName, String detail, String location, long gameTime) {
+    /** Info-only History window rows: kind + job name + detail + location + size/blocks/time. */
+    public record HistoryLine(
+            int kind,
+            String jobName,
+            String detail,
+            String location,
+            long gameTime,
+            int sizeX,
+            int sizeY,
+            int sizeZ,
+            int blocks,
+            int elapsedSeconds) {
         public void write(RegistryFriendlyByteBuf buf) {
             buf.writeVarInt(kind);
             buf.writeUtf(jobName == null ? "" : jobName, 128);
             buf.writeUtf(detail == null ? "" : detail, 256);
             buf.writeUtf(location == null ? "" : location, 64);
             buf.writeLong(gameTime);
+            buf.writeVarInt(Math.max(0, sizeX));
+            buf.writeVarInt(Math.max(0, sizeY));
+            buf.writeVarInt(Math.max(0, sizeZ));
+            buf.writeVarInt(Math.max(0, blocks));
+            buf.writeVarInt(Math.max(0, elapsedSeconds));
         }
 
         public static HistoryLine read(RegistryFriendlyByteBuf buf) {
-            return new HistoryLine(buf.readVarInt(), buf.readUtf(128), buf.readUtf(256), buf.readUtf(64), buf.readLong());
+            return new HistoryLine(
+                    buf.readVarInt(),
+                    buf.readUtf(128),
+                    buf.readUtf(256),
+                    buf.readUtf(64),
+                    buf.readLong(),
+                    buf.readVarInt(),
+                    buf.readVarInt(),
+                    buf.readVarInt(),
+                    buf.readVarInt(),
+                    buf.readVarInt());
         }
     }
 

@@ -308,6 +308,7 @@
   "screen.wrights.job_history_placed": "Placed %s",
   "screen.wrights.job_history_skipped": "Skipped %s",
   "screen.wrights.job_history_wrights": "%s wrights",
+  "history.wrights.took": "Took %s",
   "history.wrights.completed": "Completed job",
   "history.wrights.stopped": "Stopped job",
   "history.wrights.undone": "Undone job",

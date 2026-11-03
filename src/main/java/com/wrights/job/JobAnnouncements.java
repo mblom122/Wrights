@@ -75,12 +75,20 @@ public final class JobAnnouncements {
         if (player == null || library == null || job == null) {
             return;
         }
+        int blocks = job.undoing() || kind == JobEventLog.UNDONE || kind == JobEventLog.UNDOING
+                ? Math.max(1, job.undoTotal() > 0 ? job.undoTotal() : job.total())
+                : Math.max(0, job.total());
         library.eventLog().record(
                 player,
                 kind,
                 JobTitles.jobCardTitle(job, library),
                 detail == null ? "" : detail,
-                historyLocation(job));
+                historyLocation(job),
+                job.boxSizeX(),
+                job.boxSizeY(),
+                job.boxSizeZ(),
+                blocks,
+                job.elapsedSeconds());
         library.setDirty();
     }
 

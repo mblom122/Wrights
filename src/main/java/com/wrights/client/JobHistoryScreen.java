@@ -16,7 +16,7 @@ import com.wrights.network.BlueprintPayloads;
  * No action buttons — Manage keeps those on live / finished job cards.
  */
 public class JobHistoryScreen extends Screen {
-    private static final int ROW = 52;
+    private static final int ROW = 60;
 
     private final Screen parent;
     private final List<BlueprintPayloads.HistoryLine> rows = new ArrayList<>();
@@ -181,22 +181,35 @@ public class JobHistoryScreen extends Screen {
         Component title = kindTitle(event.kind());
         String name = event.jobName() == null ? "" : event.jobName();
         int titleW = this.font.width(title);
-        graphics.drawString(this.font, title, x + 8, y + 6, kindColor(event.kind()), false);
+        graphics.drawString(this.font, title, x + 8, y + 5, kindColor(event.kind()), false);
         if (!name.isBlank()) {
             int nameX = x + 8 + titleW + 8;
             String clipped = this.font.plainSubstrByWidth(name, Math.max(24, width - (nameX - x) - 8));
-            graphics.drawString(this.font, clipped, nameX, y + 6, WrightsUi.TEXT, false);
+            graphics.drawString(this.font, clipped, nameX, y + 5, WrightsUi.TEXT, false);
         }
 
+        int lineY = y + 16;
+        String stats = statsLine(event);
+        if (!stats.isBlank()) {
+            graphics.drawString(
+                    this.font,
+                    this.font.plainSubstrByWidth(stats, width - 16),
+                    x + 8,
+                    lineY,
+                    WrightsUi.SIZE,
+                    false);
+            lineY += 11;
+        }
         String location = event.location() == null ? "" : event.location();
         if (!location.isBlank()) {
             graphics.drawString(
                     this.font,
                     this.font.plainSubstrByWidth(location, width - 16),
                     x + 8,
-                    y + 18,
+                    lineY,
                     WrightsUi.MUTED,
                     false);
+            lineY += 11;
         }
         String detail = event.detail() == null || event.detail().isBlank()
                 ? Component.translatable("history.wrights.detail_none").getString()
@@ -205,9 +218,39 @@ public class JobHistoryScreen extends Screen {
                 this.font,
                 this.font.plainSubstrByWidth(detail, width - 16),
                 x + 8,
-                y + (location.isBlank() ? 20 : 30),
+                lineY,
                 WrightsUi.MUTED,
                 false);
+    }
+
+    /** Same size / blocks / duration strip the Jobs cards use. */
+    private static String statsLine(BlueprintPayloads.HistoryLine event) {
+        boolean hasSize = event.sizeX() > 0 && event.sizeY() > 0 && event.sizeZ() > 0;
+        boolean hasBlocks = event.blocks() > 0;
+        boolean hasTime = event.elapsedSeconds() > 0;
+        if (!hasSize && !hasBlocks && !hasTime) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder();
+        if (hasSize) {
+            out.append(Component.translatable(
+                    "menu.wrights.size", event.sizeX(), event.sizeY(), event.sizeZ()).getString());
+        }
+        if (hasBlocks) {
+            if (!out.isEmpty()) {
+                out.append(" - ");
+            }
+            out.append(Component.translatable(
+                    "menu.wrights.job_preview_blocks", WrightsUi.count(event.blocks())).getString());
+        }
+        if (hasTime) {
+            if (!out.isEmpty()) {
+                out.append(" · ");
+            }
+            out.append(Component.translatable(
+                    "history.wrights.took", WrightsClientState.formatSeconds(event.elapsedSeconds())).getString());
+        }
+        return out.toString();
     }
 
     private void drawBar(GuiGraphics graphics, int x, int y, int h, int mouseX, int mouseY) {

@@ -539,7 +539,8 @@ public final class WrightsClientState {
         return hold != com.wrights.job.BuildJob.HOLD_NONE && hold != com.wrights.job.BuildJob.HOLD_MANUAL;
     }
 
-    private static String formatSeconds(long seconds) {
+    /** Short elapsed / ETA text: {@code 12s}, {@code 1m 5s}, {@code 2h 10m}. */
+    public static String formatSeconds(long seconds) {
         if (seconds < 60) {
             return seconds + "s";
         }

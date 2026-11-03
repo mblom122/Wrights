@@ -136,7 +136,16 @@ public final class BlueprintNetwork {
         if (events != null) {
             for (com.wrights.job.JobEventLog.Event event : events) {
                 lines.add(new BlueprintPayloads.HistoryLine(
-                        event.kind(), event.jobName(), event.detail(), event.location(), event.gameTime()));
+                        event.kind(),
+                        event.jobName(),
+                        event.detail(),
+                        event.location(),
+                        event.gameTime(),
+                        event.sizeX(),
+                        event.sizeY(),
+                        event.sizeZ(),
+                        event.blocks(),
+                        event.elapsedSeconds()));
             }
         }
         PacketDistributor.sendToPlayer(player, new BlueprintPayloads.HistorySync(lines));
