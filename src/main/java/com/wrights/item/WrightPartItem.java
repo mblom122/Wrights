@@ -52,9 +52,9 @@ public class WrightPartItem extends Item {
         switch (slot) {
             case ROTOR -> lines.add(Component.translatable("item.wrights.rotor.speed", WrightTier.flyRateLabel(tier)));
             case FABRICATOR -> {
-                // Energy is paid once per block in CellPlacement — Apex 19 blocks = 19 charges, not one.
+                // Energy is paid once per cell action — Apex 19 actions/tick = up to 19 charges that tick.
                 int perBlock = WrightsConfig.ENERGY.get() ? WrightsConfig.ENERGY_PLACE.get() : 0;
-                lines.add(Component.translatable("item.wrights.fabricator.actions", WrightTier.operationCap(tier)));
+                lines.add(Component.translatable("item.wrights.fabricator.actions", WrightTier.actionsPerTick(tier)));
                 lines.add(Component.translatable("item.wrights.fabricator.energy", perBlock));
                 lines.add(Component.translatable(reachKey(tier)));
             }

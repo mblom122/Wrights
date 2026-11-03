@@ -42,11 +42,11 @@ public final class CellPlacement {
     }
 
     /**
-     * Blocks one hover may place, mine, void, or undo. Shared for every job kind —
-     * Apex is the full 19-cell sphere. Do not clamp to {@code blocksPerTick}.
+     * Actions/tick for this hand's fabricator. Shared for every job kind —
+     * Apex is 19. Do not clamp to {@code blocksPerTick}.
      */
-    static int placeBudget(BuildJob.Hand hand) {
-        return Math.max(1, WrightTier.operationCap(ShapeJobs.handFabricator(hand)));
+    static int actionBudget(BuildJob.Hand hand) {
+        return Math.max(1, WrightTier.actionsPerTick(ShapeJobs.handFabricator(hand)));
     }
 
     static double flyStep(int speed, double distanceSqr) {

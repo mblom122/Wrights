@@ -4,7 +4,7 @@ import java.util.Locale;
 
 /**
  * Part tiers, Basic (no part fitted) through Apex. Every {@link PartSlot} uses the same ladder.
- * A rotor tier sets flight speed and energy draw; a fabricator tier sets how many blocks one operation touches;
+ * A rotor tier sets flight speed and energy draw; a fabricator tier sets actions/tick (place, mine, void, …);
  * a Power Core tier sets how much of the rotor's draw it covers.
  */
 public final class WrightTier {
@@ -66,8 +66,11 @@ public final class WrightTier {
         return "tier.wrights." + clamp(tier);
     }
 
-    /** Blocks one operation may touch. Basic is the occupied cell; Apex is the full 19-block sphere. */
-    public static int operationCap(int tier) {
+    /**
+     * Cell actions one wright may do in a tick (place, mine, void, exchange, or undo).
+     * Basic is 1; Apex is 19, matching the full reach sphere.
+     */
+    public static int actionsPerTick(int tier) {
         return switch (clamp(tier)) {
             case BASIC -> 1;
             case SCOUT -> 3;

@@ -1270,8 +1270,8 @@ public final class JobManager {
             return;
         }
         drone.setWorkStatus(soloShow, ItemStack.EMPTY, DroneEntity.WAIT_NONE);
-        // Same ops budget as crew (place / mine / void) — do not clamp to blocksPerTick.
-        int budget = Math.max(1, WrightTier.operationCap(drone.fabricator()));
+        // Same actions/tick budget as crew (place / mine / void) — do not clamp to blocksPerTick.
+        int budget = Math.max(1, WrightTier.actionsPerTick(drone.fabricator()));
         int burst = 0;
         for (int i = 0; i < budget; i++) {
             int index = i == 0 ? at : WorkPicker.nextSolo(level, player, schematic, job);
@@ -1853,7 +1853,7 @@ public final class JobManager {
                 publishHandStatus(level, player, schematic, job, hand, handStatus);
                 continue;
             }
-            int budget = CellPlacement.placeBudget(hand);
+            int budget = CellPlacement.actionBudget(hand);
             int burst = 0;
             for (int n = 0; n < budget; n++) {
                 int at = WorkPicker.nextWork(level, player, schematic, job, hand, skipBudget);

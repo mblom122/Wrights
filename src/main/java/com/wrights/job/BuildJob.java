@@ -1669,7 +1669,7 @@ public final class BuildJob {
         public int lanes;
         /** Rotor tier; flight speed. */
         public int rotor;
-        /** Fabricator tier; how many blocks one operation reaches. */
+        /** Fabricator tier; actions/tick and reach for this hand. */
         public int fabricator;
         /** Power Core tier; with the rotor, sets the energy each block costs. */
         public int core;

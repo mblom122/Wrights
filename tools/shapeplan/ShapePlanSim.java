@@ -1666,7 +1666,7 @@ public final class ShapePlanSim {
         out.println();
         out.println("planMs is the planner only (occupancy copy + hover choice), after JIT warmup on small shapes.");
         out.println("rasterMs is reading the shape once into a bitset. routeKB is the hover list if we stored it.");
-        out.println("cap% is blocks per hover divided by 19. lb is ceil(blocks/19). crewNow is usefulCrewFor.");
+        out.println("cap% is actions per hover divided by Apex actions/tick (19). lb is ceil(blocks/19). crewNow is usefulCrewFor.");
         out.println("A planner with leftover did not finish the shape.");
         out.println();
         out.printf(Locale.US, "%-22s %-16s %10s %8s %8s %7s %6s %8s %8s %8s%n",

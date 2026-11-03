@@ -341,7 +341,7 @@ public final class WrightsConfig {
      */
     public static final int PLACE_REACH = 1;
 
-    /** Cells along a straight line one hover can cover at this operations tier. Basic is 1; every other tier is 3. */
+    /** Cells along a straight line one hover can cover at this fabricator tier. Basic is 1; every other tier is 3. */
     public static int placeAoeLine(int ops) {
         return WrightTier.clamp(ops) <= WrightTier.BASIC ? 1 : 3;
     }
@@ -351,11 +351,11 @@ public final class WrightsConfig {
     }
 
     /**
-     * Blocks one operation of {@code ops} can clear in one hover for this footprint.
-     * A beam is limited to the line length (3 at Copper and above). A plate uses the tier cap inside the sphere.
+     * Actions/tick one hover of fabricator tier {@code ops} can spend on this footprint.
+     * A beam is limited to the line length (3 above Basic). A plate uses the tier's full actions/tick.
      */
     public static int placeAoeCapacity(int sizeX, int sizeY, int sizeZ, int ops) {
-        int burst = Math.max(1, WrightTier.operationCap(ops));
+        int burst = Math.max(1, WrightTier.actionsPerTick(ops));
         int sx = Math.max(1, sizeX);
         int sy = Math.max(1, sizeY);
         int sz = Math.max(1, sizeZ);

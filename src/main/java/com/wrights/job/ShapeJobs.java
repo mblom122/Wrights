@@ -396,7 +396,7 @@ public final class ShapeJobs {
                 job.shapeAxis(),
                 job.shapePivot());
         int reach = WrightTier.operationReachSqr(fabricator);
-        int cap = Math.max(1, WrightTier.operationCap(fabricator));
+        int cap = Math.max(1, WrightTier.actionsPerTick(fabricator));
         int[] xs = new int[total];
         int[] ys = new int[total];
         int[] zs = new int[total];
@@ -795,7 +795,8 @@ public final class ShapeJobs {
             return;
         }
         int scanBudget = Math.max(1, WrightsConfig.COPY_POSITIONS_PER_TICK.getAsInt());
-        int placeBudget = fast
+        // Fast shape uses the config tick limit, not the fabricator actions/tick budget.
+        int tickLimit = fast
                 ? Math.min(8192, scanBudget)
                 : Math.max(1, WrightsConfig.BLOCKS_PER_TICK.getAsInt());
         int scanned = 0;
@@ -803,7 +804,7 @@ public final class ShapeJobs {
         DroneEntity drone = null;
         BlockState statusState = null;
         int statusWait = DroneEntity.WAIT_NONE;
-        while (job.cursor() < job.total() && scanned < scanBudget && placed < placeBudget) {
+        while (job.cursor() < job.total() && scanned < scanBudget && placed < tickLimit) {
             BlockPos pos = job.scanPos();
             if (!com.wrights.blueprint.Shapes.containsWorld(
                     shapeKind,
@@ -1078,7 +1079,7 @@ public final class ShapeJobs {
                 drone.setWorkStatus(BlockFilters.icon(state), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
                 continue;
             }
-            int budget = CellPlacement.placeBudget(hand);
+            int budget = CellPlacement.actionBudget(hand);
             int placed = 0;
             int scanned = 0;
             boolean usedAnchor = false;
@@ -1551,7 +1552,7 @@ public final class ShapeJobs {
             drone.setWorkStatus(BlockFilters.icon(state), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
             return JobManager.PATTERN_DONE;
         }
-        int budget = CellPlacement.placeBudget(hand);
+        int budget = CellPlacement.actionBudget(hand);
         int placed = 0;
         while (placed < budget) {
             int index = -1;

@@ -1,5 +1,5 @@
 """Generate the 3D drone-part items: Rotor Assembly (rotor_mk1..5, flight), Fabricator Head
-(fabricator_mk1..5, blocks per operation) and Power Core (core_mk1..5, energy per block).
+(fabricator_mk1..5, actions/tick) and Power Core (core_mk1..5, energy per block).
 Run from the repo root: python tools/gen_drone_parts.py
 """
 from __future__ import annotations

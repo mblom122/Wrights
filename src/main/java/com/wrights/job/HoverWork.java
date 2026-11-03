@@ -268,8 +268,8 @@ public final class HoverWork {
             return Result.DONE;
         }
         int budget = hand != null
-                ? CellPlacement.placeBudget(hand)
-                : Math.max(1, WrightTier.operationCap(drone.fabricator()));
+                ? CellPlacement.actionBudget(hand)
+                : Math.max(1, WrightTier.actionsPerTick(drone.fabricator()));
         int removed = 0;
         for (int n = 0; n < budget; n++) {
             int at = hand == null
