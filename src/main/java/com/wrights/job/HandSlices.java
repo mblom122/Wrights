@@ -154,7 +154,7 @@ public final class HandSlices {
             if (!hand.idle || open[i] || hand.entityId == null) {
                 continue;
             }
-            JobManager.recall(level, player, hand.entityId, slot++, going, hand.homePort);
+            DroneFleet.recall(level, player, hand.entityId, slot++, going, hand.homePort);
             hand.entityId = null;
         }
     }
@@ -181,7 +181,7 @@ public final class HandSlices {
             if (!hand.waitingOnOthers || hand.entityId == null) {
                 continue;
             }
-            JobManager.recall(level, player, hand.entityId, slot++, going, hand.homePort);
+            DroneFleet.recall(level, player, hand.entityId, slot++, going, hand.homePort);
             hand.entityId = null;
         }
     }
@@ -285,7 +285,7 @@ public final class HandSlices {
     }
 
     private static boolean cheapUnsettled(BuildJob job, Schematic.Entry entry) {
-        return !job.outsideClip(entry) && !JobManager.skippedContent(job, entry) && !job.isSettled(entry.x(), entry.y(), entry.z());
+        return !job.outsideClip(entry) && !CellPlacement.skippedContent(job, entry) && !job.isSettled(entry.x(), entry.y(), entry.z());
     }
 
     /** Blocks still left to place or skip in this wright's slices. */
@@ -334,7 +334,7 @@ public final class HandSlices {
     }
 
     private static boolean isOpenCell(ServerLevel level, Schematic schematic, BuildJob job, Schematic.Entry entry) {
-        if (job.outsideClip(entry) || JobManager.skippedContent(job, entry)) {
+        if (job.outsideClip(entry) || CellPlacement.skippedContent(job, entry)) {
             return false;
         }
         // Settled / matching world cells are done — skip the heavier survival checks.

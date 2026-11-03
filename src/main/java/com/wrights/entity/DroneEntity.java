@@ -1,5 +1,6 @@
 package com.wrights.entity;
 
+import com.wrights.job.DroneFleet;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -132,9 +133,9 @@ public class DroneEntity extends Entity {
             return;
         }
         if (docked != null) {
-            com.wrights.job.JobManager.noteDocked(server.getServer(), this.unitId, docked);
+            com.wrights.job.DroneFleet.noteDocked(server.getServer(), this.unitId, docked);
         } else {
-            com.wrights.job.JobManager.noteReleased(server.getServer(), this.unitId);
+            com.wrights.job.DroneFleet.noteReleased(server.getServer(), this.unitId);
         }
     }
 
@@ -663,9 +664,9 @@ public class DroneEntity extends Entity {
             BlockPos docked = com.wrights.drone.DockRecovery.recover(level, player, where, this.unitId, this.tier(), this.ops(), this.unitName);
             if (this.unitId != null) {
                 if (docked != null) {
-                    com.wrights.job.JobManager.noteDocked(level.getServer(), this.unitId, docked);
+                    com.wrights.job.DroneFleet.noteDocked(level.getServer(), this.unitId, docked);
                 } else {
-                    com.wrights.job.JobManager.noteReleased(level.getServer(), this.unitId);
+                    com.wrights.job.DroneFleet.noteReleased(level.getServer(), this.unitId);
                 }
             }
         }

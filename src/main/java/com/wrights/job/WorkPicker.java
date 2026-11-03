@@ -76,7 +76,7 @@ public final class WorkPicker {
         if (job.mining()) {
             return !com.wrights.blueprint.MirrorLaunch.accepts(level, pos, entry.state().getBlock(), job.mineAny());
         }
-        if (JobManager.skippedContent(job, entry)) {
+        if (CellPlacement.skippedContent(job, entry)) {
             return true;
         }
         // Already placed or skipped once. Do not retry if the block later pops (cactus) or is broken.
@@ -105,7 +105,7 @@ public final class WorkPicker {
             if (!satisfied(level, job, entry)) {
                 Falling hold = falling(level, schematic, job, entry);
                 if (hold == Falling.SKIP) {
-                    JobManager.giveUpCell(job, entry, index);
+                    CellPlacement.giveUpCell(job, entry, index);
                     JobManager.noteProgress(schematic, job, hand, entry, index);
                     budget[0]--;
                     continue;
@@ -229,7 +229,7 @@ public final class WorkPicker {
                 continue;
             }
             if (falling(level, schematic, job, entry) == Falling.SKIP) {
-                JobManager.giveUpCell(job, entry, cursor);
+                CellPlacement.giveUpCell(job, entry, cursor);
                 cursor++;
                 continue;
             }
@@ -325,7 +325,7 @@ public final class WorkPicker {
                 continue;
             }
             if (hold == Falling.SKIP) {
-                JobManager.giveUpCell(job, entry, i);
+                CellPlacement.giveUpCell(job, entry, i);
                 continue;
             }
             if (entry.secondary() && secondaryWaiting(level, job, entry)) {
@@ -644,7 +644,7 @@ public final class WorkPicker {
     }
 
     private static boolean canPay(ServerPlayer player, ServerLevel level, BuildJob job, BuildJob.Hand hand, Schematic.Entry entry) {
-        if (job.mining() || entry.secondary() || JobManager.freePlace(player)) {
+        if (job.mining() || entry.secondary() || CellPlacement.freePlace(player)) {
             return true;
         }
         return hasPlaceCosts(player, level, job, hand, entry);
@@ -680,7 +680,7 @@ public final class WorkPicker {
         if (entry == null || entry.nbt() == null || entry.secondary()) {
             return false;
         }
-        boolean full = job.placeAll() && entry.nbtFull() && WrightsConfig.copyAll() && player != null && JobManager.creative(player);
+        boolean full = job.placeAll() && entry.nbtFull() && WrightsConfig.copyAll() && player != null && CellPlacement.creative(player);
         if (full) {
             return true;
         }
@@ -869,7 +869,7 @@ public final class WorkPicker {
 
     /** False when this cell will be skipped (solid in the way, kept machine, clipped content). */
     private static boolean canEventuallyPlace(ServerLevel level, BuildJob job, Schematic.Entry entry) {
-        if (job.outsideClip(entry) || JobManager.skippedContent(job, entry)) {
+        if (job.outsideClip(entry) || CellPlacement.skippedContent(job, entry)) {
             return false;
         }
         BlockPos pos = job.min().offset(entry.x(), entry.y(), entry.z());
@@ -883,10 +883,10 @@ public final class WorkPicker {
         if (existing.equals(entry.state())) {
             return false;
         }
-        if (JobManager.keptStored(job, existing, entry.state())) {
+        if (CellPlacement.keptStored(job, existing, entry.state())) {
             return false;
         }
-        if (!JobManager.shouldVoid(job, existing, entry.state()) && !existing.isAir() && !existing.canBeReplaced()) {
+        if (!CellPlacement.shouldVoid(job, existing, entry.state()) && !existing.isAir() && !existing.canBeReplaced()) {
             return false;
         }
         return true;

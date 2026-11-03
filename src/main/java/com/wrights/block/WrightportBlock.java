@@ -1,5 +1,6 @@
 package com.wrights.block;
 
+import com.wrights.job.DroneFleet;
 import java.util.List;
 
 import javax.annotation.Nullable;
@@ -85,7 +86,7 @@ public class WrightportBlock extends BaseEntityBlock {
     @Override
     protected void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean movedByPiston) {
         if (!state.is(newState.getBlock()) && level instanceof net.minecraft.server.level.ServerLevel server) {
-            com.wrights.job.JobManager.strandFromDock(server, pos);
+            com.wrights.job.DroneFleet.strandFromDock(server, pos);
             WrightLedger.get(server.getServer()).forget(server.dimension(), pos);
         }
         super.onRemove(state, level, pos, newState, movedByPiston);
@@ -98,7 +99,7 @@ public class WrightportBlock extends BaseEntityBlock {
         if (entity instanceof WrightportBlockEntity port) {
             Swarm swarm = port.swarm();
             if (params.getLevel() instanceof net.minecraft.server.level.ServerLevel server) {
-                swarm = swarm.without(com.wrights.job.JobManager.strandFromDock(server, port.getBlockPos()));
+                swarm = swarm.without(com.wrights.job.DroneFleet.strandFromDock(server, port.getBlockPos()));
             }
             if (!swarm.units().isEmpty()) {
                 Swarm.write(stack, swarm);

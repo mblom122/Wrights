@@ -224,10 +224,10 @@ public final class ShapeJobs {
             if (!JobManager.instant(player)) {
                 if (job.hasCrew()) {
                     for (BuildJob.Hand hand : job.hands()) {
-                        JobManager.ensureHand(level, player, job, hand, min);
+                        DroneFleet.ensureHand(level, player, job, hand, min);
                     }
                 } else {
-                    JobManager.ensureDrone(level, player, job, min);
+                    DroneFleet.ensureDrone(level, player, job, min);
                 }
             }
         }
@@ -526,7 +526,7 @@ public final class ShapeJobs {
         List<Integer> speeds = new ArrayList<>();
         List<UUID> ids = new ArrayList<>();
         for (WrightHomes.FreeWright unit : units) {
-            JobManager.releaseHomeWaiter(player, library, unit.unit().id(), job.id());
+            DroneFleet.releaseHomeWaiter(player, library, unit.unit().id(), job.id());
             speeds.add(WrightTier.clamp(unit.unit().speed()));
             ids.add(unit.unit().id());
         }
@@ -687,11 +687,11 @@ public final class ShapeJobs {
         ServerLevel level = server.getLevel(job.dimension());
         ServerPlayer player = server.getPlayerList().getPlayer(job.owner());
         if (level == null) {
-            JobManager.discardDrone(server, job);
+            DroneFleet.discardDrone(server, job);
             library.removeJob(job);
             return;
         }
-        JobManager.shelterLost(level, player, library, job);
+        DroneFleet.shelterLost(level, player, library, job);
         if (player == null) {
             return;
         }
@@ -714,7 +714,7 @@ public final class ShapeJobs {
         }
         if (usable.isEmpty()) {
             Messages.actionBar(player, "message.wrights.shape_need_materials");
-            JobManager.discardDrone(server, job);
+            DroneFleet.discardDrone(server, job);
             library.removeJob(job);
             BlueprintNetwork.syncJobs(player);
             return;
@@ -738,7 +738,7 @@ public final class ShapeJobs {
             if (owed != null && !shapeCanPay(player, level, job, owed)) {
                 if (job.droneId() != null) {
                     publishShapeDroneStatus(level, job, owed, DroneEntity.WAIT_ITEMS);
-                    JobManager.parkSolo(level, player, job);
+                    DroneFleet.parkSolo(level, player, job);
                 }
                 library.setDirty();
                 return;
@@ -747,7 +747,7 @@ public final class ShapeJobs {
             job.setQueued(false);
         }
         if (job.waitKind() == BuildJob.WAIT_ENERGY && !fast) {
-            int cost = WrightsConfig.energyCost(job, false, JobManager.mirrorPlace(job));
+            int cost = WrightsConfig.energyCost(job, false, CellPlacement.mirrorPlace(job));
             if (!com.wrights.energy.PortEnergy.canFund(level, player, job, cost)) {
                 library.setDirty();
                 return;
@@ -825,7 +825,7 @@ public final class ShapeJobs {
                 scanned++;
                 continue;
             }
-            if (!level.mayInteract(player, pos) || !JobManager.canBuild(player, level, pos)) {
+            if (!level.mayInteract(player, pos) || !CellPlacement.canBuild(player, level, pos)) {
                 job.advance();
                 job.skippedOne();
                 scanned++;
@@ -864,7 +864,7 @@ public final class ShapeJobs {
             statusState = state;
             if (!fast) {
                 Vec3 hover = Vec3.atCenterOf(pos).add(0.0D, 0.9D, 0.0D);
-                drone = JobManager.ensureDrone(level, player, job, pos);
+                drone = DroneFleet.ensureDrone(level, player, job, pos);
                 if (drone == null) {
                     if (job.tickMessage()) {
                         JobManager.noteChunk(player, library, job);
@@ -899,7 +899,7 @@ public final class ShapeJobs {
                 continue;
             }
             Schematic.Entry entry = new Schematic.Entry((short) dx, (short) dy, (short) dz, state, false);
-            PlaceResult result = JobManager.placeOne(level, player, job, pos, entry, false, null, drone);
+            PlaceResult result = CellPlacement.placeOne(level, player, job, pos, entry, false, null, drone);
             if (result == PlaceResult.PAUSE) {
                 job.setWaitKind(BuildJob.WAIT_CHUNK);
                 publishShapeDroneStatus(level, job, state, DroneEntity.WAIT_CHUNK);
@@ -913,7 +913,7 @@ public final class ShapeJobs {
                 break;
             }
             if (result == PlaceResult.ENERGY) {
-                JobManager.stallForEnergy(level, player, library, job);
+                DroneFleet.stallForEnergy(level, player, library, job);
                 return;
             }
             job.advance();
@@ -935,14 +935,14 @@ public final class ShapeJobs {
         }
         if (statusState != null || statusWait != DroneEntity.WAIT_NONE) {
             if (drone != null) {
-                drone.setWorkStatus(JobManager.shapeStatusCargo(job, statusState, statusWait), ItemStack.EMPTY, statusWait);
+                drone.setWorkStatus(CellPlacement.shapeStatusCargo(job, statusState, statusWait), ItemStack.EMPTY, statusWait);
             } else {
                 publishShapeDroneStatus(level, job, statusState, statusWait);
             }
         }
         // Out of materials: send the wright home with its carry (same as blueprint stall).
         if (job.waitKind() == BuildJob.WAIT_ITEMS && !fast) {
-            JobManager.parkSolo(level, player, job);
+            DroneFleet.parkSolo(level, player, job);
             job.setQueued(true);
             job.setCrewQuota(Math.max(1, job.crewQuota()));
         }
@@ -989,7 +989,7 @@ public final class ShapeJobs {
             int patterned = tickSmallPattern(
                     level, player, library, job, hand, usable, fillMode, random, shapeKind, shapePinLocal);
             if (patterned == JobManager.PATTERN_ENERGY) {
-                JobManager.stallForEnergy(level, player, library, job);
+                DroneFleet.stallForEnergy(level, player, library, job);
                 return;
             }
             if (patterned == JobManager.PATTERN_CHUNK) {
@@ -1032,7 +1032,7 @@ public final class ShapeJobs {
             if (at == JobManager.NEED_ITEMS) {
                 waitingItems = true;
                 hand.aim = -1;
-                JobManager.parkForItems(level, player, hand);
+                DroneFleet.parkForItems(level, player, hand);
                 setShapeHandStatus(level, hand, usable.get(0).state(), DroneEntity.WAIT_ITEMS);
                 continue;
             }
@@ -1043,11 +1043,11 @@ public final class ShapeJobs {
             if (state == null) {
                 waitingItems = true;
                 hand.aim = -1;
-                JobManager.parkForItems(level, player, hand);
+                DroneFleet.parkForItems(level, player, hand);
                 setShapeHandStatus(level, hand, usable.get(0).state(), DroneEntity.WAIT_ITEMS);
                 continue;
             }
-            DroneEntity drone = JobManager.ensureHand(level, player, job, hand, pos);
+            DroneEntity drone = DroneFleet.ensureHand(level, player, job, hand, pos);
             if (drone != null) {
                 drone.setTier(hand.speed);
                 drone.setOps(handOps(hand));
@@ -1074,12 +1074,12 @@ public final class ShapeJobs {
             boolean canReachCell = drone.distanceToSqr(Vec3.atCenterOf(pos)) <= JobManager.PLACE_NEAR_SQR
                     && inOperationReachFromHover(drone.position(), pos, handOps(hand));
             if (!onHover && !canReachCell) {
-                drone.moveToward(hover, JobManager.flyStep(hand.speed, drone.distanceToSqr(hover)));
+                drone.moveToward(hover, CellPlacement.flyStep(hand.speed, drone.distanceToSqr(hover)));
                 hand.lastPos = drone.blockPosition();
                 drone.setWorkStatus(BlockFilters.icon(state), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
                 continue;
             }
-            int budget = JobManager.placeBudget(hand);
+            int budget = CellPlacement.placeBudget(hand);
             int placed = 0;
             int scanned = 0;
             boolean usedAnchor = false;
@@ -1150,7 +1150,7 @@ public final class ShapeJobs {
                     continue;
                 }
                 Schematic.Entry entry = new Schematic.Entry((short) dx, (short) dy, (short) dz, placeState, false);
-                PlaceResult result = JobManager.placeOne(level, player, job, cell, entry, false, hand, drone);
+                PlaceResult result = CellPlacement.placeOne(level, player, job, cell, entry, false, hand, drone);
                 if (result == PlaceResult.PAUSE) {
                     waitingChunk = true;
                     job.setWaitKind(BuildJob.WAIT_CHUNK);
@@ -1163,7 +1163,7 @@ public final class ShapeJobs {
                     break;
                 }
                 if (result == PlaceResult.ENERGY) {
-                    JobManager.stallForEnergy(level, player, library, job);
+                    DroneFleet.stallForEnergy(level, player, library, job);
                     return;
                 }
                 resolveShapeCell(job, hand, index, false);
@@ -1177,7 +1177,7 @@ public final class ShapeJobs {
                 hand.opStand = at;
             }
             if (waitingItems) {
-                JobManager.parkForItems(level, player, hand);
+                DroneFleet.parkForItems(level, player, hand);
                 setShapeHandStatus(level, hand, usable.get(0).state(), DroneEntity.WAIT_ITEMS);
             }
         }
@@ -1432,11 +1432,11 @@ public final class ShapeJobs {
         BlockState state = shapeNextState(job, usable, fillMode, random);
         if (state == null) {
             hand.aim = -1;
-            JobManager.parkForItems(level, player, hand);
+            DroneFleet.parkForItems(level, player, hand);
             setShapeHandStatus(level, hand, usable.isEmpty() ? null : usable.get(0).state(), DroneEntity.WAIT_ITEMS);
             return JobManager.PATTERN_ITEMS;
         }
-        DroneEntity drone = JobManager.ensureHand(level, player, job, hand, fly);
+        DroneEntity drone = DroneFleet.ensureHand(level, player, job, hand, fly);
         if (drone != null) {
             drone.setTier(hand.speed);
             drone.setOps(handOps(hand));
@@ -1448,13 +1448,13 @@ public final class ShapeJobs {
         Vec3 hover = Vec3.atCenterOf(fly).add(0.0D, 0.85D + (hand.lane % 2) * 0.45D, 0.0D);
         if (drone.launching() || !wrightOnStand(drone, fly)) {
             if (!drone.launching()) {
-                drone.moveToward(hover, JobManager.flyStep(hand.speed, drone.distanceToSqr(hover)));
+                drone.moveToward(hover, CellPlacement.flyStep(hand.speed, drone.distanceToSqr(hover)));
             }
             hand.lastPos = drone.blockPosition();
             drone.setWorkStatus(BlockFilters.icon(state), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
             return JobManager.PATTERN_DONE;
         }
-        int budget = JobManager.placeBudget(hand);
+        int budget = CellPlacement.placeBudget(hand);
         int placed = 0;
         int sx = job.boxSizeX();
         int sy = job.boxSizeY();
@@ -1501,7 +1501,7 @@ public final class ShapeJobs {
             BlockPos cell = job.scanPosAt(index);
             BlockState placeState = shapeNextState(job, usable, fillMode, random);
             if (placeState == null) {
-                JobManager.parkForItems(level, player, hand);
+                DroneFleet.parkForItems(level, player, hand);
                 setShapeHandStatus(level, hand, usable.get(0).state(), DroneEntity.WAIT_ITEMS);
                 return JobManager.PATTERN_ITEMS;
             }
@@ -1509,7 +1509,7 @@ public final class ShapeJobs {
             int dy = cell.getY() - job.min().getY();
             int dz = cell.getZ() - job.min().getZ();
             Schematic.Entry entry = new Schematic.Entry((short) dx, (short) dy, (short) dz, placeState, false);
-            PlaceResult result = JobManager.placeOne(level, player, job, cell, entry, false, hand, drone);
+            PlaceResult result = CellPlacement.placeOne(level, player, job, cell, entry, false, hand, drone);
             if (result == PlaceResult.PAUSE) {
                 job.setWaitKind(BuildJob.WAIT_CHUNK);
                 setShapeHandStatus(level, hand, placeState, DroneEntity.WAIT_CHUNK);
@@ -1517,7 +1517,7 @@ public final class ShapeJobs {
                 return JobManager.PATTERN_CHUNK;
             }
             if (result == PlaceResult.WAIT) {
-                JobManager.parkForItems(level, player, hand);
+                DroneFleet.parkForItems(level, player, hand);
                 setShapeHandStatus(level, hand, placeState, DroneEntity.WAIT_ITEMS);
                 return JobManager.PATTERN_ITEMS;
             }
@@ -1962,7 +1962,7 @@ public final class ShapeJobs {
         if (!level.isLoaded(pos)) {
             return WrightsConfig.REQUIRE_CHUNKS_LOADED.getAsBoolean() ? ShapeCell.BLOCKED : ShapeCell.SKIP;
         }
-        if (!level.mayInteract(player, pos) || !JobManager.canBuild(player, level, pos)) {
+        if (!level.mayInteract(player, pos) || !CellPlacement.canBuild(player, level, pos)) {
             return ShapeCell.SKIP;
         }
         BlockState current = level.getBlockState(pos);
@@ -2567,7 +2567,7 @@ public final class ShapeJobs {
     }
 
     private static boolean shapeCanPay(ServerPlayer player, ServerLevel level, BuildJob job, BlockState state) {
-        if (state == null || JobManager.freePlace(player)) {
+        if (state == null || CellPlacement.freePlace(player)) {
             return true;
         }
         Item payment = BlockFilters.payment(state);
@@ -2594,7 +2594,7 @@ public final class ShapeJobs {
         if (job.paused() && reason == DroneEntity.WAIT_NONE) {
             reason = DroneEntity.WAIT_PAUSED;
         }
-        drone.setWorkStatus(JobManager.shapeStatusCargo(job, state, reason), ItemStack.EMPTY, reason);
+        drone.setWorkStatus(CellPlacement.shapeStatusCargo(job, state, reason), ItemStack.EMPTY, reason);
     }
 
     private static BlockState shapeNextState(

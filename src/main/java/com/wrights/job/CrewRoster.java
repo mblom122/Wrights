@@ -1,6 +1,6 @@
 package com.wrights.job;
 
-import com.wrights.job.JobManager.Owed;
+import com.wrights.job.DroneFleet.Owed;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -149,7 +149,7 @@ public final class CrewRoster {
             }
         }
         if (flying) {
-            JobManager.discardDrone(player.getServer(), job);
+            DroneFleet.discardDrone(player.getServer(), job);
             changed = true;
         }
         if (!job.crewUnits().isEmpty()) {
@@ -328,7 +328,7 @@ public final class CrewRoster {
 
     static void placeCrew(ServerPlayer player, SchematicLibrary library, BuildJob job, List<UUID> ids) {
         if (ids.isEmpty()) {
-            JobManager.sendHome(player.getServer(), player, job);
+            DroneFleet.sendHome(player.getServer(), player, job);
             job.setCrewQuota(0);
             job.clearAssigned();
             job.noteHold(BuildJob.HOLD_NO_WRIGHTS, null);
@@ -504,7 +504,7 @@ public final class CrewRoster {
         if (need > 0 && level != null && job.schematicId() != null) {
             Schematic schematic = library.schematic(job.schematicId()).orElse(null);
             if (schematic != null) {
-                owed = JobManager.owed(level, schematic, job);
+                owed = DroneFleet.owed(level, schematic, job);
                 if (owed.idle() && ids.isEmpty()) {
                     JobManager.finishPaste(player.getServer(), library, player, job);
                     return;
@@ -535,7 +535,7 @@ public final class CrewRoster {
         }
         if (ids.isEmpty()) {
             if (job.hasCrew() || !job.crewUnits().isEmpty()) {
-                JobManager.sendHome(player.getServer(), player, job);
+                DroneFleet.sendHome(player.getServer(), player, job);
                 job.clearAssigned();
                 job.setQueued(true);
                 job.setPaused(false);
@@ -704,7 +704,7 @@ public final class CrewRoster {
         int bestOps = WrightTier.BASE;
         ServerLevel jobLevel = player.getServer().getLevel(job.dimension());
         for (UUID unitId : ids) {
-            JobManager.releaseHomeWaiter(player, library, unitId, job.id());
+            DroneFleet.releaseHomeWaiter(player, library, unitId, job.id());
             WrightHomes.FreeWright found = WrightHomes.locate(jobLevel, player, unitId, job.min());
             if (found == null) {
                 continue;
@@ -742,7 +742,7 @@ public final class CrewRoster {
             }
         }
         if (kept.isEmpty()) {
-            JobManager.discardDrone(player.getServer(), job);
+            DroneFleet.discardDrone(player.getServer(), job);
             boolean stayQueued = job.queued();
             job.clearAssigned();
             if (stayQueued) {
@@ -756,7 +756,7 @@ public final class CrewRoster {
             return;
         }
         if (!job.hasCrew() && job.droneId() != null) {
-            JobManager.discardId(player.getServer().getLevel(job.dimension()), job.droneId());
+            DroneFleet.discardId(player.getServer().getLevel(job.dimension()), job.droneId());
             job.setDroneId(null);
         }
         List<UUID> dropped = new ArrayList<>();
@@ -819,7 +819,7 @@ public final class CrewRoster {
         ServerLevel level = player.getServer().getLevel(job.dimension());
         int slot = 0;
         for (UUID droppedId : dropped) {
-            JobManager.recall(level, player, droppedId, slot++, dropped.size());
+            DroneFleet.recall(level, player, droppedId, slot++, dropped.size());
         }
         job.setCrewUnits(kept);
         for (int i = 0; i < job.hands().size() && i < homes.size(); i++) {
@@ -1061,7 +1061,7 @@ public final class CrewRoster {
         List<Integer> speeds = new ArrayList<>();
         List<UUID> ids = new ArrayList<>();
         for (WrightHomes.FreeWright unit : units) {
-            JobManager.releaseHomeWaiter(player, library, unit.unit().id(), job.id());
+            DroneFleet.releaseHomeWaiter(player, library, unit.unit().id(), job.id());
             speeds.add(WrightTier.clamp(unit.unit().speed()));
             ids.add(unit.unit().id());
         }

@@ -2,15 +2,12 @@ package com.wrights.job;
 
 import com.wrights.job.WorkPicker.Falling;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
@@ -19,30 +16,21 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.Container;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.FallingBlock;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.minecraft.world.ticks.LevelChunkTicks;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.common.util.BlockSnapshot;
-import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import com.wrights.WrightsConfig;
@@ -53,14 +41,10 @@ import com.wrights.blueprint.BoxEdits;
 import com.wrights.network.BlueprintNetwork;
 import com.wrights.network.BlueprintPayloads;
 import com.wrights.WrightsMod;
-import com.wrights.drone.DockRecovery;
 import com.wrights.drone.WrightTier;
-import com.wrights.drone.WrightportPlaces;
 import com.wrights.drone.WrightHomes;
 import com.wrights.drone.CrewSplit;
-import com.wrights.drone.Swarm;
 import com.wrights.entity.DroneEntity;
-import com.wrights.entity.ModEntities;
 import com.wrights.item.ControllerData;
 import com.wrights.item.ControllerItem;
 import com.wrights.schematic.Schematic;
@@ -133,7 +117,7 @@ public final class JobManager {
                 }
             } catch (RuntimeException ex) {
                 WrightsMod.LOGGER.error("Wrights job {} failed and was stopped", job.id(), ex);
-                discardDrone(server, job);
+                DroneFleet.discardDrone(server, job);
                 library.removeJob(job);
             }
             // Progress is in memory; dirty every second is enough and avoids heavy NBT churn mid-build.
@@ -141,7 +125,7 @@ public final class JobManager {
                 library.setDirty();
             }
         }
-        lendStocked(server, library);
+        DroneFleet.lendStocked(server, library);
         if (server.getTickCount() % 10 == 0) {
             java.util.Set<java.util.UUID> owners = new java.util.HashSet<>();
             for (BuildJob job : library.jobs()) {
@@ -262,10 +246,10 @@ public final class JobManager {
         }
         if (job.kind() == BuildJob.Kind.PASTE) {
             com.wrights.network.BlueprintNetwork.clearJobHologram(player, job.id());
-            sendHome(player.getServer(), player, job);
+            DroneFleet.sendHome(player.getServer(), player, job);
             archive(library, job, true);
         } else {
-            discardDrone(player.getServer(), job);
+            DroneFleet.discardDrone(player.getServer(), job);
             library.removeJob(job);
         }
         if (tell) {
@@ -297,7 +281,7 @@ public final class JobManager {
         job.restart();
         library.setDirty();
         if (!instant(player) && !job.hasCrew() && player.level() instanceof ServerLevel level && level.dimension().equals(job.dimension())) {
-            ensureDrone(level, player, job, job.min());
+            DroneFleet.ensureDrone(level, player, job, job.min());
         }
         BlueprintNetwork.showJobHologram(player, job, schematic);
         BlueprintNetwork.syncJobs(player);
@@ -327,7 +311,7 @@ public final class JobManager {
         }
         library.setDirty();
         if (!instant(player) && !job.hasCrew() && player.level() instanceof ServerLevel level && level.dimension().equals(job.dimension())) {
-            ensureDrone(level, player, job, job.lastRefundPos());
+            DroneFleet.ensureDrone(level, player, job, job.lastRefundPos());
         }
         BlueprintNetwork.clearJobHologram(player, job.id());
         BlueprintNetwork.syncJobs(player);
@@ -511,7 +495,7 @@ public final class JobManager {
         if (job.kind() == BuildJob.Kind.PASTE) {
             BlueprintNetwork.clearJobHologram(player, job.id());
         }
-        discardDrone(player.getServer(), job);
+        DroneFleet.discardDrone(player.getServer(), job);
         library.removeJob(job);
     }
 
@@ -681,7 +665,7 @@ public final class JobManager {
         library.addJob(job);
         ServerLevel level = player.getServer().getLevel(origin.dimension());
         if (level != null && player.level() == level && !instant(player) && !job.hasCrew()) {
-            ensureDrone(level, player, job, origin.pos());
+            DroneFleet.ensureDrone(level, player, job, origin.pos());
         }
         launched(player, job);
     }
@@ -817,7 +801,7 @@ public final class JobManager {
             return true;
         }
         if (player.level() instanceof ServerLevel level && !instant(player) && !job.hasCrew()) {
-            ensureDrone(level, player, job, origin);
+            DroneFleet.ensureDrone(level, player, job, origin);
         }
         launched(player, job);
         BlueprintNetwork.showJobHologram(player, job, schematic);
@@ -869,7 +853,7 @@ public final class JobManager {
         }
         library.addJob(job);
         if (player.level() instanceof ServerLevel level && !instant(player) && !job.hasCrew()) {
-            ensureDrone(level, player, job, origin);
+            DroneFleet.ensureDrone(level, player, job, origin);
         }
         launched(player, job);
         BlueprintNetwork.showJobHologram(player, job, schematic);
@@ -1147,7 +1131,7 @@ public final class JobManager {
             }
             return;
         }
-        ItemStack stack = findController(player, job.controllerId());
+        ItemStack stack = DroneFleet.findController(player, job.controllerId());
         if (stack.isEmpty()) {
             if (job.tickMessage()) {
                 Messages.actionBar(player, "message.wrights.hold_controller");
@@ -1179,14 +1163,14 @@ public final class JobManager {
         ServerPlayer player = server.getPlayerList().getPlayer(job.owner());
         Schematic schematic = job.schematicId() == null ? null : library.schematic(job.schematicId()).orElse(null);
         if (level == null || schematic == null) {
-            discardDrone(server, job);
+            DroneFleet.discardDrone(server, job);
             library.removeJob(job);
             if (player != null) {
                 Messages.actionBar(player, "message.wrights.paste_missing");
             }
             return;
         }
-        shelterLost(level, player, library, job);
+        DroneFleet.shelterLost(level, player, library, job);
         if (player == null) {
             return;
         }
@@ -1199,11 +1183,11 @@ public final class JobManager {
             return;
         }
         if (instant(player)) {
-            placeAll(level, player, library, job, schematic);
+            CellPlacement.placeAll(level, player, library, job, schematic);
             return;
         }
         if (job.waitKind() == BuildJob.WAIT_ENERGY) {
-            int cost = WrightsConfig.energyCost(job, false, mirrorPlace(job));
+            int cost = WrightsConfig.energyCost(job, false, CellPlacement.mirrorPlace(job));
             if (!com.wrights.energy.PortEnergy.canFund(level, player, job, cost)) {
                 library.setDirty();
                 return;
@@ -1214,7 +1198,7 @@ public final class JobManager {
         if (job.queued()) {
             CrewRoster.topUpQueued(player, library, job);
             if (!job.hasCrew()) {
-                job.setWaitKind(shortOnItems(player, library, job) ? BuildJob.WAIT_ITEMS : BuildJob.WAIT_NONE);
+                job.setWaitKind(DroneFleet.shortOnItems(player, library, job) ? BuildJob.WAIT_ITEMS : BuildJob.WAIT_NONE);
                 return;
             }
         }
@@ -1255,8 +1239,8 @@ public final class JobManager {
         if (at == NEED_ITEMS) {
             job.setWaitKind(BuildJob.WAIT_ITEMS);
             JobAnnouncements.noteHistory(player, library, job, JobEventLog.STALLED_ITEMS, Component.translatable("history.wrights.stalled_items").getString());
-            parkSolo(level, player, job);
-            releaseStalledHome(player, library, job);
+            DroneFleet.parkSolo(level, player, job);
+            DroneFleet.releaseStalledHome(player, library, job);
             library.setDirty();
             return;
         }
@@ -1266,7 +1250,7 @@ public final class JobManager {
         }
         Schematic.Entry next = schematic.entry(at);
         BlockPos nextPos = job.min().offset(next.x(), next.y(), next.z());
-        DroneEntity drone = ensureDrone(level, player, job, nextPos);
+        DroneEntity drone = DroneFleet.ensureDrone(level, player, job, nextPos);
         if (drone == null) {
             if (job.tickMessage()) {
                 noteChunk(player, library, job);
@@ -1305,8 +1289,8 @@ public final class JobManager {
             if (index == NEED_ITEMS) {
                 job.setWaitKind(BuildJob.WAIT_ITEMS);
                 drone.setWorkStatus(soloShow, ItemStack.EMPTY, DroneEntity.WAIT_ITEMS);
-                parkSolo(level, player, job);
-                releaseStalledHome(player, library, job);
+                DroneFleet.parkSolo(level, player, job);
+                DroneFleet.releaseStalledHome(player, library, job);
                 break;
             }
             if (index < 0) {
@@ -1333,11 +1317,11 @@ public final class JobManager {
                 continue;
             }
             if (WorkPicker.falling(level, schematic, job, entry) == Falling.SKIP) {
-                giveUpCell(job, entry, index);
+                CellPlacement.giveUpCell(job, entry, index);
                 WorkPicker.markSolo(job, index);
                 continue;
             }
-            PlaceResult placed = actOne(level, player, job, pos, entry, false, null);
+            PlaceResult placed = CellPlacement.actOne(level, player, job, pos, entry, false, null);
             if (placed == PlaceResult.PAUSE) {
                 job.setWaitKind(BuildJob.WAIT_CHUNK);
                 drone.setWorkStatus(soloShow, ItemStack.EMPTY, DroneEntity.WAIT_CHUNK);
@@ -1353,7 +1337,7 @@ public final class JobManager {
                 break;
             }
             if (placed == PlaceResult.ENERGY) {
-                stallForEnergy(level, player, library, job);
+                DroneFleet.stallForEnergy(level, player, library, job);
                 return;
             }
             WorkPicker.markSolo(job, index);
@@ -1375,16 +1359,16 @@ public final class JobManager {
         ServerLevel level = server.getLevel(job.dimension());
         ServerPlayer player = server.getPlayerList().getPlayer(job.owner());
         if (level == null) {
-            discardDrone(server, job);
+            DroneFleet.discardDrone(server, job);
             archive(library, job, true);
             return;
         }
-        shelterLost(level, player, library, job);
+        DroneFleet.shelterLost(level, player, library, job);
         if (player == null || job.paused()) {
             return;
         }
         if (instant(player)) {
-            undoAll(level, server, library, player, job);
+            CellPlacement.undoAll(level, server, library, player, job);
             return;
         }
         if (CrewRoster.holdWithoutDrones(player, library, job)) {
@@ -1407,7 +1391,7 @@ public final class JobManager {
             return;
         }
         BlockPos nextPos = job.lastRefundPos();
-        DroneEntity drone = ensureDrone(level, player, job, nextPos);
+        DroneEntity drone = DroneFleet.ensureDrone(level, player, job, nextPos);
         if (drone == null) {
             if (job.tickMessage()) {
                 noteChunk(player, library, job);
@@ -1453,7 +1437,7 @@ public final class JobManager {
         }
     }
 
-    private static void removeOne(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos pos, BuildJob.Refund refund, boolean quiet) {
+    static void removeOne(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos pos, BuildJob.Refund refund, boolean quiet) {
         BlockState current = level.getBlockState(pos);
         if (current.getBlock() != refund.state().getBlock()) {
             job.skippedOne();
@@ -1488,8 +1472,8 @@ public final class JobManager {
         }
     }
 
-    private static void finishUndo(MinecraftServer server, SchematicLibrary library, ServerPlayer player, BuildJob job) {
-        sendHome(server, player, job);
+    static void finishUndo(MinecraftServer server, SchematicLibrary library, ServerPlayer player, BuildJob job) {
+        DroneFleet.sendHome(server, player, job);
         int removed = Math.max(0, job.undoTotal() - job.skipped() - job.refundCount());
         int returned = job.returned();
         job.markUndone();
@@ -1506,9 +1490,9 @@ public final class JobManager {
         ServerLevel finishLevel = server.getLevel(job.dimension());
         if (finishLevel != null && !job.mining()) {
             // Drop any fall ticks neighbour places scheduled during the paste so hung sand stays.
-            scrubHangRegion(finishLevel, job);
+            CellPlacement.scrubHangRegion(finishLevel, job);
         }
-        sendHome(server, player, job);
+        DroneFleet.sendHome(server, player, job);
         int placed = job.placed();
         int skipped = job.skipped();
         archive(library, job, false);
@@ -1554,7 +1538,7 @@ public final class JobManager {
     }
 
     /** Temporary silk-touch pick used when Exchange returns the replaced blocks. */
-    private static ItemStack silkTouchPick(MinecraftServer server) {
+    static ItemStack silkTouchPick(MinecraftServer server) {
         ItemStack pick = new ItemStack(Items.DIAMOND_PICKAXE);
         if (server == null) {
             return pick;
@@ -1691,7 +1675,7 @@ public final class JobManager {
         int quota = Math.max(job.crewQuota(), recalled);
         job.rememberCrewQuota(quota);
         job.setCrewQuota(Math.max(1, quota));
-        sendHome(player.getServer(), player, job);
+        DroneFleet.sendHome(player.getServer(), player, job);
         job.clearAssigned();
         job.setQueued(true);
         job.setPaused(false);
@@ -1829,7 +1813,7 @@ public final class JobManager {
                 waiting = true;
                 waitingItems = true;
                 hand.aim = -1;
-                parkForItems(level, player, hand);
+                DroneFleet.parkForItems(level, player, hand);
                 publishHandStatus(level, player, schematic, job, hand, DroneEntity.WAIT_ITEMS);
                 continue;
             }
@@ -1861,7 +1845,7 @@ public final class JobManager {
             int handStatus = job.paused() ? DroneEntity.WAIT_PAUSED : DroneEntity.WAIT_NONE;
             Schematic.Entry next = schematic.entry(index);
             BlockPos nextPos = job.min().offset(next.x(), next.y(), next.z());
-            DroneEntity drone = ensureHand(level, player, job, hand, nextPos);
+            DroneEntity drone = DroneFleet.ensureHand(level, player, job, hand, nextPos);
             if (drone != null) {
                 drone.setTier(hand.speed);
                 drone.setOps(ShapeJobs.handOps(hand));
@@ -1878,12 +1862,12 @@ public final class JobManager {
                 continue;
             }
             if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
-                drone.moveToward(hover, flyStep(hand.speed, drone.distanceToSqr(hover)));
+                drone.moveToward(hover, CellPlacement.flyStep(hand.speed, drone.distanceToSqr(hover)));
                 hand.lastPos = drone.blockPosition();
                 publishHandStatus(level, player, schematic, job, hand, handStatus);
                 continue;
             }
-            int budget = placeBudget(hand);
+            int budget = CellPlacement.placeBudget(hand);
             int burst = 0;
             for (int n = 0; n < budget; n++) {
                 int at = WorkPicker.nextWork(level, player, schematic, job, hand, skipBudget);
@@ -1903,7 +1887,7 @@ public final class JobManager {
                     waitingItems = true;
                     hand.aim = -1;
                     handStatus = DroneEntity.WAIT_ITEMS;
-                    parkForItems(level, player, hand);
+                    DroneFleet.parkForItems(level, player, hand);
                     break;
                 }
                 if (at < 0) {
@@ -1942,7 +1926,7 @@ public final class JobManager {
                     noteProgress(schematic, job, hand, entry, at);
                     continue;
                 }
-                PlaceResult placed = actOne(level, player, job, pos, entry, false, hand);
+                PlaceResult placed = CellPlacement.actOne(level, player, job, pos, entry, false, hand);
                 if (placed == PlaceResult.PAUSE) {
                     job.setWaitKind(BuildJob.WAIT_CHUNK);
                     waitingChunk = true;
@@ -1957,11 +1941,11 @@ public final class JobManager {
                     waitingItems = true;
                     waiting = true;
                     handStatus = DroneEntity.WAIT_ITEMS;
-                    parkForItems(level, player, hand);
+                    DroneFleet.parkForItems(level, player, hand);
                     break;
                 }
                 if (placed == PlaceResult.ENERGY) {
-                    stallForEnergy(level, player, library, job);
+                    DroneFleet.stallForEnergy(level, player, library, job);
                     return;
                 }
                 noteProgress(schematic, job, hand, entry, at);
@@ -1975,7 +1959,7 @@ public final class JobManager {
         }
         // Neighbour places can re-schedule fall ticks on hung sand a tick or two later — keep clearing them.
         if (!job.hungFalls().isEmpty()) {
-            scrubHangRegion(level, job);
+            CellPlacement.scrubHangRegion(level, job);
         }
         // Slice sharing walks open counts — only when someone is idle, and not every tick.
         if (level.getGameTime() % 20L == 0L) {
@@ -2021,7 +2005,7 @@ public final class JobManager {
         job.setWaitKind(reason);
         if (reason == BuildJob.WAIT_ITEMS) {
             JobAnnouncements.noteHistory(player, library, job, JobEventLog.STALLED_ITEMS, Component.translatable("history.wrights.stalled_items").getString());
-            releaseStalledHome(player, library, job);
+            DroneFleet.releaseStalledHome(player, library, job);
         }
         if (!working && !scanning && !waiting) {
             finishPaste(level.getServer(), library, player, job);
@@ -2050,7 +2034,7 @@ public final class JobManager {
             working = true;
             BuildJob.Refund peek = job.refunds().get(index);
             BlockPos nextPos = job.min().offset(peek.x(), peek.y(), peek.z());
-            DroneEntity drone = ensureHand(level, player, job, hand, nextPos);
+            DroneEntity drone = DroneFleet.ensureHand(level, player, job, hand, nextPos);
             if (drone != null) {
                 drone.setTier(hand.speed);
                 drone.setOps(ShapeJobs.handOps(hand));
@@ -2064,11 +2048,11 @@ public final class JobManager {
                 continue;
             }
             if (drone.distanceToSqr(hover) > DRONE_REACH_SQR) {
-                drone.moveToward(hover, flyStep(hand.speed, drone.distanceToSqr(hover)));
+                drone.moveToward(hover, CellPlacement.flyStep(hand.speed, drone.distanceToSqr(hover)));
                 hand.lastPos = drone.blockPosition();
                 continue;
             }
-            int budget = placeBudget(hand);
+            int budget = CellPlacement.placeBudget(hand);
             for (int n = 0; n < budget; n++) {
                 int at = WorkPicker.refundIndex(job, hand);
                 if (at < 0) {
@@ -2232,1334 +2216,4 @@ public final class JobManager {
         return -1;
     }
 
-    static int placeBudget(BuildJob.Hand hand) {
-        // One operation is one hover. The tier cap (Netherite 19) is the lag bound;
-        // clamping it to blocksPerTick split a 19-block sphere into a second tick and a second op.
-        return Math.max(1, WrightTier.operationCap(ShapeJobs.handOps(hand)));
-    }
-
-    static double flyStep(int speed, double distanceSqr) {
-        double step = WrightTier.flyClose(speed);
-        if (distanceSqr > 64.0D) {
-            step *= 2.1D;
-        }
-        return step;
-    }
-
-    private static void placeAll(ServerLevel level, ServerPlayer player, SchematicLibrary library, BuildJob job, Schematic schematic) {
-        int count = Math.min(job.total(), schematic.blockCount());
-        boolean[] done = new boolean[count];
-        int guard = count + 1;
-        boolean progress = true;
-        while (progress && guard-- > 0) {
-            progress = false;
-            for (int i = 0; i < count; i++) {
-                if (done[i]) {
-                    continue;
-                }
-                Schematic.Entry entry = schematic.entry(i);
-                if (job.outsideClip(entry)) {
-                    done[i] = true;
-                    progress = true;
-                    continue;
-                }
-                BlockPos pos = job.min().offset(entry.x(), entry.y(), entry.z());
-                if (!level.isLoaded(pos)) {
-                    level.getChunkAt(pos);
-                }
-                PlaceResult placed = actOne(level, player, job, pos, entry, true, null);
-                if (placed == PlaceResult.PAUSE) {
-                    library.setDirty();
-                    return;
-                }
-                if (placed == PlaceResult.WAIT || placed == PlaceResult.ENERGY) {
-                    if (placed == PlaceResult.ENERGY) {
-                        job.setWaitKind(BuildJob.WAIT_ENERGY);
-                        job.setQueued(true);
-                    }
-                    continue;
-                }
-                done[i] = true;
-                progress = true;
-                // Instant finish has no hover AOE — each successful cell is one operation.
-                job.operationOne();
-            }
-        }
-        for (int i = 0; i < count; i++) {
-            if (!done[i]) {
-                job.skippedOne();
-            }
-        }
-        while (job.cursor() < job.total()) {
-            job.advance();
-        }
-        library.setDirty();
-        if (job.cursor() >= job.total()) {
-            finishPaste(player.getServer(), library, player, job);
-        }
-    }
-
-    private static void undoAll(ServerLevel level, MinecraftServer server, SchematicLibrary library, ServerPlayer player, BuildJob job) {
-        while (job.hasRefunds()) {
-            BuildJob.Refund refund = job.pollRefund();
-            BlockPos pos = job.min().offset(refund.x(), refund.y(), refund.z());
-            if (!level.isLoaded(pos)) {
-                level.getChunkAt(pos);
-            }
-            if (!level.isLoaded(pos)) {
-                job.skippedOne();
-                continue;
-            }
-            removeOne(level, player, job, pos, refund, true);
-        }
-        finishUndo(server, library, player, job);
-    }
-
-    private static PlaceResult actOne(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos pos, Schematic.Entry entry, boolean quiet, BuildJob.Hand hand) {
-        if (job.mining()) {
-            return mineOne(level, player, job, pos, entry, hand);
-        }
-        return placeOne(level, player, job, pos, entry, quiet, hand);
-    }
-
-    /** Breaks one mirrored block and sends its drops to the player who started the job. */
-    private static PlaceResult mineOne(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos pos, Schematic.Entry entry, BuildJob.Hand hand) {
-        if (level.isOutsideBuildHeight(pos)) {
-            job.skippedOne();
-            clearPlacedGhost(player, job, entry);
-            return PlaceResult.DONE;
-        }
-        if (!level.isLoaded(pos)) {
-            if (WrightsConfig.REQUIRE_CHUNKS_LOADED.getAsBoolean()) {
-                return PlaceResult.PAUSE;
-            }
-            job.skippedOne();
-            clearPlacedGhost(player, job, entry);
-            return PlaceResult.DONE;
-        }
-        if (!level.mayInteract(player, pos) || !com.wrights.blueprint.MirrorLaunch.accepts(level, pos, entry.state().getBlock(), job.mineAny())) {
-            job.skippedOne();
-            clearPlacedGhost(player, job, entry);
-            return PlaceResult.DONE;
-        }
-        if (!freePlace(player)) {
-            int cost = WrightsConfig.energyCost(job, false, false);
-            if (cost > 0 && !com.wrights.energy.PortEnergy.tryPay(level, player, hand, cost)) {
-                return PlaceResult.ENERGY;
-            }
-        }
-        java.util.List<ItemStack> drops = com.wrights.blueprint.MirrorLaunch.harvest(player, level, pos, job.mineTool(), job.mineVoid());
-        showCarry(level, job, hand, drops, null);
-        clearPlacedGhost(player, job, entry);
-        job.placedOne();
-        return PlaceResult.DONE;
-    }
-
-    /**
-     * Fold this break’s drops into the wright’s haul, then clear the place/mine preview
-     * so the under-wright icon switches to what was actually received (mine / exchange void-off).
-     */
-    private static void showCarry(
-            ServerLevel level,
-            BuildJob job,
-            BuildJob.Hand hand,
-            java.util.List<ItemStack> drops,
-            DroneEntity actor) {
-        if (drops == null || drops.isEmpty()) {
-            return;
-        }
-        DroneEntity drone = resolveCargoDrone(level, job, hand, actor);
-        if (drone == null) {
-            return;
-        }
-        drone.takeHaul(drops);
-        if (!drone.carried().isEmpty()) {
-            drone.clearCurrentBlock();
-        }
-    }
-
-    /** Prefer the wright that just acted, then hand / job flyer, then any job-bound flyer nearby. */
-    private static DroneEntity resolveCargoDrone(
-            ServerLevel level,
-            BuildJob job,
-            BuildJob.Hand hand,
-            DroneEntity actor) {
-        if (actor != null && actor.isAlive()) {
-            return actor;
-        }
-        if (hand != null && hand.entityId != null) {
-            Entity existing = level.getEntity(hand.entityId);
-            if (existing instanceof DroneEntity drone && drone.isAlive()) {
-                return drone;
-            }
-        }
-        if (job.droneId() != null) {
-            Entity existing = level.getEntity(job.droneId());
-            if (existing instanceof DroneEntity drone && drone.isAlive()) {
-                return drone;
-            }
-        }
-        for (BuildJob.Hand other : job.hands()) {
-            if (other.entityId == null) {
-                continue;
-            }
-            Entity existing = level.getEntity(other.entityId);
-            if (existing instanceof DroneEntity drone && drone.isAlive()) {
-                return drone;
-            }
-        }
-        BlockPos at = job.min();
-        for (DroneEntity drone : level.getEntitiesOfClass(
-                DroneEntity.class,
-                new AABB(at).inflate(96.0D),
-                entity -> entity.isAlive() && entity.jobId().filter(job.id()::equals).isPresent())) {
-            return drone;
-        }
-        return null;
-    }
-
-    /**
-     * Under-wright place preview for Shape / Exchange status.
-     * Exchange void-off while idle/paused leaves current empty so haul shows after a swap;
-     * the fly-to-next path sets the place material again when outbound. Void-on keeps the place icon.
-     */
-    static ItemStack shapeStatusCargo(BuildJob job, BlockState state, int waitReason) {
-        if (state == null) {
-            return ItemStack.EMPTY;
-        }
-        if (job != null && job.exchangeJob() && !job.voidBlocks()
-                && (waitReason == DroneEntity.WAIT_NONE || waitReason == DroneEntity.WAIT_PAUSED)) {
-            return ItemStack.EMPTY;
-        }
-        return BlockFilters.icon(state);
-    }
-
-    static PlaceResult placeOne(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos pos, Schematic.Entry entry, boolean quiet) {
-        return placeOne(level, player, job, pos, entry, quiet, null, null);
-    }
-
-    static PlaceResult placeOne(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos pos, Schematic.Entry entry, boolean quiet, BuildJob.Hand hand) {
-        return placeOne(level, player, job, pos, entry, quiet, hand, null);
-    }
-
-    static PlaceResult placeOne(
-            ServerLevel level,
-            ServerPlayer player,
-            BuildJob job,
-            BlockPos pos,
-            Schematic.Entry entry,
-            boolean quiet,
-            BuildJob.Hand hand,
-            DroneEntity actor) {
-        if (level.isOutsideBuildHeight(pos)) {
-            return skipCell(player, job, entry);
-        }
-        if (!level.isLoaded(pos)) {
-            if (WrightsConfig.REQUIRE_CHUNKS_LOADED.getAsBoolean()) {
-                return PlaceResult.PAUSE;
-            }
-            return skipCell(player, job, entry);
-        }
-        if (!canBuild(player, level, pos)) {
-            return skipCell(player, job, entry);
-        }
-        BlockState state = entry.state();
-        Item payment = BlockFilters.payment(state);
-        java.util.List<Item> extras = WorkPicker.willApplyExtras(player, job, entry)
-                ? com.wrights.util.BlockExtras.of(entry)
-                : java.util.List.of();
-        BlockState existing = level.getBlockState(pos);
-        if (existing.equals(state)) {
-            applyEntryNbt(level, player, job, pos, entry);
-            clearPlacedGhost(player, job, entry);
-            return PlaceResult.DONE;
-        }
-        if (skippedContent(job, entry)) {
-            return skipCell(player, job, entry);
-        }
-        if (keptStored(job, existing, state)) {
-            return skipCell(player, job, entry);
-        }
-        boolean clearFirst = shouldVoid(job, existing, state);
-        if (clearFirst && existing.getDestroySpeed(level, pos) < 0.0F) {
-            return skipCell(player, job, entry);
-        }
-        // Void off: leave the world block alone and never revisit this schematic cell.
-        if (!clearFirst && !existing.isAir() && !existing.canBeReplaced()) {
-            return skipCell(player, job, entry);
-        }
-        if (entry.secondary()) {
-            BlockState below = level.getBlockState(pos.below());
-            if (below.getBlock() != state.getBlock()) {
-                if (below.isAir() || below.canBeReplaced()) {
-                    return PlaceResult.WAIT;
-                }
-                return skipCell(player, job, entry);
-            }
-        } else if (level.isLoaded(pos.below()) && !state.canSurvive(level, pos)) {
-            // Wrong floor, or cactus against a neighbor — do not place (and do not retry forever).
-            return skipCell(player, job, entry);
-        } else if (!freePlace(player) && (payment != null || !extras.isEmpty())) {
-            if (!WorkPicker.hasPlaceCosts(player, level, job, hand, entry)) {
-                return PlaceResult.WAIT;
-            }
-        }
-        // Hang gravity blocks when nothing solid is under them (worldgen-style), instead of
-        // waiting forever or refusing the cell.
-        boolean suspendFall = false;
-        if (BlockFilters.falls(state)) {
-            BlockPos below = pos.below();
-            if (level.isOutsideBuildHeight(below) || !level.isLoaded(below)) {
-                return PlaceResult.WAIT;
-            }
-            suspendFall = FallingBlock.isFree(level.getBlockState(below));
-        }
-        int paidEnergy = 0;
-        if (!freePlace(player)) {
-            int cost = WrightsConfig.energyCost(job, clearFirst, mirrorPlace(job));
-            if (cost > 0 && !com.wrights.energy.PortEnergy.tryPay(level, player, hand, cost)) {
-                return PlaceResult.ENERGY;
-            }
-            paidEnergy = cost;
-        }
-        // Exchange undo needs the block that was swapped out (voided or harvested).
-        BlockState restore = job.exchangeJob() && clearFirst && !existing.isAir() && !existing.canBeReplaced()
-                ? existing
-                : null;
-        if (clearFirst) {
-            if (job.exchangeJob()) {
-                if (job.voidBlocks()) {
-                    // Void on: destroy with no returns to the player.
-                    voidCell(level, pos);
-                } else {
-                    // Void off: still swap, but harvest drops back (silk if enabled).
-                    BlockState removed = existing;
-                    ItemStack tool = job.exchangeSilk() ? silkTouchPick(level.getServer()) : ItemStack.EMPTY;
-                    java.util.List<ItemStack> drops =
-                            com.wrights.blueprint.MirrorLaunch.harvest(player, level, pos, tool, false);
-                    // If drop claim missed entities, still show the swapped-out block on the wright.
-                    if (drops.isEmpty()) {
-                        ItemStack visual = BlockFilters.icon(removed);
-                        if (!visual.isEmpty()) {
-                            drops = java.util.List.of(visual);
-                        }
-                    }
-                    showCarry(level, job, hand, drops, actor);
-                }
-            } else {
-                voidCell(level, pos);
-            }
-            existing = level.getBlockState(pos);
-        }
-
-        BlockSnapshot snapshot = BlockSnapshot.create(level.dimension(), level, pos);
-        writePlaced(level, pos, state, suspendFall);
-        BlockState after = level.getBlockState(pos);
-        if (after.getBlock() != state.getBlock()) {
-            if (paidEnergy > 0) {
-                com.wrights.energy.PortEnergy.refund(level, player, hand, paidEnergy);
-            }
-            if (!after.equals(existing)) {
-                level.setBlock(pos, existing, Block.UPDATE_ALL);
-            }
-            return skipCell(player, job, entry);
-        }
-        BlockEvent.EntityPlaceEvent event = new BlockEvent.EntityPlaceEvent(snapshot, existing, player);
-        NeoForge.EVENT_BUS.post(event);
-        if (event.isCanceled()) {
-            level.setBlock(pos, existing, Block.UPDATE_ALL);
-            return skipCell(player, job, entry);
-        }
-        if (suspendFall) {
-            job.noteHungFall(pos.immutable());
-        }
-        boolean paid = !entry.secondary() && !freePlace(player) && (payment != null || !extras.isEmpty());
-        int[] extraIds = BuildJob.Refund.NO_EXTRAS;
-        if (paid) {
-            if (payment != null) {
-                JobSupply.consumeItem(player, level, job, hand, payment);
-            }
-            if (!extras.isEmpty()) {
-                extraIds = new int[extras.size()];
-                for (int i = 0; i < extras.size(); i++) {
-                    Item extra = extras.get(i);
-                    JobSupply.consumeItem(player, level, job, hand, extra);
-                    extraIds[i] = Item.getId(extra);
-                }
-            }
-        }
-        boolean first = !job.isSettled(entry.x(), entry.y(), entry.z());
-        applyEntryNbt(level, player, job, pos, entry);
-        job.recordPlaced(entry.x(), entry.y(), entry.z(), after, paid, extraIds, restore);
-        clearPlacedGhost(player, job, entry);
-        if (!quiet) {
-            level.gameEvent(player, GameEvent.BLOCK_PLACE, pos);
-            level.playSound(null, pos, state.getSoundType(level, pos, player).getPlaceSound(), SoundSource.BLOCKS, 1.0F, 1.0F);
-            level.levelEvent(2001, pos, Block.getId(state));
-        }
-        if (first) {
-            job.placedOne();
-        }
-        return PlaceResult.DONE;
-    }
-
-    /**
-     * Writes a block into the world. Gravity blocks with nothing under them are hung like
-     * worldgen: {@link FallingBlock#onPlace} is skipped (NeoForge snapshot capture), clients
-     * are notified without neighbour updates, and any fall ticks from later neighbour places
-     * during this paste are scrubbed so the sand stays until something updates it after the job.
-     */
-    private static void writePlaced(ServerLevel level, BlockPos pos, BlockState state, boolean suspendFall) {
-        if (!suspendFall) {
-            level.setBlock(pos, state, Block.UPDATE_ALL);
-            // A normal place can schedule fall ticks on already-hung sand beside it — drop those.
-            scrubHangAround(level, pos);
-            return;
-        }
-        BlockState old = level.getBlockState(pos);
-        boolean capturing = level.captureBlockSnapshots;
-        level.captureBlockSnapshots = true;
-        try {
-            level.setBlock(pos, state, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
-        } finally {
-            level.captureBlockSnapshots = capturing;
-            if (!level.capturedBlockSnapshots.isEmpty()) {
-                level.capturedBlockSnapshots.remove(level.capturedBlockSnapshots.size() - 1);
-            }
-        }
-        // Capture skips markAndNotify — push the new block to clients ourselves.
-        level.sendBlockUpdated(pos, old, state, Block.UPDATE_CLIENTS);
-        cancelHangAt(level, pos);
-        scrubHangAround(level, pos);
-    }
-
-    private static void scrubHangAround(ServerLevel level, BlockPos center) {
-        cancelHangAt(level, center);
-        for (Direction direction : Direction.values()) {
-            cancelHangAt(level, center.relative(direction));
-        }
-    }
-
-    private static void scrubHangRegion(ServerLevel level, BuildJob job) {
-        for (long packed : job.hungFalls()) {
-            cancelHangAt(level, BlockPos.of(packed));
-        }
-    }
-
-    private static void cancelHangAt(ServerLevel level, BlockPos pos) {
-        if (!level.isLoaded(pos)) {
-            return;
-        }
-        BlockState state = level.getBlockState(pos);
-        Block block = state.getBlock();
-        if (!(block instanceof FallingBlock)) {
-            return;
-        }
-        BlockPos below = pos.below();
-        if (level.isOutsideBuildHeight(below) || !level.isLoaded(below) || !FallingBlock.isFree(level.getBlockState(below))) {
-            return;
-        }
-        cancelFallTick(level, pos, block);
-    }
-
-    @SuppressWarnings("unchecked")
-    private static void cancelFallTick(ServerLevel level, BlockPos pos, Block block) {
-        if (!(level.getChunkAt(pos).getBlockTicks() instanceof LevelChunkTicks<?> ticks)) {
-            return;
-        }
-        ((LevelChunkTicks<Block>) ticks).removeIf(tick -> tick.pos().equals(pos) && tick.type() == block);
-    }
-
-    /**
-     * Permanent skip for this job (occupied without void, can't survive, etc.).
-     * Soft waits (need floor first) use {@link Falling#WAIT} and do not call this.
-     */
-    private static PlaceResult skipCell(ServerPlayer player, BuildJob job, Schematic.Entry entry) {
-        boolean first = !job.isSettled(entry.x(), entry.y(), entry.z());
-        clearPlacedGhost(player, job, entry);
-        if (first) {
-            job.skippedOne();
-        }
-        return PlaceResult.DONE;
-    }
-
-    /** Permanent give-up from falling/ground rules. Count once; never retry this cell. */
-    static void giveUpCell(BuildJob job, Schematic.Entry entry, int index) {
-        if (job.retire(index)) {
-            job.skippedOne();
-        }
-        job.settleGhost(entry.x(), entry.y(), entry.z());
-    }
-
-    /** The cell is filled, so the preview ghost for it is finished. */
-    private static void clearPlacedGhost(ServerPlayer player, BuildJob job, Schematic.Entry entry) {
-        job.settleGhost(entry.x(), entry.y(), entry.z());
-        // Per-block packets on a 20k+ job flood the client; the throttled hologram refresh covers those.
-        if (job.total() > 8000) {
-            return;
-        }
-        com.wrights.network.BlueprintNetwork.dropJobGhost(player, job.id(), entry.x(), entry.y(), entry.z());
-    }
-
-    static boolean skippedContent(BuildJob job, Schematic.Entry entry) {
-        net.minecraft.world.level.block.state.BlockState state = entry.state();
-        if (!job.placeFluids() && BlockFilters.isFluid(state)) {
-            return true;
-        }
-        return !job.placeNbtBlocks() && state.hasBlockEntity();
-    }
-
-    /**
-     * A placed machine starts like a hand-placed one. Copied settings are applied on top.
-     * A full copy replaces that, and only a creative player may place one.
-     */
-    private static void applyEntryNbt(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos pos, Schematic.Entry entry) {
-        BlockEntity be = level.getBlockEntity(pos);
-        if (be == null) {
-            return;
-        }
-        Item item = be.getBlockState().getBlock().asItem();
-        if (item != Items.AIR) {
-            try {
-                be.applyComponentsFromItemStack(new ItemStack(item));
-            } catch (RuntimeException ignored) {
-                // A mod item with a broken default component must not abort the place.
-            }
-        }
-        if (entry.nbt() == null) {
-            return;
-        }
-        net.minecraft.nbt.CompoundTag data = entry.nbt();
-        boolean full = job.placeAll() && entry.nbtFull() && WrightsConfig.copyAll() && creative(player);
-        if (!full) {
-            if (!job.placeSettings() || !WrightsConfig.copySettings() || !WrightsConfig.settingsAllowed(be.getBlockState().getBlock())) {
-                return;
-            }
-            data = com.wrights.util.BlockEntityNbt.settings(data);
-            if (data == null) {
-                return;
-            }
-        }
-        try {
-            be.loadWithComponents(data, level.registryAccess());
-            be.setChanged();
-        } catch (RuntimeException ignored) {
-            // Bad or version-mismatched settings NBT must not break the place.
-        }
-    }
-
-    static boolean creative(ServerPlayer player) {
-        return player.getAbilities().instabuild && !player.isSpectator();
-    }
-
-    /** A chest or other stored block stays unless voiding those was turned on. */
-    static boolean keptStored(BuildJob job, BlockState existing, BlockState target) {
-        return existing.hasBlockEntity() && !existing.equals(target) && !job.voidNbt();
-    }
-
-    /** Remove a solid block or a fluid that does not match, when that void option is on. */
-    static boolean shouldVoid(BuildJob job, BlockState existing, BlockState target) {
-        if (existing.isAir() || existing.equals(target) || existing.canBeReplaced()) {
-            return false;
-        }
-        if (existing.hasBlockEntity() && !job.voidNbt()) {
-            return false;
-        }
-        if (BlockFilters.isFluid(existing)) {
-            return job.voidFluids();
-        }
-        // Exchange always clears matching solids; Void only controls whether drops return.
-        if (job.exchangeJob()) {
-            return true;
-        }
-        return job.voidBlocks();
-    }
-
-    private static void voidCell(ServerLevel level, BlockPos pos) {
-        BlockEntity entity = level.getBlockEntity(pos);
-        if (entity instanceof Container container) {
-            container.clearContent();
-        }
-        level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_SUPPRESS_DROPS);
-    }
-
-    static boolean canBuild(ServerPlayer player, ServerLevel level, BlockPos pos) {
-        if (player.isSpectator()) {
-            return false;
-        }
-        if (!level.mayInteract(player, pos)) {
-            return false;
-        }
-        return !player.blockActionRestricted(level, pos, player.gameMode.getGameModeForPlayer());
-    }
-
-    static boolean mirrorPlace(BuildJob job) {
-        return job != null && !job.mining() && !job.exchangeJob()
-                && com.wrights.blueprint.Mirror.marksBlocks(job.blueprintName());
-    }
-
-    static boolean freePlace(ServerPlayer player) {
-        return player.getAbilities().instabuild && !player.isSpectator();
-    }
-
-    static DroneEntity ensureDrone(ServerLevel level, ServerPlayer player, BuildJob job, BlockPos workPos) {
-        if (job.droneId() != null) {
-            Entity existing = level.getEntity(job.droneId());
-            if (existing instanceof DroneEntity drone && drone.isAlive()) {
-                paint(drone, job);
-                bindUnit(job, drone, 0);
-                return drone;
-            }
-            BlockPos last = job.lastDronePos();
-            if (last != null && !level.isLoaded(last) && !level.isLoaded(workPos)) {
-                return null;
-            }
-        }
-        // Never adopt a leftover flyer on the site — that looks like a snap. Always leave from home.
-        discardUnownedJobFlyers(level, job, workPos);
-        if (stillFlyingHome(job, 0)) {
-            return null;
-        }
-        BlockPos home = job.hands().isEmpty() ? null : job.hands().get(0).homePort;
-        Vec3 site = Vec3.atCenterOf(workPos).add(0.0D, 1.15D, 0.0D);
-        DroneEntity drone = new DroneEntity(ModEntities.DRONE.get(), level);
-        drone.setJobId(job.id());
-        bindUnit(job, drone, 0);
-        job.setDroneId(drone.getUUID());
-        level.addFreshEntity(drone);
-        depart(drone, player, site, 0, 1, home);
-        job.setLastDronePos(drone.blockPosition());
-        paint(drone, job);
-        return drone;
-    }
-
-    private static void bindUnit(BuildJob job, DroneEntity drone, int handIndex) {
-        if (handIndex >= 0 && handIndex < job.crewUnits().size()) {
-            drone.assignUnit(job.crewUnits().get(handIndex));
-        }
-    }
-
-    /** The flyer for this wright is still on its way back, so another one must not launch. */
-    private static boolean stillFlyingHome(BuildJob job, int handIndex) {
-        return handIndex >= 0 && handIndex < job.crewUnits().size() && WrightFlights.isReturning(job.crewUnits().get(handIndex));
-    }
-
-    private static void paint(DroneEntity drone, BuildJob job) {
-        int tier = job.hands().isEmpty() ? 1 : job.hands().get(0).speed;
-        drone.setTier(tier);
-        drone.setOps(job.hands().isEmpty() ? tier : ShapeJobs.handOps(job.hands().get(0)));
-    }
-
-    static DroneEntity ensureHand(ServerLevel level, ServerPlayer player, BuildJob job, BuildJob.Hand hand, BlockPos workPos) {
-        if (hand.entityId != null) {
-            Entity existing = level.getEntity(hand.entityId);
-            if (existing instanceof DroneEntity drone && drone.isAlive()) {
-                carryStrand(job, hand, drone);
-                bindUnit(job, drone, job.hands().indexOf(hand));
-                return drone;
-            }
-            BlockPos last = hand.lastPos;
-            if (last != null && !level.isLoaded(last) && !level.isLoaded(workPos)) {
-                return null;
-            }
-            hand.entityId = null;
-        }
-        // Never adopt a leftover flyer on the site — that looks like a snap. Always leave from home.
-        discardUnownedJobFlyers(level, job, workPos);
-        if (stillFlyingHome(job, job.hands().indexOf(hand))) {
-            return null;
-        }
-        Vec3 site = Vec3.atCenterOf(workPos).add(0.0D, 1.15D, 0.0D);
-        DroneEntity drone = new DroneEntity(ModEntities.DRONE.get(), level);
-        drone.setJobId(job.id());
-        bindUnit(job, drone, job.hands().indexOf(hand));
-        hand.entityId = drone.getUUID();
-        carryStrand(job, hand, drone);
-        level.addFreshEntity(drone);
-        depart(drone, player, site, hand.lane, hand.lanes, hand.homePort);
-        hand.lastPos = drone.blockPosition();
-        return drone;
-    }
-
-    /** Drops stray flyers still tagged for this job so a later spawn cannot reuse them on site. */
-    private static void discardUnownedJobFlyers(ServerLevel level, BuildJob job, BlockPos workPos) {
-        if (level == null || job == null || workPos == null) {
-            return;
-        }
-        AABB search = new AABB(workPos).inflate(96.0D);
-        for (DroneEntity drone : level.getEntitiesOfClass(
-                DroneEntity.class,
-                search,
-                entity -> entity.isAlive() && entity.jobId().filter(job.id()::equals).isPresent())) {
-            if (!job.ownsDrone(drone.getUUID())) {
-                drone.discard();
-            }
-        }
-    }
-
-    private static void carryStrand(BuildJob job, BuildJob.Hand hand, DroneEntity drone) {
-        if (!hand.stranded) {
-            return;
-        }
-        int index = job.hands().indexOf(hand);
-        UUID unit = index >= 0 && index < job.crewUnits().size() ? job.crewUnits().get(index) : null;
-        drone.strand(unit);
-    }
-
-    /** Wrights that are out from this dock stay out. They are recovered when they fly home. */
-    public static Set<UUID> strandFromDock(ServerLevel level, BlockPos pos) {
-        Set<UUID> away = new HashSet<>();
-        if (level == null || pos == null || level.getServer() == null) {
-            return away;
-        }
-        SchematicLibrary library = SchematicLibrary.get(level.getServer());
-        boolean dirty = false;
-        for (BuildJob job : library.jobs()) {
-            if (job.finished()) {
-                continue;
-            }
-            List<UUID> units = job.crewUnits();
-            for (int i = 0; i < units.size() && i < job.hands().size(); i++) {
-                BuildJob.Hand hand = job.hands().get(i);
-                if (hand.homePort == null || !hand.homePort.equals(pos)) {
-                    continue;
-                }
-                away.add(units.get(i));
-                hand.stranded = true;
-                if (level.getBlockEntity(pos) instanceof WrightportBlockEntity port) {
-                    for (Swarm.Unit unit : port.swarm().units()) {
-                        if (unit.id().equals(units.get(i)) && unit.name() != null && !unit.name().isBlank()) {
-                            hand.wrightName = unit.name();
-                            break;
-                        }
-                    }
-                }
-                dirty = true;
-                ServerLevel jobLevel = level.getServer().getLevel(job.dimension());
-                if (jobLevel == null || hand.entityId == null) {
-                    continue;
-                }
-                if (jobLevel.getEntity(hand.entityId) instanceof DroneEntity drone && drone.isAlive()) {
-                    drone.strand(units.get(i));
-                }
-            }
-        }
-        if (dirty) {
-            library.setDirty();
-        }
-        return away;
-    }
-
-    /**
-     * A wright whose dock is gone should not hover there. Fly it to another port that
-     * covers the build and has a free slot. Otherwise put it in digital storage, or drop it.
-     */
-    static void shelterLost(ServerLevel level, ServerPlayer player, SchematicLibrary library, BuildJob job) {
-        if (level == null || job == null || job.finished() || !job.hasCrew()) {
-            return;
-        }
-        List<UUID> units = job.crewUnits();
-        Map<BlockPos, Integer> reserved = new HashMap<>();
-        boolean dirty = false;
-        int flying = 0;
-        for (int i = Math.min(job.hands().size(), units.size()) - 1; i >= 0; i--) {
-            if (i >= job.hands().size()) {
-                continue;
-            }
-            BuildJob.Hand hand = job.hands().get(i);
-            UUID id = units.get(i);
-            if (hand.sheltering) {
-                Entity entity = hand.entityId == null ? null : level.getEntity(hand.entityId);
-                if (entity instanceof DroneEntity drone && drone.isAlive() && drone.returning()) {
-                    continue;
-                }
-                if (player != null && WrightHomes.stillThere(level, player, hand.homePort, id)) {
-                    hand.sheltering = false;
-                    hand.stranded = false;
-                    hand.entityId = null;
-                    dirty = true;
-                    continue;
-                }
-                hand.sheltering = false;
-            }
-            BlockPos home = hand.homePort;
-            boolean gone = WrightHomes.dockGone(level, player, home, id);
-            if (!gone && hand.stranded && player != null) {
-                gone = !WrightHomes.stillThere(level, player, home, id);
-            }
-            if (!gone) {
-                continue;
-            }
-            String name = hand.wrightName == null ? "" : hand.wrightName;
-            if (player != null) {
-                Swarm.Unit known = WrightHomes.findUnit(player, id);
-                if (known != null && known.name() != null && !known.name().isBlank()) {
-                    name = known.name();
-                    hand.wrightName = name;
-                }
-            }
-            WrightportPlaces.removeUnit(player, id);
-            int tier = WrightTier.clamp(hand.speed);
-            BlockPos next = WrightHomes.openPort(level, job.min(), job.owner(), reserved);
-            DroneEntity drone = null;
-            if (hand.entityId != null && level.getEntity(hand.entityId) instanceof DroneEntity found && found.isAlive()) {
-                drone = found;
-            }
-            if (player != null && drone != null && next != null) {
-                reserved.merge(next, 1, Integer::sum);
-                hand.homePort = next;
-                hand.stranded = true;
-                hand.sheltering = true;
-                hand.idle = false;
-                hand.waitingOnOthers = false;
-                drone.strand(id, name);
-                drone.setHomePort(next);
-                drone.flyHome(player, flying, Math.max(1, job.hands().size()), next);
-                flying++;
-                dirty = true;
-                continue;
-            }
-            BlockPos where = next != null
-                    ? next
-                    : (drone != null ? drone.blockPosition() : (hand.lastPos != null ? hand.lastPos : job.min()));
-            BlockPos docked = DockRecovery.recover(level, player, where, id, tier, ShapeJobs.handOps(hand), name);
-            dirty = true;
-            if (docked != null) {
-                noteDocked(level.getServer(), id, docked);
-                if (drone != null && drone.isAlive()) {
-                    drone.forgetStrand();
-                    drone.discard();
-                }
-            } else {
-                noteReleased(level.getServer(), id);
-            }
-        }
-        if (dirty) {
-            library.setDirty();
-        }
-    }
-
-    /** The wright reached a real port and is stored there under the same id. */
-    public static void noteDocked(MinecraftServer server, UUID unitId, BlockPos port) {
-        if (server == null || unitId == null || port == null) {
-            return;
-        }
-        SchematicLibrary library = SchematicLibrary.get(server);
-        for (BuildJob job : library.jobs()) {
-            int index = job.crewUnits().indexOf(unitId);
-            if (index < 0 || index >= job.hands().size()) {
-                continue;
-            }
-            BuildJob.Hand hand = job.hands().get(index);
-            hand.homePort = port.immutable();
-            hand.stranded = false;
-            hand.sheltering = false;
-            hand.entityId = null;
-            library.setDirty();
-            return;
-        }
-    }
-
-    /** The wright was stored in digital storage or dropped, so the job must let go of it. */
-    public static void noteReleased(MinecraftServer server, UUID unitId) {
-        if (server == null || unitId == null) {
-            return;
-        }
-        SchematicLibrary library = SchematicLibrary.get(server);
-        for (BuildJob job : library.jobs()) {
-            int index = job.crewUnits().indexOf(unitId);
-            if (index < 0 || index >= job.hands().size()) {
-                continue;
-            }
-            retire(server, library, job, index);
-            return;
-        }
-    }
-
-    private static void retire(MinecraftServer server, SchematicLibrary library, BuildJob job, int index) {
-        List<BuildJob.Hand> hands = job.hands();
-        if (index < 0 || index >= hands.size()) {
-            return;
-        }
-        BuildJob.Hand hand = hands.get(index);
-        ServerLevel level = server.getLevel(job.dimension());
-        if (level != null && hand.entityId != null && level.getEntity(hand.entityId) instanceof DroneEntity drone) {
-            drone.forgetStrand();
-            drone.discard();
-        }
-        hand.sheltering = false;
-        hand.stranded = false;
-        hand.entityId = null;
-        if (hands.size() <= 1) {
-            job.setCrewUnits(List.of());
-            if (job.queued()) {
-                job.setPaused(false);
-                job.clearHold();
-            } else if (!job.paused()) {
-                job.noteHold(BuildJob.HOLD_NO_WRIGHTS, null);
-                job.setPaused(true);
-            }
-            library.setDirty();
-            return;
-        }
-        for (int i = 0; i < hands.size(); i++) {
-            if (i == index) {
-                continue;
-            }
-            hands.get(i).slices.addAll(hand.slices);
-            break;
-        }
-        hands.remove(index);
-        List<UUID> units = new ArrayList<>(job.crewUnits());
-        if (index < units.size()) {
-            units.remove(index);
-        }
-        job.setCrewUnits(units);
-        for (int i = 0; i < hands.size(); i++) {
-            hands.get(i).lane = i;
-            hands.get(i).lanes = hands.size();
-        }
-        library.setDirty();
-    }
-
-    /**
-     * Every launch leaves from home: personal → behind the player, placed → wrightport lip.
-     * Never appear on the job first. TELEPORT mode is the only path that starts at the work.
-     */
-    private static void depart(DroneEntity drone, ServerPlayer player, Vec3 work, int lane, int lanes, BlockPos homePort) {
-        drone.setHomePort(homePort);
-        float yaw = player == null ? 0.0F : player.getYRot();
-        if (!WrightsConfig.flyToJob()) {
-            drone.moveTo(work.x, work.y, work.z, yaw, 0.0F);
-            drone.setYRot(yaw);
-            return;
-        }
-        boolean playerHere = player != null && player.level() == drone.level();
-        if (homePort != null) {
-            if (drone.level() instanceof ServerLevel server && server.isLoaded(homePort)) {
-                drone.departFromBlock(homePort, work, lane, lanes);
-                return;
-            }
-            if (playerHere) {
-                drone.departFromPlayer(player, work, lane, lanes);
-                drone.setHomePort(homePort);
-                return;
-            }
-            drone.moveTo(work.x, work.y + 8.0D, work.z, yaw, 0.0F);
-            drone.setYRot(yaw);
-            return;
-        }
-        if (playerHere) {
-            drone.departFromPlayer(player, work, lane, lanes);
-            return;
-        }
-        drone.moveTo(work.x, work.y + 8.0D, work.z, yaw, 0.0F);
-        drone.setYRot(yaw);
-    }
-
-    /** Dock the crew, keep the job and its ghost, and wait until the port can pay for another block. */
-    static void stallForEnergy(ServerLevel level, ServerPlayer player, SchematicLibrary library, BuildJob job) {
-        job.setWaitKind(BuildJob.WAIT_ENERGY);
-        job.setQueued(true);
-        job.setCrewQuota(Math.max(1, Math.max(job.crewQuota(), job.hands().size())));
-        for (BuildJob.Hand hand : job.hands()) {
-            hand.awaitingItems = false;
-            hand.idle = false;
-            recallHand(level, player, hand);
-        }
-        if (job.hands().isEmpty()) {
-            parkSolo(level, player, job);
-        }
-        JobAnnouncements.noteHistory(player, library, job, JobEventLog.STALLED_ITEMS, Component.translatable("history.wrights.stalled_energy").getString());
-        library.setDirty();
-    }
-
-    static void parkForItems(ServerLevel level, ServerPlayer player, BuildJob.Hand hand) {
-        hand.awaitingItems = true;
-        hand.idle = false;
-        hand.waitingOnOthers = false;
-        recallHand(level, player, hand);
-    }
-
-    /** Send this wright home. It stays on the crew and comes back when it has something to place. */
-    private static void recallHand(ServerLevel level, ServerPlayer player, BuildJob.Hand hand) {
-        if (hand.entityId == null) {
-            return;
-        }
-        recall(level, player, hand.entityId, 0, 1, hand.homePort);
-        hand.entityId = null;
-    }
-
-    static void parkSolo(ServerLevel level, ServerPlayer player, BuildJob job) {
-        if (job.droneId() == null) {
-            return;
-        }
-        recall(level, player, job.droneId(), 0, 1, null);
-        job.setDroneId(null);
-    }
-
-    /**
-     * A wright with nothing left it can pay for on this job can join another build that its supply can continue.
-     */
-    private static void lendStocked(MinecraftServer server, SchematicLibrary library) {
-        if (server.getTickCount() % 20 != 0) {
-            return;
-        }
-        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            boolean moved = false;
-            for (BuildJob job : new ArrayList<>(library.jobsFor(player.getUUID()))) {
-                if (moved || job.finished() || job.paused() || job.undoing() || job.kind() != BuildJob.Kind.PASTE || !job.hasCrew()) {
-                    continue;
-                }
-                ServerLevel level = server.getLevel(job.dimension());
-                Schematic schematic = job.schematicId() == null ? null : library.schematic(job.schematicId()).orElse(null);
-                if (level == null || schematic == null) {
-                    continue;
-                }
-                List<UUID> units = job.crewUnits();
-                for (int i = 0; i < job.hands().size() && i < units.size(); i++) {
-                    BuildJob.Hand hand = job.hands().get(i);
-                    if (!hand.awaitingItems || hand.entityId != null) {
-                        continue;
-                    }
-                    BuildJob target = lendTarget(server, library, player, job, hand);
-                    if (target == null) {
-                        continue;
-                    }
-                    moveUnit(player, library, job, target, units.get(i));
-                    moved = true;
-                    break;
-                }
-            }
-        }
-    }
-
-    private static BuildJob lendTarget(MinecraftServer server, SchematicLibrary library, ServerPlayer player, BuildJob source, BuildJob.Hand hand) {
-        BuildJob best = null;
-        for (BuildJob job : library.jobsFor(player.getUUID())) {
-            if (job == source || job.finished() || job.undoing() || job.kind() != BuildJob.Kind.PASTE) {
-                continue;
-            }
-            int cap = WrightsConfig.maxWrightsPerJob(job);
-            if (job.crewUnits().size() >= cap || !CrewRoster.coversJob(player, job, hand.homePort)) {
-                continue;
-            }
-            ServerLevel level = server.getLevel(job.dimension());
-            Schematic schematic = job.schematicId() == null ? null : library.schematic(job.schematicId()).orElse(null);
-            if (level == null || schematic == null) {
-                continue;
-            }
-            int room = CrewRoster.crewRoom(schematic, job);
-            if (job.crewUnits().size() >= Math.min(room, cap)) {
-                continue;
-            }
-            Owed owed = owed(level, schematic, job);
-            if (!owed.allows(player, level, job, hand.homePort)) {
-                continue;
-            }
-            boolean waiting = job.queued() || !job.hasCrew();
-            if (!waiting) {
-                for (BuildJob.Hand other : job.hands()) {
-                    if (other.awaitingItems) {
-                        waiting = true;
-                        break;
-                    }
-                }
-            }
-            if (waiting) {
-                return job;
-            }
-            if (best == null) {
-                best = job;
-            }
-        }
-        return best;
-    }
-
-    /**
-     * A stalled job does not keep wrights that have gone home. The wanted count stays, and whoever is free
-     * when the items arrive can continue it.
-     */
-    private static void releaseStalledHome(ServerPlayer player, SchematicLibrary library, BuildJob job) {
-        if (player == null || job.paused() || job.finished() || job.waitKind() != BuildJob.WAIT_ITEMS) {
-            return;
-        }
-        List<UUID> units = job.crewUnits();
-        if (units.isEmpty()) {
-            return;
-        }
-        List<UUID> keepIds = new ArrayList<>();
-        List<BuildJob.Hand> keepHands = new ArrayList<>();
-        List<BuildJob.Slice> spare = new ArrayList<>();
-        for (int i = 0; i < units.size(); i++) {
-            BuildJob.Hand hand = i < job.hands().size() ? job.hands().get(i) : null;
-            if (CrewRoster.unitIsOut(player, job, units.get(i))) {
-                keepIds.add(units.get(i));
-                if (hand != null) {
-                    keepHands.add(hand);
-                }
-            } else if (hand != null) {
-                spare.addAll(hand.slices);
-            }
-        }
-        if (keepIds.size() == units.size()) {
-            return;
-        }
-        int quota = Math.max(1, Math.max(job.crewQuota(), units.size()));
-        if (keepIds.isEmpty()) {
-            sendHome(player.getServer(), player, job);
-            job.clearAssigned();
-            job.setCrewQuota(quota);
-            job.setQueued(true);
-            job.setPaused(false);
-            job.clearHold();
-            job.setWaitKind(BuildJob.WAIT_ITEMS);
-            library.setDirty();
-            return;
-        }
-        if (!spare.isEmpty() && !keepHands.isEmpty()) {
-            keepHands.get(0).slices.addAll(spare);
-        }
-        job.hands().clear();
-        job.hands().addAll(keepHands);
-        for (int i = 0; i < job.hands().size(); i++) {
-            BuildJob.Hand hand = job.hands().get(i);
-            hand.lane = i;
-            hand.lanes = job.hands().size();
-        }
-        job.setCrewUnits(keepIds);
-        job.setCrewQuota(quota);
-        job.setPaused(false);
-        job.clearHold();
-        library.setDirty();
-    }
-
-    /** True when the blocks still open need items that no free wright can pay for yet. */
-    private static boolean shortOnItems(ServerPlayer player, SchematicLibrary library, BuildJob job) {
-        ServerLevel level = player.getServer() == null ? null : player.getServer().getLevel(job.dimension());
-        if (level == null || job.schematicId() == null) {
-            return false;
-        }
-        Schematic schematic = library.schematic(job.schematicId()).orElse(null);
-        if (schematic == null) {
-            return false;
-        }
-        Owed owed = owed(level, schematic, job);
-        if (owed.idle() || owed.open || owed.items.isEmpty()) {
-            return false;
-        }
-        for (WrightHomes.FreeWright free : CrewRoster.freeUnits(player, library, job, Integer.MAX_VALUE)) {
-            if (owed.allows(player, level, job, free.homePort())) {
-                return false;
-            }
-        }
-        return !owed.allows(player, level, job, null);
-    }
-
-    /** Takes a wright that went home to wait for items off that job, so a new job can have it. */
-    static void releaseHomeWaiter(ServerPlayer player, SchematicLibrary library, UUID unitId, UUID keepJob) {
-        for (BuildJob other : new ArrayList<>(library.jobsFor(player.getUUID()))) {
-            if (keepJob != null && other.id().equals(keepJob)) {
-                continue;
-            }
-            if (!CrewRoster.usesDrones(other) || other.awaitingDrones() || other.waitKind() != BuildJob.WAIT_ITEMS) {
-                continue;
-            }
-            if (!other.crewUnits().contains(unitId) || CrewRoster.unitIsOut(player, other, unitId)) {
-                continue;
-            }
-            leaveCrew(player, library, other, unitId);
-        }
-    }
-
-    private static void leaveCrew(ServerPlayer player, SchematicLibrary library, BuildJob source, UUID unitId) {
-        List<UUID> from = new ArrayList<>(source.crewUnits());
-        if (!from.remove(unitId)) {
-            return;
-        }
-        int quota = Math.max(source.crewQuota(), from.size() + 1);
-        if (from.isEmpty()) {
-            sendHome(player.getServer(), player, source);
-            source.clearAssigned();
-            source.setCrewQuota(Math.max(1, quota));
-            source.setQueued(true);
-            source.setPaused(false);
-            source.clearHold();
-        } else {
-            CrewRoster.placeCrew(player, library, source, from);
-            source.setCrewQuota(Math.max(source.crewQuota(), quota));
-            source.setQueued(true);
-            source.setPaused(false);
-            source.clearHold();
-        }
-        library.setDirty();
-    }
-
-    private static void moveUnit(ServerPlayer player, SchematicLibrary library, BuildJob source, BuildJob target, UUID unitId) {
-        leaveCrew(player, library, source, unitId);
-        List<UUID> to = new ArrayList<>(target.crewUnits());
-        if (!to.contains(unitId)) {
-            to.add(unitId);
-        }
-        CrewRoster.placeCrew(player, library, target, to);
-        target.setPaused(false);
-        target.clearHold();
-        if (target.crewQuota() < target.crewUnits().size()) {
-            target.setCrewQuota(target.crewUnits().size());
-        }
-        library.setDirty();
-    }
-
-    /** What is still unplaced, and whether any of it needs no item. */
-    static Owed owed(ServerLevel level, Schematic schematic, BuildJob job) {
-        Owed owed = new Owed();
-        int count = Math.min(job.total(), schematic.blockCount());
-        for (int i = 0; i < count; i++) {
-            Schematic.Entry entry = schematic.entry(i);
-            if (job.outsideClip(entry) || WorkPicker.satisfied(level, job, entry)) {
-                continue;
-            }
-            if (!level.isLoaded(job.min().offset(entry.x(), entry.y(), entry.z()))) {
-                owed.open = true;
-                continue;
-            }
-            Falling hold = WorkPicker.falling(level, schematic, job, entry);
-            if (hold == Falling.WAIT) {
-                owed.pending = true;
-                continue;
-            }
-            if (hold == Falling.SKIP || entry.secondary()) {
-                owed.open = true;
-                continue;
-            }
-            Item payment = BlockFilters.payment(entry.state());
-            if (payment == null && com.wrights.util.BlockExtras.of(entry).isEmpty()) {
-                owed.open = true;
-                continue;
-            }
-            if (payment != null && owed.items.size() < 64 && !owed.items.contains(payment)) {
-                owed.items.add(payment);
-            }
-            if (WorkPicker.willApplyExtras(null, job, entry)) {
-                for (Item extra : com.wrights.util.BlockExtras.of(entry)) {
-                    if (owed.items.size() >= 64) {
-                        break;
-                    }
-                    if (!owed.items.contains(extra)) {
-                        owed.items.add(extra);
-                    }
-                }
-            }
-        }
-        return owed;
-    }
-
-    static final class Owed {
-        boolean open;
-        boolean pending;
-        final List<Item> items = new ArrayList<>();
-
-        boolean idle() {
-            return !open && !pending && items.isEmpty();
-        }
-
-        boolean allows(ServerPlayer player, ServerLevel level, BuildJob job, BlockPos home) {
-            if (open) {
-                return true;
-            }
-            if (items.isEmpty()) {
-                return false;
-            }
-            BuildJob.Hand hand = new BuildJob.Hand();
-            hand.homePort = home;
-            for (Item item : items) {
-                if (JobSupply.hasItem(player, level, job, hand, item)) {
-                    return true;
-                }
-            }
-            return false;
-        }
-    }
-
-    static void sendHome(MinecraftServer server, ServerPlayer player, BuildJob job) {
-        ServerLevel level = server.getLevel(job.dimension());
-        if (player == null || level == null || player.level() != level) {
-            discardDrone(server, job);
-            return;
-        }
-        List<UUID> ids = new ArrayList<>();
-        List<BlockPos> homes = new ArrayList<>();
-        if (job.droneId() != null) {
-            ids.add(job.droneId());
-            homes.add(job.hands().isEmpty() ? null : job.hands().get(0).homePort);
-        }
-        for (BuildJob.Hand hand : job.hands()) {
-            if (hand.entityId != null && !ids.contains(hand.entityId)) {
-                ids.add(hand.entityId);
-                homes.add(hand.homePort);
-            }
-        }
-        int slot = 0;
-        for (UUID id : ids) {
-            recall(level, player, id, slot, ids.size(), homes.get(slot));
-            slot++;
-        }
-        job.setDroneId(null);
-        for (BuildJob.Hand hand : job.hands()) {
-            hand.entityId = null;
-        }
-    }
-
-    static void recall(ServerLevel level, ServerPlayer player, UUID id, int slot, int count) {
-        recall(level, player, id, slot, count, null);
-    }
-
-    static void recall(ServerLevel level, ServerPlayer player, UUID id, int slot, int count, BlockPos homePort) {
-        if (level == null || id == null) {
-            return;
-        }
-        if (player == null || player.level() != level) {
-            discardId(level, id);
-            return;
-        }
-        Entity entity = level.getEntity(id);
-        if (entity instanceof DroneEntity drone && drone.isAlive()) {
-            BlockPos home = homePort != null ? homePort : drone.homePort();
-            drone.flyHome(player, slot, count, home);
-        }
-    }
-
-    static void discardDrone(MinecraftServer server, BuildJob job) {
-        ServerLevel level = server.getLevel(job.dimension());
-        discardId(level, job.droneId());
-        job.setDroneId(null);
-        for (BuildJob.Hand hand : job.hands()) {
-            discardId(level, hand.entityId);
-            hand.entityId = null;
-        }
-    }
-
-    static void discardId(ServerLevel level, UUID id) {
-        if (level == null || id == null) {
-            return;
-        }
-        Entity entity = level.getEntity(id);
-        if (entity instanceof DroneEntity drone) {
-            drone.recoverIfStranded();
-        }
-        if (entity != null) {
-            entity.discard();
-        }
-    }
-
-    private static ItemStack findController(ServerPlayer player, UUID controllerId) {
-        Inventory inventory = player.getInventory();
-        for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
-            ItemStack stack = inventory.getItem(slot);
-            if (stack.getItem() instanceof ControllerItem && controllerId.equals(ControllerData.from(stack).controllerId().orElse(null))) {
-                return stack;
-            }
-        }
-        return ItemStack.EMPTY;
-    }
 }
