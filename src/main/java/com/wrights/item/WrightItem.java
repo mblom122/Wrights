@@ -114,6 +114,9 @@ public class WrightItem extends Item {
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         Loadout parts = parts(stack);
+        if (parts.isBasic()) {
+            tooltip.add(Component.translatable("item.wrights.wright.bare").withStyle(ChatFormatting.YELLOW));
+        }
         for (PartSlot slot : PartSlot.values()) {
             int tier = parts.tier(slot);
             Component fitted = Component.translatable(slot.fittedKey(tier)).withColor(WrightTier.textColor(tier) & 0xFFFFFF);

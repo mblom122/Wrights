@@ -51,7 +51,7 @@ public enum PartSlot implements StringRepresentable {
         return "part.wrights." + id;
     }
 
-    /** "Scout Rotor Assembly" for {@code tier}, or "No Rotor Assembly" for Basic. */
+    /** "Scout Rotor Assembly" for {@code tier}, or "Unequipped (Basic)" for an empty slot. */
     public String fittedKey(int tier) {
         int mark = WrightTier.clamp(tier);
         return mark <= WrightTier.BASIC ? "part.wrights." + id + ".none" : "item.wrights." + id + "_mk" + mark;
