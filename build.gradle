@@ -161,6 +161,11 @@ dependencies {
     localRuntime "maven.modrinth:framedblocks:${framedblocks_version}"
     compileOnly "maven.modrinth:refined-storage:${rs_version}"
 
+    // Plain unit tests for logic that never touches Minecraft classes (see src/test).
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
     // Example mod dependency using a mod jar from ./libs with a flat dir repository
     // This maps to ./libs/coolmod-${mc_version}-${coolmod_version}.jar
     // The group id is ignored when searching -- in this case, it is "blank"
@@ -217,6 +222,10 @@ publishing {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
 }
 
 // Copies the built jar into modpack/mods. Curios is still required in that instance, and Jade

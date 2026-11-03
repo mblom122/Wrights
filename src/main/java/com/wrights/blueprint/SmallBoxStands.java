@@ -211,30 +211,4 @@ public final class SmallBoxStands {
         int dz = z - oz;
         return dx * dx + dy * dy + dz * dz;
     }
-
-    public static void main(String[] args) {
-        int[][] floor = stands(3, 1, 3, false, Shapes.Kind.SQUARE.ordinal(), 2);
-        if (floor.length != 1 || floor[0][0] != 1 || floor[0][1] != 0 || floor[0][2] != 1) {
-            throw new IllegalStateException("3x3 floor should stand on the middle");
-        }
-        int[][] sphere = stands(3, 3, 3, false, Shapes.Kind.SPHERE.ordinal(), 2);
-        if (sphere.length != 1 || sphere[0][0] != 1 || sphere[0][1] != 1 || sphere[0][2] != 1) {
-            throw new IllegalStateException("diameter 3 sphere should stand on the center");
-        }
-        int[][] cube = stands(3, 3, 3, false, Shapes.Kind.CUBE.ordinal(), 2);
-        if (cube.length != 3 || cube[0][0] != 1 || cube[0][1] != 1 || cube[0][2] != 1) {
-            throw new IllegalStateException("solid 3 cube should be 3 stands starting at the center, got " + cube.length);
-        }
-        if (stands(8, 8, 8, false, Shapes.Kind.CUBE.ordinal(), 2).length != 0) {
-            throw new IllegalStateException("large boxes stay on the old planner");
-        }
-        int[][] wide = stands(6, 1, 6, false, Shapes.Kind.SQUARE.ordinal(), 2);
-        if (wide.length != 4 || wide[0][0] != 1 || wide[0][1] != 0 || wide[0][2] != 1) {
-            throw new IllegalStateException("6x1x6 floor should be four 3x3 stamps, got " + wide.length);
-        }
-        if (stands(20, 1, 20, false, Shapes.Kind.SQUARE.ordinal(), 2).length != 0) {
-            throw new IllegalStateException("a long floor stays on the old planner");
-        }
-        System.out.println("SmallBoxStands checks passed");
-    }
 }
