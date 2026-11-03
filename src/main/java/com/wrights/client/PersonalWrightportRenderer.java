@@ -71,6 +71,7 @@ public class PersonalWrightportRenderer implements ICurioRenderer {
         PartModels.render(poseStack, buffer, PartModels.PACK, light, TEXTURE_WHITE);
         PartModels.renderIris(poseStack, buffer, PartModels.PACK_BLADE, open, false, 8.0F, 18.0F, 0.6F, 0.03F, light);
         PartModels.render(poseStack, buffer, PartModels.PACK_LAMP, PartModels.FULL_BRIGHT, bulbTint(stack));
+        PartModels.renderGauge(poseStack, buffer, PartModels.PACK_CELLS, com.wrights.energy.PortEnergy.itemBars(stack));
         poseStack.popPose();
     }
 

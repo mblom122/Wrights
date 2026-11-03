@@ -37,6 +37,9 @@ public final class PartModels {
     public static final ModelResourceLocation PACK_LAMP = id("pack_lamp");
     public static final ModelResourceLocation IRIS_BLADE = id("iris_blade");
     public static final ModelResourceLocation PORT_LAMPS = id("wrightport_lamps");
+    /** Index is the number of lit charge bars, 0..6. */
+    public static final List<ModelResourceLocation> PACK_CELLS = gauge("pack_cells_");
+    public static final List<ModelResourceLocation> PORT_BARS = gauge("wrightport_bars_");
 
     public static final List<ModelResourceLocation> ALL = all();
 
@@ -61,12 +64,27 @@ public final class PartModels {
         return List.copyOf(ids);
     }
 
+    private static List<ModelResourceLocation> gauge(String prefix) {
+        List<ModelResourceLocation> ids = new java.util.ArrayList<>();
+        for (int lit = 0; lit <= com.wrights.energy.EnergyBars.BARS; lit++) {
+            ids.add(id(prefix + lit));
+        }
+        return List.copyOf(ids);
+    }
+
+    /** The charge gauge for {@code lit} bars, from {@link #PACK_CELLS} or {@link #PORT_BARS}. */
+    public static void renderGauge(PoseStack pose, MultiBufferSource buffers, List<ModelResourceLocation> gauge, int lit) {
+        render(pose, buffers, gauge.get(Mth.clamp(lit, 0, gauge.size() - 1)), FULL_BRIGHT, 0xFFFFFFFF);
+    }
+
     private static List<ModelResourceLocation> all() {
         List<ModelResourceLocation> ids = new java.util.ArrayList<>(List.of(DRONE_BODY, ROTOR_LOW, PACK, PACK_BLADE, PACK_LAMP, IRIS_BLADE, PORT_LAMPS));
         ids.addAll(ROTOR_MOUNTS);
         ids.addAll(ROTOR_BLADES);
         ids.addAll(FABRICATORS);
         ids.addAll(CORES);
+        ids.addAll(PACK_CELLS);
+        ids.addAll(PORT_BARS);
         return List.copyOf(ids);
     }
 

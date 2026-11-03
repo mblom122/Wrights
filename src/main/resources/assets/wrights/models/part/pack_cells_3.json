@@ -1,0 +1,11 @@
+{
+  "parent": "wrights:part/pack_cells",
+  "textures": {
+    "e0": "wrights:item/part/energy_yellow",
+    "e1": "wrights:item/part/energy_yellow",
+    "e2": "wrights:item/part/energy_yellow",
+    "e3": "wrights:item/part/energy_off",
+    "e4": "wrights:item/part/energy_off",
+    "e5": "wrights:item/part/energy_off"
+  }
+}

@@ -8,7 +8,7 @@
     "heatsink": "wrights:item/part/heatsink",
     "band": "wrights:item/part/duct_mk1",
     "core": "wrights:item/part/port_core",
-    "glow": "wrights:item/part/core_glow",
+    "gauge": "wrights:item/part/port_gauge",
     "nozzle_side": "wrights:item/part/nozzle_side",
     "bay": "wrights:item/part/bay",
     "pillar": "wrights:item/part/pillar",

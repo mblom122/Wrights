@@ -1,0 +1,11 @@
+{
+  "parent": "wrights:part/wrightport_bars",
+  "textures": {
+    "e0": "wrights:item/part/energy_red",
+    "e1": "wrights:item/part/energy_red",
+    "e2": "wrights:item/part/energy_off",
+    "e3": "wrights:item/part/energy_off",
+    "e4": "wrights:item/part/energy_off",
+    "e5": "wrights:item/part/energy_off"
+  }
+}

@@ -78,6 +78,7 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
             BlockPos chest = boundChest();
             if (chest != null) {
                 WrightsClientState.highlightPortChest(chest);
+                getMinecraft().setScreen(null);
             }
         });
         addRenderableWidget(highlightChestButton);

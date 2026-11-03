@@ -79,6 +79,11 @@ public class WrightsClient {
                 ModItems.BLUEPRINT_FOLDER.get(),
                 ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "filled"),
                 (stack, level, entity, seed) -> BlueprintFolderItem.hasData(stack) ? 1.0F : 0.0F));
+        ResourceLocation energy = ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "energy");
+        for (var item : java.util.List.of(ModItems.PERSONAL_WRIGHTPORT.get(), ModBlocks.WRIGHTPORT_ITEM.get())) {
+            event.enqueueWork(() -> ItemProperties.register(item, energy,
+                    (stack, level, entity, seed) -> com.wrights.energy.PortEnergy.itemBars(stack) / (float) com.wrights.energy.EnergyBars.BARS));
+        }
     }
 
     @SubscribeEvent

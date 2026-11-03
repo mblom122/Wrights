@@ -62,6 +62,11 @@ public final class PortEnergy {
         tooltip.add(Component.translatable("menu.wrights.energy", format(stored), format(capacity)).withStyle(ChatFormatting.GRAY));
     }
 
+    /** Lit bars on a wrightport item's charge gauge. */
+    public static int itemBars(ItemStack stack) {
+        return EnergyBars.lit(itemStored(stack), WrightsConfig.portEnergyCapacity());
+    }
+
     public static boolean itemBarVisible(ItemStack stack) {
         return WrightsConfig.portEnergyCapacity() > 0;
     }

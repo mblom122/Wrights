@@ -49,6 +49,8 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
     /** Corner lamps. Red until the server has looked at the crew. */
     private int lamp = WrightportLamp.RED;
     private final PortEnergy.Buffer energy = new PortEnergy.Buffer();
+    /** Gauge the client last heard about. Server-only, not saved. */
+    private int syncedBars = -1;
     /** Player who placed this port. Their stored wrights share one limit. */
     private UUID owner;
     private String ownerName = "";
@@ -210,9 +212,17 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
         restoreTop(level);
         int previous = this.lamp;
         refreshLamp();
-        if (previous != this.lamp) {
+        // Cables charge the buffer without telling the port, so the gauge is checked here.
+        int bars = energyBars();
+        if (previous != this.lamp || bars != this.syncedBars) {
+            this.syncedBars = bars;
             sync();
         }
+    }
+
+    /** Lit bars on the tower's charge gauge. */
+    public int energyBars() {
+        return com.wrights.energy.EnergyBars.lit(energy.stored(), energy.limit());
     }
 
     /** Ports placed before the tower was two blocks tall have no top half. Add it once the space is free. */

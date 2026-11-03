@@ -13,7 +13,7 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.AABB;
 
-/** Draws the roof iris and the corner lamps. The tower itself is the block model. */
+/** Draws the roof iris, the corner lamps and the charge gauge. The tower itself is the block model. */
 public class WrightportRenderer implements BlockEntityRenderer<WrightportBlockEntity> {
     public WrightportRenderer(BlockEntityRendererProvider.Context context) {
     }
@@ -24,6 +24,7 @@ public class WrightportRenderer implements BlockEntityRenderer<WrightportBlockEn
         PartModels.renderIris(pose, buffers, PartModels.IRIS_BLADE, port.hatchOpen(partialTick),
                 true, 8.0F, 8.0F, 1.0F, 0.035F, roofLight);
         PartModels.render(pose, buffers, PartModels.PORT_LAMPS, PartModels.FULL_BRIGHT, 0xFF000000 | colorOf(port));
+        PartModels.renderGauge(pose, buffers, PartModels.PORT_BARS, port.energyBars());
     }
 
     /** The tower is two blocks tall and a little wider than its block. */

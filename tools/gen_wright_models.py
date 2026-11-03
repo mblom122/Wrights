@@ -321,16 +321,41 @@ def tex_port_core():
     save(img, "port_core")
 
 
-def tex_core_glow():
+def tex_port_gauge():
+    """Dark plate behind the tower's energy bars."""
     img = image()
     for y in range(S):
         for x in range(S):
             t = 1 - abs(x - 15.5) / 15.5
-            c = mix((150, 60, 10), mix(AMBER, (255, 245, 210), 0.6), t ** 1.4)
-            if y % 8 in (0, 1):
-                c = mul(c, 0.42)
-            put(img, x, y, c)
-    save(img, "core_glow")
+            put(img, x, y, mix((14, 15, 18), (30, 33, 38), t))
+    for i in range(S):
+        for d in (0, S - 1):
+            put(img, i, d, (54, 58, 66))
+            put(img, d, i, (54, 58, 66))
+    save(img, "port_gauge")
+
+
+# Lit colour of the energy bars, by how many of the six are lit. See EnergyBars.java.
+ENERGY = dict(off=(34, 37, 42), red=(226, 52, 40), yellow=(246, 196, 44), green=(60, 220, 92))
+BARS = 6
+
+
+def bar_color(lit):
+    return "red" if lit <= 2 else ("yellow" if lit <= 4 else "green")
+
+
+def tex_energy():
+    for name, c in ENERGY.items():
+        img = image()
+        lit = name != "off"
+        for y in range(S):
+            for x in range(S):
+                t = 1 - abs(y - 15.5) / 15.5
+                v = mix(mul(c, 0.62), mix(c, (255, 255, 255), 0.35 if lit else 0.12), t ** 0.8)
+                if x in (0, S - 1) or y in (0, S - 1):
+                    v = mul(c, 0.45)
+                put(img, x, y, v)
+        save(img, f"energy_{name}")
 
 
 def tex_bay():
@@ -450,12 +475,8 @@ def tex_cell():
             k = cyl(x)
             if y < 5 or y > 26:
                 c = mul(add(STEEL, 10 if y in (0, 31) else -10), k)
-            elif x < 6 or x > 25:
-                c = mul((40, 44, 52), k)
             else:
-                bar = (y - 6) % 4
-                c = (14, 30, 18) if bar == 3 else mix((40, 210, 90), (180, 255, 200), 0.3 if bar == 1 else 0)
-                c = mul(c, 0.7 + 0.4 * k)
+                c = mul((24, 27, 32), k)
             put(img, x, y, c)
     save(img, "cell")
 
@@ -776,7 +797,36 @@ def pack(item=False):
     if item:
         els += PACK_IRIS.closed_blades("#blade")
         els.append(pack_lamp_el())
+        els += pack_bars()
     return els
+
+
+def pack_bars():
+    """Six rings round each side cell, bottom up, textured #e0..#e5."""
+    els = []
+    pad = 0.06
+    for x0, x1 in ((1.25, 2.25), (13.75, 14.75)):
+        for i in range(BARS):
+            y = 14.9 + i * 1.08
+            els.append(cube([x0 - pad, y, 11.5 - pad], [x1 + pad, y + 0.8, 14.25 + pad], f"#e{i}", glow=True))
+    return els
+
+
+def energy_textures(lit):
+    """Bar textures for a gauge showing {lit} of six bars."""
+    color = bar_color(lit)
+    return {f"e{i}": T(f"energy_{color}" if i < lit else "energy_off") for i in range(BARS)}
+
+
+def energy_overrides(prefix):
+    """Item overrides on wrights:energy (lit bars / 6), one child model per lit count."""
+    return [{"predicate": {"wrights:energy": round((lit - 0.5) / BARS, 4)}, "model": f"{prefix}_energy_{lit}"}
+            for lit in range(1, BARS + 1)]
+
+
+def write_energy_variants(folder: Path, name: str, parent: str, first=0):
+    for lit in range(first, BARS + 1):
+        write(folder / f"{name}_{lit}.json", {"parent": parent, "textures": energy_textures(lit)})
 
 
 def pack_lamp_el():
@@ -816,7 +866,7 @@ def tower():
         ([5.5, 18, 0.6], [10.5, 26, 1]), ([5.5, 18, 15], [10.5, 26, 15.4]),
         ([0.6, 18, 5.5], [1, 26, 10.5]), ([15, 18, 5.5], [15.4, 26, 10.5]),
     ):
-        els.append(cube(frm, to, "#glow", glow=True))
+        els.append(cube(frm, to, "#gauge"))
     for z0, z1 in ((0.4, 1.2), (14.8, 15.6)):
         for y in (17.4, 26):
             els.append(cube([5, y, z0], [11, y + 0.6, z1], "#steel"))
@@ -836,8 +886,23 @@ def tower_lamps():
     return [cube([x, 31, z], [x + 2, 32, z + 2], "#lamp", tint=True, glow=True) for x, z in LAMPS]
 
 
+def tower_bars():
+    """Six bars on each gauge plate, bottom up, textured #e0..#e5. Drawn by the block entity renderer in the world."""
+    els = []
+    for i in range(BARS):
+        y0 = 18.5 + i * 1.21
+        y1 = y0 + 0.95
+        els += [
+            cube([6, y0, 0.5], [10, y1, 0.6], f"#e{i}", glow=True),
+            cube([6, y0, 15.4], [10, y1, 15.5], f"#e{i}", glow=True),
+            cube([0.5, y0, 6], [0.6, y1, 10], f"#e{i}", glow=True),
+            cube([15.4, y0, 6], [15.5, y1, 10], f"#e{i}", glow=True),
+        ]
+    return els
+
+
 TOWER_TEX = dict(frame="frame", steel="steel", hazard="hazard", panel="port_panel", door="port_door",
-                 heatsink="heatsink", band="duct_mk1", core="port_core", glow="core_glow",
+                 heatsink="heatsink", band="duct_mk1", core="port_core", gauge="port_gauge",
                  nozzle_side="nozzle_side", bay="bay", pillar="pillar", led="led_mk1", bezel="duct_mk1",
                  blade="iris_blade", lamp="lamp")
 
@@ -855,7 +920,7 @@ FLAT_DISPLAY = {
 }
 
 PACK_DISPLAY = {
-    "gui": {"rotation": [20, 160, 0], "translation": [-7.3, -6, 0], "scale": [0.78, 0.78, 0.78]},
+    "gui": {"rotation": [20, 160, 0], "translation": [-1.6, -8, 0], "scale": [0.67, 0.67, 0.67]},
     "ground": {"rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [0.3, 0.3, 0.3]},
     "fixed": {"rotation": [0, 180, 0], "translation": [0, -4, 0], "scale": [0.6, 0.6, 0.6]},
     "head": {"rotation": [0, 180, 0], "translation": [0, -2, 0], "scale": [0.6, 0.6, 0.6]},
@@ -879,8 +944,8 @@ TOWER_DISPLAY = {
 
 def main():
     for fn in (tex_shell, tex_accent, tex_screen, tex_grip, tex_slate, tex_holo, tex_case, tex_label, tex_led_off,
-               tex_port_panel, tex_port_core, tex_core_glow, tex_bay, tex_iris_blade, tex_pillar, tex_lamp,
-               tex_port_door, tex_pack_bay, tex_cell, tex_strap):
+               tex_port_panel, tex_port_core, tex_port_gauge, tex_bay, tex_iris_blade, tex_pillar, tex_lamp,
+               tex_port_door, tex_pack_bay, tex_cell, tex_strap, tex_energy):
         fn()
     tex_blade("drone", (206, 212, 220), (246, 248, 250))
 
@@ -934,8 +999,14 @@ def main():
     write(PART_MODELS / "pack_blade.json", {"textures": textures(**PACK_TEX),
                                             "elements": [PACK_IRIS.blade_model("#blade")]})
     write(PART_MODELS / "pack_lamp.json", {"textures": textures(**PACK_TEX), "elements": [pack_lamp_el()]})
-    write(MODELS / "personal_wrightport.json", {"gui_light": "side", "textures": textures(**PACK_TEX),
-                                                "elements": pack(item=True), "display": PACK_DISPLAY})
+    # Energy bars: one base model with #e0..#e5, and a texture-only child per lit count (0..6).
+    write(PART_MODELS / "pack_cells.json", {"textures": textures(**energy_textures(0)), "elements": pack_bars()})
+    write_energy_variants(PART_MODELS, "pack_cells", "wrights:part/pack_cells")
+    write(MODELS / "personal_wrightport.json", {"gui_light": "side",
+                                                "textures": textures(**PACK_TEX, **energy_textures(0)),
+                                                "elements": pack(item=True), "display": PACK_DISPLAY,
+                                                "overrides": energy_overrides("wrights:item/personal_wrightport")})
+    write_energy_variants(MODELS, "personal_wrightport_energy", "wrights:item/personal_wrightport", 1)
 
     # Wrightport tower: two blocks tall. The lower half draws everything; the upper half is collision only.
     write(BLOCK_MODELS / "wrightport.json", {"ambientocclusion": False, "textures": textures(**TOWER_TEX),
@@ -944,10 +1015,15 @@ def main():
     write(PART_MODELS / "iris_blade.json", {"textures": textures(**TOWER_TEX),
                                             "elements": [BLOCK_IRIS.blade_model("#blade")]})
     write(PART_MODELS / "wrightport_lamps.json", {"textures": textures(**TOWER_TEX), "elements": tower_lamps()})
+    write(PART_MODELS / "wrightport_bars.json", {"textures": textures(**energy_textures(0)), "elements": tower_bars()})
+    write_energy_variants(PART_MODELS, "wrightport_bars", "wrights:part/wrightport_bars")
     write(MODELS / "wrightport.json", {"ambientocclusion": False, "gui_light": "side",
-                                       "textures": textures(**TOWER_TEX),
-                                       "elements": tower() + BLOCK_IRIS.closed_blades("#blade") + tower_lamps(),
-                                       "display": TOWER_DISPLAY})
+                                       "textures": textures(**TOWER_TEX, **energy_textures(0)),
+                                       "elements": tower() + BLOCK_IRIS.closed_blades("#blade") + tower_lamps()
+                                       + tower_bars(),
+                                       "display": TOWER_DISPLAY,
+                                       "overrides": energy_overrides("wrights:item/wrightport")})
+    write_energy_variants(MODELS, "wrightport_energy", "wrights:item/wrightport", 1)
     write(BLOCKSTATES / "wrightport.json", {"variants": {
         "half=lower": {"model": "wrights:block/wrightport"},
         "half=upper": {"model": "wrights:block/wrightport_upper"},

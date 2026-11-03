@@ -9,7 +9,7 @@
     "heatsink": "wrights:item/part/heatsink",
     "band": "wrights:item/part/duct_mk1",
     "core": "wrights:item/part/port_core",
-    "glow": "wrights:item/part/core_glow",
+    "gauge": "wrights:item/part/port_gauge",
     "nozzle_side": "wrights:item/part/nozzle_side",
     "bay": "wrights:item/part/bay",
     "pillar": "wrights:item/part/pillar",
@@ -1155,7 +1155,7 @@
             16,
             16
           ],
-          "texture": "#glow"
+          "texture": "#gauge"
         },
         "east": {
           "uv": [
@@ -1164,7 +1164,7 @@
             16,
             16
           ],
-          "texture": "#glow"
+          "texture": "#gauge"
         },
         "south": {
           "uv": [
@@ -1173,7 +1173,7 @@
             16,
             16
           ],
-          "texture": "#glow"
+          "texture": "#gauge"
         },
         "west": {
           "uv": [
@@ -1182,7 +1182,7 @@
             16,
             16
           ],
-          "texture": "#glow"
+          "texture": "#gauge"
         },
         "up": {
           "uv": [
@@ -1191,7 +1191,7 @@
             16,
             16
           ],
-          "texture": "#glow"
+          "texture": "#gauge"
         },
         "down": {
           "uv": [
@@ -1200,12 +1200,8 @@
             16,
             16
           ],
-          "texture": "#glow"
+          "texture": "#gauge"
         }
-      },
-      "neoforge_data": {
-        "block_light": 15,
-        "sky_light": 15
       }
     },
     {
@@ -1227,7 +1223,7 @@
             16,
             16
           ],
-          "texture": "#glow"
+          "texture": "#gauge"
         },
         "east": {
           "uv": [
@@ -1236,7 +1232,7 @@
             16,
             16
           ],
-          "texture": "#glow"
+          "texture": "#gauge"
         },
         "south": {
           "uv": [
@@ -1245,7 +1241,7 @@
             16,
             16
           ],
-          "texture": "#glow"
+          "texture": "#gauge"
         },
         "west": {
           "uv": [
@@ -1254,7 +1250,7 @@
             16,
             16
           ],
-          "texture": "#glow"
+          "texture": "#gauge"
         },
         "up": {
           "uv": [
@@ -1263,7 +1259,7 @@
             16,
             16
           ],
-          "texture": "#glow"
+          "texture": "#gauge"
         },
         "down": {
           "uv": [
@@ -1272,12 +1268,8 @@
             16,
             16
           ],
-          "texture": "#glow"
+          "texture": "#gauge"
         }
-      },
-      "neoforge_data": {
-        "block_light": 15,
-        "sky_light": 15
       }
     },
     {
@@ -1299,7 +1291,7 @@
             16,
             16
           ],
-          "texture": "#glow"
+          "texture": "#gauge"
         },
         "east": {
           "uv": [
@@ -1308,7 +1300,7 @@
             16,
             16
           ],
-          "texture": "#glow"
+          "texture": "#gauge"
         },
         "south": {
           "uv": [
@@ -1317,7 +1309,7 @@
             16,
             16
           ],
-          "texture": "#glow"
+          "texture": "#gauge"
         },
         "west": {
           "uv": [
@@ -1326,7 +1318,7 @@
             16,
             16
           ],
-          "texture": "#glow"
+          "texture": "#gauge"
         },
         "up": {
           "uv": [
@@ -1335,7 +1327,7 @@
             16,
             16
           ],
-          "texture": "#glow"
+          "texture": "#gauge"
         },
         "down": {
           "uv": [
@@ -1344,12 +1336,8 @@
             16,
             16
           ],
-          "texture": "#glow"
+          "texture": "#gauge"
         }
-      },
-      "neoforge_data": {
-        "block_light": 15,
-        "sky_light": 15
       }
     },
     {
@@ -1371,7 +1359,7 @@
             16,
             16
           ],
-          "texture": "#glow"
+          "texture": "#gauge"
         },
         "east": {
           "uv": [
@@ -1380,7 +1368,7 @@
             16,
             16
           ],
-          "texture": "#glow"
+          "texture": "#gauge"
         },
         "south": {
           "uv": [
@@ -1389,7 +1377,7 @@
             16,
             16
           ],
-          "texture": "#glow"
+          "texture": "#gauge"
         },
         "west": {
           "uv": [
@@ -1398,7 +1386,7 @@
             16,
             16
           ],
-          "texture": "#glow"
+          "texture": "#gauge"
         },
         "up": {
           "uv": [
@@ -1407,7 +1395,7 @@
             16,
             16
           ],
-          "texture": "#glow"
+          "texture": "#gauge"
         },
         "down": {
           "uv": [
@@ -1416,12 +1404,8 @@
             16,
             16
           ],
-          "texture": "#glow"
+          "texture": "#gauge"
         }
-      },
-      "neoforge_data": {
-        "block_light": 15,
-        "sky_light": 15
       }
     },
     {

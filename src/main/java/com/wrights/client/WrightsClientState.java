@@ -725,7 +725,7 @@ public final class WrightsClientState {
         com.wrights.WrightsClientConfig.setLastMode(modeId, style, tool, id);
     }
 
-    /** Drop Shape / Mirror / Exchange / Bind aims without changing mode or remembered tool. */
+    /** Drop Shape / Mirror / Exchange / Bind-inventory aims without changing mode or remembered tool. */
     public static void clearBuildAims() {
         mirrorAim = false;
         shapeAim = false;
@@ -734,11 +734,19 @@ public final class WrightsClientState {
         bridgeActive = false;
         bindSupply = false;
         bindFromMenu = false;
+    }
+
+    /** Leave wrightport Bind Chest aim (tool switch, cancel, or finished bind). */
+    public static void clearPortChestAim() {
         bindPort = null;
     }
 
     /** Restore Mirror / Shape / Exchange / Bind inventory after Build mode comes back. */
     public static void applyLastBuildTool() {
+        // Port-chest bind is exclusive — do not restore Place/Shape over it after Bind Chest.
+        if (bindPort != null) {
+            return;
+        }
         clearBuildAims();
         int tool = com.wrights.WrightsClientConfig.LAST_BUILD_TOOL.get();
         if (tool == 1 && WrightsConfig.allowMirror()) {
@@ -909,6 +917,7 @@ public final class WrightsClientState {
         captureDirty = false;
         clearedGeneration = generation;
         clearBuildAims();
+        clearPortChestAim();
         styleHudTicks = STYLE_HUD_TICKS;
         updateFlags();
     }
@@ -925,6 +934,7 @@ public final class WrightsClientState {
         leaveCapture();
         mode = Mode.JOBS;
         clearBuildAims();
+        clearPortChestAim();
         updateFlags();
     }
 
@@ -940,6 +950,7 @@ public final class WrightsClientState {
         leaveCapture();
         mode = Mode.MANAGE;
         clearBuildAims();
+        clearPortChestAim();
         updateFlags();
     }
 
@@ -947,6 +958,7 @@ public final class WrightsClientState {
         leaveCapture();
         mode = Mode.INFO;
         clearBuildAims();
+        clearPortChestAim();
         updateFlags();
     }
 
@@ -954,6 +966,7 @@ public final class WrightsClientState {
         leaveCapture();
         mode = Mode.LINK;
         clearBuildAims();
+        clearPortChestAim();
         updateFlags();
     }
 
@@ -1318,6 +1331,7 @@ public final class WrightsClientState {
                     follow = false;
                     if (incoming == Mode.CAPTURE || incoming == Mode.SAVING) {
                         clearBuildAims();
+                        clearPortChestAim();
                     }
                 } else if (previous != Mode.BUILD) {
                     applyLastBuildTool();
@@ -1778,6 +1792,8 @@ public final class WrightsClientState {
         clearShapeLookSnap();
         mode = Mode.BUILD;
         bindPort = port.immutable();
+        // Drop any armed blueprint follow so Place/Shape clicks cannot run under a Bind HUD.
+        follow = false;
         styleHudTicks = STYLE_HUD_TICKS;
         styleAnnounce = true;
         updateFlags();
@@ -1787,11 +1803,11 @@ public final class WrightsClientState {
 
     public static void finishPortChest(BlockPos chest) {
         if (bindPort == null || chest == null) {
-            bindPort = null;
+            clearPortChestAim();
             return;
         }
         PacketDistributor.sendToServer(new BlueprintPayloads.BindPortChest(bindPort, chest, false));
-        bindPort = null;
+        clearPortChestAim();
     }
 
     /** True while aiming a wrightport supply chest (controller Bind tool for that port). */
@@ -2718,6 +2734,7 @@ public final class WrightsClientState {
             enterBuildFromLast();
         }
         clearBuildAims();
+        clearPortChestAim();
         bindSupply = bind;
         if (bind) {
             bindFromMenu = false;
@@ -2727,6 +2744,7 @@ public final class WrightsClientState {
 
     private static void selectNewStyle(CaptureStyle style) {
         clearBuildAims();
+        clearPortChestAim();
         if (mode == Mode.SAVING) {
             return;
         }

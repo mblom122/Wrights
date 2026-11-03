@@ -225,12 +225,12 @@ public final class WrightsInput {
         if (!event.getLevel().isClientSide()) {
             return;
         }
-        if (WrightsClientState.bindPort != null && Minecraft.getInstance().screen == null) {
+        if (WrightsClientState.portChestAim() && Minecraft.getInstance().screen == null) {
             event.setCanceled(true);
             event.setUseBlock(TriState.FALSE);
             event.setUseItem(TriState.FALSE);
             if (event.getEntity().isShiftKeyDown()) {
-                WrightsClientState.bindPort = null;
+                WrightsClientState.clearPortChestAim();
                 event.getEntity().displayClientMessage(net.minecraft.network.chat.Component.translatable("message.wrights.port_chest_cancel"), true);
                 return;
             }
@@ -248,7 +248,7 @@ public final class WrightsInput {
         if (Minecraft.getInstance().screen == null
                 && event.getLevel().getBlockState(event.getPos()).getBlock() instanceof com.wrights.block.WrightportBlock
                 && !menuChord(event.getEntity())
-                && WrightsClientState.bindPort == null) {
+                && !WrightsClientState.portChestAim()) {
             return;
         }
         if (Minecraft.getInstance().screen == null && undoChord(event.getEntity())) {
@@ -326,10 +326,10 @@ public final class WrightsInput {
         if (!event.getLevel().isClientSide()) {
             return;
         }
-        if (WrightsClientState.bindPort != null && Minecraft.getInstance().screen == null) {
+        if (WrightsClientState.portChestAim() && Minecraft.getInstance().screen == null) {
             event.setCanceled(true);
             if (event.getEntity().isShiftKeyDown()) {
-                WrightsClientState.bindPort = null;
+                WrightsClientState.clearPortChestAim();
                 event.getEntity().displayClientMessage(net.minecraft.network.chat.Component.translatable("message.wrights.port_chest_cancel"), true);
             }
             return;
@@ -458,6 +458,21 @@ public final class WrightsInput {
     }
 
     private static void useBuildClick(net.minecraft.world.entity.player.Player player, BlockPos pos, Direction face, BlockHitResult hit) {
+        // Port Bind Chest must win over Place / Shape even if aims were restored under the HUD.
+        if (WrightsClientState.portChestAim()) {
+            if (player.isShiftKeyDown()) {
+                WrightsClientState.clearPortChestAim();
+                player.displayClientMessage(net.minecraft.network.chat.Component.translatable("message.wrights.port_chest_cancel"), true);
+                return;
+            }
+            if (pos != null && Minecraft.getInstance().level != null
+                    && SelectionRenderer.isSupplyContainer(Minecraft.getInstance().level, pos)) {
+                WrightsClientState.finishPortChest(pos);
+            } else if (pos != null) {
+                player.displayClientMessage(net.minecraft.network.chat.Component.translatable("message.wrights.supply_not_container"), true);
+            }
+            return;
+        }
         if (pos != null) {
             boundThisClick = true;
         }
