@@ -9,6 +9,7 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -21,6 +22,8 @@ import com.wrights.util.Messages;
 
 public final class ClipboardExchange {
     private static final int MAX_BYTES = 512_000;
+    /** Largest NBT a pasted blueprint may expand to. Real blueprints are a few MB at most. */
+    private static final long MAX_DECODED_BYTES = 32L * 1024L * 1024L;
 
     private ClipboardExchange() {
     }
@@ -128,8 +131,11 @@ public final class ClipboardExchange {
             return null;
         }
         try {
-            return NbtIo.read(new DataInputStream(new GZIPInputStream(new ByteArrayInputStream(data))));
-        } catch (IOException ignored) {
+            // The compressed size is capped above, but a gzip stream can expand a thousandfold. The
+            // accounter stops a crafted payload from allocating the server out of memory.
+            return NbtIo.read(new DataInputStream(new GZIPInputStream(new ByteArrayInputStream(data))),
+                    NbtAccounter.create(MAX_DECODED_BYTES));
+        } catch (IOException | RuntimeException ignored) {
             return null;
         }
     }
