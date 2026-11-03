@@ -765,21 +765,32 @@ public final class WrightsClientConfig {
                 || form == com.wrights.blueprint.Shapes.ExchangeForm.CIRCLE;
     }
 
-    /** Place Look Circle form — Flat (floor) vs upright (wall) mount. */
-    public static boolean placeCircleForm() {
-        return placeStyle() == 0 && exchangeForm() == com.wrights.blueprint.Shapes.ExchangeForm.CIRCLE;
+    /** Active form is Circle (shared by Exchange and Place Look). */
+    public static boolean circleForm() {
+        return exchangeForm() == com.wrights.blueprint.Shapes.ExchangeForm.CIRCLE;
     }
 
-    /** True when Circle is tipped onto a vertical plane. */
+    /** Place Look Circle form — Flat (floor) vs upright (wall) mount. */
+    public static boolean placeCircleForm() {
+        return placeStyle() == 0 && circleForm();
+    }
+
+    /** True when Circle is tipped onto a vertical plane (Floor mount = false). */
+    public static boolean circleWallMount() {
+        return circleForm() && SHAPE_PLANE.get() != com.wrights.blueprint.Shapes.AXIS_Y;
+    }
+
+    /** @deprecated prefer {@link #circleWallMount()} */
+    @Deprecated
     public static boolean placeCircleWall() {
-        return placeCircleForm() && SHAPE_PLANE.get() != com.wrights.blueprint.Shapes.AXIS_Y;
+        return placeCircleForm() && circleWallMount();
     }
 
     /**
      * Flat: disk on the floor (Y up). Wall: disk stands across the player's look,
-     * same facing snap as the Wall form.
+     * same facing snap as the Wall form. Used by Exchange and Place Circle.
      */
-    public static void setPlaceCircleWall(boolean wall, net.minecraft.world.entity.player.Player player) {
+    public static void setCircleWall(boolean wall, net.minecraft.world.entity.player.Player player) {
         if (wall) {
             net.minecraft.core.Direction facing = player == null
                     ? net.minecraft.core.Direction.NORTH
@@ -790,6 +801,12 @@ public final class WrightsClientConfig {
         } else {
             setShapePlane(com.wrights.blueprint.Shapes.AXIS_Y);
         }
+    }
+
+    /** @deprecated prefer {@link #setCircleWall} */
+    @Deprecated
+    public static void setPlaceCircleWall(boolean wall, net.minecraft.world.entity.player.Player player) {
+        setCircleWall(wall, player);
     }
 
     /** Nudge shape yaw by quarter-turns (positive = left / CCW). */

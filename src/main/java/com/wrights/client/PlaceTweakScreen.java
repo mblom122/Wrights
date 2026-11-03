@@ -260,7 +260,7 @@ public class PlaceTweakScreen extends Screen {
             drawValue(graphics, toMeHeightY, WrightsClientConfig.placeToMeHeight());
         }
         if (circleMountY >= 0) {
-            boolean wall = WrightsClientConfig.placeCircleWall();
+            boolean wall = WrightsClientConfig.circleWallMount();
             int gap = GAP;
             int choiceW = (panelW - PAD * 2 - gap) / 2;
             int choiceX = panelX + PAD;
@@ -364,11 +364,11 @@ public class PlaceTweakScreen extends Screen {
             int choiceX = panelX + PAD;
             int rightW = panelW - PAD * 2 - choiceW - gap;
             if (hit(mouseX, mouseY, choiceX, circleMountY, choiceW, ROW)) {
-                WrightsClientConfig.setPlaceCircleWall(false, this.minecraft != null ? this.minecraft.player : null);
+                WrightsClientConfig.setCircleWall(false, this.minecraft != null ? this.minecraft.player : null);
                 return true;
             }
             if (hit(mouseX, mouseY, choiceX + choiceW + gap, circleMountY, rightW, ROW)) {
-                WrightsClientConfig.setPlaceCircleWall(true, this.minecraft != null ? this.minecraft.player : null);
+                WrightsClientConfig.setCircleWall(true, this.minecraft != null ? this.minecraft.player : null);
                 return true;
             }
         }

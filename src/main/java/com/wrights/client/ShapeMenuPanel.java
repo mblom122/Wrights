@@ -187,6 +187,9 @@ final class ShapeMenuPanel {
             y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
                     "menu.wrights.shape_section_dimensions", "menu.wrights.shape_section_dimensions_hint", false);
             y = drawFormDimensions(graphics, mouseX, mouseY, x, y, leftW, kind, exchangeForm, exchangeLine, exchangePlate, ring, box, axis);
+            if (formPresets() && exchangeForm == Shapes.ExchangeForm.CIRCLE) {
+                y = drawCircleMount(graphics, mouseX, mouseY, x, y, leftW);
+            }
             if (!formPresets()) {
                 y = beginSection(graphics, mouseX, mouseY, x, y, lineEnd,
                         "menu.wrights.shape_section_orientation", "menu.wrights.shape_section_orientation_hint", false);
@@ -709,8 +712,11 @@ final class ShapeMenuPanel {
             }
             case "place_circle_mount" -> {
                 // drawPair: 0 = Floor (flat), 1 = Wall (upright across look).
-                if (placeMode && WrightsClientConfig.placeCircleForm()) {
-                    WrightsClientConfig.setPlaceCircleWall(
+                // Place Look Circle, or Exchange Circle (same Mount under Diameter).
+                boolean allow = WrightsClientConfig.circleForm()
+                        && (placeMode ? WrightsClientConfig.placeCircleForm() : formPresets());
+                if (allow) {
+                    WrightsClientConfig.setCircleWall(
                             value != 0,
                             net.minecraft.client.Minecraft.getInstance().player);
                 }
@@ -1135,15 +1141,7 @@ final class ShapeMenuPanel {
             y = drawFormDimensions(graphics, mouseX, mouseY, x, y, leftW, kind, form, exchangeLine, exchangePlate,
                     kind == Shapes.Kind.RING, kind == Shapes.Kind.BOX, axis);
             if (form == Shapes.ExchangeForm.CIRCLE) {
-                drawField(graphics, mouseX, mouseY, x, y,
-                        "menu.wrights.place_circle_mount", "menu.wrights.place_circle_mount_hint");
-                y += 12;
-                y = drawPair(graphics, mouseX, mouseY, x, y, leftW,
-                        WrightsClientConfig.placeCircleWall(),
-                        "menu.wrights.place_circle_floor",
-                        "menu.wrights.place_circle_wall",
-                        "place_circle_mount");
-                y += 4;
+                y = drawCircleMount(graphics, mouseX, mouseY, x, y, leftW);
             }
             if (WrightsClientConfig.placeFormYawRotatable()) {
                 drawField(graphics, mouseX, mouseY, x, y,
@@ -1806,6 +1804,19 @@ final class ShapeMenuPanel {
         graphics.fill(x, y, x + w, y + 14, hover ? hoverFill : fill);
         graphics.drawCenteredString(font, Component.translatable(label), x + w / 2, y + 3, ink);
         hits.add(new Hit(x, y, w, 14, id, 0));
+    }
+
+    /** Floor / Wall mount under Circle diameter — tips the disk onto Y or across look. */
+    private int drawCircleMount(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width) {
+        drawField(graphics, mouseX, mouseY, x, y,
+                "menu.wrights.place_circle_mount", "menu.wrights.place_circle_mount_hint");
+        y += 12;
+        y = drawPair(graphics, mouseX, mouseY, x, y, width,
+                WrightsClientConfig.circleWallMount(),
+                "menu.wrights.place_circle_floor",
+                "menu.wrights.place_circle_wall",
+                "place_circle_mount");
+        return y + 4;
     }
 
     private int drawPair(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int width, boolean second, String left, String right, String id) {

@@ -1366,7 +1366,7 @@
   "menu.wrights.place_void_hint": "On: clear solid or fluid in each cell, then place.\nOff: skip cells that are already occupied.\nApplies to Look, To me, Bridge, and Stairs.",
   "menu.wrights.place_form_rotation_hint": "Turns Floor, Wall, Beam, or Circle 90° left or right around the look pin (horizontal spin).",
   "menu.wrights.place_circle_mount": "Mount",
-  "menu.wrights.place_circle_mount_hint": "Floor lays the disk flat on the ground. Wall stands it upright across your look (same facing snap as the Wall form).",
+  "menu.wrights.place_circle_mount_hint": "Floor lays the disk flat on the ground (Y). Wall stands it upright across your look (X or Z — same facing snap as the Wall form).",
   "menu.wrights.place_circle_floor": "Floor",
   "menu.wrights.place_circle_wall": "Wall",
   "screen.wrights.place_tweak_title": "Place tweak",

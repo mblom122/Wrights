@@ -42,6 +42,7 @@ public class ShapeTweakScreen extends Screen {
     private int sizeY = -1;
     private int alongY = -1;
     private int thicknessY = -1;
+    private int circleMountY = -1;
     private int placeLabelY = -1;
     private int placeChoicesY = -1;
     private int matchLabelY = -1;
@@ -74,6 +75,7 @@ public class ShapeTweakScreen extends Screen {
         labelW = Math.max(labelW, this.font.width(Component.translatable("screen.wrights.shape_tweak_length")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("screen.wrights.shape_tweak_depth")));
         labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.shape_place")));
+        labelW = Math.max(labelW, this.font.width(Component.translatable("menu.wrights.place_circle_mount")));
         labelW = Math.max(labelW, this.font.width(Component.translatable(
                 exchange ? "menu.wrights.exchange_to" : "menu.wrights.shape_materials")));
         if (exchange) {
@@ -100,11 +102,13 @@ public class ShapeTweakScreen extends Screen {
         boolean showSize = !line;
         boolean showAlong = (line || kind.usesHeight()) && !equal;
         boolean showThickness = !line && !equal && (kind == Shapes.Kind.BOX || kind == Shapes.Kind.RING);
+        boolean showCircleMount = exchange && WrightsClientConfig.circleForm();
         boolean showLookLock = !exchange && anchors && !WrightsClientConfig.SHAPE_USE_ANCHOR.get();
         int rows = 1 // title
                 + (showSize ? 1 : 0)
                 + (showAlong ? 1 : 0)
                 + (showThickness ? 1 : 0)
+                + (showCircleMount ? 1 : 0) // Floor / Wall
                 + 1 // Build at label
                 + 1 // Build at choices
                 + (exchange ? 2 : 0) // Match label + Match look / Any
@@ -123,7 +127,7 @@ public class ShapeTweakScreen extends Screen {
         int plusX = valueX + fieldW + 2;
         int y = panelY + PAD + 12 + GAP;
 
-        sizeY = alongY = thicknessY = placeLabelY = placeChoicesY = matchLabelY = matchChoicesY = matsLabelY = matsRowY = -1;
+        sizeY = alongY = thicknessY = circleMountY = placeLabelY = placeChoicesY = matchLabelY = matchChoicesY = matsLabelY = matsRowY = -1;
         if (showSize) {
             sizeY = y;
             step(minusX, y, "-", () -> nudgeSize(-1));
@@ -140,6 +144,10 @@ public class ShapeTweakScreen extends Screen {
             thicknessY = y;
             step(minusX, y, "-", () -> nudgeThickness(-1));
             step(plusX, y, "+", () -> nudgeThickness(1));
+            y += ROW + GAP;
+        }
+        if (showCircleMount) {
+            circleMountY = y;
             y += ROW + GAP;
         }
 
@@ -213,6 +221,16 @@ public class ShapeTweakScreen extends Screen {
             graphics.drawString(this.font, Component.translatable(thickKey),
                     panelX + PAD, thicknessY + 3, WrightsUi.MUTED, false);
             drawValue(graphics, thicknessY, WrightsClientConfig.SHAPE_THICKNESS.get());
+        }
+        if (circleMountY >= 0) {
+            boolean wall = WrightsClientConfig.circleWallMount();
+            int gap = GAP;
+            int choiceW = (panelW - PAD * 2 - gap) / 2;
+            int choiceX = panelX + PAD;
+            drawChoice(graphics, mouseX, mouseY, choiceX, circleMountY, choiceW,
+                    !wall, "menu.wrights.place_circle_floor");
+            drawChoice(graphics, mouseX, mouseY, choiceX + choiceW + gap, circleMountY,
+                    panelW - PAD * 2 - choiceW - gap, wall, "menu.wrights.place_circle_wall");
         }
 
         boolean anchors = WrightsConfig.allowShapeAnchor();
@@ -343,11 +361,23 @@ public class ShapeTweakScreen extends Screen {
     private boolean handleModeClick(double mouseX, double mouseY) {
         boolean anchors = WrightsConfig.allowShapeAnchor();
         boolean useAnchor = anchors && WrightsClientConfig.SHAPE_USE_ANCHOR.get();
+        int choiceX = panelX + PAD;
+        int choiceW = (panelW - PAD * 2 - GAP) / 2;
+        if (circleMountY >= 0) {
+            int gap = GAP;
+            int rightW = panelW - PAD * 2 - choiceW - gap;
+            if (hit(mouseX, mouseY, choiceX, circleMountY, choiceW, ROW)) {
+                WrightsClientConfig.setCircleWall(false, this.minecraft != null ? this.minecraft.player : null);
+                return true;
+            }
+            if (hit(mouseX, mouseY, choiceX + choiceW + gap, circleMountY, rightW, ROW)) {
+                WrightsClientConfig.setCircleWall(true, this.minecraft != null ? this.minecraft.player : null);
+                return true;
+            }
+        }
         if (placeChoicesY < 0) {
             return false;
         }
-        int choiceX = panelX + PAD;
-        int choiceW = (panelW - PAD * 2 - GAP) / 2;
         if (hit(mouseX, mouseY, choiceX, placeChoicesY, choiceW, ROW)) {
             WrightsClientConfig.setShapeUseAnchor(false);
             WrightsClientState.clearShapeLookSnap();
