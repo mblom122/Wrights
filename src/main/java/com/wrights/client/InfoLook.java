@@ -19,6 +19,7 @@ import net.minecraft.world.phys.Vec3;
 
 import com.wrights.WrightsClientConfig;
 import com.wrights.WrightsConfig;
+import com.wrights.block.WrightportBlock;
 import com.wrights.block.WrightportBlockEntity;
 import com.wrights.blueprint.Mirror;
 import com.wrights.entity.DroneEntity;
@@ -142,10 +143,15 @@ public final class InfoLook {
         Hit best = null;
         if (minecraft.hitResult instanceof BlockHitResult hit && hit.getType() == HitResult.Type.BLOCK) {
             BlockPos pos = hit.getBlockPos();
-            if (minecraft.level.getBlockEntity(pos) instanceof WrightportBlockEntity port) {
+            BlockState state = minecraft.level.getBlockState(pos);
+            BlockPos base = state.getBlock() instanceof WrightportBlock
+                    ? WrightportBlock.base(state, pos)
+                    : pos;
+            if (minecraft.level.getBlockEntity(base) instanceof WrightportBlockEntity port) {
+                // Hit either half; info always comes from the lower BE.
                 Vec3 at = clip(new AABB(pos).inflate(0.08D), eye, end);
                 if (at != null) {
-                    best = new Hit(eye.distanceToSqr(at), pos, portLines(here, pos, port));
+                    best = new Hit(eye.distanceToSqr(at), base, portLines(here, base, port));
                 }
             }
         }
