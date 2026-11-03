@@ -50,7 +50,11 @@ public class WrightPartItem extends Item {
     public static List<Component> stats(PartSlot slot, int tier) {
         List<Component> lines = new ArrayList<>(3);
         switch (slot) {
-            case ROTOR -> lines.add(Component.translatable("item.wrights.rotor.speed", WrightTier.flyRateLabel(tier)));
+            case ROTOR -> {
+                int bonus = WrightTier.flyBonusPercent(tier);
+                String signed = bonus > 0 ? "+" + bonus : Integer.toString(bonus);
+                lines.add(Component.translatable("item.wrights.rotor.speed", WrightTier.flyRateLabel(tier), signed));
+            }
             case FABRICATOR -> {
                 // Energy is paid once per cell action — Apex 19 actions/tick = up to 19 charges that tick.
                 int perBlock = WrightsConfig.ENERGY.get() ? WrightsConfig.ENERGY_PLACE.get() : 0;

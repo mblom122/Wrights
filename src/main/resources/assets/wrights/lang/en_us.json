@@ -881,7 +881,7 @@
   "part.wrights.rotor.none": "No Rotor Assembly",
   "part.wrights.fabricator.none": "No Fabricator Head",
   "part.wrights.core.none": "No Power Core",
-  "item.wrights.rotor.speed": "• Flight Speed: %s blocks/s",
+  "item.wrights.rotor.speed": "• Flight Speed: %s blocks/s (%s%%)",
   "item.wrights.core.rating": "Covers a rotor drawing up to %s%%. A faster rotor costs more energy, a slower one less.",
   "item.wrights.core.match": "Matched with a %s Rotor Assembly, blocks cost the base energy.",
   "item.wrights.core.efficiency": "• FE Efficiency: %s%% power drain",

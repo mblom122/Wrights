@@ -116,6 +116,18 @@ public final class WrightTier {
     }
 
     /**
+     * Flight speed change vs Basic, in percent of Basic blocks/s.
+     * Apex → {@code +1000}; Scout → {@code +100}; Basic → {@code 0}.
+     */
+    public static int flyBonusPercent(int tier) {
+        double basic = flyBlocksPerSecond(BASIC);
+        if (basic <= 0.0D) {
+            return 0;
+        }
+        return (int) Math.round(100.0D * (flyBlocksPerSecond(tier) / basic - 1.0D));
+    }
+
+    /**
      * Energy a rotor tier draws per block, in percent of Basic. A Power Core of a tier is rated for the rotor of
      * the same tier: it divides by the same figure, so a matched pair works at the Basic cost.
      */
