@@ -151,6 +151,11 @@ public class WrightportBlock extends BaseEntityBlock {
         return openPort(state, level, pos, player);
     }
 
+    /** Either half of a placed wrightport. */
+    public static boolean isPort(net.minecraft.world.level.BlockGetter level, BlockPos pos) {
+        return pos != null && level.getBlockState(pos).getBlock() instanceof WrightportBlock;
+    }
+
     /** Holding a controller (or any item) still opens the port — build clicks must not steal this. */
     @Override
     protected ItemInteractionResult useItemOn(

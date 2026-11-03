@@ -19,7 +19,7 @@ public final class BlueprintInteract {
         if (event.getLevel().isClientSide() || !(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
-        if (!ControllerItem.isHeld(player)) {
+        if (!ControllerItem.isHeld(player) || com.wrights.block.WrightportBlock.isPort(event.getLevel(), event.getPos())) {
             return;
         }
         BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);

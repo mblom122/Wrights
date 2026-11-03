@@ -105,6 +105,12 @@ public class ControllerItem extends Item {
         if (!(event.getItemStack().getItem() instanceof ControllerItem)) {
             return;
         }
+        // A wrightport opens its screen whatever tool or blueprint mode the controller is in.
+        if (com.wrights.block.WrightportBlock.isPort(event.getLevel(), event.getPos())) {
+            event.setUseBlock(TriState.TRUE);
+            event.setUseItem(TriState.FALSE);
+            return;
+        }
         if (event.getEntity() instanceof ServerPlayer player && BlueprintSessions.suppressController(player)) {
             event.setUseBlock(TriState.FALSE);
             event.setUseItem(TriState.FALSE);
@@ -112,12 +118,6 @@ public class ControllerItem extends Item {
         }
         if (event.getLevel().isClientSide() && BlueprintClientFlags.suppressController) {
             event.setUseBlock(TriState.FALSE);
-            event.setUseItem(TriState.FALSE);
-            return;
-        }
-        // Prefer opening a wrightport over build/place when looking at one.
-        if (event.getLevel().getBlockState(event.getPos()).getBlock() instanceof com.wrights.block.WrightportBlock) {
-            event.setUseBlock(TriState.TRUE);
             event.setUseItem(TriState.FALSE);
             return;
         }
