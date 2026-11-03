@@ -9,11 +9,13 @@ Creative mode does not pay. Set `energy` to false in the server config and every
 | Launch | Where the energy comes from |
 | --- | --- |
 | Placed wrightport | That block's buffer. Cables can fill it. |
-| Personal wrightport | Energy items in the player's inventory, then Curios slots. The worn port has no buffer of its own. |
+| Personal wrightport | That item's own Forge Energy buffer first (inventory or Curios), then other energy items the player carries. |
 
 A wright from a placed port never falls back to the player's batteries. If that port's chunk is not loaded, the action simply cannot be paid.
 
 A placed port holds **1,000,000 FE** and accepts or emits **10,000 FE** per transfer. Placing one starts it empty. Cables or a battery have to fill it. After that, the saved amount is what it has.
+
+The personal wrightport item exposes the same Forge Energy buffer, so energy cubes, cables that charge items, and wireless pads that talk FE can fill it in the inventory or Curios slot. Mekanism's chargepad only powers one inventory item per tick and only then tries Curios, so while you stand on a pad Wrights also moves FE from your other batteries into any personal wrightport you hold or wear.
 
 A personal wright can pull at most **10,000 FE** for one block, and only if the items together hold the whole cost. A shortfall does not leave a partial drain.
 

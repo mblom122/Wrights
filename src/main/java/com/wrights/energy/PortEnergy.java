@@ -9,6 +9,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.capabilities.Capabilities;
@@ -19,6 +20,7 @@ import net.neoforged.neoforge.energy.IEnergyStorage;
 import com.wrights.WrightsConfig;
 import com.wrights.block.WrightportBlockEntity;
 import com.wrights.item.ModDataComponents;
+import com.wrights.item.ModItems;
 import com.wrights.job.BuildJob;
 
 import top.theillusivec4.curios.api.CuriosApi;
@@ -93,6 +95,103 @@ public final class PortEnergy {
             return 0xFFE0B060;
         }
         return 0xFF3CFE9A;
+    }
+
+    /**
+     * Move Forge Energy from other carried batteries into every personal wrightport the player
+     * holds or wears. Used while standing on a wireless item charger so the port is not starved
+     * when another inventory item keeps winning the charger's single slot each tick.
+     */
+    public static void fillPersonalPortsFromCarried(Player player) {
+        if (player == null) {
+            return;
+        }
+        int rate = WrightsConfig.portEnergyTransfer();
+        if (rate <= 0) {
+            return;
+        }
+        fillPersonalPorts(player.getInventory(), player, rate);
+        fillPersonalPortsCurios(player, rate);
+    }
+
+    private static void fillPersonalPorts(Inventory inventory, Player player, int rate) {
+        for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
+            ItemStack stack = inventory.getItem(slot);
+            if (stack.is(ModItems.PERSONAL_WRIGHTPORT.get())) {
+                moveIntoPort(player, stack, rate);
+            }
+        }
+    }
+
+    private static void fillPersonalPortsCurios(Player player, int rate) {
+        ICuriosItemHandler handler = CuriosApi.getCuriosInventory(player).orElse(null);
+        if (handler == null) {
+            return;
+        }
+        for (var stacks : handler.getCurios().values()) {
+            IDynamicStackHandler inv = stacks.getStacks();
+            for (int slot = 0; slot < inv.getSlots(); slot++) {
+                ItemStack stack = inv.getStackInSlot(slot);
+                if (stack.is(ModItems.PERSONAL_WRIGHTPORT.get())) {
+                    moveIntoPort(player, stack, rate);
+                }
+            }
+        }
+    }
+
+    private static void moveIntoPort(Player player, ItemStack destination, int rate) {
+        IEnergyStorage dest = destination.getCapability(Capabilities.EnergyStorage.ITEM);
+        if (dest == null || !dest.canReceive()) {
+            return;
+        }
+        int room = dest.receiveEnergy(rate, true);
+        if (room <= 0) {
+            return;
+        }
+        int taken = takeFromOthers(player, destination, room);
+        if (taken > 0) {
+            dest.receiveEnergy(taken, false);
+        }
+    }
+
+    private static int takeFromOthers(Player player, ItemStack skip, int need) {
+        int left = need;
+        left = takeInventoryExcept(player.getInventory(), skip, left);
+        if (left > 0) {
+            left = takeCuriosExcept(player, skip, left);
+        }
+        return need - left;
+    }
+
+    private static int takeInventoryExcept(Inventory inventory, ItemStack skip, int need) {
+        int left = need;
+        for (int slot = 0; slot < inventory.getContainerSize() && left > 0; slot++) {
+            ItemStack stack = inventory.getItem(slot);
+            if (stack == skip || stack.is(ModItems.PERSONAL_WRIGHTPORT.get())) {
+                continue;
+            }
+            left -= pull(stack, left, false);
+        }
+        return left;
+    }
+
+    private static int takeCuriosExcept(Player player, ItemStack skip, int need) {
+        ICuriosItemHandler handler = CuriosApi.getCuriosInventory(player).orElse(null);
+        if (handler == null) {
+            return need;
+        }
+        int left = need;
+        for (var stacks : handler.getCurios().values()) {
+            IDynamicStackHandler inv = stacks.getStacks();
+            for (int slot = 0; slot < inv.getSlots() && left > 0; slot++) {
+                ItemStack stack = inv.getStackInSlot(slot);
+                if (stack == skip || stack.is(ModItems.PERSONAL_WRIGHTPORT.get())) {
+                    continue;
+                }
+                left -= pull(stack, left, false);
+            }
+        }
+        return left;
     }
 
     private static String format(int value) {

@@ -262,7 +262,7 @@ public final class WrightsConfig {
             .comment("Forge Energy buffer on a placed wrightport. A newly placed port starts empty.")
             .defineInRange("portEnergy", 1_000_000, 1_000, 1_000_000_000);
     public static final ModConfigSpec.IntValue PORT_ENERGY_TRANSFER = BUILDER
-            .comment("Forge Energy a placed wrightport can accept or emit per transfer, for cables and batteries.")
+            .comment("Forge Energy a wrightport item or placed port can accept or emit per transfer, for cables, batteries, and wireless item chargers.")
             .defineInRange("portEnergyTransfer", 10_000, 1, 1_000_000_000);
     public static final ModConfigSpec.IntValue PERSONAL_ENERGY_RATE = BUILDER
             .comment("Forge Energy one personal-port block may pull from inventory energy items.")
