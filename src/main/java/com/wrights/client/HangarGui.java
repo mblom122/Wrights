@@ -40,7 +40,6 @@ final class HangarGui {
     static final int PART_SLOT = HangarLayout.sx(34);
     static final int PART_GAP = HangarLayout.sx(57);
 
-    /** Defaults — live values come from {@link #EDIT}. */
     static final int BTN_X = HangarLayout.sx(463);
     static final int BTN_Y = HangarLayout.sx(60);
     static final int BTN_SLOT = HangarLayout.sx(31);
@@ -56,49 +55,6 @@ final class HangarGui {
     static final int GAUGE_BAR_W = Math.max(1, HangarLayout.sx(12));
     static final int GAUGE_BAR_H = HangarLayout.sx(91);
 
-    /** Live layout tweaks from the in-GUI editor (Copy → clipboard). After defaults above. */
-    static final HangarLayoutEdit EDIT = new HangarLayoutEdit();
-
-    static int btnX() {
-        return EDIT.btnX;
-    }
-
-    static int btnY() {
-        return EDIT.btnY;
-    }
-
-    static int btnSlot() {
-        return EDIT.btnSlot;
-    }
-
-    static int btnGap() {
-        return EDIT.btnGap;
-    }
-
-    static int gaugeX() {
-        return EDIT.gaugeX;
-    }
-
-    static int gaugeY() {
-        return EDIT.gaugeY;
-    }
-
-    static int gaugeW() {
-        return EDIT.gaugeW;
-    }
-
-    static int gaugeH() {
-        return EDIT.gaugeH;
-    }
-
-    static int invSlotLeftLive() {
-        return EDIT.invSlotLeft;
-    }
-
-    static int invSlotTopLive() {
-        return EDIT.invSlotTop;
-    }
-
     static final int BTN_BOUNDARY = 0;
     static final int BTN_BIND = 1;
     static final int BTN_HIGHLIGHT = 2;
@@ -113,11 +69,11 @@ final class HangarGui {
     }
 
     static int invSlotLeft() {
-        return invSlotLeftLive();
+        return HangarLayout.invSlotLeft();
     }
 
     static int invSlotTop() {
-        return invSlotTopLive();
+        return HangarLayout.invSlotTop();
     }
 
     static void blitPanel(GuiGraphics graphics, int left, int top) {
@@ -155,19 +111,18 @@ final class HangarGui {
     }
 
     static int buttonX(int left) {
-        return left + btnX();
+        return left + BTN_X;
     }
 
     static int buttonY(int top, int index) {
-        return top + btnY() + index * (btnSlot() + btnGap());
+        return top + BTN_Y + index * (BTN_SLOT + BTN_GAP);
     }
 
     static int buttonHit(int left, int top, double mouseX, double mouseY) {
-        int size = btnSlot();
         for (int i = 0; i < 3; i++) {
             int x = buttonX(left);
             int y = buttonY(top, i);
-            if (mouseX >= x && mouseX < x + size && mouseY >= y && mouseY < y + size) {
+            if (mouseX >= x && mouseX < x + BTN_SLOT && mouseY >= y && mouseY < y + BTN_SLOT) {
                 return i;
             }
         }
@@ -188,10 +143,9 @@ final class HangarGui {
     static void blitButton(GuiGraphics graphics, int left, int top, int button, int state) {
         int x = buttonX(left);
         int y = buttonY(top, button);
-        int size = btnSlot();
         float u = button * (BTN_ATLAS + BTN_ATLAS_GAP);
         float v = state * (BTN_ATLAS + BTN_ATLAS_GAP);
-        graphics.blit(BUTTONS, x, y, size, size, u, v, BTN_ATLAS, BTN_ATLAS, BTN_SHEET_W, BTN_SHEET_H);
+        graphics.blit(BUTTONS, x, y, BTN_SLOT, BTN_SLOT, u, v, BTN_ATLAS, BTN_ATLAS, BTN_SHEET_W, BTN_SHEET_H);
     }
 
     static int buttonState(boolean enabled, boolean active, boolean hover) {
@@ -211,10 +165,10 @@ final class HangarGui {
     }
 
     static void drawEnergyGauge(GuiGraphics graphics, int left, int top, int stored, int capacity) {
-        int x = left + gaugeX();
-        int y = top + gaugeY();
-        int w = gaugeW();
-        int h = gaugeH();
+        int x = left + GAUGE_BAR_X;
+        int y = top + GAUGE_BAR_Y;
+        int w = GAUGE_BAR_W;
+        int h = GAUGE_BAR_H;
         graphics.fill(x, y, x + w, y + h, 0xFF0A1018);
         WrightsUi.border(graphics, x, y, w, h, 0xFF3D4E5E);
         if (capacity <= 0) {

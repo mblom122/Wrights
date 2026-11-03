@@ -103,7 +103,7 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
                 bound,
                 highlightOn
         };
-        int size = HangarGui.btnSlot();
+        int size = HangarGui.BTN_SLOT;
         for (int i = 0; i < 3; i++) {
             int x = HangarGui.buttonX(leftPos);
             int y = HangarGui.buttonY(topPos, i);
@@ -113,9 +113,6 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
     }
 
     private boolean clickPortButton(double mouseX, double mouseY) {
-        if (HangarGui.EDIT.editing) {
-            return false;
-        }
         int hit = HangarGui.buttonHit(leftPos, topPos, mouseX, mouseY);
         if (hit < 0) {
             return false;
@@ -158,9 +155,6 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
 
     /** Port-tool hover tip (chrome strip). */
     private Component portButtonTip(int mouseX, int mouseY) {
-        if (HangarGui.EDIT.editing) {
-            return null;
-        }
         int hit = HangarGui.buttonHit(leftPos, topPos, mouseX, mouseY);
         if (hit < 0) {
             return null;
@@ -313,12 +307,9 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         this.renderBackground(graphics, mouseX, mouseY, partialTick);
         renderBg(graphics, partialTick, mouseX, mouseY);
-        HangarGui.EDIT.syncMenuSlots(this.menu);
         manage.render(this, graphics, mouseX, mouseY);
         drawEnergy(graphics);
         drawPortButtons(graphics, mouseX, mouseY);
-        HangarGui.EDIT.drawOverlays(graphics, leftPos, topPos);
-        HangarGui.EDIT.drawChrome(graphics, this.font, leftPos, topPos);
         // Supply warning only when no notice tip is already on the strip (manage draws notices).
         if ((manage.tipLine() == null || manage.tipLine().getString().isEmpty())
                 && canRename() && !portHasSupply()) {
@@ -359,10 +350,6 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (HangarGui.EDIT.mouseClicked(leftPos, topPos, mouseX, mouseY, button)) {
-            HangarGui.EDIT.syncMenuSlots(this.menu);
-            return true;
-        }
         if (button == 0 && clickPortButton(mouseX, mouseY)) {
             return true;
         }
@@ -376,24 +363,6 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
-    }
-
-    @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (HangarGui.EDIT.mouseReleased()) {
-            HangarGui.EDIT.syncMenuSlots(this.menu);
-            return true;
-        }
-        return super.mouseReleased(mouseX, mouseY, button);
-    }
-
-    @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        if (HangarGui.EDIT.mouseDragged(leftPos, topPos, mouseX, mouseY)) {
-            HangarGui.EDIT.syncMenuSlots(this.menu);
-            return true;
-        }
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
     }
 
     @Override
