@@ -260,7 +260,7 @@ public class DroneEntity extends Entity {
         }
         this.returnLimit = returnBudget(dock);
         if (this.unitId != null && !this.level().isClientSide) {
-            com.wrights.job.JobManager.holdReturn(this.unitId);
+            com.wrights.job.WrightFlights.holdReturn(this.unitId);
         }
     }
 
@@ -286,7 +286,7 @@ public class DroneEntity extends Entity {
             com.wrights.drone.HangarDock.arrived(server, this.ownerId, this.getUUID());
         }
         if (reason.shouldDestroy() && this.unitId != null && this.level() instanceof ServerLevel) {
-            com.wrights.job.JobManager.releaseReturn(this.unitId);
+            com.wrights.job.WrightFlights.releaseReturn(this.unitId);
         }
         super.remove(reason);
     }
@@ -529,14 +529,14 @@ public class DroneEntity extends Entity {
             return;
         }
         if (this.unitId != null) {
-            com.wrights.job.JobManager.noteFlyer(this.unitId, this);
+            com.wrights.job.WrightFlights.noteFlyer(this.unitId, this);
         }
         if (this.launchTicks > 0) {
             this.launchTicks--;
         }
         if (returning()) {
             if (this.unitId != null) {
-                com.wrights.job.JobManager.holdReturn(this.unitId);
+                com.wrights.job.WrightFlights.holdReturn(this.unitId);
             }
             ServerPlayer player = this.ownerId == null ? null : serverLevel.getServer().getPlayerList().getPlayer(this.ownerId);
             boolean loadedHome = homePort != null && serverLevel.isLoaded(homePort);
@@ -621,7 +621,7 @@ public class DroneEntity extends Entity {
             this.unitId = tag.getUUID("UnitId");
         }
         if (returning() && this.unitId != null && this.level() instanceof ServerLevel) {
-            com.wrights.job.JobManager.holdReturn(this.unitId);
+            com.wrights.job.WrightFlights.holdReturn(this.unitId);
         }
         this.unitName = tag.getString("UnitName");
         if (tag.contains("Carried")) {

@@ -438,7 +438,7 @@ public final class BlueprintNetwork {
 
     private static void visitWright(BlueprintPayloads.VisitWright payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
-        context.enqueueWork(() -> com.wrights.job.JobManager.visitWright(player, payload.unit()));
+        context.enqueueWork(() -> com.wrights.job.WrightFlights.visitWright(player, payload.unit()));
     }
 
     private static void assign(BlueprintPayloads.SetAssign payload, IPayloadContext context) {
@@ -854,7 +854,7 @@ public final class BlueprintNetwork {
         jobs.sort(java.util.Comparator.comparing(BuildJob::finished).thenComparing(java.util.Comparator.comparingInt(BuildJob::historyOrder).reversed()));
         java.util.List<BlueprintPayloads.JobLine> lines = new java.util.ArrayList<>();
         for (BuildJob job : jobs) {
-            String name = JobManager.jobCardTitle(job, library);
+            String name = com.wrights.job.JobTitles.jobCardTitle(job, library);
             int done = job.progressDone();
             int total = job.undoing() ? Math.max(1, job.undoTotal()) : job.total();
             lines.add(new BlueprintPayloads.JobLine(
@@ -893,7 +893,7 @@ public final class BlueprintNetwork {
                     crewHands(player.getServer(), job)));
         }
         PacketDistributor.sendToPlayer(player, new BlueprintPayloads.JobSync(lines));
-        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.WrightSpots(com.wrights.job.JobManager.wrightSpots(player)));
+        PacketDistributor.sendToPlayer(player, new BlueprintPayloads.WrightSpots(com.wrights.job.WrightFlights.wrightSpots(player)));
         syncHistory(player, library.eventLog().events(player.getUUID()));
     }
 

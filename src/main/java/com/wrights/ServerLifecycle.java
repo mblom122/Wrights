@@ -10,7 +10,7 @@ import com.wrights.drone.CraftDeliveries;
 import com.wrights.drone.DockRecovery;
 import com.wrights.drone.HangarDock;
 import com.wrights.drone.ManageLock;
-import com.wrights.job.JobManager;
+import com.wrights.job.WrightFlights;
 import com.wrights.storage.DigitalNetworks;
 
 /**
@@ -33,7 +33,7 @@ public final class ServerLifecycle {
     }
 
     private static void resetCaches() {
-        JobManager.reset();
+        WrightFlights.reset();
         CraftDeliveries.reset();
         HangarDock.reset();
         ManageLock.reset();

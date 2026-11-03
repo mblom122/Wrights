@@ -16,7 +16,6 @@ import net.minecraft.core.GlobalPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -126,7 +125,7 @@ public final class JobManager {
     public static void tick(MinecraftServer server) {
         DigitalNetworks.tickCrafts(server);
         com.wrights.drone.CraftDeliveries.tick(server);
-        sweepReturns();
+        WrightFlights.sweepReturns();
         SchematicLibrary library = SchematicLibrary.get(server);
         List<BuildJob> jobs = new ArrayList<>(library.jobs());
         for (BuildJob job : jobs) {
@@ -222,13 +221,13 @@ public final class JobManager {
             job.noteHold(BuildJob.HOLD_MANUAL, null);
             job.setPaused(true);
             library.setDirty();
-            noteHistory(player, library, job, JobEventLog.PAUSED, Component.translatable("history.wrights.paused_manual").getString());
+            JobAnnouncements.noteHistory(player, library, job, JobEventLog.PAUSED, Component.translatable("history.wrights.paused_manual").getString());
         } else if (action == com.wrights.network.BlueprintPayloads.JobControl.RESUME && !job.finished()) {
             if (job.queued()) {
                 job.setPaused(false);
                 job.clearHold();
                 library.setDirty();
-                noteHistory(player, library, job, JobEventLog.RESUMED, Component.translatable("history.wrights.resumed").getString());
+                JobAnnouncements.noteHistory(player, library, job, JobEventLog.RESUMED, Component.translatable("history.wrights.resumed").getString());
             } else {
                 bindCrewIds(player, library);
                 if (job.paused() && !restorePausedCrew(player, library, job)) {
@@ -237,7 +236,7 @@ public final class JobManager {
                     job.setPaused(false);
                     job.clearHold();
                     library.setDirty();
-                    noteHistory(player, library, job, JobEventLog.RESUMED, Component.translatable("history.wrights.resumed").getString());
+                    JobAnnouncements.noteHistory(player, library, job, JobEventLog.RESUMED, Component.translatable("history.wrights.resumed").getString());
                 }
             }
         } else if (action == com.wrights.network.BlueprintPayloads.JobControl.REDO) {
@@ -287,7 +286,7 @@ public final class JobManager {
                 "history.wrights.stopped_detail",
                 Math.max(0, job.progressDone()),
                 Math.max(1, job.total())).getString();
-        noteHistory(player, library, job, JobEventLog.STOPPED, detail);
+        JobAnnouncements.noteHistory(player, library, job, JobEventLog.STOPPED, detail);
     }
 
     private static void redo(ServerPlayer player, SchematicLibrary library, BuildJob job) {
@@ -344,7 +343,7 @@ public final class JobManager {
         BlueprintNetwork.clearJobHologram(player, job.id());
         BlueprintNetwork.syncJobs(player);
         Messages.actionBar(player, "message.wrights.undo_started");
-        noteHistory(player, library, job, JobEventLog.UNDOING, Component.translatable("history.wrights.undoing").getString());
+        JobAnnouncements.noteHistory(player, library, job, JobEventLog.UNDOING, Component.translatable("history.wrights.undoing").getString());
     }
 
     /** Creative teleport to the session's bound supply chest. */
@@ -474,10 +473,10 @@ public final class JobManager {
                 }
                 if (paused) {
                     job.noteHold(BuildJob.HOLD_MANUAL, null);
-                    noteHistory(player, library, job, JobEventLog.PAUSED, Component.translatable("history.wrights.paused_all").getString());
+                    JobAnnouncements.noteHistory(player, library, job, JobEventLog.PAUSED, Component.translatable("history.wrights.paused_all").getString());
                 } else {
                     job.clearHold();
-                    noteHistory(player, library, job, JobEventLog.RESUMED, Component.translatable("history.wrights.resumed").getString());
+                    JobAnnouncements.noteHistory(player, library, job, JobEventLog.RESUMED, Component.translatable("history.wrights.resumed").getString());
                 }
                 job.setPaused(paused);
                 changed = true;
@@ -510,7 +509,7 @@ public final class JobManager {
     }
 
     private static void removeOneJob(ServerPlayer player, SchematicLibrary library, BuildJob job) {
-        noteHistory(player, library, job, JobEventLog.REMOVED, Component.translatable("history.wrights.removed").getString());
+        JobAnnouncements.noteHistory(player, library, job, JobEventLog.REMOVED, Component.translatable("history.wrights.removed").getString());
         discardJob(player, library, job);
         BlueprintNetwork.syncJobs(player);
         Messages.actionBar(player, "message.wrights.job_removed");
@@ -654,7 +653,7 @@ public final class JobManager {
         BuildJob job = BuildJob.copy(player.getUUID(), data.controllerId().orElseThrow(), cornerA.dimension(), min, max);
         library.addJob(job);
         Messages.actionBar(player, "message.wrights.copy_started");
-        noteHistory(
+        JobAnnouncements.noteHistory(
                 player,
                 library,
                 job,
@@ -686,7 +685,7 @@ public final class JobManager {
                 schematic.id(),
                 schematic.blockCount());
         job.setAnchor(origin.pos().offset(schematic.anchorX(), schematic.anchorY(), schematic.anchorZ()));
-        job.setBlueprintName(blueprintJobTitle(schematic.name()));
+        job.setBlueprintName(JobTitles.blueprintJobTitle(schematic.name()));
         if (!instant(player) && !assignCrew(player, job, schematic)) {
             return;
         }
@@ -720,14 +719,14 @@ public final class JobManager {
                 Math.max(cornerA.getY(), cornerB.getY()),
                 Math.max(cornerA.getZ(), cornerB.getZ()));
         BuildJob job = BuildJob.copy(player.getUUID(), player.getUUID(), dimension, min, max);
-        job.setBlueprintName(blueprintJobTitle(name == null || name.isBlank() ? "Saving" : name));
+        job.setBlueprintName(JobTitles.blueprintJobTitle(name == null || name.isBlank() ? "Saving" : name));
         job.setCopyFluids(copyFluids);
         job.setCopyNbt(copyNbtBlocks, copyNbtSettings, copyNbtAll);
         job.setCopyTurns(turns);
         job.setReplaceSchematicId(replaceId);
         library.addJob(job);
         Messages.actionBar(player, "message.wrights.saving");
-        noteHistory(
+        JobAnnouncements.noteHistory(
                 player,
                 library,
                 job,
@@ -1083,7 +1082,7 @@ public final class JobManager {
         job.setPasteOptions(false, voidBlocks, voidBlocks, false, false, false, false);
         job.setClip(job.boxSizeX(), job.boxSizeY(), job.boxSizeZ());
         job.setAnchor(min);
-        String title = shapeJobTitle(exchange, kind, size, height, thickness, axis);
+        String title = JobTitles.shapeJobTitle(exchange, kind, size, height, thickness, axis);
         if (placeTool && !exchange && title.startsWith("Shape - ")) {
             title = "Place - " + title.substring("Shape - ".length());
         }
@@ -1766,7 +1765,7 @@ public final class JobManager {
                 statusState = usable.get(0).state();
                 statusWait = DroneEntity.WAIT_ITEMS;
                 job.setWaitKind(BuildJob.WAIT_ITEMS);
-                noteHistory(player, library, job, JobEventLog.STALLED_ITEMS, Component.translatable("history.wrights.stalled_items").getString());
+                JobAnnouncements.noteHistory(player, library, job, JobEventLog.STALLED_ITEMS, Component.translatable("history.wrights.stalled_items").getString());
                 break;
             }
             // Exchange already matching — count it without flying out first.
@@ -2101,7 +2100,7 @@ public final class JobManager {
             job.setWaitKind(BuildJob.WAIT_CHUNK);
         } else if (waitingItems) {
             job.setWaitKind(BuildJob.WAIT_ITEMS);
-            noteHistory(player, library, job, JobEventLog.STALLED_ITEMS, Component.translatable("history.wrights.stalled_items").getString());
+            JobAnnouncements.noteHistory(player, library, job, JobEventLog.STALLED_ITEMS, Component.translatable("history.wrights.stalled_items").getString());
             job.setQueued(true);
             job.setCrewQuota(Math.max(1, job.crewQuota()));
         } else {
@@ -3221,7 +3220,7 @@ public final class JobManager {
         hand.aim = -1;
         hand.idle = false;
         hand.probe = 0;
-        noteHistory(player, library, job, JobEventLog.SHARE_SPLIT,
+        JobAnnouncements.noteHistory(player, library, job, JobEventLog.SHARE_SPLIT,
                 Component.translatable("history.wrights.share_split").getString());
         return true;
     }
@@ -3726,9 +3725,9 @@ public final class JobManager {
         }
         if (job.resultSchematicId() == null) {
             if (job.skippedSpecial() > 0) {
-                announce(player, library, job, "hud.wrights.task_save", Component.translatable("message.wrights.copy_empty_skipped", job.skippedSpecial()));
+                JobAnnouncements.announce(player, library, job, "hud.wrights.task_save", Component.translatable("message.wrights.copy_empty_skipped", job.skippedSpecial()));
             } else {
-                announce(player, library, job, "hud.wrights.task_save", Component.translatable("message.wrights.copy_empty"));
+                JobAnnouncements.announce(player, library, job, "hud.wrights.task_save", Component.translatable("message.wrights.copy_empty"));
             }
             library.removeJob(job);
             if (job.blueprintName() != null) {
@@ -3740,13 +3739,13 @@ public final class JobManager {
             Schematic saved = library.schematic(job.resultSchematicId()).orElse(null);
             library.removeJob(job);
             if (saved == null) {
-                announce(player, library, job, "hud.wrights.task_save", Component.translatable("message.wrights.copy_empty"));
+                JobAnnouncements.announce(player, library, job, "hud.wrights.task_save", Component.translatable("message.wrights.copy_empty"));
                 BlueprintActions.finishSave(player, null, false);
             } else if (job.skippedSpecial() > 0) {
-                announce(player, library, job, "hud.wrights.task_save", Component.translatable("hud.wrights.done_saved_skipped", saved.blockCount(), BoxEdits.volume(saved.sizeX(), saved.sizeY(), saved.sizeZ()), job.skippedSpecial()));
+                JobAnnouncements.announce(player, library, job, "hud.wrights.task_save", Component.translatable("hud.wrights.done_saved_skipped", saved.blockCount(), BoxEdits.volume(saved.sizeX(), saved.sizeY(), saved.sizeZ()), job.skippedSpecial()));
                 BlueprintActions.finishSave(player, saved.id(), true);
             } else {
-                announce(player, library, job, "hud.wrights.task_save", Component.translatable("hud.wrights.done_saved", saved.blockCount(), BoxEdits.volume(saved.sizeX(), saved.sizeY(), saved.sizeZ())));
+                JobAnnouncements.announce(player, library, job, "hud.wrights.task_save", Component.translatable("hud.wrights.done_saved", saved.blockCount(), BoxEdits.volume(saved.sizeX(), saved.sizeY(), saved.sizeZ())));
                 BlueprintActions.finishSave(player, saved.id(), true);
             }
             return;
@@ -3771,9 +3770,9 @@ public final class JobManager {
         }
         ControllerData.write(stack, data.withSchematic(schematic.id(), schematic.sizeX(), schematic.sizeY(), schematic.sizeZ(), schematic.blockCount()));
         if (job.skippedSpecial() > 0) {
-            announce(player, library, job, "hud.wrights.task_save", Component.translatable("hud.wrights.done_saved_skipped", schematic.blockCount(), BoxEdits.volume(schematic.sizeX(), schematic.sizeY(), schematic.sizeZ()), job.skippedSpecial()));
+            JobAnnouncements.announce(player, library, job, "hud.wrights.task_save", Component.translatable("hud.wrights.done_saved_skipped", schematic.blockCount(), BoxEdits.volume(schematic.sizeX(), schematic.sizeY(), schematic.sizeZ()), job.skippedSpecial()));
         } else {
-            announce(player, library, job, "hud.wrights.task_save", Component.translatable("hud.wrights.done_saved", schematic.blockCount(), BoxEdits.volume(schematic.sizeX(), schematic.sizeY(), schematic.sizeZ())));
+            JobAnnouncements.announce(player, library, job, "hud.wrights.task_save", Component.translatable("hud.wrights.done_saved", schematic.blockCount(), BoxEdits.volume(schematic.sizeX(), schematic.sizeY(), schematic.sizeZ())));
         }
         library.removeJob(job);
     }
@@ -3858,7 +3857,7 @@ public final class JobManager {
         }
         if (at == NEED_ITEMS) {
             job.setWaitKind(BuildJob.WAIT_ITEMS);
-            noteHistory(player, library, job, JobEventLog.STALLED_ITEMS, Component.translatable("history.wrights.stalled_items").getString());
+            JobAnnouncements.noteHistory(player, library, job, JobEventLog.STALLED_ITEMS, Component.translatable("history.wrights.stalled_items").getString());
             parkSolo(level, player, job);
             releaseStalledHome(player, library, job);
             library.setDirty();
@@ -4229,7 +4228,7 @@ public final class JobManager {
         Component detail = removed <= 0
                 ? Component.translatable("message.wrights.undo_none")
                 : Component.translatable("hud.wrights.done_undo", removed, returned);
-        announce(player, library, job, "hud.wrights.task_undo", detail);
+        JobAnnouncements.announce(player, library, job, "hud.wrights.task_undo", detail);
     }
 
     private static void finishPaste(MinecraftServer server, SchematicLibrary library, ServerPlayer player, BuildJob job) {
@@ -4253,7 +4252,7 @@ public final class JobManager {
             } else {
                 detail = Component.translatable("hud.wrights.done_mined", placed, skipped);
             }
-            announce(player, library, job, null, withOperations(detail, job));
+            JobAnnouncements.announce(player, library, job, null, JobAnnouncements.withOperations(detail, job));
             return;
         }
         library.schematic(job.schematicId())
@@ -4272,319 +4271,10 @@ public final class JobManager {
         } else {
             detail = Component.translatable("hud.wrights.done_placed", placed, skipped);
         }
-        announce(player, library, job, null, withOperations(detail, job));
+        JobAnnouncements.announce(player, library, job, null, JobAnnouncements.withOperations(detail, job));
     }
 
-    /** Appends " · N operations" when the job recorded at least one AOE/place burst. */
-    private static Component withOperations(Component detail, BuildJob job) {
-        if (detail == null || job == null || job.operations() <= 0 || isNoopFinish(detail)) {
-            return detail;
-        }
-        Component ops = job.operations() == 1
-                ? Component.translatable("hud.wrights.done_operations_one")
-                : Component.translatable("hud.wrights.done_operations", job.operations());
-        return detail.copy().append(Component.literal(" · ")).append(ops);
-    }
-
-    /** Mode, the sub-modes that were on, and the task. The detail says what the job actually did. */
-    private static void announce(ServerPlayer player, SchematicLibrary library, BuildJob job, String taskKey, Component detail) {
-        if (player == null || job == null) {
-            return;
-        }
-        Component title = jobTitle(player.getServer(), library, job, taskKey);
-        Component line = detail == null ? Component.empty() : detail;
-        // Nothing changed — short mid-screen tip instead of a Job done toast.
-        if (isNoopFinish(line)) {
-            Messages.centerTip(player, line);
-        } else if (line.getString().isEmpty()) {
-            Messages.actionBar(player, title);
-            BlueprintNetwork.jobDone(player, title, line, job.elapsedSeconds());
-        } else {
-            Messages.actionBar(player, title.copy().append(Component.literal(". ")).append(line));
-            BlueprintNetwork.jobDone(player, title, line, job.elapsedSeconds());
-        }
-        int kind = JobEventLog.COMPLETED;
-        if ("hud.wrights.task_undo".equals(taskKey)) {
-            kind = JobEventLog.UNDONE;
-        } else if ("hud.wrights.task_save".equals(taskKey)) {
-            kind = JobEventLog.COPY_DONE;
-        } else if (job.stopped()) {
-            kind = JobEventLog.STOPPED;
-        }
-        String historyDetail = line.getString();
-        int crew = Math.max(job.crewQuota(), assignedCount(job));
-        if (crew > 0 && (kind == JobEventLog.COMPLETED || kind == JobEventLog.UNDONE)) {
-            String crewBit = Component.translatable(
-                    crew == 1 ? "history.wrights.crew_used_one" : "history.wrights.crew_used",
-                    crew).getString();
-            historyDetail = historyDetail.isBlank() ? crewBit : historyDetail + " · " + crewBit;
-        }
-        noteHistory(player, library, job, kind, historyDetail);
-    }
-
-    private static boolean isNoopFinish(Component detail) {
-        if (detail == null) {
-            return false;
-        }
-        String text = detail.getString();
-        return text.equals(Component.translatable("message.wrights.already_built").getString())
-                || text.equals(Component.translatable("message.wrights.all_skipped").getString())
-                || text.equals(Component.translatable("message.wrights.shape_nowhere").getString())
-                || text.equals(Component.translatable("message.wrights.mine_none").getString())
-                || text.equals(Component.translatable("message.wrights.exchange_none").getString());
-    }
-
-    private static void noteHistory(ServerPlayer player, SchematicLibrary library, BuildJob job, int kind, String detail) {
-        if (player == null || library == null || job == null) {
-            return;
-        }
-        library.eventLog().record(
-                player,
-                kind,
-                jobCardTitle(job, library),
-                detail == null ? "" : detail,
-                historyLocation(job));
-        library.setDirty();
-    }
-
-    /** Same coords the Jobs card shows — History needs them to find the site later. */
-    private static String historyLocation(BuildJob job) {
-        BlockPos pos = job.anchor() != null ? job.anchor() : job.min();
-        if (pos == null) {
-            return "";
-        }
-        return Component.translatable("menu.wrights.job_anchor", pos.getX(), pos.getY(), pos.getZ()).getString();
-    }
-
-    private static Component jobTitle(MinecraftServer server, SchematicLibrary library, BuildJob job, String taskKey) {
-        Schematic schematic = job.schematicId() == null || library == null ? null : library.schematic(job.schematicId()).orElse(null);
-        boolean mirror = job.mining() || (schematic != null && schematic.ephemeral() && com.wrights.blueprint.Mirror.marksBlocks(schematic.name()));
-        String mode;
-        if (job.exchangeJob()) {
-            mode = "hud.wrights.tool_exchange";
-        } else if (job.kind() == BuildJob.Kind.SHAPE) {
-            mode = "hud.wrights.tool_shape";
-        } else if (mirror) {
-            mode = "hud.wrights.tool_mirror";
-        } else if (job.kind() == BuildJob.Kind.COPY) {
-            mode = "hud.wrights.tool_new";
-        } else {
-            mode = "hud.wrights.tool_build";
-        }
-        String subject = subjectName(job, schematic);
-        boolean blockPlace = mirror && subject.isEmpty() && !job.mining();
-        String task = taskKey;
-        if (task == null) {
-            if (job.mining()) {
-                task = "hud.wrights.task_mine";
-            } else if (job.kind() == BuildJob.Kind.COPY) {
-                task = "hud.wrights.task_save";
-            } else if (blockPlace) {
-                task = "hud.wrights.task_place";
-            } else {
-                task = "hud.wrights.task_build";
-            }
-        }
-        MutableComponent title = Component.translatable(mode).append(" - ").append(Component.translatable(task));
-        if (job.mining()) {
-            if (job.mineAny()) {
-                title.append(" - ").append(Component.translatable("menu.wrights.mirror_mine_any"));
-            }
-            if (job.mineVoid()) {
-                title.append(" - ").append(Component.translatable("menu.wrights.mirror_mine_void"));
-            }
-            if (silkTouch(server, job.mineTool())) {
-                title.append(" - ").append(Component.translatable("menu.wrights.mirror_mine_silk"));
-            }
-        } else if (job.kind() == BuildJob.Kind.COPY) {
-            if (job.copyFluids()) {
-                title.append(" - ").append(Component.translatable("screen.wrights.copy_fluids"));
-            }
-            if (job.copyNbtAll()) {
-                title.append(" - ").append(Component.translatable("screen.wrights.copy_nbt_all"));
-            } else if (job.copyNbtSettings()) {
-                title.append(" - ").append(Component.translatable("screen.wrights.copy_nbt_settings"));
-            } else if (job.copyNbtBlocks()) {
-                title.append(" - ").append(Component.translatable("screen.wrights.copy_nbt_blocks"));
-            }
-        } else if (blockPlace) {
-            if (job.voidBlocks()) {
-                title.append(" - ").append(Component.translatable("menu.wrights.mirror_replace"));
-            }
-        } else if (!"hud.wrights.task_undo".equals(task) || job.voidBlocks() || job.voidFluids() || job.voidNbt()) {
-            if (job.voidBlocks()) {
-                title.append(" - ").append(Component.translatable("screen.wrights.void_blocks"));
-            }
-            if (job.voidFluids()) {
-                title.append(" - ").append(Component.translatable("screen.wrights.void_fluids"));
-            }
-            if (job.voidNbt()) {
-                title.append(" - ").append(Component.translatable("screen.wrights.void_nbt"));
-            }
-        }
-        if (!subject.isEmpty()) {
-            title.append(" - ").append(Component.literal(subject));
-        }
-        return title;
-    }
-
-    private static String subjectName(BuildJob job, Schematic schematic) {
-        String name = job.blueprintName();
-        if (name != null) {
-            for (String prefix : new String[] {"Shape - ", "Exchange - ", "Blueprint - "}) {
-                if (name.startsWith(prefix)) {
-                    name = name.substring(prefix.length()).trim();
-                    break;
-                }
-            }
-        }
-        if (name != null && (name.equals("Mirror - Mine") || name.equals("Build") || name.equals("Saving")
-                || name.equals("Blueprint") || name.equals("Exchange") || name.equals("Shape"))) {
-            name = null;
-        }
-        if ((name == null || name.isBlank()) && schematic != null) {
-            name = schematic.name();
-            if (name != null && name.startsWith("Blueprint - ")) {
-                name = name.substring("Blueprint - ".length()).trim();
-            }
-        }
-        if (name == null || name.isBlank()) {
-            return "";
-        }
-        name = stripMirrorSuffix(name);
-        if (name.equals("Mirror")) {
-            return "";
-        }
-        return name;
-    }
-
-    /** Jobs card / stored title: {@code Shape - Ring}, {@code Exchange - Wall}, {@code Blueprint - Dock}. */
-    public static String jobCardTitle(BuildJob job, SchematicLibrary library) {
-        if (job == null) {
-            return "Build";
-        }
-        if (job.kind() == BuildJob.Kind.SHAPE) {
-            String current = job.blueprintName();
-            if (current != null && (current.startsWith("Shape - ") || current.startsWith("Exchange - ") || current.startsWith("Place - "))) {
-                return clipJobTitle(current);
-            }
-            String titled = shapeJobTitle(
-                    job.exchangeJob(),
-                    job.shapeKind(),
-                    job.shapeSize(),
-                    job.shapeHeight(),
-                    job.shapeThickness(),
-                    job.shapeAxis());
-            if (job.placeTool() && !job.exchangeJob() && titled.startsWith("Shape - ")) {
-                titled = "Place - " + titled.substring("Shape - ".length());
-            }
-            return clipJobTitle(titled);
-        }
-        if (job.kind() == BuildJob.Kind.COPY) {
-            String current = job.blueprintName();
-            if (current != null && current.startsWith("Blueprint - ")) {
-                return clipJobTitle(current);
-            }
-            String bare = current == null || current.isBlank() ? "Saving" : current;
-            return clipJobTitle(blueprintJobTitle(bare));
-        }
-        // PASTE — blueprints, mirror copies, and Place path batches.
-        String current = job.blueprintName();
-        if (current != null && !current.isBlank()) {
-            if (current.startsWith("Blueprint - ") || current.startsWith("Mirror") || current.startsWith("Place - ")) {
-                return clipJobTitle(current);
-            }
-            if (current.equals("Build") || current.equals("Saving") || current.equals("Blueprint")) {
-                current = null;
-            }
-        }
-        if ((current == null || current.isBlank()) && job.schematicId() != null && library != null) {
-            current = library.schematic(job.schematicId()).map(Schematic::name).orElse(null);
-        }
-        if (current == null || current.isBlank()) {
-            return "Blueprint - Build";
-        }
-        if (current.startsWith("Mirror")) {
-            return clipJobTitle(current);
-        }
-        return clipJobTitle(blueprintJobTitle(current));
-    }
-
-    public static String shapeJobTitle(boolean exchange, int kindId, int size, int height, int thickness, int axis) {
-        String mode = exchange ? "Exchange" : "Shape";
-        String detail = exchange
-                ? exchangeFormLabel(kindId, size, height, thickness, axis)
-                : shapeKindLabel(com.wrights.blueprint.Shapes.Kind.byId(kindId));
-        return mode + " - " + detail;
-    }
-
-    public static String blueprintJobTitle(String blueprintName) {
-        String bare = blueprintName == null ? "" : blueprintName.trim();
-        if (bare.startsWith("Blueprint - ")) {
-            return bare;
-        }
-        if (bare.isEmpty()) {
-            bare = "Build";
-        }
-        return "Blueprint - " + bare;
-    }
-
-    private static String exchangeFormLabel(int kindId, int size, int height, int thickness, int axis) {
-        com.wrights.blueprint.Shapes.Kind kind = com.wrights.blueprint.Shapes.Kind.byId(kindId);
-        return switch (kind) {
-            case CIRCLE -> "Circle";
-            case BOX -> {
-                if (Math.max(1, size) <= 1 && Math.max(1, thickness) <= 1) {
-                    yield "Pillar";
-                }
-                if (Math.max(1, height) <= 1) {
-                    yield "Beam";
-                }
-                yield "Box";
-            }
-            case SQUARE, RECTANGLE -> com.wrights.blueprint.Shapes.clampPlane(axis) == com.wrights.blueprint.Shapes.AXIS_Y
-                    ? "Floor"
-                    : "Wall";
-            default -> shapeKindLabel(kind);
-        };
-    }
-
-    private static String shapeKindLabel(com.wrights.blueprint.Shapes.Kind kind) {
-        if (kind == null) {
-            return "Shape";
-        }
-        String raw = kind.name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
-        return Character.toUpperCase(raw.charAt(0)) + raw.substring(1);
-    }
-
-    private static String clipJobTitle(String title) {
-        if (title == null || title.isBlank()) {
-            return "Build";
-        }
-        return title.length() > 48 ? title.substring(0, 48) : title;
-    }
-
-    private static String stripMirrorSuffix(String name) {
-        if (name.endsWith(" · mirror")) {
-            return name.substring(0, name.length() - " · mirror".length()).trim();
-        }
-        int cut = name.lastIndexOf(" · ");
-        if (cut <= 0) {
-            return name;
-        }
-        String tail = name.substring(cut + 3);
-        if (tail.isEmpty()) {
-            return name;
-        }
-        for (int i = 0; i < tail.length(); i++) {
-            if (!Character.isDigit(tail.charAt(i))) {
-                return name;
-            }
-        }
-        return name.substring(0, cut).trim();
-    }
-
-    private static boolean silkTouch(MinecraftServer server, ItemStack tool) {
+    static boolean silkTouch(MinecraftServer server, ItemStack tool) {
         if (server == null || tool == null || tool.isEmpty()) {
             return false;
         }
@@ -4689,7 +4379,7 @@ public final class JobManager {
             if (shown != null) {
                 tellPortAt(player, player.getServer().getLevel(job.dimension()), shown, message, "message.wrights.paused_port_range_named");
             }
-            noteHistory(player, library, job, JobEventLog.PAUSED, Component.translatable("history.wrights.paused_port").getString());
+            JobAnnouncements.noteHistory(player, library, job, JobEventLog.PAUSED, Component.translatable("history.wrights.paused_port").getString());
             BlueprintNetwork.syncJobs(player);
         } else if (reason != BuildJob.HOLD_PLAYER_RANGE && reason != BuildJob.HOLD_DIMENSION && job.tickMessage()) {
             // Player-range / wrong-dimension: crew docks silently and the job keeps its quota.
@@ -4739,12 +4429,12 @@ public final class JobManager {
         BlueprintNetwork.syncJobs(player);
         if (recalled > 0) {
             Component header = Component.translatable("hud.wrights.wrights_returned");
-            Component name = Component.literal(jobCardTitle(job, library));
+            Component name = Component.literal(JobTitles.jobCardTitle(job, library));
             Component detail = hold == BuildJob.HOLD_DIMENSION
                     ? Component.translatable("hud.wrights.wrights_returned_dimension", recalled)
                     : Component.translatable("hud.wrights.wrights_returned_range", recalled);
             BlueprintNetwork.jobDone(player, header, name, detail, -1);
-            noteHistory(
+            JobAnnouncements.noteHistory(
                     player,
                     library,
                     job,
@@ -4798,7 +4488,7 @@ public final class JobManager {
             Messages.actionBar(player, "message.wrights.launched");
         }
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
-        noteHistory(player, library, job, JobEventLog.LAUNCHED, launchedHistoryDetail(player, job, sent));
+        JobAnnouncements.noteHistory(player, library, job, JobEventLog.LAUNCHED, launchedHistoryDetail(player, job, sent));
     }
 
     /** Queued for crew in range — action bar + History with assigned count. */
@@ -4806,7 +4496,7 @@ public final class JobManager {
         int wanted = Math.max(1, assigned);
         Messages.actionBar(player, "message.wrights.queued", wanted);
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
-        noteHistory(
+        JobAnnouncements.noteHistory(
                 player,
                 library,
                 job,
@@ -4926,7 +4616,7 @@ public final class JobManager {
         }
     }
 
-    private static int assignedCount(BuildJob job) {
+    static int assignedCount(BuildJob job) {
         return Math.max(job.crewUnits().size(), job.hasCrew() ? job.hands().size() : 0);
     }
 
@@ -5227,7 +4917,7 @@ public final class JobManager {
     }
 
     private static boolean claimedByOther(ServerPlayer player, SchematicLibrary library, UUID jobId, UUID unitId) {
-        if (isReturning(unitId)) {
+        if (WrightFlights.isReturning(unitId)) {
             return true;
         }
         for (BuildJob other : library.jobsFor(player.getUUID())) {
@@ -5360,10 +5050,10 @@ public final class JobManager {
             BlueprintNetwork.jobDone(
                     player,
                     Component.translatable("hud.wrights.wrights_rejoined"),
-                    Component.literal(jobCardTitle(job, library)),
+                    Component.literal(JobTitles.jobCardTitle(job, library)),
                     detail,
                     -1);
-            noteHistory(player, library, job, JobEventLog.REJOINED, detail.getString());
+            JobAnnouncements.noteHistory(player, library, job, JobEventLog.REJOINED, detail.getString());
         }
     }
 
@@ -6097,7 +5787,7 @@ public final class JobManager {
         }
         job.setWaitKind(reason);
         if (reason == BuildJob.WAIT_ITEMS) {
-            noteHistory(player, library, job, JobEventLog.STALLED_ITEMS, Component.translatable("history.wrights.stalled_items").getString());
+            JobAnnouncements.noteHistory(player, library, job, JobEventLog.STALLED_ITEMS, Component.translatable("history.wrights.stalled_items").getString());
             releaseStalledHome(player, library, job);
         }
         if (!working && !scanning && !waiting) {
@@ -8680,7 +8370,7 @@ public final class JobManager {
 
     /** The flyer for this wright is still on its way back, so another one must not launch. */
     private static boolean stillFlyingHome(BuildJob job, int handIndex) {
-        return handIndex >= 0 && handIndex < job.crewUnits().size() && isReturning(job.crewUnits().get(handIndex));
+        return handIndex >= 0 && handIndex < job.crewUnits().size() && WrightFlights.isReturning(job.crewUnits().get(handIndex));
     }
 
     private static void paint(DroneEntity drone, BuildJob job) {
@@ -9009,7 +8699,7 @@ public final class JobManager {
         if (job.hands().isEmpty()) {
             parkSolo(level, player, job);
         }
-        noteHistory(player, library, job, JobEventLog.STALLED_ITEMS, Component.translatable("history.wrights.stalled_energy").getString());
+        JobAnnouncements.noteHistory(player, library, job, JobEventLog.STALLED_ITEMS, Component.translatable("history.wrights.stalled_energy").getString());
         library.setDirty();
     }
 
@@ -9318,197 +9008,6 @@ public final class JobManager {
             }
             return false;
         }
-    }
-
-    /** Wrights still flying home. A queued job must not launch a second flyer for the same one. */
-    private static final Set<UUID> RETURNING = new HashSet<>();
-    /** Last place a wright was seen flying, so a lost one can be highlighted after the entity is gone. */
-    private static final Map<UUID, Flyer> FLYERS = new HashMap<>();
-    private static int returnClock;
-
-    /** Drops flight bookkeeping so a world opened later in the same session starts clean. */
-    public static void reset() {
-        RETURNING.clear();
-        FLYERS.clear();
-        returnClock = 0;
-    }
-
-    public static void noteFlyer(UUID unitId, DroneEntity drone) {
-        if (unitId == null || drone == null || drone.level().isClientSide) {
-            return;
-        }
-        Flyer flyer = FLYERS.computeIfAbsent(unitId, id -> new Flyer());
-        flyer.entityId = drone.getUUID();
-        flyer.dimension = drone.level().dimension();
-        flyer.pos = drone.blockPosition();
-        flyer.returning = drone.returning();
-        flyer.seen = returnClock;
-        if (drone.returning()) {
-            holdReturn(unitId);
-        }
-    }
-
-    /** Drops a return lock when the flyer has been gone long enough that it is not coming back. */
-    private static void sweepReturns() {
-        returnClock++;
-        int now = returnClock;
-        RETURNING.removeIf(id -> {
-            Flyer flyer = FLYERS.get(id);
-            return flyer == null || !flyer.returning || now - flyer.seen > 100;
-        });
-        FLYERS.entrySet().removeIf(entry -> now - entry.getValue().seen > 200);
-    }
-
-    public static List<BlueprintPayloads.WrightSpot> wrightSpots(ServerPlayer player) {
-        List<BlueprintPayloads.WrightSpot> spots = new ArrayList<>();
-        if (player == null || player.getServer() == null) {
-            return spots;
-        }
-        SchematicLibrary library = SchematicLibrary.get(player.getServer());
-        Set<UUID> seen = new HashSet<>();
-        int now = returnClock;
-        for (BuildJob job : library.jobsFor(player.getUUID())) {
-            if (job.finished()) {
-                continue;
-            }
-            ServerLevel level = player.getServer().getLevel(job.dimension());
-            List<UUID> crew = job.crewUnits();
-            for (int i = 0; i < crew.size(); i++) {
-                UUID unit = crew.get(i);
-                if (unit == null || !seen.add(unit)) {
-                    continue;
-                }
-                BuildJob.Hand hand = i < job.hands().size() ? job.hands().get(i) : null;
-                spots.add(spotFor(player.getServer(), job, hand, unit, level, now));
-            }
-        }
-        return spots;
-    }
-
-    public static void visitWright(ServerPlayer player, UUID unit) {
-        if (player == null || unit == null) {
-            return;
-        }
-        if (!player.getAbilities().instabuild || player.isSpectator()) {
-            Messages.actionBar(player, "message.wrights.visit_survival");
-            return;
-        }
-        if (!ownsWright(player, unit)) {
-            Messages.actionBar(player, "message.wrights.visit_wright_missing");
-            return;
-        }
-        BlueprintPayloads.WrightSpot spot = null;
-        for (BlueprintPayloads.WrightSpot found : wrightSpots(player)) {
-            if (unit.equals(found.unit())) {
-                spot = found;
-                break;
-            }
-        }
-        if (spot == null || player.getServer() == null) {
-            Messages.actionBar(player, "message.wrights.visit_wright_missing");
-            return;
-        }
-        ServerLevel level = null;
-        for (ServerLevel candidate : player.getServer().getAllLevels()) {
-            if (candidate.dimension().location().toString().equals(spot.dimension())) {
-                level = candidate;
-                break;
-            }
-        }
-        if (level == null) {
-            Messages.actionBar(player, "message.wrights.visit_wright_missing");
-            return;
-        }
-        BlockPos pos = spot.pos();
-        if (pos != null && level.getBlockState(pos).blocksMotion() && !level.getBlockState(pos.above()).blocksMotion()) {
-            pos = pos.above();
-        }
-        if (pos == null) {
-            Messages.actionBar(player, "message.wrights.visit_wright_missing");
-            return;
-        }
-        player.teleportTo(level, pos.getX() + 0.5D, pos.getY(), pos.getZ() + 0.5D, player.getYRot(), player.getXRot());
-        Messages.actionBar(player, "message.wrights.visited", pos.getX(), pos.getY(), pos.getZ());
-    }
-
-    private static boolean ownsWright(ServerPlayer player, UUID unit) {
-        if (WrightHomes.findUnit(player, unit) != null) {
-            return true;
-        }
-        SchematicLibrary library = SchematicLibrary.get(player.getServer());
-        for (BuildJob job : library.jobsFor(player.getUUID())) {
-            if (job.crewUnits().contains(unit)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static BlueprintPayloads.WrightSpot spotFor(MinecraftServer server, BuildJob job, BuildJob.Hand hand, UUID unit, ServerLevel level, int now) {
-        DroneEntity drone = livingFlyer(server, level, hand, unit, now);
-        if (drone != null && drone.level() instanceof ServerLevel) {
-            return new BlueprintPayloads.WrightSpot(unit, drone.level().dimension().location().toString(), drone.blockPosition(), drone.returning() ? 1 : 0);
-        }
-        Flyer flyer = FLYERS.get(unit);
-        BlockPos pos = flyer == null ? null : flyer.pos;
-        String dimension = job.dimension().location().toString();
-        if (flyer != null && flyer.dimension != null) {
-            dimension = flyer.dimension.location().toString();
-        }
-        if (pos == null && hand != null && hand.lastPos != null) {
-            pos = hand.lastPos;
-        }
-        if (pos == null && hand != null && hand.homePort != null) {
-            pos = hand.homePort;
-        }
-        if (pos == null) {
-            pos = job.anchor() != null ? job.anchor() : job.min();
-        }
-        return new BlueprintPayloads.WrightSpot(unit, dimension, pos, 2);
-    }
-
-    private static DroneEntity livingFlyer(MinecraftServer server, ServerLevel level, BuildJob.Hand hand, UUID unit, int now) {
-        if (level != null && hand != null && hand.entityId != null && level.getEntity(hand.entityId) instanceof DroneEntity drone && drone.isAlive()) {
-            return drone;
-        }
-        Flyer flyer = FLYERS.get(unit);
-        if (flyer == null || flyer.entityId == null || flyer.dimension == null || now - flyer.seen > 40) {
-            return null;
-        }
-        ServerLevel flyerLevel = server.getLevel(flyer.dimension);
-        if (flyerLevel != null && flyerLevel.getEntity(flyer.entityId) instanceof DroneEntity drone && drone.isAlive()) {
-            return drone;
-        }
-        return null;
-    }
-
-    private static final class Flyer {
-        private UUID entityId;
-        private ResourceKey<Level> dimension;
-        private BlockPos pos;
-        private boolean returning;
-        private int seen;
-    }
-
-    public static void holdReturn(UUID unitId) {
-        if (unitId != null) {
-            RETURNING.add(unitId);
-            Flyer flyer = FLYERS.get(unitId);
-            if (flyer != null) {
-                flyer.returning = true;
-                flyer.seen = returnClock;
-            }
-        }
-    }
-
-    public static void releaseReturn(UUID unitId) {
-        if (unitId != null) {
-            RETURNING.remove(unitId);
-        }
-    }
-
-    private static boolean isReturning(UUID unitId) {
-        return unitId != null && RETURNING.contains(unitId);
     }
 
     private static void sendHome(MinecraftServer server, ServerPlayer player, BuildJob job) {
