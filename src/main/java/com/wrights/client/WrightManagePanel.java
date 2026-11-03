@@ -10,7 +10,6 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -213,8 +212,12 @@ final class WrightManagePanel {
         }
 
         drawHardware(graphics, screen, swarm, mouseX, mouseY);
-        tipLine = chromeTip(screen, swarm, mouseX, mouseY);
-        HangarGui.drawTipStrip(graphics, screen.font(), panelX, panelY, tipLine);
+        drawPartTooltip(graphics, screen, swarm, mouseX, mouseY);
+        // Ephemeral notices only — never the always-on hangar_hint (that stacked with port tips).
+        tipLine = noticeTip();
+        if (!tipLine.getString().isEmpty()) {
+            HangarGui.drawTipStrip(graphics, screen.font(), panelX, panelY, tipLine);
+        }
 
         if (dialog != NONE) {
             renderDialog(screen, graphics, swarm, mouseX, mouseY);
@@ -258,60 +261,30 @@ final class WrightManagePanel {
         }
     }
 
-    /** Chrome tip: hovered part name only, else a short hangar hint. */
-    private Component chromeTip(ManageHost screen, Swarm swarm, int mouseX, int mouseY) {
+    private Component noticeTip() {
         long now = System.currentTimeMillis();
         if (WrightsClientState.notice != null && now < WrightsClientState.noticeUntil
                 && !WrightsClientState.notice.getString().isEmpty()) {
             return WrightsClientState.notice;
         }
-        if (expanded >= 0 && expanded < swarm.units().size()) {
-            int hit = HangarGui.partHit(panelX, panelY, mouseX, mouseY);
-            if (hit >= 0) {
-                PartSlot slot = PartSlot.values()[hit];
-                int tier = swarm.units().get(expanded).parts().tier(slot);
-                return Component.translatable(slot.fittedKey(tier)).withColor(WrightTier.textColor(tier) & 0xFFFFFF);
-            }
-        }
-        if (swarm.units().isEmpty()) {
-            return Component.translatable("screen.wrights.hangar_empty");
-        }
-        return Component.translatable("screen.wrights.hangar_hint");
+        return Component.empty();
     }
 
-    void drawDigitalTip(ManageHost screen, GuiGraphics graphics, int mouseX, int mouseY) {
-        long now = System.currentTimeMillis();
-        List<Component> source = new ArrayList<>();
-        if (WrightsClientState.notice != null && now < WrightsClientState.noticeUntil && !WrightsClientState.notice.getString().isEmpty()) {
-            source.add(WrightsClientState.notice);
-        } else if (!WrightsClientState.digitalUseTip.isEmpty() && now < WrightsClientState.digitalUseUntil) {
-            source.addAll(WrightsClientState.digitalUseTip);
-        }
-        if (source.isEmpty()) {
+    /** Mouse tooltip for a hardware part — name + stats. */
+    private void drawPartTooltip(GuiGraphics graphics, ManageHost screen, Swarm swarm, int mouseX, int mouseY) {
+        if (expanded < 0 || expanded >= swarm.units().size()) {
             return;
         }
-        int max = Math.max(80, panelW - 28);
-        List<FormattedCharSequence> lines = new ArrayList<>();
-        for (Component line : source) {
-            lines.addAll(screen.font().split(line, max));
-        }
-        if (lines.isEmpty()) {
+        int hit = HangarGui.partHit(panelX, panelY, mouseX, mouseY);
+        if (hit < 0) {
             return;
         }
-        int boxH = lines.size() * 10 + 8;
-        int x = panelX + 8;
-        int w = panelW - 16;
-        int y = panelY + panelH - 54 - boxH - 6;
-        if (y < panelY + 20) {
-            y = panelY + 20;
-        }
-        graphics.fill(x, y, x + w, y + boxH, 0xF0141810);
-        WrightsUi.border(graphics, x, y, w, boxH, 0xFFE0B060);
-        int textY = y + 4;
-        for (FormattedCharSequence line : lines) {
-            graphics.drawString(screen.font(), line, x + 6, textY, 0xFFFFE7B0, false);
-            textY += 10;
-        }
+        PartSlot slot = PartSlot.values()[hit];
+        int tier = swarm.units().get(expanded).parts().tier(slot);
+        List<Component> lines = new ArrayList<>();
+        lines.add(Component.translatable(slot.fittedKey(tier)).withColor(WrightTier.textColor(tier) & 0xFFFFFF));
+        lines.addAll(WrightPartItem.stats(slot, tier));
+        graphics.renderComponentTooltip(screen.font(), lines, mouseX, mouseY);
     }
 
     boolean mouseClicked(ManageHost screen, double mouseX, double mouseY, int button) {

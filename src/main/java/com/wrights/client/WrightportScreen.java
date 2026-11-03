@@ -156,8 +156,11 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         return true;
     }
 
-    /** Port-tool tip for the chrome strip (overrides hangar tip while hovering). */
+    /** Port-tool hover tip (chrome strip). */
     private Component portButtonTip(int mouseX, int mouseY) {
+        if (HangarGui.EDIT.editing) {
+            return null;
+        }
         int hit = HangarGui.buttonHit(leftPos, topPos, mouseX, mouseY);
         if (hit < 0) {
             return null;
@@ -316,12 +319,15 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         drawPortButtons(graphics, mouseX, mouseY);
         HangarGui.EDIT.drawOverlays(graphics, leftPos, topPos);
         HangarGui.EDIT.drawChrome(graphics, this.font, leftPos, topPos);
-        Component portTip = portButtonTip(mouseX, mouseY);
-        if (portTip != null) {
-            HangarGui.drawTipStrip(graphics, this.font, leftPos, topPos, portTip);
-        } else if (canRename() && !portHasSupply()) {
+        // Supply warning only when no notice tip is already on the strip (manage draws notices).
+        if ((manage.tipLine() == null || manage.tipLine().getString().isEmpty())
+                && canRename() && !portHasSupply()) {
             HangarGui.drawTipStrip(graphics, this.font, leftPos, topPos,
                     Component.translatable("message.wrights.port_need_supply").withStyle(net.minecraft.ChatFormatting.RED));
+        }
+        Component portTip = portButtonTip(mouseX, mouseY);
+        if (portTip != null) {
+            graphics.renderTooltip(this.font, portTip, mouseX, mouseY);
         }
         graphics.pose().pushPose();
         graphics.pose().translate(leftPos, topPos, 0.0F);
