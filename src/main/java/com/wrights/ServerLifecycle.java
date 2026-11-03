@@ -11,6 +11,7 @@ import com.wrights.drone.DockRecovery;
 import com.wrights.drone.HangarDock;
 import com.wrights.drone.ManageLock;
 import com.wrights.job.JobManager;
+import com.wrights.storage.DigitalNetworks;
 
 /**
  * Server-side caches live in statics. A singleplayer session can close one world and open another
@@ -38,5 +39,6 @@ public final class ServerLifecycle {
         ManageLock.reset();
         DockRecovery.reset();
         MirrorLaunch.reset();
+        DigitalNetworks.reset();
     }
 }

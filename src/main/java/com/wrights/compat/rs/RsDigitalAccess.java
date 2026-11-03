@@ -57,6 +57,11 @@ public final class RsDigitalAccess implements DigitalAccess {
     }
 
     @Override
+    public void reset() {
+        QUIET_UNTIL.clear();
+    }
+
+    @Override
     public boolean isBindTarget(Level level, BlockPos pos) {
         ResourceLocation id = BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock());
         if (CONTROLLER.equals(id) || CREATIVE.equals(id)) {

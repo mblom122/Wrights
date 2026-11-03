@@ -166,6 +166,13 @@ public final class DigitalNetworks {
         }
     }
 
+    /** Clears per-world craft state in every loaded backend. Does not load backends that are not booted. */
+    public static void reset() {
+        for (DigitalAccess access : ACCESS) {
+            access.reset();
+        }
+    }
+
     public static boolean requestCraft(ServerPlayer player, ServerLevel level, DigitalLink link, Item item, long amount) {
         if (amount <= 0L || link == null || !link.bound()) {
             return false;

@@ -207,6 +207,13 @@ public final class Ae2DigitalAccess implements DigitalAccess {
     }
 
     @Override
+    public void reset() {
+        PENDING.clear();
+        QUIET_UNTIL.clear();
+        ACCEPTED_UNTIL.clear();
+    }
+
+    @Override
     public void tickCrafts(MinecraftServer server) {
         if (PENDING.isEmpty() && QUIET_UNTIL.isEmpty() && ACCEPTED_UNTIL.isEmpty()) {
             return;

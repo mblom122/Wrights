@@ -38,6 +38,10 @@ public interface DigitalAccess {
     default void tickCrafts(net.minecraft.server.MinecraftServer server) {
     }
 
+    /** Drops cached craft state when the server starts or stops. Tick counts restart with each world. */
+    default void reset() {
+    }
+
     /**
      * Pulls wright item stacks of any tier. Returns the tier of each extracted wright.
      * Default drains via {@link #extract} and treats them as stock wrights.

@@ -5,9 +5,13 @@ import com.wrights.block.WrightportLamp;
 import com.wrights.drone.Swarm;
 import com.wrights.entity.DroneEntity;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -29,11 +33,11 @@ public class PersonalWrightportRenderer implements ICurioRenderer {
     private static final int TEXTURE_WHITE = 0xFFFFFFFF;
 
     private final PersonalWrightportModel model;
-    private float doorOpen;
-    private float doorOpenO;
-    private long scanTick = Long.MIN_VALUE;
-    private int scanEntity = -1;
-    private boolean scanTraffic;
+    /** Per game tick. About what 0.12 and 0.1 per frame felt like at 60 fps. */
+    private static final float OPEN_STEP = 0.36F;
+    private static final float CLOSE_STEP = 0.30F;
+
+    private final Map<Integer, Door> doors = new HashMap<>();
 
     public PersonalWrightportRenderer(PersonalWrightportModel model) {
         this.model = model;
@@ -58,15 +62,7 @@ public class PersonalWrightportRenderer implements ICurioRenderer {
             return;
         }
 
-        float target = trafficOpen(entity) ? 1.0F : 0.0F;
-        doorOpenO = doorOpen;
-        if (doorOpen < target) {
-            doorOpen = Math.min(target, doorOpen + 0.12F);
-        } else if (doorOpen > target) {
-            doorOpen = Math.max(target, doorOpen - 0.1F);
-        }
-        float open = Mth.lerp(partialTicks, doorOpenO, doorOpen);
-        model.setupAnim(open);
+        model.setupAnim(doorFor(entity).open(entity, partialTicks));
 
         poseStack.pushPose();
         ICurioRenderer.translateIfSneaking(poseStack, entity);
@@ -100,20 +96,48 @@ public class PersonalWrightportRenderer implements ICurioRenderer {
         });
     }
 
-    /** Render runs every frame, but the scan only needs to run once per game tick per wearer. */
-    private boolean trafficOpen(LivingEntity entity) {
-        if (entity.level() == null) {
-            return false;
+    /** Door state for one wearer. Every wearer gets their own, since this renderer is shared. */
+    private Door doorFor(LivingEntity entity) {
+        long now = entity.level().getGameTime();
+        if (doors.size() > 16) {
+            doors.values().removeIf(door -> Math.abs(now - door.tick) > 100L);
         }
-        long tick = entity.level().getGameTime();
-        if (tick != scanTick || entity.getId() != scanEntity) {
-            Vec3 dock = behindClient(entity);
-            AABB box = new AABB(dock.x - 5.0D, dock.y - 1.5D, dock.z - 5.0D, dock.x + 5.0D, dock.y + 56.0D, dock.z + 5.0D);
-            scanTraffic = !entity.level().getEntitiesOfClass(DroneEntity.class, box, drone -> drone.isAlive()).isEmpty();
-            scanTick = tick;
-            scanEntity = entity.getId();
+        return doors.computeIfAbsent(entity.getId(), id -> new Door());
+    }
+
+    /**
+     * Opens and closes in game ticks, with the partial tick smoothing between them, so the speed
+     * does not depend on frame rate. The wright scan also runs once per tick instead of per frame.
+     */
+    private static final class Door {
+        private float open;
+        private float previous;
+        private long tick = Long.MIN_VALUE;
+
+        float open(LivingEntity entity, float partialTicks) {
+            long now = entity.level().getGameTime();
+            if (now != tick) {
+                tick = now;
+                previous = open;
+                float target = trafficOpen(entity) ? 1.0F : 0.0F;
+                if (open < target) {
+                    open = Math.min(target, open + OPEN_STEP);
+                } else if (open > target) {
+                    open = Math.max(target, open - CLOSE_STEP);
+                }
+            }
+            return Mth.lerp(partialTicks, previous, open);
         }
-        return scanTraffic || PersonalPortFx.doorHold() > 0;
+    }
+
+    private static boolean trafficOpen(LivingEntity entity) {
+        // The hold pulse comes from the local player's own wrights, so it only belongs on their pack.
+        if (entity == Minecraft.getInstance().player && PersonalPortFx.doorHold() > 0) {
+            return true;
+        }
+        Vec3 dock = behindClient(entity);
+        AABB box = new AABB(dock.x - 5.0D, dock.y - 1.5D, dock.z - 5.0D, dock.x + 5.0D, dock.y + 56.0D, dock.z + 5.0D);
+        return !entity.level().getEntitiesOfClass(DroneEntity.class, box, drone -> drone.isAlive()).isEmpty();
     }
 
     private static Vec3 behindClient(LivingEntity entity) {
