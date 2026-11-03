@@ -1,7 +1,6 @@
 package com.wrights.client;
 
 import com.wrights.WrightsMod;
-import com.wrights.drone.WrightTier;
 import com.wrights.entity.DroneEntity;
 
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -19,8 +18,6 @@ import net.minecraft.world.item.ItemStack;
 
 public class DroneRenderer extends EntityRenderer<DroneEntity> {
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "textures/item/part/shell.png");
-    /** Rotor hubs in model pixels, matching PODS in tools/gen_wright_models.py. */
-    private static final float[][] PODS = {{4.25F, 4.25F}, {11.75F, 4.25F}, {4.25F, 11.75F}, {11.75F, 11.75F}};
     private static final float SCALE = 0.7F;
     private final ItemRenderer items;
 
@@ -38,18 +35,8 @@ public class DroneRenderer extends EntityRenderer<DroneEntity> {
         pose.translate(0.0F, 0.15F + bob, 0.0F);
         pose.mulPose(Axis.YP.rotationDegrees(180.0F - yaw));
         pose.scale(SCALE, SCALE, SCALE);
-        // Model space is 0..16 with the skids at y 3.4; center it and stand it on the origin.
-        pose.translate(-0.5F, -3.4F / 16.0F, -0.5F);
-        PartModels.render(pose, buffers, PartModels.DRONE_BODY, light, WrightTier.modelColor(entity.rotor()));
-        float spin = age * 40.0F;
-        for (int i = 0; i < PODS.length; i++) {
-            pose.pushPose();
-            pose.translate(PODS[i][0] / 16.0F, 0.0F, PODS[i][1] / 16.0F);
-            pose.mulPose(Axis.YP.rotationDegrees(i == 0 || i == 3 ? spin : -spin));
-            pose.translate(-0.5F, 0.0F, -0.5F);
-            PartModels.render(pose, buffers, PartModels.DRONE_ROTOR, light, 0xFFFFFFFF);
-            pose.popPose();
-        }
+        pose.translate(-0.5F, -WrightModel.SKIDS / 16.0F, -0.5F);
+        WrightModel.render(pose, buffers, entity.parts(), age * 40.0F, light);
         pose.popPose();
         // Place/Exchange outbound: place material. Mine / Exchange after swap (void off): haul. Home: carried.
         ItemStack cargo = entity.displayCargo();

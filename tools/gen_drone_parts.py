@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ASSETS = ROOT / "src" / "main" / "resources" / "assets" / "wrights"
 TEX = ASSETS / "textures" / "item" / "part"
 MODELS = ASSETS / "models" / "item"
+PART_MODELS = ASSETS / "models" / "part"
 
 S = 32
 
@@ -413,7 +414,7 @@ def blade_z(y, tex, pitch=22.5, yaw=None):
     return box(frm, to, tex, r, spin_z_faces=True)
 
 
-def rotor(name, mark):
+def rotor_textures(name, mark):
     t = {
         "frame": "wrights:item/part/frame",
         "steel": "wrights:item/part/steel",
@@ -426,6 +427,11 @@ def rotor(name, mark):
     }
     if mark >= 3:
         t["duct"] = f"wrights:item/part/duct_{name}"
+    return t
+
+
+def rotor_parts(mark):
+    """(mount, blades, lower blades). The blades spin about the model's vertical centre line."""
     motor = {"side": "#motor", "end": "#motor_top"}
     els = [
         box([0.5, 5, 7], [6, 7, 9], "#frame"),
@@ -434,18 +440,21 @@ def rotor(name, mark):
         box([6, 4.5, 6], [10, 8, 10], motor),
         box([6.5, 8, 6.5], [9.5, 8.5, 9.5], "#led" if mark >= 5 else "#steel", glow=mark >= 5),
         box([7.5, 8.5, 7.5], [8.5, 9.5, 8.5], "#steel"),
+    ]
+    blades = [
         box([7, 9.25, 7], [9, 10.25, 9], {"side": "#frame", "end": "#motor_top"}),
         box([7.5, 10.25, 7.5], [8.5, 11, 8.5], "#led" if mark >= 4 else "#steel", glow=mark >= 4),
     ]
+    low = []
     if mark >= 4:
         els.append(box([1.5, 7, 6.75], [4, 8, 9.25], {"side": "#frame", "end": "#heatsink"}))
         els.append(box([2, 8, 7.5], [3.5, 8.25, 8.5], "#led", glow=True))
     else:
         els.append(box([1.5, 7, 7.5], [4, 7.25, 8.5], "#led", glow=True))
 
-    els.append(blade_x(9.5, "#blade"))
+    blades.append(blade_x(9.5, "#blade"))
     if mark >= 2:
-        els.append(blade_z(9.5, "#blade"))
+        blades.append(blade_z(9.5, "#blade"))
         for frm, to in (
             ([10, 5, 6.6], [10.75, 7.5, 7.1]), ([10, 5, 8.9], [10.75, 7.5, 9.4]),
             ([6.6, 5, 10], [7.1, 7.5, 10.75]), ([8.9, 5, 10], [9.4, 7.5, 10.75]),
@@ -459,12 +468,12 @@ def rotor(name, mark):
                 els.append(box([x0, 8.5, 7.75], [x1, 9, 8.25], "#steel", rot("y", yaw, [8, 8.75, 8])))
         els.append(box([0.75, 7, 7.5], [1.25, 9, 8.5], "#steel"))
     if mark >= 4:
-        els.append(blade_x(9.5, "#blade", yaw=45))
-        els.append(blade_x(9.5, "#blade", yaw=-45))
+        blades.append(blade_x(9.5, "#blade", yaw=45))
+        blades.append(blade_x(9.5, "#blade", yaw=-45))
     if mark >= 5:
-        els.append(box([7, 2, 7], [9, 3.5, 9], {"side": "#frame", "end": "#motor_top"}))
-        els.append(blade_x(2.5, "#blade", yaw=22.5))
-        els.append(blade_z(2.5, "#blade", yaw=22.5))
+        low.append(box([7, 2, 7], [9, 3.5, 9], {"side": "#frame", "end": "#motor_top"}))
+        low.append(blade_x(2.5, "#blade", yaw=22.5))
+        low.append(blade_z(2.5, "#blade", yaw=22.5))
         els += octagon(1.75, 3.25, 7.4, 0.8, "#duct")
         for frm, to in (
             ([7.5, 3.25, 0.7], [8.5, 9, 1.3]), ([7.5, 3.25, 14.7], [8.5, 9, 15.3]),
@@ -473,7 +482,43 @@ def rotor(name, mark):
             els.append(box(frm, to, "#steel"))
         for z in (4.5, 8, 11.5):
             els.append(box([3, 1, z - 0.4], [13, 1.4, z + 0.4], "#heatsink", rot("x", 22.5, [8, 1.2, z])))
-    return {"parent": "wrights:item/drone_part", "textures": t, "elements": els}
+    return els, blades, low
+
+
+def rotor(name, mark):
+    mount, blades, low = rotor_parts(mark)
+    return {"parent": "wrights:item/drone_part", "textures": rotor_textures(name, mark), "elements": mount + blades + low}
+
+
+def stock_rotor():
+    """The motor and two-blade prop every wright has before a Rotor Assembly is fitted."""
+    t = {
+        "frame": "wrights:item/part/frame",
+        "steel": "wrights:item/part/steel",
+        "motor": "wrights:item/part/motor",
+        "motor_top": "wrights:item/part/motor_top",
+        "led": "wrights:item/part/led_mk1",
+        "blade": "wrights:item/part/blade_drone",
+        "particle": "wrights:item/part/frame",
+    }
+    mount = [
+        box([1, 5, 7.25], [6.5, 6.5, 8.75], "#frame"),
+        box([2, 6.5, 7.6], [3.5, 6.75, 8.4], "#led", glow=True),
+        box([6, 3.5, 6], [10, 4.5, 10], "#frame"),
+        box([6.5, 4.5, 6.5], [9.5, 8, 9.5], {"side": "#motor", "end": "#motor_top"}),
+        box([7.5, 8, 7.5], [8.5, 9.25, 8.5], "#steel"),
+    ]
+    blades = [
+        box([7, 9.25, 7], [9, 10, 9], {"side": "#frame", "end": "#motor_top"}),
+        blade_x(9.5, "#blade"),
+    ]
+    return t, mount, blades
+
+
+def write_part(name, textures, elements):
+    PART_MODELS.mkdir(parents=True, exist_ok=True)
+    (PART_MODELS / f"{name}.json").write_text(
+        json.dumps({"textures": textures, "elements": elements}, indent=2) + "\n", encoding="utf-8")
 
 
 def fabricator(name, mark):
@@ -566,6 +611,9 @@ def main():
     tex_nozzle()
     tex_nozzle_side()
     write_model("drone_part", PARENT)
+    t, mount, blades = stock_rotor()
+    write_part("rotor_mount_mk0", t, mount)
+    write_part("rotor_blades_mk0", t, blades)
     for mark, accent, light in TIERS:
         tag = f"mk{mark}"
         tex_blade(tag, accent, light)
@@ -573,7 +621,15 @@ def main():
         tex_lens(tag, accent, light)
         tex_duct(tag, accent, light)
         write_model(f"rotor_mk{mark}", rotor(tag, mark))
-        write_model(f"fabricator_mk{mark}", fabricator(tag, mark))
+        mount, blades, low = rotor_parts(mark)
+        rt = rotor_textures(tag, mark)
+        write_part(f"rotor_mount_mk{mark}", rt, mount)
+        write_part(f"rotor_blades_mk{mark}", rt, blades)
+        if low:
+            write_part(f"rotor_low_mk{mark}", rt, low)
+        head = fabricator(tag, mark)
+        write_model(f"fabricator_mk{mark}", head)
+        write_part(f"fabricator_mk{mark}", head["textures"], head["elements"])
 
 
 if __name__ == "__main__":

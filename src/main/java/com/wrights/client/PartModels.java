@@ -23,15 +23,20 @@ import net.neoforged.neoforge.client.model.data.ModelData;
  */
 public final class PartModels {
     public static final ModelResourceLocation DRONE_BODY = id("drone_body");
-    public static final ModelResourceLocation DRONE_ROTOR = id("drone_rotor");
+    /** Index is the rotor tier; 0 is the stock motor and prop. */
+    public static final List<ModelResourceLocation> ROTOR_MOUNTS = tiers("rotor_mount_mk", 0);
+    public static final List<ModelResourceLocation> ROTOR_BLADES = tiers("rotor_blades_mk", 0);
+    /** Counter-rotating lower blades, Apex only. */
+    public static final ModelResourceLocation ROTOR_LOW = id("rotor_low_mk5");
+    /** Index is the fabricator tier minus one; Basic draws no head. */
+    public static final List<ModelResourceLocation> FABRICATORS = tiers("fabricator_mk", 1);
     public static final ModelResourceLocation PACK = id("pack");
     public static final ModelResourceLocation PACK_BLADE = id("pack_blade");
     public static final ModelResourceLocation PACK_LAMP = id("pack_lamp");
     public static final ModelResourceLocation IRIS_BLADE = id("iris_blade");
     public static final ModelResourceLocation PORT_LAMPS = id("wrightport_lamps");
 
-    public static final List<ModelResourceLocation> ALL = List.of(
-            DRONE_BODY, DRONE_ROTOR, PACK, PACK_BLADE, PACK_LAMP, IRIS_BLADE, PORT_LAMPS);
+    public static final List<ModelResourceLocation> ALL = all();
 
     /** Full bright, for lamps and glowing parts drawn outside the chunk mesh. */
     public static final int FULL_BRIGHT = 0xF000F0;
@@ -44,6 +49,22 @@ public final class PartModels {
     private static final float TWIST = 22.5F;
 
     private PartModels() {
+    }
+
+    private static List<ModelResourceLocation> tiers(String prefix, int first) {
+        List<ModelResourceLocation> ids = new java.util.ArrayList<>();
+        for (int tier = first; tier <= com.wrights.drone.WrightTier.APEX; tier++) {
+            ids.add(id(prefix + tier));
+        }
+        return List.copyOf(ids);
+    }
+
+    private static List<ModelResourceLocation> all() {
+        List<ModelResourceLocation> ids = new java.util.ArrayList<>(List.of(DRONE_BODY, ROTOR_LOW, PACK, PACK_BLADE, PACK_LAMP, IRIS_BLADE, PORT_LAMPS));
+        ids.addAll(ROTOR_MOUNTS);
+        ids.addAll(ROTOR_BLADES);
+        ids.addAll(FABRICATORS);
+        return List.copyOf(ids);
     }
 
     private static ModelResourceLocation id(String name) {

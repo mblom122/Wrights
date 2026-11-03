@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from gen_drone_parts import (  # noqa: E402
     COPPER, GUN, MODELS, S, STEEL, add, bevel, bolt, cyl, get, image, mix, mul, noisy, put, save,
-    tex_blade,
+    PARENT, tex_blade,
 )
 
 ASSETS = MODELS.parent.parent
@@ -641,12 +641,13 @@ def textures(**keys):
 
 # ---------------------------------------------------------------- wright drone
 
-PODS = [(4.25, 4.25), (11.75, 4.25), (4.25, 11.75), (11.75, 11.75)]
+# Rotor mount plates, matching PODS in client/WrightModel.java. A rotor part stands on each plate top (y 7).
+PODS = [(3.25, 3.25), (12.75, 3.25), (3.25, 12.75), (12.75, 12.75)]
 
 
 def drone_body():
+    """The bare chassis. Rotors stand on the four plates, the Fabricator Head hangs under the belly plate (y 5)."""
     shell = {"side": "#shell", "up": "#shell", "down": "#frame"}
-    motor = {"side": "#motor", "end": "#motor_top"}
     els = [
         cube([5, 6, 5], [11, 8.5, 11], shell),
         cube([6, 8.5, 6], [10, 9.25, 10], {"side": "#steel", "up": "#frame"}),
@@ -656,33 +657,19 @@ def drone_body():
         cube([7, 6.5, 3.8], [9, 7.7, 4.1], "#lens", glow=True),
         cube([4.85, 6.6, 6], [5, 7.8, 10], "#accent", tint=True),
         cube([11, 6.6, 6], [11.15, 7.8, 10], "#accent", tint=True),
-        cube([7.25, 4.25, 7.25], [8.75, 5, 8.75], "#steel"),
-        cube([7.6, 3.6, 7.6], [8.4, 4.25, 8.4], "#frame"),
+        cube([6.5, 4.6, 6.5], [9.5, 5, 9.5], {"side": "#steel", "down": "#frame", "up": "#frame"}),
         cube([10.6, 6.7, 6.6], [11.6, 7.6, 7.4], "#led", glow=True),
     ]
-    for x0, x1 in ((1.5, 6), (10, 14.5)):
+    for x0, x1 in ((1.3, 6), (10, 14.7)):
         for ang in (45, -45):
-            els.append(cube([x0, 7, 7.5], [x1, 7.75, 8.5], {"side": "#frame", "end": "#steel"}, rot("y", ang, [8, 7.4, 8])))
+            els.append(cube([x0, 6.4, 7.5], [x1, 7, 8.5], {"side": "#frame", "end": "#steel"}, rot("y", ang, [8, 6.7, 8])))
     for px, pz in PODS:
-        els.append(cube([px - 1, 6.5, pz - 1], [px + 1, 8.5, pz + 1], motor))
-        els.append(cube([px - 0.6, 5.9, pz - 0.6], [px + 0.6, 6.5, pz + 0.6], "#led", glow=True))
-    for x0 in (5.25, 10):
-        els.append(cube([x0, 3.4, 4.5], [x0 + 0.75, 3.9, 11.5], "#steel"))
-        for z in (6, 9.5):
-            els.append(cube([x0 + 0.15, 3.9, z], [x0 + 0.6, 5, z + 0.5], "#frame"))
-    return els
-
-
-def drone_rotor(px=8, pz=8, spin=False):
-    y = 8.6
-    hub = {"side": "#frame", "end": "#motor_top"}
-    els = [cube([px - 0.6, 8.5, pz - 0.6], [px + 0.6, 9.3, pz + 0.6], hub)]
-    if spin:
-        els.append(cube([px - 2.6, y + 0.3, pz - 0.4], [px + 2.6, y + 0.5, pz + 0.4], "#blade", rot("y", 22.5, [px, y, pz])))
-        els.append(cube([px - 0.4, y + 0.3, pz - 2.6], [px + 0.4, y + 0.5, pz + 2.6], "#blade", rot("y", 22.5, [px, y, pz])))
-    else:
-        els.append(cube([px - 2.6, y + 0.3, pz - 0.4], [px + 2.6, y + 0.5, pz + 0.4], "#blade", rot("x", 22.5, [px, y + 0.4, pz])))
-        els.append(cube([px - 0.4, y + 0.3, pz - 2.6], [px + 0.4, y + 0.5, pz + 2.6], "#blade", rot("z", 22.5, [px, y + 0.4, pz])))
+        els.append(cube([px - 1.1, 6.5, pz - 1.1], [px + 1.1, 7, pz + 1.1], {"side": "#steel", "end": "#frame"}))
+        els.append(cube([px - 0.5, 6.1, pz - 0.5], [px + 0.5, 6.5, pz + 0.5], "#led", glow=True))
+    for x0 in (4.6, 10.6):
+        els.append(cube([x0, 0.8, 4], [x0 + 0.8, 1.3, 12], "#steel"))
+        for z in (5.5, 10):
+            els.append(cube([x0 + 0.15, 1.3, z], [x0 + 0.6, 6.4, z + 0.5], "#frame"))
     return els
 
 
@@ -896,19 +883,12 @@ def main():
         fn()
     tex_blade("drone", (206, 212, 220), (246, 248, 250))
 
-    # Wright drone: body and rotor parts for the flying entity, one combined item model.
+    # Wright: only the chassis is a model. Rotors and the Fabricator Head are drawn on it from the fitted
+    # parts, by the entity renderer in the world and by the item renderer for the icon.
     write(PART_MODELS / "drone_body.json", {"textures": textures(**{**DRONE_TEX, "accent": "accent"}),
                                             "elements": drone_body()})
-    write(PART_MODELS / "drone_rotor.json", {"textures": textures(**DRONE_TEX), "elements": drone_rotor()})
-    item_drone = drone_body()
-    for px, pz in PODS:
-        item_drone += drone_rotor(px, pz, spin=True)
-    for el in item_drone:
-        for face in el["faces"].values():
-            face.pop("tintindex", None)
-    write(MODELS / "wright.json", {"parent": "wrights:item/drone_part",
-                                   "textures": textures(**{**DRONE_TEX, "accent": "accent_amber"}),
-                                   "elements": item_drone})
+    write(MODELS / "wright.json", {"parent": "minecraft:builtin/entity", "gui_light": "side",
+                                   "textures": {"particle": T("shell")}, "display": PARENT["display"]})
 
     write(MODELS / "controller.json", {
         "parent": "wrights:item/drone_part",

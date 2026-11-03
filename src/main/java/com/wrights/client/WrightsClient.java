@@ -12,6 +12,7 @@ import com.wrights.item.BlueprintItem;
 import com.wrights.item.ModItems;
 import com.wrights.menu.ModMenus;
 
+import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.client.renderer.item.ItemProperties;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -26,6 +27,8 @@ import net.neoforged.neoforge.client.event.ModelEvent;
 import net.neoforged.neoforge.client.event.RegisterClientTooltipComponentFactoriesEvent;
 import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
+import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
+import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 
@@ -41,6 +44,21 @@ public class WrightsClient {
     @SubscribeEvent
     public static void registerModels(ModelEvent.RegisterAdditional event) {
         PartModels.ALL.forEach(event::register);
+    }
+
+    @SubscribeEvent
+    public static void registerItemRenderers(RegisterClientExtensionsEvent event) {
+        event.registerItem(new IClientItemExtensions() {
+            private WrightItemRenderer renderer;
+
+            @Override
+            public BlockEntityWithoutLevelRenderer getCustomRenderer() {
+                if (renderer == null) {
+                    renderer = new WrightItemRenderer();
+                }
+                return renderer;
+            }
+        }, ModItems.WRIGHT.get());
     }
 
     @SubscribeEvent
