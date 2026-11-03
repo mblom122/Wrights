@@ -37,14 +37,10 @@ final class WrightManagePanel {
     private static final int ADD = 1;
     private static final int MARKED = 2;
 
-    private WrightsButton addButton;
-    private WrightsButton removeButton;
     private WrightsButton partsButton;
     private WrightsButton backButton;
     private EditBox countBox;
-    private EditBox nameBox;
-    private String sentWrightName = "";
-    private int nameFor = -1;
+    private Component tipLine = Component.empty();
 
     private boolean open;
     private int scroll;
@@ -108,6 +104,11 @@ final class WrightManagePanel {
         }
     }
 
+    /** Tip text for the chrome strip under the hangar art. */
+    Component tipLine() {
+        return tipLine == null ? Component.empty() : tipLine;
+    }
+
     void toggle(ManageHost screen) {
         open = !open;
         scroll = 0;
@@ -128,19 +129,12 @@ final class WrightManagePanel {
 
     void addWidgets(ManageHost screen) {
         place(screen);
-        // Compact chrome under the hangar art (Add / Remove / Parts / Back).
-        int chromeY = panelY + HangarGui.HEIGHT + 4;
-        partsButton = new WrightsButton(panelX + 8, chromeY, 120, 14,
+        // Tip strip owns most of the chrome; only Parts (when marked) and Back remain as buttons.
+        int chromeY = panelY + HangarGui.HEIGHT + 2;
+        partsButton = new WrightsButton(panelX + HangarGui.WIDTH - 200, chromeY, 120, 14,
                 Component.translatable("screen.wrights.manage_parts_marked"), button -> openMarked(screen));
         partsButton.active = false;
         screen.addButton(partsButton);
-        addButton = new WrightsButton(panelX + 132, chromeY, 56, 14,
-                Component.translatable("screen.wrights.manage_add"), button -> openAdd(screen));
-        screen.addButton(addButton);
-        removeButton = new WrightsButton(panelX + 192, chromeY, 72, 14,
-                Component.translatable("screen.wrights.manage_remove"), button -> removeSelected(screen), true);
-        removeButton.active = false;
-        screen.addButton(removeButton);
         backButton = new WrightsButton(panelX + HangarGui.WIDTH - 72, chromeY, 64, 14,
                 Component.translatable("screen.wrights.back"), button -> close(screen));
         screen.addButton(backButton);
@@ -149,30 +143,16 @@ final class WrightManagePanel {
         countBox.setFilter(text -> text.chars().allMatch(Character::isDigit));
         countBox.setVisible(false);
         screen.addField(countBox);
-        nameBox = new EditBox(screen.font(), 0, 0, 120, 14, Component.translatable("screen.wrights.name"));
-        nameBox.setMaxLength(32);
-        nameBox.setHint(Component.translatable("screen.wrights.name"));
-        nameBox.setVisible(false);
-        screen.addField(nameBox);
         layoutChrome(screen);
     }
 
     void layoutChrome(ManageHost screen) {
         place(screen);
-        int y = panelY + HangarGui.HEIGHT + 4;
+        int y = panelY + HangarGui.HEIGHT + 2;
         if (partsButton != null) {
-            partsButton.setX(panelX + 8);
+            partsButton.setX(panelX + HangarGui.WIDTH - 200);
             partsButton.setY(y);
             partsButton.setWidth(120);
-        }
-        if (addButton != null) {
-            addButton.setX(panelX + 132);
-            addButton.setY(y);
-        }
-        if (removeButton != null) {
-            removeButton.setX(panelX + 192);
-            removeButton.setY(y);
-            removeButton.setWidth(72);
         }
         if (backButton != null) {
             backButton.setX(panelX + HangarGui.WIDTH - 72);
@@ -200,22 +180,12 @@ final class WrightManagePanel {
         int marked = markedCount(screen, swarm);
         boolean chrome = dialog == NONE;
         boolean tool = screen.toolHeld();
-        int canAdd = allThatFit(screen);
         if (partsButton != null) {
             partsButton.setShown(open && chrome && marked > 0);
             partsButton.active = open && chrome && tool && marked > 0;
         }
-        if (addButton != null) {
-            addButton.setShown(open && chrome);
-            addButton.active = open && chrome && tool && canAdd > 0;
-        }
         if (backButton != null) {
             backButton.setShown(open && chrome && !screen.embedded());
-        }
-        if (removeButton != null) {
-            removeButton.setShown(open && chrome);
-            removeButton.active = open && chrome && tool && (marked > 0 || (expanded >= 0 && !away(screen, swarm, expanded)));
-            removeButton.setMessage(Component.translatable(marked > 0 ? "screen.wrights.manage_remove_marked" : "screen.wrights.manage_remove"));
         }
         if (countBox != null) {
             countBox.setVisible(open && dialog == ADD);
@@ -242,17 +212,16 @@ final class WrightManagePanel {
             }
         }
 
-        drawHardware(graphics, screen, swarm, mouseX, mouseY, tool);
-        placeWrightName(screen, swarm);
+        drawHardware(graphics, screen, swarm, mouseX, mouseY);
+        tipLine = chromeTip(screen, swarm, mouseX, mouseY);
+        HangarGui.drawTipStrip(graphics, screen.font(), panelX, panelY, tipLine);
 
         if (dialog != NONE) {
             renderDialog(screen, graphics, swarm, mouseX, mouseY);
         }
-        drawDigitalTip(screen, graphics, mouseX, mouseY);
-        drawPartTooltip(graphics, screen, swarm, mouseX, mouseY);
     }
 
-    private void drawHardware(GuiGraphics graphics, ManageHost screen, Swarm swarm, int mouseX, int mouseY, boolean tool) {
+    private void drawHardware(GuiGraphics graphics, ManageHost screen, Swarm swarm, int mouseX, int mouseY) {
         PartSlot[] slots = PartSlot.values();
         boolean selected = expanded >= 0 && expanded < swarm.units().size();
         boolean locked = selected && away(screen, swarm, expanded);
@@ -285,53 +254,29 @@ final class WrightManagePanel {
         }
         if (selected && parts != null) {
             graphics.drawString(screen.font(), WrightItem.energyLine(parts),
-                    panelX + HangarGui.PART_X, panelY + HangarGui.PART_Y + HangarGui.PART_SLOT + 4, WrightsUi.TEXT, false);
+                    panelX + HangarGui.ENERGY_LINE_X, panelY + HangarGui.ENERGY_LINE_Y, WrightsUi.TEXT, false);
         }
     }
 
-    private void placeWrightName(ManageHost screen, Swarm swarm) {
-        if (nameBox == null) {
-            return;
+    /** Chrome tip: hovered part name only, else a short hangar hint. */
+    private Component chromeTip(ManageHost screen, Swarm swarm, int mouseX, int mouseY) {
+        long now = System.currentTimeMillis();
+        if (WrightsClientState.notice != null && now < WrightsClientState.noticeUntil
+                && !WrightsClientState.notice.getString().isEmpty()) {
+            return WrightsClientState.notice;
         }
-        if (expanded < 0 || expanded >= swarm.units().size() || away(screen, swarm, expanded)) {
-            nameBox.setVisible(false);
-            return;
-        }
-        // Sit under the hologram / above hardware so the selected wright can be renamed.
-        nameBox.setVisible(true);
-        nameBox.setX(panelX + HangarGui.PART_X);
-        nameBox.setY(panelY + HangarGui.PART_Y - 16);
-        nameBox.setWidth(HangarGui.PART_SLOT * 3 + HangarGui.PART_GAP * 2);
-        if (nameFor != expanded) {
-            String current = swarm.units().get(expanded).name();
-            if (current == null) {
-                current = "";
+        if (expanded >= 0 && expanded < swarm.units().size()) {
+            int hit = HangarGui.partHit(panelX, panelY, mouseX, mouseY);
+            if (hit >= 0) {
+                PartSlot slot = PartSlot.values()[hit];
+                int tier = swarm.units().get(expanded).parts().tier(slot);
+                return Component.translatable(slot.fittedKey(tier)).withColor(WrightTier.textColor(tier) & 0xFFFFFF);
             }
-            nameBox.setValue(current);
-            sentWrightName = current;
-            nameFor = expanded;
         }
-    }
-
-    private void drawPartTooltip(GuiGraphics graphics, ManageHost screen, Swarm swarm, int mouseX, int mouseY) {
-        if (expanded < 0 || expanded >= swarm.units().size()) {
-            return;
+        if (swarm.units().isEmpty()) {
+            return Component.translatable("screen.wrights.hangar_empty");
         }
-        int hit = HangarGui.partHit(panelX, panelY, mouseX, mouseY);
-        if (hit < 0) {
-            return;
-        }
-        PartSlot slot = PartSlot.values()[hit];
-        int tier = swarm.units().get(expanded).parts().tier(slot);
-        Item part = slot.item(tier);
-        List<Component> lines = new ArrayList<>();
-        lines.add(Component.translatable(slot.fittedKey(tier)).withColor(WrightTier.textColor(tier) & 0xFFFFFF));
-        lines.addAll(WrightPartItem.stats(slot, tier));
-        if (part != null) {
-            graphics.renderComponentTooltip(screen.font(), lines, mouseX, mouseY);
-        } else {
-            graphics.renderTooltip(screen.font(), Component.translatable(slot.fittedKey(tier)), mouseX, mouseY);
-        }
+        return Component.translatable("screen.wrights.hangar_hint");
     }
 
     void drawDigitalTip(ManageHost screen, GuiGraphics graphics, int mouseX, int mouseY) {
@@ -371,12 +316,6 @@ final class WrightManagePanel {
 
     boolean mouseClicked(ManageHost screen, double mouseX, double mouseY, int button) {
         if (button != 0 || !open) {
-            return false;
-        }
-        if (nameBox != null && nameBox.isFocused() && !nameBox.isMouseOver(mouseX, mouseY)) {
-            commitName(screen);
-        }
-        if (nameBox != null && nameBox.visible && nameBox.isMouseOver(mouseX, mouseY)) {
             return false;
         }
         place(screen);
@@ -459,9 +398,7 @@ final class WrightManagePanel {
                 }
                 return true;
             }
-            commitName(screen);
             if (expanded == slot) {
-                nameFor = -1;
                 expanded = -1;
             } else {
                 expanded = slot;
@@ -710,46 +647,7 @@ final class WrightManagePanel {
     }
 
     boolean keyPressed(ManageHost screen, int keyCode, int scanCode, int modifiers) {
-        if (nameBox == null || !nameBox.isFocused()) {
-            return false;
-        }
-        if (keyCode == 257 || keyCode == 335) {
-            commitName(screen);
-            nameBox.setFocused(false);
-            screen.focus(null);
-            return true;
-        }
-        if (keyCode == 256) {
-            nameBox.setValue(sentWrightName);
-            nameBox.setFocused(false);
-            screen.focus(null);
-            return true;
-        }
-        nameBox.keyPressed(keyCode, scanCode, modifiers);
-        return true;
-    }
-
-    private void commitName(ManageHost screen) {
-        if (nameBox == null || expanded < 0) {
-            return;
-        }
-        Swarm swarm = screen.swarm();
-        if (expanded >= swarm.units().size()) {
-            return;
-        }
-        String next = Swarm.cleanName(nameBox.getValue());
-        String current = swarm.units().get(expanded).name();
-        if (current == null) {
-            current = "";
-        }
-        if (!nameBox.getValue().equals(next)) {
-            nameBox.setValue(next);
-        }
-        sentWrightName = next;
-        if (next.equals(current)) {
-            return;
-        }
-        screen.rename(expanded, next);
+        return false;
     }
 
     private int bayX() {
@@ -906,12 +804,6 @@ final class WrightManagePanel {
     private void hideChrome() {
         if (partsButton != null) {
             partsButton.setShown(false);
-        }
-        if (addButton != null) {
-            addButton.setShown(false);
-        }
-        if (removeButton != null) {
-            removeButton.setShown(false);
         }
         if (backButton != null) {
             backButton.setShown(false);

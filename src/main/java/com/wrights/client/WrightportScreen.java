@@ -22,8 +22,6 @@ import com.wrights.network.BlueprintPayloads;
 /** Placed wrightport hangar — textured panel with Boundary / Bind / Highlight icons. */
 public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> implements ManageHost {
     private final WrightManagePanel manage = new WrightManagePanel();
-    private EditBox nameBox;
-    private String sentName = "";
     private boolean energyKnown;
     private int energyStored;
     private int energyCapacity;
@@ -51,17 +49,6 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         manage.setActive(true);
         clearWidgets();
         manage.addWidgets(this);
-        nameBox = new EditBox(this.font, 0, 0, HangarGui.TITLE_W, 14, Component.translatable("screen.wrights.name"));
-        nameBox.setMaxLength(32);
-        nameBox.setHint(Component.translatable("screen.wrights.name"));
-        nameBox.setBordered(false);
-        nameBox.setTextColor(WrightsUi.TEXT);
-        if (getMinecraft().level != null && getMinecraft().level.getBlockEntity(menu.pos()) instanceof WrightportBlockEntity port) {
-            sentName = port.label();
-            nameBox.setValue(sentName);
-        }
-        addRenderableWidget(nameBox);
-        placeName();
     }
 
     private boolean canRename() {
@@ -72,37 +59,6 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
             return false;
         }
         return port.owner() == null || port.owner().equals(getMinecraft().player.getUUID());
-    }
-
-    private void commitName() {
-        if (nameBox == null || !canRename() || getMinecraft().level == null) {
-            return;
-        }
-        String next = WrightportBlockEntity.cleanLabel(nameBox.getValue());
-        if (next.equals(sentName)) {
-            if (!nameBox.getValue().equals(next)) {
-                nameBox.setValue(next);
-            }
-            return;
-        }
-        sentName = next;
-        nameBox.setValue(next);
-        PacketDistributor.sendToServer(new BlueprintPayloads.RenameWrightport(
-                getMinecraft().level.dimension().location().toString(), menu.pos(), next));
-    }
-
-    private void placeName() {
-        if (nameBox == null) {
-            return;
-        }
-        boolean mine = canRename();
-        nameBox.visible = mine;
-        if (!mine) {
-            return;
-        }
-        nameBox.setX(leftPos + HangarGui.TITLE_X + 4);
-        nameBox.setY(topPos + HangarGui.TITLE_Y + 3);
-        nameBox.setWidth(HangarGui.TITLE_W - 8);
     }
 
     private BlockPos boundChest() {
@@ -197,12 +153,13 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         return true;
     }
 
-    private void drawTooltips(GuiGraphics graphics, int mouseX, int mouseY) {
+    /** Port-tool tip for the chrome strip (overrides hangar tip while hovering). */
+    private Component portButtonTip(int mouseX, int mouseY) {
         int hit = HangarGui.buttonHit(leftPos, topPos, mouseX, mouseY);
         if (hit < 0) {
-            return;
+            return null;
         }
-        Component tip = switch (hit) {
+        return switch (hit) {
             case HangarGui.BTN_BOUNDARY -> Component.translatable("screen.wrights.boundary");
             case HangarGui.BTN_BIND -> !controllerHeld() && canRename()
                     ? Component.translatable("screen.wrights.port_chest_need_controller")
@@ -210,9 +167,6 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
             case HangarGui.BTN_HIGHLIGHT -> Component.translatable("screen.wrights.supply_highlight");
             default -> null;
         };
-        if (tip != null) {
-            graphics.renderTooltip(this.font, tip, mouseX, mouseY);
-        }
     }
 
     @Override
@@ -353,18 +307,15 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         this.renderBackground(graphics, mouseX, mouseY, partialTick);
         renderBg(graphics, partialTick, mouseX, mouseY);
-        placeName();
         manage.render(this, graphics, mouseX, mouseY);
         drawEnergy(graphics);
         drawPortButtons(graphics, mouseX, mouseY);
-        if (canRename() && !portHasSupply()) {
-            graphics.drawString(
-                    this.font,
-                    Component.translatable("message.wrights.port_need_supply"),
-                    leftPos + 12,
-                    topPos + HangarGui.HEIGHT - 14,
-                    WrightsUi.RED,
-                    false);
+        Component portTip = portButtonTip(mouseX, mouseY);
+        if (portTip != null) {
+            HangarGui.drawTipStrip(graphics, this.font, leftPos, topPos, portTip);
+        } else if (canRename() && !portHasSupply()) {
+            HangarGui.drawTipStrip(graphics, this.font, leftPos, topPos,
+                    Component.translatable("message.wrights.port_need_supply").withStyle(net.minecraft.ChatFormatting.RED));
         }
         graphics.pose().pushPose();
         graphics.pose().translate(leftPos, topPos, 0.0F);
@@ -391,16 +342,11 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
             graphics.renderItemDecorations(this.font, carried, mouseX - 8, mouseY - 8);
             graphics.pose().popPose();
         }
-        manage.drawDigitalTip(this, graphics, mouseX, mouseY);
         this.renderTooltip(graphics, mouseX, mouseY);
-        drawTooltips(graphics, mouseX, mouseY);
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (nameBox != null && nameBox.isFocused() && !nameBox.isMouseOver(mouseX, mouseY)) {
-            commitName();
-        }
         if (button == 0 && clickPortButton(mouseX, mouseY)) {
             return true;
         }
@@ -439,22 +385,6 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         if (manage.keyPressed(this, keyCode, scanCode, modifiers)) {
             return true;
         }
-        if (nameBox != null && nameBox.isFocused()) {
-            if (keyCode == 257 || keyCode == 335) {
-                commitName();
-                setFocused(null);
-                nameBox.setFocused(false);
-                return true;
-            }
-            if (keyCode == 256) {
-                nameBox.setValue(sentName);
-                nameBox.setFocused(false);
-                setFocused(null);
-                return true;
-            }
-            nameBox.keyPressed(keyCode, scanCode, modifiers);
-            return true;
-        }
         if (getFocused() instanceof EditBox box && box.isFocused()) {
             box.keyPressed(keyCode, scanCode, modifiers);
             return true;
@@ -463,11 +393,5 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
-    }
-
-    @Override
-    public void removed() {
-        commitName();
-        super.removed();
     }
 }
