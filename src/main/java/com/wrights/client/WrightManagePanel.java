@@ -112,12 +112,6 @@ final class WrightManagePanel {
         return tipLine == null ? Component.empty() : tipLine;
     }
 
-    /** True when the strip is the default mark hint (not a notice). */
-    boolean showingMarkHint() {
-        Component tip = tipLine();
-        return tip.getString().equals(Component.translatable("screen.wrights.hangar_hint").getString());
-    }
-
     void toggle(ManageHost screen) {
         open = !open;
         scroll = 0;

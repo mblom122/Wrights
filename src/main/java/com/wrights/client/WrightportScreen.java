@@ -76,17 +76,6 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         return getMinecraft().player != null && com.wrights.item.ControllerItem.isHeld(getMinecraft().player);
     }
 
-    private boolean portHasSupply() {
-        if (getMinecraft().level == null
-                || !(getMinecraft().level.getBlockEntity(menu.pos()) instanceof WrightportBlockEntity port)) {
-            return false;
-        }
-        if (port.supplyChest() != null) {
-            return true;
-        }
-        return WrightsClientState.digitalBound;
-    }
-
     private void drawPortButtons(GuiGraphics graphics, int mouseX, int mouseY) {
         boolean mine = canRename();
         boolean held = controllerHeld();
@@ -370,10 +359,6 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         }
         // Dialog + tip last so hangar/inventory do not show through; tip stays readable.
         manage.renderOverlay(this, graphics, mouseX, mouseY);
-        if (canRename() && !portHasSupply() && manage.showingMarkHint()) {
-            HangarGui.drawTipStrip(graphics, this.font, leftPos, topPos,
-                    Component.translatable("message.wrights.port_need_supply").withStyle(net.minecraft.ChatFormatting.RED));
-        }
         Component portTip = portButtonTip(mouseX, mouseY);
         if (portTip != null) {
             graphics.renderTooltip(this.font, portTip, mouseX, mouseY);
