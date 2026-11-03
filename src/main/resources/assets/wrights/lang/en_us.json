@@ -886,7 +886,7 @@
   "item.wrights.core.match": "Matched with a %s Rotor Assembly, blocks cost the base energy.",
   "item.wrights.core.efficiency": "• FE Efficiency: %s%% power drain",
   "item.wrights.fabricator.actions": "• Actions: Up to %s / tick",
-  "item.wrights.fabricator.energy": "• Energy cost: %s FE per block",
+  "item.wrights.fabricator.energy": "• Energy cost: %s FE per action",
   "item.wrights.fabricator.blocks": "Up to %s cell actions per tick — placing, mining, voiding, exchanging, or undoing.",
   "item.wrights.fabricator.cell": "• Reach: standing cell (1 block)",
   "item.wrights.fabricator.faces": "• Reach: cell + 6 faces (7 blocks)",

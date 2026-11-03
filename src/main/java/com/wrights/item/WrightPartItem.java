@@ -57,9 +57,9 @@ public class WrightPartItem extends Item {
             }
             case FABRICATOR -> {
                 // Energy is paid once per cell action — Apex 19 actions/tick = up to 19 charges that tick.
-                int perBlock = WrightsConfig.ENERGY.get() ? WrightsConfig.ENERGY_PLACE.get() : 0;
+                int perAction = WrightsConfig.ENERGY.get() ? WrightsConfig.ENERGY_PLACE.get() : 0;
                 lines.add(Component.translatable("item.wrights.fabricator.actions", WrightTier.actionsPerTick(tier)));
-                lines.add(Component.translatable("item.wrights.fabricator.energy", perBlock));
+                lines.add(Component.translatable("item.wrights.fabricator.energy", perAction));
                 lines.add(Component.translatable(reachKey(tier)));
             }
             case CORE -> {
