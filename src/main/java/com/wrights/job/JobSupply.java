@@ -22,6 +22,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import com.wrights.block.WrightportBlockEntity;
 import com.wrights.network.BlueprintPayloads;
 import com.wrights.drone.WrightHomes;
+import com.wrights.storage.DigitalLink;
 import com.wrights.storage.DigitalNetworks;
 import com.wrights.util.BlockFilters;
 
@@ -82,8 +83,23 @@ public final class JobSupply {
         com.wrights.blueprint.ShapeSupply.takeOne(player, item, com.wrights.blueprint.ShapeSupply.parse(job.supplyOrder()), container);
     }
 
+    /**
+     * Personal homes are always ready. A placed port needs its bound chest (still inside the
+     * boundary) or a bound digital network — otherwise hands cannot pay for blocks.
+     */
+    public static boolean portSupplyReady(ServerLevel level, ServerPlayer player, BlockPos homePort) {
+        if (homePort == null) {
+            return true;
+        }
+        if (portChest(level, homePort) != null) {
+            return true;
+        }
+        DigitalLink link = com.wrights.storage.ItemSource.linkOf(player);
+        return link != null && link.bound() && DigitalNetworks.online(level, link);
+    }
+
     /** The chest bound to this port, when it is still inside that port's chunk square. */
-    private static Container portChest(ServerLevel level, BlockPos portPos) {
+    public static Container portChest(ServerLevel level, BlockPos portPos) {
         if (portPos == null || !level.isLoaded(portPos)) {
             return null;
         }
@@ -98,6 +114,44 @@ public final class JobSupply {
             return null;
         }
         return containerAt(level, chestPos);
+    }
+
+    /**
+     * Deposit mine / exchange returns into the port chest then digital, else the player.
+     * Returns stacks that were actually stored somewhere (for haul icons).
+     */
+    public static void giveReturns(
+            ServerLevel level,
+            ServerPlayer player,
+            BuildJob job,
+            BuildJob.Hand hand,
+            java.util.List<ItemStack> stacks) {
+        if (stacks == null || stacks.isEmpty()) {
+            return;
+        }
+        DigitalLink link = com.wrights.storage.ItemSource.linkOf(player);
+        Container chest = hand != null && hand.homePort != null ? portChest(level, hand.homePort) : supply(level, player, job);
+        for (ItemStack stack : stacks) {
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
+            ItemStack left = stack.copy();
+            if (chest != null) {
+                left = insert(chest, left);
+                chest.setChanged();
+            }
+            if (!left.isEmpty() && link != null && link.bound()) {
+                long taken = DigitalNetworks.insert(player, level, link, left);
+                if (taken > 0L) {
+                    left.shrink((int) Math.min(left.getCount(), taken));
+                }
+            }
+            if (!left.isEmpty()) {
+                if (!player.getInventory().add(left)) {
+                    player.drop(left, false);
+                }
+            }
+        }
     }
 
     private static boolean holds(Container container, Item item) {

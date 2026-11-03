@@ -95,10 +95,25 @@ public final class Requirements {
 
     /** Fills in how many of each item the player, a bound chest, and a bound digital network currently hold. */
     public static List<Cost> stocked(ServerPlayer player, List<Cost> costs, BlockPos supply, ResourceKey<Level> dimension) {
+        return stocked(player, costs, supply, dimension, null, null);
+    }
+
+    /**
+     * Same as {@link #stocked(ServerPlayer, List, BlockPos, ResourceKey)} and adds stock from owned
+     * wrightport chests that cover the job box into the supply column.
+     */
+    public static List<Cost> stocked(
+            ServerPlayer player,
+            List<Cost> costs,
+            BlockPos supply,
+            ResourceKey<Level> dimension,
+            BlockPos jobMin,
+            BlockPos jobMax) {
         List<Cost> stocked = new ArrayList<>(costs.size());
         for (Cost cost : costs) {
             Item item = Item.byId(cost.itemId());
-            stocked.add(new Cost(cost.itemId(), cost.count(), playerCount(player, item), supplyCount(player, supply, dimension, item), digitalCount(player, item)));
+            int chests = supplyCount(player, supply, dimension, item) + portSupplyCount(player, jobMin, jobMax, item);
+            stocked.add(new Cost(cost.itemId(), cost.count(), playerCount(player, item), chests, digitalCount(player, item)));
         }
         return stocked;
     }
@@ -108,9 +123,47 @@ public final class Requirements {
      * then items they already have enough of.
      */
     public static List<Cost> ordered(ServerPlayer player, List<Cost> costs, BlockPos supply, ResourceKey<Level> dimension) {
-        List<Cost> stocked = stocked(player, costs, supply, dimension);
+        return ordered(player, costs, supply, dimension, null, null);
+    }
+
+    public static List<Cost> ordered(
+            ServerPlayer player,
+            List<Cost> costs,
+            BlockPos supply,
+            ResourceKey<Level> dimension,
+            BlockPos jobMin,
+            BlockPos jobMax) {
+        List<Cost> stocked = stocked(player, costs, supply, dimension, jobMin, jobMax);
         stocked.sort(Comparator.comparingInt(Requirements::shortFirst).thenComparing(Comparator.comparingInt(Cost::count).reversed()).thenComparingInt(Cost::itemId));
         return stocked;
+    }
+
+    /** Bound chests on owned wrightports that cover the job AABB. */
+    public static int portSupplyCount(ServerPlayer player, BlockPos jobMin, BlockPos jobMax, Item item) {
+        if (player == null || jobMin == null || item == null || !(player.level() instanceof ServerLevel level)) {
+            return 0;
+        }
+        BlockPos max = jobMax == null ? jobMin : jobMax;
+        long stored = 0L;
+        java.util.HashSet<BlockPos> seen = new java.util.HashSet<>();
+        for (com.wrights.drone.WrightHomes.FreeWright free : com.wrights.drone.WrightHomes.freeFor(
+                player, level, jobMin, max, false, false, id -> true, Integer.MAX_VALUE)) {
+            BlockPos home = free.homePort();
+            if (home == null || !seen.add(home)) {
+                continue;
+            }
+            Container chest = com.wrights.job.JobSupply.portChest(level, home);
+            if (chest == null) {
+                continue;
+            }
+            for (int slot = 0; slot < chest.getContainerSize(); slot++) {
+                ItemStack stack = chest.getItem(slot);
+                if (stack.is(item)) {
+                    stored += stack.getCount();
+                }
+            }
+        }
+        return stored > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) stored;
     }
 
     public static boolean anyShort(List<Cost> costs) {

@@ -396,6 +396,10 @@ public final class JobManager {
         if (!(player.level() instanceof ServerLevel level)) {
             return;
         }
+        if (!ControllerItem.isHeld(player)) {
+            Messages.actionBar(player, "message.wrights.need_controller");
+            return;
+        }
         if (portPos == null || !(level.getBlockEntity(portPos) instanceof com.wrights.block.WrightportBlockEntity port)) {
             return;
         }

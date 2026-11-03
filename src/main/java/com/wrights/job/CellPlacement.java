@@ -153,6 +153,10 @@ public final class CellPlacement {
             clearPlacedGhost(player, job, entry);
             return PlaceResult.DONE;
         }
+        if (!job.mineVoid() && hand != null && hand.homePort != null
+                && !JobSupply.portSupplyReady(level, player, hand.homePort)) {
+            return PlaceResult.WAIT;
+        }
         if (!freePlace(player)) {
             int cost = WrightsConfig.energyCost(job, false, false);
             if (cost > 0 && !com.wrights.energy.PortEnergy.tryPay(level, player, hand, cost)) {
@@ -160,6 +164,9 @@ public final class CellPlacement {
             }
         }
         java.util.List<ItemStack> drops = com.wrights.blueprint.MirrorLaunch.harvest(player, level, pos, job.mineTool(), job.mineVoid());
+        if (!job.mineVoid() && !drops.isEmpty()) {
+            JobSupply.giveReturns(level, player, job, hand, drops);
+        }
         showCarry(level, job, hand, drops, null);
         clearPlacedGhost(player, job, entry);
         job.placedOne();
@@ -344,6 +351,10 @@ public final class CellPlacement {
                     voidCell(level, pos);
                 } else {
                     // Void off: still swap, but harvest drops back (silk if enabled).
+                    if (hand != null && hand.homePort != null
+                            && !JobSupply.portSupplyReady(level, player, hand.homePort)) {
+                        return PlaceResult.WAIT;
+                    }
                     BlockState removed = existing;
                     ItemStack tool = job.exchangeSilk() ? JobManager.silkTouchPick(level.getServer()) : ItemStack.EMPTY;
                     java.util.List<ItemStack> drops =
@@ -354,6 +365,8 @@ public final class CellPlacement {
                         if (!visual.isEmpty()) {
                             drops = java.util.List.of(visual);
                         }
+                    } else {
+                        JobSupply.giveReturns(level, player, job, hand, drops);
                     }
                     showCarry(level, job, hand, drops, actor);
                 }

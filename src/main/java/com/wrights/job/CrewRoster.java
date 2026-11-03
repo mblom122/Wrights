@@ -523,6 +523,9 @@ public final class CrewRoster {
                 if (ids.contains(id) || !coversJob(player, job, free.homePort())) {
                     continue;
                 }
+                if (!JobSupply.portSupplyReady(level, player, free.homePort())) {
+                    continue;
+                }
                 if (owed != null && !owed.allows(player, level, job, free.homePort())) {
                     continue;
                 }
@@ -1050,11 +1053,21 @@ public final class CrewRoster {
         }
         int room = crewRoom(schematic, job, WrightHomes.bestOps(player, id -> !claimedByOther(player, library, job.id(), id)));
         int wanted = requested > 0 ? Math.min(requested, room) : room;
+        ServerLevel level = player.getServer().getLevel(job.dimension());
         List<WrightHomes.FreeWright> units = freeUnits(player, library, job, wanted);
+        if (level != null) {
+            units = units.stream()
+                    .filter(unit -> JobSupply.portSupplyReady(level, player, unit.homePort()))
+                    .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
+        }
         if (units.isEmpty()) {
-            tellNoCrew(player, job, false);
-            if (crewGap(player, job) != CrewGap.NONE_AVAILABLE) {
-                glowClosestPort(player, player.getServer().getLevel(job.dimension()), job.min());
+            if (level != null && !freeUnits(player, library, job, wanted).isEmpty()) {
+                Messages.actionBar(player, "message.wrights.port_need_supply");
+            } else {
+                tellNoCrew(player, job, false);
+                if (crewGap(player, job) != CrewGap.NONE_AVAILABLE) {
+                    glowClosestPort(player, level, job.min());
+                }
             }
             return false;
         }

@@ -157,7 +157,8 @@ public final class ShapeLaunch {
                     orderBatch,
                     seed);
             BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
-            List<Requirements.Cost> listed = Requirements.ordered(player, costs, session.supplyPos(), session.supplyDimension());
+            List<Requirements.Cost> listed = Requirements.ordered(
+                    player, costs, session.supplyPos(), session.supplyDimension(), min, max);
             if (Requirements.anyShort(listed)) {
                 BlueprintNetwork.materials(
                         player,
@@ -295,8 +296,21 @@ public final class ShapeLaunch {
             for (Map.Entry<Item, Integer> entry : need.entrySet()) {
                 costs.add(new Requirements.Cost(Item.getId(entry.getKey()), entry.getValue()));
             }
+            BlockPos jobMin = cells.get(0);
+            BlockPos jobMax = cells.get(0);
+            for (BlockPos at : cells) {
+                jobMin = new BlockPos(
+                        Math.min(jobMin.getX(), at.getX()),
+                        Math.min(jobMin.getY(), at.getY()),
+                        Math.min(jobMin.getZ(), at.getZ()));
+                jobMax = new BlockPos(
+                        Math.max(jobMax.getX(), at.getX()),
+                        Math.max(jobMax.getY(), at.getY()),
+                        Math.max(jobMax.getZ(), at.getZ()));
+            }
             BlueprintSessions.BlueprintSession session = BlueprintSessions.get(player);
-            List<Requirements.Cost> listed = Requirements.ordered(player, costs, session.supplyPos(), session.supplyDimension());
+            List<Requirements.Cost> listed = Requirements.ordered(
+                    player, costs, session.supplyPos(), session.supplyDimension(), jobMin, jobMax);
             if (Requirements.anyShort(listed)) {
                 BlueprintNetwork.materials(player, MATERIALS_ID, true, listed);
                 return;

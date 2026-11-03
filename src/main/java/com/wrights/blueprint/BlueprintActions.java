@@ -1174,7 +1174,9 @@ public final class BlueprintActions {
                     costs = scaled;
                 }
             }
-            java.util.List<Requirements.Cost> listed = Requirements.ordered(player, costs, session.supplyPos(), session.supplyDimension());
+            BlockPos jobMax = origin.offset(Math.max(0, sx - 1), Math.max(0, sy - 1), Math.max(0, sz - 1));
+            java.util.List<Requirements.Cost> listed = Requirements.ordered(
+                    player, costs, session.supplyPos(), session.supplyDimension(), origin, jobMax);
             if (Requirements.anyShort(listed)) {
                 BlueprintNetwork.materials(player, id, true, listed);
                 return;

@@ -374,8 +374,8 @@ public final class MirrorLaunch {
     }
 
     /**
-     * Mirror drops go into the inventory. Whatever does not fit lands at the player.
-     * Returns one stack per item type with the total count claimed from this break.
+     * Collects drops from this break. Does not deposit them — callers route to a port chest,
+     * digital store, or the player via {@link com.wrights.job.JobSupply#giveReturns}.
      */
     private static List<ItemStack> claimDrops(ServerPlayer player, ServerLevel level, BlockPos pos, Set<UUID> already) {
         List<ItemStack> claimed = new ArrayList<>();
@@ -389,7 +389,6 @@ public final class MirrorLaunch {
                 continue;
             }
             mergeClaim(claimed, stack);
-            giveOrDrop(player, stack.copy());
         }
         return claimed;
     }

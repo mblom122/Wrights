@@ -244,6 +244,13 @@ public final class WrightsInput {
         if (!com.wrights.item.ControllerItem.isHeld(event.getEntity())) {
             return;
         }
+        // Wrightport UI wins over build/place/mine — do not cancel the block open.
+        if (Minecraft.getInstance().screen == null
+                && event.getLevel().getBlockState(event.getPos()).getBlock() instanceof com.wrights.block.WrightportBlock
+                && !menuChord(event.getEntity())
+                && WrightsClientState.bindPort == null) {
+            return;
+        }
         if (Minecraft.getInstance().screen == null && undoChord(event.getEntity())) {
             event.setCanceled(true);
             event.setUseBlock(TriState.FALSE);

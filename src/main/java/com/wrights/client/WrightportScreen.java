@@ -58,6 +58,13 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         });
         addRenderableWidget(boundaryButton);
         chestButton = new WrightsButton(0, 0, 88, 16, Component.translatable("screen.wrights.port_chest"), button -> {
+            if (!controllerHeld()) {
+                if (getMinecraft().player != null) {
+                    getMinecraft().player.displayClientMessage(
+                            Component.translatable("message.wrights.need_controller"), true);
+                }
+                return;
+            }
             if (getMinecraft().player != null && net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
                 PacketDistributor.sendToServer(new BlueprintPayloads.BindPortChest(menu.pos(), net.minecraft.core.BlockPos.ZERO, true));
                 return;
@@ -141,7 +148,9 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         boundaryButton.setPicked(WrightportBounds.showing(menu.pos()));
         if (chestButton != null) {
             boolean mine = canRename();
+            boolean tool = controllerHeld();
             chestButton.setShown(mine);
+            chestButton.active = mine && tool;
             chestButton.setX(boundaryButton.getX());
             chestButton.setY(boundaryButton.getY() + 18);
             boolean bound = getMinecraft().level != null
@@ -149,6 +158,21 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
                     && port.supplyChest() != null;
             chestButton.setPicked(bound);
         }
+    }
+
+    private boolean controllerHeld() {
+        return getMinecraft().player != null && com.wrights.item.ControllerItem.isHeld(getMinecraft().player);
+    }
+
+    private boolean portHasSupply() {
+        if (getMinecraft().level == null
+                || !(getMinecraft().level.getBlockEntity(menu.pos()) instanceof WrightportBlockEntity port)) {
+            return false;
+        }
+        if (port.supplyChest() != null) {
+            return true;
+        }
+        return WrightsClientState.digitalBound;
     }
 
     @Override
@@ -267,7 +291,7 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
 
     @Override
     public boolean toolHeld() {
-        // Block UI is opened from the wrightport itself — no controller gate.
+        // Hangar edits stay available from the block; Chest bind still needs a controller.
         return true;
     }
 
@@ -294,6 +318,15 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         drawEnergy(graphics);
         placeBoundary();
         placeName();
+        if (canRename() && !portHasSupply()) {
+            graphics.drawString(
+                    this.font,
+                    Component.translatable("message.wrights.port_need_supply"),
+                    leftPos + 12,
+                    topPos + imageHeight - 14,
+                    WrightsUi.RED,
+                    false);
+        }
         for (Renderable widget : this.renderables) {
             widget.render(graphics, mouseX, mouseY, partialTick);
         }

@@ -10,7 +10,9 @@ import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -146,8 +148,38 @@ public class WrightportBlock extends BaseEntityBlock {
 
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
+        return openPort(state, level, pos, player);
+    }
+
+    /** Holding a controller (or any item) still opens the port — build clicks must not steal this. */
+    @Override
+    protected ItemInteractionResult useItemOn(
+            ItemStack stack,
+            BlockState state,
+            Level level,
+            BlockPos pos,
+            Player player,
+            InteractionHand hand,
+            BlockHitResult hit) {
+        InteractionResult opened = openPort(state, level, pos, player);
+        return opened.consumesAction()
+                ? ItemInteractionResult.sidedSuccess(level.isClientSide)
+                : ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+    }
+
+    private static InteractionResult openPort(BlockState state, Level level, BlockPos pos, Player player) {
         BlockPos at = base(state, pos);
         if (!level.isClientSide && player instanceof ServerPlayer server && level.getBlockEntity(at) instanceof WrightportBlockEntity port) {
+            if (port.supplyChest() == null) {
+                boolean digital = false;
+                if (server.getServer() != null) {
+                    var link = com.wrights.storage.ItemSource.linkOf(server);
+                    digital = link != null && link.bound();
+                }
+                if (!digital) {
+                    com.wrights.util.Messages.actionBar(server, "message.wrights.port_need_supply");
+                }
+            }
             server.openMenu(port, buffer -> buffer.writeBlockPos(at));
         }
         return InteractionResult.sidedSuccess(level.isClientSide);

@@ -586,7 +586,7 @@ public final class DroneFleet {
             return false;
         }
         Owed owed = owed(level, schematic, job);
-        if (owed.idle() || owed.open || owed.items.isEmpty()) {
+        if (owed.idle() || owed.items.isEmpty()) {
             return false;
         }
         for (WrightHomes.FreeWright free : CrewRoster.freeUnits(player, library, job, Integer.MAX_VALUE)) {
@@ -705,20 +705,22 @@ public final class DroneFleet {
         }
 
         boolean allows(ServerPlayer player, ServerLevel level, BuildJob job, BlockPos home) {
-            if (open) {
-                return true;
-            }
-            if (items.isEmpty()) {
+            // Placed ports with no chest/digital must not relaunch — that caused fly-out/home loops.
+            if (!JobSupply.portSupplyReady(level, player, home)) {
                 return false;
             }
             BuildJob.Hand hand = new BuildJob.Hand();
             hand.homePort = home;
-            for (Item item : items) {
-                if (JobSupply.hasItem(player, level, job, hand, item)) {
-                    return true;
+            if (!items.isEmpty()) {
+                for (Item item : items) {
+                    if (JobSupply.hasItem(player, level, job, hand, item)) {
+                        return true;
+                    }
                 }
+                // Still owes materials — do not relaunch just because some unpaid/open cells remain.
+                return false;
             }
-            return false;
+            return open || pending;
         }
     }
 
