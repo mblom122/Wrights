@@ -425,11 +425,44 @@ public final class CellPlacement {
             scrubHangAround(level, pos);
             return;
         }
+        hangWrite(level, pos, state, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+    }
+
+    /**
+     * Undo write: air or restore without neighbour shape updates that would knock down hung
+     * sand/gravel left from the paste. Restored gravity blocks use the same hang path as place.
+     */
+    static void writeUndo(ServerLevel level, BuildJob job, BlockPos pos, BlockState putBack) {
+        boolean suspendFall = false;
+        if (BlockFilters.falls(putBack)) {
+            BlockPos below = pos.below();
+            if (!level.isOutsideBuildHeight(below) && level.isLoaded(below)) {
+                suspendFall = FallingBlock.isFree(level.getBlockState(below));
+            }
+        }
+        int flags = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE | Block.UPDATE_SUPPRESS_DROPS;
+        if (suspendFall) {
+            hangWrite(level, pos, putBack, flags);
+            if (job != null) {
+                job.noteHungFall(pos.immutable());
+            }
+            return;
+        }
+        // KNOWN_SHAPE: clearing a cell must not schedule falls on hung neighbours.
+        level.setBlock(pos, putBack, flags);
+        if (job != null) {
+            job.clearHungFall(pos);
+        }
+        scrubHangAround(level, pos);
+    }
+
+    /** Snapshot-capture setBlock so {@link FallingBlock#onPlace} does not schedule a fall. */
+    private static void hangWrite(ServerLevel level, BlockPos pos, BlockState state, int flags) {
         BlockState old = level.getBlockState(pos);
         boolean capturing = level.captureBlockSnapshots;
         level.captureBlockSnapshots = true;
         try {
-            level.setBlock(pos, state, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+            level.setBlock(pos, state, flags);
         } finally {
             level.captureBlockSnapshots = capturing;
             if (!level.capturedBlockSnapshots.isEmpty()) {
@@ -442,7 +475,7 @@ public final class CellPlacement {
         scrubHangAround(level, pos);
     }
 
-    private static void scrubHangAround(ServerLevel level, BlockPos center) {
+    static void scrubHangAround(ServerLevel level, BlockPos center) {
         cancelHangAt(level, center);
         for (Direction direction : Direction.values()) {
             cancelHangAt(level, center.relative(direction));

@@ -1075,6 +1075,11 @@ public final class BuildJob {
         hungFalls.add(worldPos.asLong());
     }
 
+    /** Drop a cell from the hang list once undo cleared it (or it no longer needs scrubbing). */
+    public void clearHungFall(BlockPos worldPos) {
+        hungFalls.remove(worldPos.asLong());
+    }
+
     public Set<Long> hungFalls() {
         return hungFalls;
     }

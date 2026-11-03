@@ -1430,6 +1430,9 @@ public final class JobManager {
             }
             removeOne(level, player, job, pos, refund, false);
         }
+        if (!job.hungFalls().isEmpty()) {
+            CellPlacement.scrubHangRegion(level, job);
+        }
         if (!job.hasRefunds()) {
             finishUndo(server, library, player, job);
         } else if (job.tickMessage()) {
@@ -1448,11 +1451,14 @@ public final class JobManager {
             level.playSound(null, pos, current.getSoundType(level, pos, player).getBreakSound(), SoundSource.BLOCKS, 1.0F, 1.0F);
         }
         BlockState putBack = refund.restore() != null ? refund.restore() : Blocks.AIR.defaultBlockState();
-        level.setBlock(pos, putBack, Block.UPDATE_CLIENTS | Block.UPDATE_SUPPRESS_DROPS);
+        // Same hang rules as paste: no neighbour shape updates, scrub fall ticks around the cell.
+        CellPlacement.writeUndo(level, job, pos, putBack);
         if (putBack.isAir()) {
             FluidState fluid = current.getFluidState();
             if (!fluid.isEmpty()) {
                 FluidClearing.clearFluidSpread(level, pos, fluid.getType(), job);
+                // Fluid cleanup can re-schedule falls — scrub hung sand again.
+                CellPlacement.scrubHangAround(level, pos);
             }
         }
         // Creative / unpaid placements skip returns; paid Survival placements get items back.
@@ -1473,6 +1479,11 @@ public final class JobManager {
     }
 
     static void finishUndo(MinecraftServer server, SchematicLibrary library, ServerPlayer player, BuildJob job) {
+        ServerLevel finishLevel = server.getLevel(job.dimension());
+        if (finishLevel != null) {
+            // Undo removals can re-schedule fall ticks a tick later — clear hung sand one last time.
+            CellPlacement.scrubHangRegion(finishLevel, job);
+        }
         DroneFleet.sendHome(server, player, job);
         int removed = Math.max(0, job.undoTotal() - job.skipped() - job.refundCount());
         int returned = job.returned();
@@ -2082,6 +2093,9 @@ public final class JobManager {
                 }
                 removeOne(level, player, job, pos, refund, false);
             }
+        }
+        if (!job.hungFalls().isEmpty()) {
+            CellPlacement.scrubHangRegion(level, job);
         }
         HandSlices.shareUndo(job);
         if (!working) {
