@@ -5,6 +5,7 @@ import java.text.NumberFormat;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.ItemStack;
 
 public final class WrightsUi {
     public static final int COPPER = 0xFFC47A3A;
@@ -215,9 +216,30 @@ public final class WrightsUi {
     }
 
     public static void slot(GuiGraphics graphics, int x, int y, int edge) {
-        graphics.fill(x, y, x + 18, y + 18, 0xFF050A10);
-        border(graphics, x, y, 18, 18, edge);
-        graphics.fill(x + 1, y + 1, x + 17, y + 2, 0xFF1A2836);
+        slot(graphics, x, y, 18, edge);
+    }
+
+    /** Inventory slot frame. Vanilla is 18; hangar bays use 36 (twice). */
+    public static void slot(GuiGraphics graphics, int x, int y, int size, int edge) {
+        int s = Math.max(8, size);
+        graphics.fill(x, y, x + s, y + s, 0xFF050A10);
+        border(graphics, x, y, s, s, edge);
+        graphics.fill(x + 1, y + 1, x + s - 1, y + 2, 0xFF1A2836);
+    }
+
+    /** Draws a stack centered in a slot of {@code size} (item scales with the slot). */
+    public static void slotItem(GuiGraphics graphics, Font font, ItemStack stack, int x, int y, int size) {
+        if (stack == null || stack.isEmpty()) {
+            return;
+        }
+        float scale = size / 18.0F;
+        int pad = Math.max(1, Math.round(size * 1.0F / 18.0F));
+        graphics.pose().pushPose();
+        graphics.pose().translate(x + pad, y + pad, 100.0F);
+        graphics.pose().scale(scale, scale, 1.0F);
+        graphics.renderItem(stack, 0, 0);
+        graphics.renderItemDecorations(font, stack, 0, 0);
+        graphics.pose().popPose();
     }
 
     /** Thin rule above a section (skip for the first section under a page title). */

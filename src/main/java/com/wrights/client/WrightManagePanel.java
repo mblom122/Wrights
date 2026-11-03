@@ -8,6 +8,7 @@ import java.util.UUID;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
@@ -25,11 +26,10 @@ import com.wrights.item.WrightPartItem;
 import com.wrights.network.BlueprintPayloads;
 
 /**
- * Wright list for one personal wrightport. Only wrights still in the port are
- * shown; ones out on a job stay off this list.
+ * Hangar bay for one wrightport: a 5×2 grid of double-size wright-only slots.
+ * Wrights out on a job stay in their slot but are locked until they return.
  */
 final class WrightManagePanel {
-    private static final int ROW = 16;
     /** Header + up to three stat bullets + fit/remove + tier chips. */
     private static final int SECTION = 80;
     /** Part sections, then the energy line. */
@@ -227,58 +227,77 @@ final class WrightManagePanel {
         drawCheck(graphics, panelX + 12, allY, all, home > 0, mouseX, mouseY);
         graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_all"), panelX + 26, allY + 1, home > 0 ? WrightsUi.TEXT : WrightsUi.MUTED, false);
 
-        int listTop = listTop();
-        int listBottom = panelY + panelH - 62;
+        int bayX = bayX();
+        int bayY = bayY();
+        int detailTop = bayY + HangarBay.height() + 6;
+        int detailBottom = panelY + panelH - 62;
         int listX = panelX + 8;
         int listW = Math.max(40, panelW - 16);
-        int contentH = contentHeight(screen, swarm);
-        int view = Math.max(1, listBottom - listTop);
-        boolean bar = contentH > view;
-        int barPad = bar ? 8 : 0;
-        scroll = Mth.clamp(scroll, 0, Math.max(0, contentH - view));
-        WrightsUi.inset(graphics, listX, listTop, listW, view);
-        graphics.enableScissor(listX + 1, listTop + 1, listX + listW - 1 - barPad, listBottom - 1);
-        if (home == 0) {
-            graphics.drawString(screen.font(), Component.translatable(swarm.units().isEmpty() ? "screen.wrights.hangar_empty" : "screen.wrights.manage_home_empty"),
-                    listX + 6, listTop + 6, WrightsUi.MUTED, false);
+        boolean bar = false;
+        int barPad = 0;
+        if (expanded >= 0 && expanded < swarm.units().size()) {
+            int contentH = EXPAND;
+            int view = Math.max(1, detailBottom - detailTop);
+            bar = contentH > view;
+            barPad = bar ? 8 : 0;
+            scroll = Mth.clamp(scroll, 0, Math.max(0, contentH - view));
+        } else {
+            scroll = 0;
         }
-        int y = listTop + 2 - scroll;
-        int rowRight = listX + listW - 4 - barPad;
-        for (int i = 0; i < swarm.units().size(); i++) {
-            if (away(screen, swarm, i)) {
-                checked.remove(swarm.units().get(i).id());
-                continue;
-            }
-            Swarm.Unit unit = swarm.units().get(i);
-            int tier = unit.parts().topTier();
-            if (y + ROW >= listTop && y < listBottom) {
-                boolean mark = checked.contains(unit.id());
-                if (mark || i == expanded) {
-                    graphics.fill(listX + 2, y - 1, rowRight, y + ROW - 1, i == expanded ? 0x553C2A1A : 0x33243340);
+
+        for (int i = 0; i < HangarBay.SLOTS; i++) {
+            int sx = HangarBay.slotX(bayX, i);
+            int sy = HangarBay.slotY(bayY, i);
+            boolean hovered = mouseX >= sx && mouseX < sx + HangarBay.SLOT && mouseY >= sy && mouseY < sy + HangarBay.SLOT;
+            if (i < swarm.units().size()) {
+                Swarm.Unit unit = swarm.units().get(i);
+                boolean locked = away(screen, swarm, i);
+                if (locked) {
+                    checked.remove(unit.id());
                 }
-                drawCheck(graphics, listX + 4, y + 2, mark, true, mouseX, mouseY);
-                Component tierName = Component.translatable(WrightTier.nameKey(tier));
-                int tierWidth = screen.font().width(tierName);
-                String name = screen.font().plainSubstrByWidth(unit.title(i + 1).getString(), Math.max(24, rowRight - listX - 22 - tierWidth));
-                graphics.drawString(screen.font(), name, listX + 20, y + 3, WrightsUi.TEXT, false);
-                graphics.drawString(screen.font(), tierName, rowRight - tierWidth, y + 3, WrightTier.textColor(tier), false);
-            }
-            y += ROW;
-            if (i == expanded) {
-                placeNameBox(screen, swarm, i, y, listTop, listBottom);
-                if (y + EXPAND > listTop && y < listBottom) {
-                    PartSlot[] slots = PartSlot.values();
-                    for (int k = 0; k < slots.length; k++) {
-                        drawPartSection(graphics, screen, unit, slots[k], listX + 10, y + sectionTop(k), mouseX, mouseY, barPad, tool);
-                    }
-                    graphics.drawString(screen.font(), com.wrights.item.WrightItem.energyLine(unit.parts()), listX + 10, y + sectionTop(slots.length), WrightsUi.TEXT, false);
-                }
-                y += EXPAND;
+                HangarBay.drawSlot(graphics, screen.font(), sx, sy, WrightItem.stack(unit), checked.contains(unit.id()),
+                        i == expanded, locked, hovered);
+            } else {
+                HangarBay.drawSlot(graphics, screen.font(), sx, sy, ItemStack.EMPTY, false, false, false, hovered);
             }
         }
-        graphics.disableScissor();
-        WrightsUi.scrollBar(graphics, listX + listW - 5, listTop + 2, view - 4, scroll, contentH);
-        if (nameBox != null && expanded < 0) {
+        if (expanded < 0) {
+            int tipY = bayY + HangarBay.height() + 2;
+            if (swarm.units().isEmpty()) {
+                graphics.drawString(screen.font(), Component.translatable("screen.wrights.hangar_empty"),
+                        bayX, tipY, WrightsUi.MUTED, false);
+            } else if (home == 0) {
+                graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_home_empty"),
+                        bayX, tipY, WrightsUi.MUTED, false);
+            } else {
+                graphics.drawString(screen.font(), Component.translatable("screen.wrights.hangar_hint"),
+                        bayX, tipY, WrightsUi.MUTED, false);
+            }
+        }
+
+        if (expanded >= 0 && expanded < swarm.units().size() && detailBottom > detailTop + 8) {
+            Swarm.Unit unit = swarm.units().get(expanded);
+            WrightsUi.inset(graphics, listX, detailTop, listW, detailBottom - detailTop);
+            graphics.enableScissor(listX + 1, detailTop + 1, listX + listW - 1 - barPad, detailBottom - 1);
+            int y = detailTop + 2 - scroll;
+            placeNameBox(screen, swarm, expanded, y, detailTop, detailBottom);
+            y += 18;
+            PartSlot[] slots = PartSlot.values();
+            for (int k = 0; k < slots.length; k++) {
+                int top = y + sectionTop(k) - 20;
+                if (top + SECTION > detailTop && top < detailBottom) {
+                    drawPartSection(graphics, screen, unit, slots[k], listX + 10, top, mouseX, mouseY, barPad, tool && !away(screen, swarm, expanded));
+                }
+            }
+            int energyY = y + sectionTop(slots.length) - 20;
+            if (energyY + 12 > detailTop && energyY < detailBottom) {
+                graphics.drawString(screen.font(), WrightItem.energyLine(unit.parts()), listX + 10, energyY, WrightsUi.TEXT, false);
+            }
+            graphics.disableScissor();
+            if (bar) {
+                WrightsUi.scrollBar(graphics, listX + listW - 5, detailTop + 2, Math.max(1, detailBottom - detailTop - 4), scroll, EXPAND);
+            }
+        } else if (nameBox != null) {
             nameBox.setVisible(false);
         }
         if (dialog != NONE) {
@@ -345,40 +364,70 @@ final class WrightManagePanel {
             }
             return true;
         }
-        int listTop = listTop();
-        int listBottom = panelY + panelH - 62;
-        int barPad = listBarPad(screen, swarm, listTop, listBottom);
-        if (mouseX < panelX + 8 || mouseX > panelX + panelW - 8 - barPad || mouseY < listTop || mouseY >= listBottom) {
+        int bayHit = HangarBay.hit(bayX(), bayY(), mouseX, mouseY);
+        if (bayHit >= 0) {
+            return hangarClick(screen, swarm, bayHit, mouseX, mouseY);
+        }
+        if (expanded < 0 || expanded >= swarm.units().size()) {
             return false;
         }
-        int local = (int) mouseY - listTop - 2 + scroll;
-        int y = 0;
-        for (int i = 0; i < swarm.units().size(); i++) {
-            if (away(screen, swarm, i)) {
-                continue;
+        int detailTop = bayY() + HangarBay.height() + 6;
+        int detailBottom = panelY + panelH - 62;
+        int barPad = detailBarPad(detailTop, detailBottom);
+        if (mouseX < panelX + 8 || mouseX > panelX + panelW - 8 - barPad || mouseY < detailTop || mouseY >= detailBottom) {
+            return false;
+        }
+        if (away(screen, swarm, expanded)) {
+            return true;
+        }
+        int local = (int) mouseY - detailTop - 2 + scroll;
+        // Name row is 0..18; part sections follow (same layout as render).
+        int partsOrigin = 18;
+        PartSlot[] slots = PartSlot.values();
+        for (int k = 0; k < slots.length; k++) {
+            int sectionLocal = local - partsOrigin - (sectionTop(k) - 20);
+            if (partClick(screen, swarm, expanded, slots[k], sectionLocal, mouseX, barPad)) {
+                return true;
             }
-            if (local >= y && local < y + ROW) {
-                if (mouseX >= panelX + 12 && mouseX < panelX + 24) {
-                    toggle(swarm.units().get(i).id());
-                } else {
-                    commitName(screen);
-                    if (expanded == i) {
-                        nameFor = -1;
+        }
+        return true;
+    }
+
+    private boolean hangarClick(ManageHost screen, Swarm swarm, int slot, double mouseX, double mouseY) {
+        if (slot < swarm.units().size()) {
+            Swarm.Unit unit = swarm.units().get(slot);
+            boolean locked = away(screen, swarm, slot);
+            int sx = HangarBay.slotX(bayX(), slot);
+            int sy = HangarBay.slotY(bayY(), slot);
+            if (!locked && hit(mouseX, mouseY, sx + 2, sy + 2, 8, 8)) {
+                toggle(unit.id());
+                return true;
+            }
+            if (Screen.hasShiftDown()) {
+                if (!locked && screen.requireTool()) {
+                    screen.edit(HangarOps.TAKE, slot);
+                    if (expanded == slot) {
+                        expanded = -1;
                     }
-                    expanded = expanded == i ? -1 : i;
+                    checked.remove(unit.id());
                 }
                 return true;
             }
-            y += ROW;
-            if (expanded == i) {
-                PartSlot[] slots = PartSlot.values();
-                for (int k = 0; k < slots.length; k++) {
-                    if (partClick(screen, swarm, i, slots[k], local - y - sectionTop(k), mouseX, barPad)) {
-                        return true;
-                    }
-                }
-                y += EXPAND;
+            commitName(screen);
+            if (expanded == slot) {
+                nameFor = -1;
+                expanded = -1;
+            } else {
+                expanded = slot;
+                scroll = 0;
             }
+            return true;
+        }
+        if (slot >= Swarm.capacity()) {
+            return true;
+        }
+        if (screen.requireTool() && roomLeft(swarm) > 0 && allThatFit(screen) > 0) {
+            screen.batch(HangarOps.ADD_COUNT, 1, new int[0]);
         }
         return true;
     }
@@ -448,14 +497,17 @@ final class WrightManagePanel {
         if (dialog != NONE) {
             return true;
         }
-        int listTop = listTop();
-        int listBottom = panelY + panelH - 62;
-        if (mouseX < panelX || mouseX > panelX + panelW || mouseY < listTop || mouseY > listBottom) {
+        if (expanded < 0) {
             return false;
         }
-        int max = Math.max(0, contentHeight(screen, screen.swarm()) - (listBottom - listTop));
+        int detailTop = bayY() + HangarBay.height() + 6;
+        int detailBottom = panelY + panelH - 62;
+        if (mouseX < panelX || mouseX > panelX + panelW || mouseY < detailTop || mouseY > detailBottom) {
+            return false;
+        }
+        int max = Math.max(0, EXPAND - Math.max(1, detailBottom - detailTop));
         commitName(screen);
-        scroll = Mth.clamp(scroll - (int) Math.signum(delta) * ROW, 0, max);
+        scroll = Mth.clamp(scroll - (int) Math.signum(delta) * 16, 0, max);
         return true;
     }
 
@@ -713,7 +765,7 @@ final class WrightManagePanel {
         }
         nameBox.setX(panelX + 18);
         nameBox.setY(y + 2);
-        int barPad = listBarPad(screen, swarm, listTop, listBottom);
+        int barPad = detailBarPad(listTop, listBottom);
         nameBox.setWidth(Math.max(60, panelW - 36 - barPad));
         if (nameFor != index && index >= 0 && index < swarm.units().size()) {
             String current = swarm.units().get(index).name();
@@ -749,12 +801,16 @@ final class WrightManagePanel {
         screen.rename(expanded, next);
     }
 
-    private int listTop() {
+    private int bayX() {
+        return panelX + 12;
+    }
+
+    private int bayY() {
         return panelY + 52 + headExtra;
     }
 
-    private int listBarPad(ManageHost screen, Swarm swarm, int listTop, int listBottom) {
-        return contentHeight(screen, swarm) > Math.max(1, listBottom - listTop) ? 8 : 0;
+    private int detailBarPad(int detailTop, int detailBottom) {
+        return EXPAND > Math.max(1, detailBottom - detailTop) ? 8 : 0;
     }
 
     private int upX() {
@@ -771,20 +827,6 @@ final class WrightManagePanel {
 
     private int downW(int barPad) {
         return Math.min(156, Math.max(40, panelW - 44 - barPad - upW() - 8));
-    }
-
-    private int contentHeight(ManageHost screen, Swarm swarm) {
-        int height = 0;
-        for (int i = 0; i < swarm.units().size(); i++) {
-            if (away(screen, swarm, i)) {
-                continue;
-            }
-            height += ROW;
-            if (i == expanded) {
-                height += EXPAND;
-            }
-        }
-        return height;
     }
 
     private int awayCount(ManageHost screen, Swarm swarm) {

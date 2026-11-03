@@ -23,9 +23,12 @@ import com.wrights.item.ModDataComponents;
  * The wrights stored in one wrightport. Each {@link Unit} keeps its fitted parts and its name.
  */
 public record Swarm(List<Unit> units, int assign) {
-    /** How many wrights one wrightport may hold. Comes from the server config. */
+    /** Hangar grid size (5×2). Config may not raise the port above this without a larger UI. */
+    public static final int HANGAR_SLOTS = 10;
+
+    /** How many wrights one wrightport may hold. Comes from the server config, capped by the hangar. */
     public static int capacity() {
-        return WrightsConfig.maxWrightsCarried();
+        return Math.min(HANGAR_SLOTS, WrightsConfig.maxWrightsCarried());
     }
     public static final Swarm EMPTY = new Swarm(List.of(), 1);
 

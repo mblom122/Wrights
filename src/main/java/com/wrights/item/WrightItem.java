@@ -158,9 +158,22 @@ public class WrightItem extends Item {
                 Component.literal(Integer.toString(fullTick)).withStyle(color)).withStyle(ChatFormatting.GRAY);
     }
 
-    /** Right-click a part onto a wright: fits it, and the part it replaces goes to the cursor. */
+    /** Left-click another wright with the same upgrades onto this stack: merge up to 64, ignoring names. */
     @Override
     public boolean overrideOtherStackedOnMe(ItemStack stack, ItemStack other, Slot slot, ClickAction action, Player player, SlotAccess access) {
+        if (action == ClickAction.PRIMARY && sameUpgrades(stack, other) && slot.allowModification(player)
+                && !ItemStack.isSameItemSameComponents(stack, other)) {
+            int room = Math.max(0, stack.getMaxStackSize() - stack.getCount());
+            if (room <= 0 || other.isEmpty()) {
+                return true;
+            }
+            int move = Math.min(room, other.getCount());
+            stack.grow(move);
+            other.shrink(move);
+            access.set(other);
+            slot.setChanged();
+            return true;
+        }
         if (action != ClickAction.SECONDARY || !(other.getItem() instanceof WrightPartItem part) || !slot.allowModification(player)) {
             return false;
         }
