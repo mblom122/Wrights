@@ -332,33 +332,36 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         manage.render(this, graphics, mouseX, mouseY);
         drawEnergy(graphics);
         drawPortButtons(graphics, mouseX, mouseY);
-        graphics.pose().pushPose();
-        graphics.pose().translate(leftPos, topPos, 0.0F);
+        boolean modal = manage.dialogOpen();
         this.hoveredSlot = null;
-        for (var slot : this.menu.slots) {
-            if (!slot.isActive()) {
-                continue;
+        if (!modal) {
+            graphics.pose().pushPose();
+            graphics.pose().translate(leftPos, topPos, 0.0F);
+            for (var slot : this.menu.slots) {
+                if (!slot.isActive()) {
+                    continue;
+                }
+                this.renderSlot(graphics, slot);
+                if (this.isHovering(slot.x, slot.y, 16, 16, mouseX, mouseY)) {
+                    this.hoveredSlot = slot;
+                    AbstractContainerScreen.renderSlotHighlight(graphics, slot.x, slot.y, 0);
+                }
             }
-            this.renderSlot(graphics, slot);
-            if (this.isHovering(slot.x, slot.y, 16, 16, mouseX, mouseY)) {
-                this.hoveredSlot = slot;
-                AbstractContainerScreen.renderSlotHighlight(graphics, slot.x, slot.y, 0);
-            }
+            graphics.pose().popPose();
         }
-        graphics.pose().popPose();
         for (Renderable widget : this.renderables) {
             widget.render(graphics, mouseX, mouseY, partialTick);
         }
+        // Dialog + tip last so hangar/inventory do not show through; tip stays readable.
+        manage.renderOverlay(this, graphics, mouseX, mouseY);
         var carried = this.menu.getCarried();
         if (!carried.isEmpty()) {
             graphics.pose().pushPose();
-            graphics.pose().translate(0.0F, 0.0F, 232.0F);
+            graphics.pose().translate(0.0F, 0.0F, 500.0F);
             graphics.renderItem(carried, mouseX - 8, mouseY - 8);
             graphics.renderItemDecorations(this.font, carried, mouseX - 8, mouseY - 8);
             graphics.pose().popPose();
         }
-        // Dialog + tip last so hangar/inventory do not show through; tip stays readable.
-        manage.renderOverlay(this, graphics, mouseX, mouseY);
         Component portTip = portButtonTip(mouseX, mouseY);
         if (portTip != null) {
             graphics.renderTooltip(this.font, portTip, mouseX, mouseY);

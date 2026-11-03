@@ -64,6 +64,11 @@ final class WrightManagePanel {
         return open;
     }
 
+    /** True while Add / Marked-upgrade modal covers the hangar. */
+    boolean dialogOpen() {
+        return open && dialog != NONE;
+    }
+
     boolean closeTop() {
         if (dialog == NONE) {
             return false;
@@ -231,7 +236,7 @@ final class WrightManagePanel {
         tipLine = chromeTip();
     }
 
-    /** Dialog dim + panel, then tip strip on top so the hint stays readable. */
+    /** Dialog dim + panel above hangar/inventory; tip strip only when no modal is open. */
     void renderOverlay(ManageHost screen, GuiGraphics graphics, int mouseX, int mouseY) {
         if (!open) {
             return;
@@ -239,7 +244,11 @@ final class WrightManagePanel {
         place(screen);
         Swarm swarm = screen.swarm();
         if (dialog != NONE) {
+            graphics.pose().pushPose();
+            graphics.pose().translate(0.0F, 0.0F, 400.0F);
             renderDialog(screen, graphics, swarm, mouseX, mouseY);
+            graphics.pose().popPose();
+            return;
         }
         Component tip = tipLine();
         if (tip.getString().isEmpty()) {
@@ -620,8 +629,8 @@ final class WrightManagePanel {
         int dh = dialog == ADD ? 110 : markedDialogH();
         int dx = (screen.screenWidth() - dw) / 2;
         int dy = (screen.screenHeight() - dh) / 2;
-        // Opaque enough that hangar icons / gauges do not read through the upgrade panel.
-        graphics.fill(0, 0, screen.screenWidth(), screen.screenHeight(), 0xF00A1018);
+        // Fully cover hangar icons, player inventory, and tip chrome under the modal.
+        graphics.fill(0, 0, screen.screenWidth(), screen.screenHeight(), 0xFF060C14);
         WrightsUi.panel(graphics, dx, dy, dw, dh);
         if (dialog == ADD) {
             graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_add_title"), dx + 12, dy + 12, WrightsUi.COPPER, false);
