@@ -646,7 +646,8 @@ PODS = [(3.25, 3.25), (12.75, 3.25), (3.25, 12.75), (12.75, 12.75)]
 
 
 def drone_body():
-    """The bare chassis. Rotors stand on the four plates, the Fabricator Head hangs under the belly plate (y 5)."""
+    """The bare chassis. Rotors stand on the four plates, the Power Core on the raised top plate (y 9.25),
+    and the Fabricator Head hangs under the belly plate (y 5)."""
     shell = {"side": "#shell", "up": "#shell", "down": "#frame"}
     els = [
         cube([5, 6, 5], [11, 8.5, 11], shell),

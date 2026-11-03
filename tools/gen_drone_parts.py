@@ -1,5 +1,5 @@
-"""Generate the 3D drone-part items: Rotor Assembly (rotor_mk1..5, flight) and Fabricator Head
-(fabricator_mk1..5, blocks per operation).
+"""Generate the 3D drone-part items: Rotor Assembly (rotor_mk1..5, flight), Fabricator Head
+(fabricator_mk1..5, blocks per operation) and Power Core (core_mk1..5, energy per block).
 Run from the repo root: python tools/gen_drone_parts.py
 """
 from __future__ import annotations
@@ -355,6 +355,25 @@ def tex_duct(name, accent, light):
     save(img, f"duct_{name}")
 
 
+def tex_cell(name, accent, light):
+    """Energy column: glassy edges, a bright filament up the middle, and charge bands."""
+    rng = random.Random(19)
+    img = image()
+    for y in range(S):
+        for x in range(S):
+            d = abs(x - 15.5) / 15.5
+            t = (1 - d) ** 1.8
+            c = mix(mul(accent, 0.35), mix(light, (255, 255, 255), 0.55), t)
+            if y % 8 in (0, 1):
+                c = mix(c, (30, 32, 38), 0.65)
+            elif y % 8 == 2:
+                c = add(c, 26)
+            if d > 0.86:
+                c = mix(c, STEEL, 0.6)
+            put(img, x, y, noisy(rng, c, 4))
+    save(img, f"cell_{name}")
+
+
 # ---------------------------------------------------------------- models
 
 UV = [0, 0, 16, 16]
@@ -582,6 +601,51 @@ def fabricator(name, mark):
     return {"parent": "wrights:item/drone_part", "textures": t, "elements": els}
 
 
+def core(name, mark):
+    """Power Core: a charge column in a cage. It stands on the chassis top plate, base at y 0."""
+    t = {
+        "frame": "wrights:item/part/frame",
+        "steel": "wrights:item/part/steel",
+        "heatsink": "wrights:item/part/heatsink",
+        "motor": "wrights:item/part/motor",
+        "motor_top": "wrights:item/part/motor_top",
+        "cell": f"wrights:item/part/cell_{name}",
+        "lens": f"wrights:item/part/lens_{name}",
+        "led": f"wrights:item/part/led_{name}",
+        "particle": "wrights:item/part/frame",
+    }
+    if mark >= 5:
+        t["duct"] = f"wrights:item/part/duct_{name}"
+    top = 6 + mark * 0.5
+    els = [
+        box([3, 0, 3], [13, 1.5, 13], {"side": "#frame", "end": "#steel"}),
+        box([4, 1.5, 4], [12, 2.25, 12], {"side": "#steel", "end": "#frame"}),
+        box([6, 2.25, 6], [10, top, 10], {"side": "#cell", "end": "#lens"}, glow=True),
+        box([5, top, 5], [11, top + 1.25, 11], {"side": "#frame", "end": "#steel"}),
+        box([7, top + 1.25, 7], [9, top + 2, 9], "#lens", glow=True),
+        box([4.5, 0.4, 13], [11.5, 1.1, 13.25], "#led", glow=True),
+        box([2.75, 0.4, 4.5], [3, 1.1, 11.5], "#led", glow=True),
+    ]
+    for x, z in ((4.25, 4.25), (11.75, 4.25), (4.25, 11.75), (11.75, 11.75)):
+        els.append(box([x - 0.5, 2.25, z - 0.5], [x + 0.5, top, z + 0.5], "#steel"))
+    if mark >= 2:
+        for y in (3.5, top - 1.75):
+            els.append(box([5.5, y, 5.5], [10.5, y + 0.75, 10.5], "#heatsink"))
+    if mark >= 3:
+        can = {"side": "#motor", "end": "#motor_top"}
+        els.append(box([0.75, 0, 6.25], [3, 4.5, 9.75], can))
+        els.append(box([13, 0, 6.25], [15.25, 4.5, 9.75], can))
+    if mark >= 4:
+        can = {"side": "#motor", "end": "#motor_top"}
+        els.append(box([6.25, 0, 0.75], [9.75, 4.5, 3], can))
+        els.append(box([6.25, 0, 13], [9.75, 4.5, 15.25], can))
+        for x, z in ((4.25, 4.25), (11.75, 4.25), (4.25, 11.75), (11.75, 11.75)):
+            els.append(box([x - 0.6, top - 1, z - 0.6], [x + 0.6, top - 0.5, z + 0.6], "#led", glow=True))
+    if mark >= 5:
+        els += octagon(5, 5.75, 6.6, 0.7, "#duct", glow=True)
+    return {"parent": "wrights:item/drone_part", "textures": t, "elements": els}
+
+
 PARENT = {
     "gui_light": "side",
     "display": {
@@ -630,6 +694,10 @@ def main():
         head = fabricator(tag, mark)
         write_model(f"fabricator_mk{mark}", head)
         write_part(f"fabricator_mk{mark}", head["textures"], head["elements"])
+        tex_cell(tag, accent, light)
+        cell = core(tag, mark)
+        write_model(f"core_mk{mark}", cell)
+        write_part(f"core_mk{mark}", cell["textures"], cell["elements"])
 
 
 if __name__ == "__main__":

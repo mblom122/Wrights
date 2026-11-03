@@ -10,7 +10,7 @@ import com.wrights.drone.WrightTier;
 
 /**
  * A wright built from its fitted parts: the chassis, a rotor of the fitted tier on each of the four mount
- * plates, and the Fabricator Head under the belly. Draws in the chassis' own 0..16 model space at the pose
+ * plates, the Power Core on top of the hull, and the Fabricator Head under the belly. Draws in the chassis' own 0..16 model space at the pose
  * origin, so the entity and the item icon share it.
  */
 public final class WrightModel {
@@ -23,6 +23,9 @@ public final class WrightModel {
     /** Belly mount, where a Fabricator Head's base (its model y 0) is fixed, nozzles down. */
     private static final float BELLY = 5.0F;
     private static final float FABRICATOR_SCALE = 0.3F;
+    /** Top of the hull's raised plate, where a Power Core's base (its model y 0) stands. */
+    private static final float TOP_PLATE = 9.25F;
+    private static final float CORE_SCALE = 0.36F;
     /** Skid bottom in chassis pixels; callers stand the wright on this. */
     public static final float SKIDS = 0.8F;
 
@@ -33,8 +36,16 @@ public final class WrightModel {
      * @param spin rotor angle in degrees; alternate rotors turn the other way
      */
     public static void render(PoseStack pose, MultiBufferSource buffers, Loadout parts, float spin, int light) {
-        int accent = WrightTier.modelColor(Math.max(parts.rotor(), parts.fabricator()));
+        int accent = WrightTier.modelColor(parts.topTier());
         PartModels.render(pose, buffers, PartModels.DRONE_BODY, light, accent);
+        if (parts.core() > WrightTier.BASIC) {
+            pose.pushPose();
+            pose.translate(0.5F, TOP_PLATE / 16.0F, 0.5F);
+            pose.scale(CORE_SCALE, CORE_SCALE, CORE_SCALE);
+            pose.translate(-0.5F, 0.0F, -0.5F);
+            PartModels.render(pose, buffers, PartModels.CORES.get(parts.core() - 1), light, 0xFFFFFFFF);
+            pose.popPose();
+        }
         int rotor = parts.rotor();
         for (int i = 0; i < PODS.length; i++) {
             float px = PODS[i][0];

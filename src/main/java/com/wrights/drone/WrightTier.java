@@ -2,8 +2,6 @@ package com.wrights.drone;
 
 import java.util.Locale;
 
-import net.minecraft.util.Mth;
-
 /**
  * Part tiers, Basic (no part fitted) through Apex. Every {@link PartSlot} uses the same ladder.
  * A rotor tier sets flight speed and energy draw; a fabricator tier sets how many blocks one operation touches;
@@ -26,7 +24,7 @@ public final class WrightTier {
     }
 
     public static int clamp(int tier) {
-        return Mth.clamp(tier, BASIC, APEX);
+        return Math.clamp(tier, BASIC, APEX);
     }
 
     /** Flight score for a rotor tier (Basic 200 … Apex 1200). */

@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "GMG",
+    "LPL",
+    "GGG"
+  ],
+  "key": {
+    "G": {
+      "item": "minecraft:glass_pane"
+    },
+    "M": {
+      "item": "minecraft:netherite_ingot"
+    },
+    "L": {
+      "item": "minecraft:glowstone_dust"
+    },
+    "P": {
+      "item": "wrights:core_mk4"
+    }
+  },
+  "result": {
+    "id": "wrights:core_mk5",
+    "count": 1
+  }
+}

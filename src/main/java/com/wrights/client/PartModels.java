@@ -30,6 +30,8 @@ public final class PartModels {
     public static final ModelResourceLocation ROTOR_LOW = id("rotor_low_mk5");
     /** Index is the fabricator tier minus one; Basic draws no head. */
     public static final List<ModelResourceLocation> FABRICATORS = tiers("fabricator_mk", 1);
+    /** Index is the Power Core tier minus one; Basic leaves the top plate bare. */
+    public static final List<ModelResourceLocation> CORES = tiers("core_mk", 1);
     public static final ModelResourceLocation PACK = id("pack");
     public static final ModelResourceLocation PACK_BLADE = id("pack_blade");
     public static final ModelResourceLocation PACK_LAMP = id("pack_lamp");
@@ -64,6 +66,7 @@ public final class PartModels {
         ids.addAll(ROTOR_MOUNTS);
         ids.addAll(ROTOR_BLADES);
         ids.addAll(FABRICATORS);
+        ids.addAll(CORES);
         return List.copyOf(ids);
     }
 
