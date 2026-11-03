@@ -1414,7 +1414,10 @@ public final class JobManager {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         bindCrewIds(player, library);
         int bestOps = WrightHomes.bestOps(player, id -> !claimedByOther(player, library, job.id(), id));
-        int stations = planShapeStations(job, bestOps);
+        int stations = smallBoxCrew(job, bestOps);
+        if (stations <= 0) {
+            stations = planShapeStations(job, bestOps);
+        }
         int fitted = stations > 0
                 ? stations
                 : WrightsConfig.usefulCrewFor(
@@ -1946,7 +1949,12 @@ public final class JobManager {
                 setShapeHandStatus(level, hand, state, DroneEntity.WAIT_CHUNK);
                 continue;
             }
-            Vec3 hover = Vec3.atCenterOf(pos).add(0.0D, 0.85D + (hand.lane % 2) * 0.45D, 0.0D);
+            // A 3×3 floor is one operation only when the feet are on the middle block.
+            BlockPos fly = smallBoxStand(level, player, job, hand, shapeKind, shapePinLocal);
+            if (fly == null) {
+                fly = pos;
+            }
+            Vec3 hover = Vec3.atCenterOf(fly).add(0.0D, 0.85D + (hand.lane % 2) * 0.45D, 0.0D);
             if (drone.launching()) {
                 hand.lastPos = drone.blockPosition();
                 drone.setWorkStatus(BlockFilters.icon(state), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
@@ -2205,6 +2213,10 @@ public final class JobManager {
                 hand.aim = -1;
             }
         }
+        int patterned = smallBoxReadyIndex(level, player, job, hand, shapeKind, shapePinLocal);
+        if (patterned >= 0) {
+            return patterned;
+        }
         // Small shapes pick the hover that covers the most cells (the middle of a sphere).
         // Nearest-first is only for large jobs, where scoring every cell would hitch the tick.
         if (origin != null && !shapeOneStation(job, hand) && job.total() > 512) {
@@ -2258,6 +2270,138 @@ public final class JobManager {
         int dy = cell.getY() - anchor.getY();
         int dz = cell.getZ() - anchor.getZ();
         return dx * dx + dy * dy + dz * dz <= WrightTier.operationReachSqr(ops);
+    }
+
+    /** Predefined stand count for a box that fits in 3×3×3. {@code 0} leaves crew sizing alone. */
+    private static int smallBoxCrew(BuildJob job, int ops) {
+        if (job == null) {
+            return 0;
+        }
+        int reach = WrightTier.operationReachSqr(ops);
+        return com.wrights.blueprint.SmallBoxStands.count(
+                job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(), job.shapeHollow(), job.shapeKind(), reach);
+    }
+
+    /**
+     * World block this wright should stand on for a 3×3×3-or-smaller shape, or null when the
+     * shape is larger (those keep the existing route).
+     */
+    private static BlockPos smallBoxStand(
+            ServerLevel level,
+            ServerPlayer player,
+            BuildJob job,
+            BuildJob.Hand hand,
+            com.wrights.blueprint.Shapes.Kind shapeKind,
+            BlockPos shapePinLocal) {
+        int[] local = chooseSmallStand(level, player, job, hand, shapeKind, shapePinLocal);
+        if (local == null || job.min() == null) {
+            return null;
+        }
+        return job.min().offset(local[0], local[1], local[2]);
+    }
+
+    /** A READY cell of this wright's predefined stand, or {@code -1} when the cheatsheet does not apply. */
+    private static int smallBoxReadyIndex(
+            ServerLevel level,
+            ServerPlayer player,
+            BuildJob job,
+            BuildJob.Hand hand,
+            com.wrights.blueprint.Shapes.Kind shapeKind,
+            BlockPos shapePinLocal) {
+        int[] stand = chooseSmallStand(level, player, job, hand, shapeKind, shapePinLocal);
+        if (stand == null) {
+            return -1;
+        }
+        int reach = WrightTier.operationReachSqr(handOps(hand));
+        int best = -1;
+        int bestDist = Integer.MAX_VALUE;
+        int sx = job.boxSizeX();
+        int sy = job.boxSizeY();
+        int sz = job.boxSizeZ();
+        for (int z = 0; z < sz; z++) {
+            for (int y = 0; y < sy; y++) {
+                for (int x = 0; x < sx; x++) {
+                    if (!com.wrights.blueprint.SmallBoxStands.covers(stand, x, y, z, reach)) {
+                        continue;
+                    }
+                    int index = job.min() == null ? -1 : job.scanIndex(job.min().offset(x, y, z));
+                    if (index < 0 || aimedByOther(job, hand, index)) {
+                        continue;
+                    }
+                    if (classifyShapeCell(level, player, job, hand, index, shapeKind, shapePinLocal, true)
+                            != ShapeCell.READY) {
+                        continue;
+                    }
+                    int dist = (x - stand[0]) * (x - stand[0])
+                            + (y - stand[1]) * (y - stand[1])
+                            + (z - stand[2]) * (z - stand[2]);
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        best = index;
+                    }
+                }
+            }
+        }
+        return best;
+    }
+
+    /** This lane's stand, or the next stand that still has a block to place. */
+    private static int[] chooseSmallStand(
+            ServerLevel level,
+            ServerPlayer player,
+            BuildJob job,
+            BuildJob.Hand hand,
+            com.wrights.blueprint.Shapes.Kind shapeKind,
+            BlockPos shapePinLocal) {
+        if (job == null || hand == null) {
+            return null;
+        }
+        int reach = WrightTier.operationReachSqr(handOps(hand));
+        int[][] stands = com.wrights.blueprint.SmallBoxStands.stands(
+                job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(), job.shapeHollow(), job.shapeKind(), reach);
+        if (stands.length == 0) {
+            return null;
+        }
+        int lane = Math.max(0, hand.lane);
+        for (int step = 0; step < stands.length; step++) {
+            int[] stand = stands[(lane + step) % stands.length];
+            if (smallStandHasReady(level, player, job, hand, shapeKind, shapePinLocal, stand, reach)) {
+                return stand;
+            }
+        }
+        return null;
+    }
+
+    private static boolean smallStandHasReady(
+            ServerLevel level,
+            ServerPlayer player,
+            BuildJob job,
+            BuildJob.Hand hand,
+            com.wrights.blueprint.Shapes.Kind shapeKind,
+            BlockPos shapePinLocal,
+            int[] stand,
+            int reach) {
+        int sx = job.boxSizeX();
+        int sy = job.boxSizeY();
+        int sz = job.boxSizeZ();
+        for (int z = 0; z < sz; z++) {
+            for (int y = 0; y < sy; y++) {
+                for (int x = 0; x < sx; x++) {
+                    if (!com.wrights.blueprint.SmallBoxStands.covers(stand, x, y, z, reach)) {
+                        continue;
+                    }
+                    int index = job.min() == null ? -1 : job.scanIndex(job.min().offset(x, y, z));
+                    if (index < 0 || job.isShapeResolved(index) || aimedByOther(job, hand, index)) {
+                        continue;
+                    }
+                    if (classifyShapeCell(level, player, job, hand, index, shapeKind, shapePinLocal, true)
+                            == ShapeCell.READY) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /** This hand's cells fit in one place-AOE hover (short line, small plate, or one beam strip). */
