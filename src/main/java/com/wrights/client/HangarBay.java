@@ -122,13 +122,8 @@ final class HangarBay {
     static void drawSlot(GuiGraphics graphics, Font font, int x, int y, int size, ItemStack stack, boolean marked,
             boolean selected, boolean locked, boolean hovered, boolean drawFrame) {
         if (drawFrame) {
-            int edge = selected ? WrightsUi.COPPER : hovered ? WrightsUi.BLUE : WrightsUi.MUTED;
+            int edge = selected ? WrightsUi.YELLOW : hovered ? WrightsUi.BLUE : WrightsUi.MUTED;
             WrightsUi.slot(graphics, x, y, size, edge & 0xFFFFFF | 0xFF000000);
-        } else if (selected) {
-            graphics.fill(x, y, x + size, y + 1, 0xFFC47A3A);
-            graphics.fill(x, y + size - 1, x + size, y + size, 0xFFC47A3A);
-            graphics.fill(x, y, x + 1, y + size, 0xFFC47A3A);
-            graphics.fill(x + size - 1, y, x + size, y + size, 0xFFC47A3A);
         }
         if (marked) {
             graphics.fill(x + 2, y + 2, x + 8, y + 8, 0xFF3CFE9A);
@@ -144,11 +139,8 @@ final class HangarBay {
         if (hovered) {
             hangarHoverTint(graphics, x, y, size);
         }
-        if (selected && drawFrame) {
-            graphics.fill(x, y, x + size, y + 1, 0xFFC47A3A);
-            graphics.fill(x, y + size - 1, x + size, y + size, 0xFFC47A3A);
-            graphics.fill(x, y, x + 1, y + size, 0xFFC47A3A);
-            graphics.fill(x + size - 1, y, x + size, y + size, 0xFFC47A3A);
+        if (selected) {
+            drawSelectedBorder(graphics, x, y, size);
         }
     }
 
@@ -158,5 +150,30 @@ final class HangarBay {
             return;
         }
         graphics.fill(x + 1, y + 1, x + size - 1, y + size - 1, 0x80FFFFFF);
+    }
+
+    /** 2px yellow selection ring with pixel-rounded corners. */
+    static void drawSelectedBorder(GuiGraphics graphics, int x, int y, int size) {
+        if (size < 6) {
+            WrightsUi.border(graphics, x, y, size, size, WrightsUi.YELLOW);
+            return;
+        }
+        int c = WrightsUi.YELLOW;
+        int x2 = x + size;
+        int y2 = y + size;
+        // 2px edges, inset 2 so corners can round
+        graphics.fill(x + 2, y, x2 - 2, y + 2, c);
+        graphics.fill(x + 2, y2 - 2, x2 - 2, y2, c);
+        graphics.fill(x, y + 2, x + 2, y2 - 2, c);
+        graphics.fill(x2 - 2, y + 2, x2, y2 - 2, c);
+        // rounded corner steps (radius 2)
+        graphics.fill(x + 1, y, x + 2, y + 1, c);
+        graphics.fill(x, y + 1, x + 1, y + 2, c);
+        graphics.fill(x2 - 2, y, x2 - 1, y + 1, c);
+        graphics.fill(x2 - 1, y + 1, x2, y + 2, c);
+        graphics.fill(x + 1, y2 - 1, x + 2, y2, c);
+        graphics.fill(x, y2 - 2, x + 1, y2 - 1, c);
+        graphics.fill(x2 - 2, y2 - 1, x2 - 1, y2, c);
+        graphics.fill(x2 - 1, y2 - 2, x2, y2 - 1, c);
     }
 }
