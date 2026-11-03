@@ -1668,7 +1668,7 @@ public final class WrightsClientState {
             return 0;
         }
         boolean boosted = exchangeToolActive() || placeToolActive();
-        int useful = WrightsConfig.usefulCrewFor(blocks, viewX, viewY, viewZ, bestFreeOps());
+        int useful = WrightsConfig.usefulCrewFor(blocks, viewX, viewY, viewZ, bestFreeFabricator());
         int ceiling = Math.min(useful, WrightsConfig.maxWrightsPerJob(boosted));
         return Math.min(Math.max(1, WrightsClientConfig.droneCountFor(boosted)), Math.min(free, ceiling));
     }
@@ -1678,8 +1678,8 @@ public final class WrightsClientState {
         return knownFree();
     }
 
-    /** Best operations tier among free wrights the client can see. Netherite when none are loaded. */
-    private static int bestFreeOps() {
+    /** Best fabricator tier among free wrights the client can see. Apex when none are loaded. */
+    private static int bestFreeFabricator() {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player == null) {
             return com.wrights.drone.WrightTier.APEX;
@@ -1725,7 +1725,7 @@ public final class WrightsClientState {
             return 0;
         }
         boolean boosted = exchangeToolActive() || placeToolActive();
-        int useful = WrightsConfig.usefulCrewFor(blocks, viewX, viewY, viewZ, bestFreeOps());
+        int useful = WrightsConfig.usefulCrewFor(blocks, viewX, viewY, viewZ, bestFreeFabricator());
         int ceiling = Math.min(useful, WrightsConfig.maxWrightsPerJob(boosted));
         int freeCap = deployCap();
         return freeCap > 0 ? freeCap : ceiling;

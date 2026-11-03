@@ -64,7 +64,7 @@ public final class JobManager {
     static final int PATTERN_CHUNK = 3;
     static final int PATTERN_ENERGY = 4;
     /**
-     * Sentinel for a place-reach cluster probe. The legal cells are the operations sphere
+     * Sentinel for a place-reach cluster probe. The legal cells are the fabricator reach sphere
      * ({@link WrightTier#operationReachSqr}), not this euclidean distance. Flight probes use {@link #FLY_NEAR_SQR}.
      */
     static final double PLACE_NEAR_SQR = 9.0D;
