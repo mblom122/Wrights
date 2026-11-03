@@ -1,0 +1,97 @@
+{
+  "textures": {
+    "frame": "wrights:item/part/frame",
+    "steel": "wrights:item/part/steel",
+    "bay": "wrights:item/part/pack_bay",
+    "cell": "wrights:item/part/cell",
+    "led": "wrights:item/part/led_mk1",
+    "nozzle": "wrights:item/part/nozzle",
+    "nozzle_side": "wrights:item/part/nozzle_side",
+    "heatsink": "wrights:item/part/heatsink",
+    "strap": "wrights:item/part/strap",
+    "bezel": "wrights:item/part/duct_mk1",
+    "blade": "wrights:item/part/iris_blade",
+    "lamp": "wrights:item/part/lamp",
+    "particle": "wrights:item/part/frame"
+  },
+  "elements": [
+    {
+      "from": [
+        10.4,
+        29,
+        12.4
+      ],
+      "to": [
+        11.4,
+        30,
+        13.4
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#lamp",
+          "tintindex": 0
+        },
+        "east": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#lamp",
+          "tintindex": 0
+        },
+        "south": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#lamp",
+          "tintindex": 0
+        },
+        "west": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#lamp",
+          "tintindex": 0
+        },
+        "up": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#lamp",
+          "tintindex": 0
+        },
+        "down": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#lamp",
+          "tintindex": 0
+        }
+      },
+      "neoforge_data": {
+        "block_light": 15,
+        "sky_light": 15
+      }
+    }
+  ]
+}

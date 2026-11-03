@@ -1,6 +1,5 @@
 package com.wrights.client;
 
-import com.wrights.WrightsMod;
 import com.wrights.block.WrightportLamp;
 import com.wrights.drone.Swarm;
 import com.wrights.entity.DroneEntity;
@@ -9,16 +8,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.math.Axis;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
-import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
@@ -29,19 +25,13 @@ import top.theillusivec4.curios.api.SlotContext;
 import top.theillusivec4.curios.api.client.ICurioRenderer;
 
 public class PersonalWrightportRenderer implements ICurioRenderer {
-    private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "textures/entity/personal_wrightport.png");
     private static final int TEXTURE_WHITE = 0xFFFFFFFF;
 
-    private final PersonalWrightportModel model;
-    /** Per game tick. About what 0.12 and 0.1 per frame felt like at 60 fps. */
-    private static final float OPEN_STEP = 0.36F;
-    private static final float CLOSE_STEP = 0.30F;
+    /** Per game tick. Slow enough that the staggered blades read as a spiral. */
+    private static final float OPEN_STEP = 0.2F;
+    private static final float CLOSE_STEP = 0.16F;
 
     private final Map<Integer, Door> doors = new HashMap<>();
-
-    public PersonalWrightportRenderer(PersonalWrightportModel model) {
-        this.model = model;
-    }
 
     @Override
     public <T extends LivingEntity, M extends EntityModel<T>> void render(
@@ -62,7 +52,7 @@ public class PersonalWrightportRenderer implements ICurioRenderer {
             return;
         }
 
-        model.setupAnim(doorFor(entity).open(entity, partialTicks));
+        float open = doorFor(entity).open(entity, partialTicks);
 
         poseStack.pushPose();
         ICurioRenderer.translateIfSneaking(poseStack, entity);
@@ -71,13 +61,16 @@ public class PersonalWrightportRenderer implements ICurioRenderer {
         if (parent instanceof HumanoidModel<?> humanoid) {
             humanoid.body.translateAndRotate(poseStack);
         }
-        // Shell starts on the body back face; nudge it out so the plate clears the torso.
-        poseStack.translate(0.0F, 0.0F, 0.0625F);
+        // Body space has Y down and +Z behind the player. The dock model is Y up with its
+        // player side on the south face, so turn it over and put model (8, 24, 16) on the
+        // top of the back, just behind the torso.
+        poseStack.translate(0.0F, 0.0F, 2.0F / 16.0F);
+        poseStack.mulPose(Axis.XP.rotationDegrees(180.0F));
+        poseStack.translate(-0.5F, -1.5F, -1.0F);
 
-        VertexConsumer consumer = buffer.getBuffer(RenderType.entityCutoutNoCull(TEXTURE));
-        model.renderPack(poseStack, consumer, light, OverlayTexture.NO_OVERLAY, TEXTURE_WHITE);
-        model.renderDoors(poseStack, consumer, light, OverlayTexture.NO_OVERLAY, TEXTURE_WHITE);
-        model.renderAntenna(poseStack, consumer, light, OverlayTexture.NO_OVERLAY, TEXTURE_WHITE, bulbTint(stack));
+        PartModels.render(poseStack, buffer, PartModels.PACK, light, TEXTURE_WHITE);
+        PartModels.renderIris(poseStack, buffer, PartModels.PACK_BLADE, open, false, 8.0F, 18.0F, 0.6F, 0.03F, light);
+        PartModels.render(poseStack, buffer, PartModels.PACK_LAMP, PartModels.FULL_BRIGHT, bulbTint(stack));
         poseStack.popPose();
     }
 

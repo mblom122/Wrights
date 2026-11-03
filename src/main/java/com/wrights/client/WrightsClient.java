@@ -12,8 +12,6 @@ import com.wrights.item.BlueprintItem;
 import com.wrights.item.ModItems;
 import com.wrights.menu.ModMenus;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.model.geom.ModelLayerLocation;
 import net.minecraft.client.renderer.item.ItemProperties;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -24,6 +22,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
+import net.neoforged.neoforge.client.event.ModelEvent;
 import net.neoforged.neoforge.client.event.RegisterClientTooltipComponentFactoriesEvent;
 import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
@@ -35,22 +34,13 @@ import top.theillusivec4.curios.api.client.CuriosRendererRegistry;
 @Mod(value = WrightsMod.MOD_ID, dist = Dist.CLIENT)
 @EventBusSubscriber(modid = WrightsMod.MOD_ID, value = Dist.CLIENT)
 public class WrightsClient {
-    public static final ModelLayerLocation DRONE_LAYER = new ModelLayerLocation(
-            ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "drone"), "main");
-    public static final ModelLayerLocation PERSONAL_WRIGHTPORT_LAYER = new ModelLayerLocation(
-            ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "personal_wrightport"), "main");
-    public static final ModelLayerLocation WRIGHTPORT_HATCH_LAYER = new ModelLayerLocation(
-            ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "wrightport_hatch"), "main");
-
     public WrightsClient(ModContainer container) {
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
     }
 
     @SubscribeEvent
-    public static void registerLayers(EntityRenderersEvent.RegisterLayerDefinitions event) {
-        event.registerLayerDefinition(DRONE_LAYER, DroneModel::createBodyLayer);
-        event.registerLayerDefinition(PERSONAL_WRIGHTPORT_LAYER, PersonalWrightportModel::createBodyLayer);
-        event.registerLayerDefinition(WRIGHTPORT_HATCH_LAYER, WrightportHatchModel::createBodyLayer);
+    public static void registerModels(ModelEvent.RegisterAdditional event) {
+        PartModels.ALL.forEach(event::register);
     }
 
     @SubscribeEvent
@@ -58,10 +48,7 @@ public class WrightsClient {
         event.registerEntityRenderer(ModEntities.DRONE.get(), DroneRenderer::new);
         event.registerBlockEntityRenderer(ModBlockEntities.WRIGHTPORT.get(), WrightportRenderer::new);
         // Curios copies this map at the end of AddLayers. Registering there is too late, so the back model never draws.
-        CuriosRendererRegistry.register(
-                ModItems.PERSONAL_WRIGHTPORT.get(),
-                () -> new PersonalWrightportRenderer(new PersonalWrightportModel(
-                        Minecraft.getInstance().getEntityModels().bakeLayer(PERSONAL_WRIGHTPORT_LAYER))));
+        CuriosRendererRegistry.register(ModItems.PERSONAL_WRIGHTPORT.get(), PersonalWrightportRenderer::new);
     }
 
     @SubscribeEvent

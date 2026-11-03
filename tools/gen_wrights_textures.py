@@ -76,8 +76,13 @@ def panel_plate(img: Image.Image, x0=0, y0=0, x1=16, y1=16) -> None:
     rivets(img, [(x0 + 3, y0 + 3), (x1 - 4, y0 + 3), (x0 + 3, y1 - 4), (x1 - 4, y1 - 4)])
 
 
+LEGACY = ROOT / "art_backup" / "legacy_textures"
+# Everything else here was replaced by the 3D models from gen_wright_models.py and is only kept as reference art.
+STILL_USED = ("slot/", "item/wrightport_upgrade_")
+
+
 def save(img: Image.Image, rel: str) -> None:
-    path = TEX / rel
+    path = (TEX if rel.startswith(STILL_USED) else LEGACY) / rel
     path.parent.mkdir(parents=True, exist_ok=True)
     img.save(path)
     print("wrote", path.relative_to(ROOT))

@@ -27,6 +27,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.phys.AABB;
 
 import com.wrights.drone.Swarm;
@@ -188,10 +189,11 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
             this.hatchHold--;
         }
         float target = traffic || this.hatchHold > 0 ? 1.0F : 0.0F;
+        // Slow enough that the staggered blades read as a spiral.
         if (this.hatch < target) {
-            this.hatch = Math.min(target, this.hatch + 0.14F);
+            this.hatch = Math.min(target, this.hatch + 0.09F);
         } else if (this.hatch > target) {
-            this.hatch = Math.max(target, this.hatch - 0.07F);
+            this.hatch = Math.max(target, this.hatch - 0.06F);
         }
     }
 
@@ -205,10 +207,23 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
         if (level == null || ((level.getGameTime() + this.worldPosition.asLong()) & 7L) != 0L) {
             return;
         }
+        restoreTop(level);
         int previous = this.lamp;
         refreshLamp();
         if (previous != this.lamp) {
             sync();
+        }
+    }
+
+    /** Ports placed before the tower was two blocks tall have no top half. Add it once the space is free. */
+    private void restoreTop(Level level) {
+        BlockState state = getBlockState();
+        if (level.isClientSide || !state.hasProperty(WrightportBlock.HALF) || WrightportBlock.isUpper(state)) {
+            return;
+        }
+        BlockPos above = this.worldPosition.above();
+        if (level.isInWorldBounds(above) && level.getBlockState(above).isAir()) {
+            level.setBlock(above, state.setValue(WrightportBlock.HALF, DoubleBlockHalf.UPPER), Block.UPDATE_ALL);
         }
     }
 

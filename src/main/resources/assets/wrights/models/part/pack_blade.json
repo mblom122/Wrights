@@ -1,0 +1,96 @@
+{
+  "textures": {
+    "frame": "wrights:item/part/frame",
+    "steel": "wrights:item/part/steel",
+    "bay": "wrights:item/part/pack_bay",
+    "cell": "wrights:item/part/cell",
+    "led": "wrights:item/part/led_mk1",
+    "nozzle": "wrights:item/part/nozzle",
+    "nozzle_side": "wrights:item/part/nozzle_side",
+    "heatsink": "wrights:item/part/heatsink",
+    "strap": "wrights:item/part/strap",
+    "bezel": "wrights:item/part/duct_mk1",
+    "blade": "wrights:item/part/iris_blade",
+    "lamp": "wrights:item/part/lamp",
+    "particle": "wrights:item/part/frame"
+  },
+  "elements": [
+    {
+      "from": [
+        7.82,
+        16.8,
+        10.66
+      ],
+      "to": [
+        10.46,
+        19.2,
+        10.7
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#blade"
+        },
+        "east": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#blade"
+        },
+        "south": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#blade"
+        },
+        "west": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#blade"
+        },
+        "up": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#blade"
+        },
+        "down": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#blade"
+        }
+      },
+      "rotation": {
+        "angle": 22.5,
+        "axis": "z",
+        "origin": [
+          10.46,
+          18,
+          10.7
+        ]
+      }
+    }
+  ]
+}

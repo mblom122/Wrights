@@ -1,40 +1,36 @@
 package com.wrights.client;
 
-import com.wrights.WrightsMod;
 import com.wrights.block.WrightportBlockEntity;
 import com.wrights.block.WrightportLamp;
 import com.wrights.drone.Swarm;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 
+import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
-import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
 
+/** Draws the roof iris and the corner lamps. The tower itself is the block model. */
 public class WrightportRenderer implements BlockEntityRenderer<WrightportBlockEntity> {
-    private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "textures/block/wrightport_copper.png");
-    private static final ResourceLocation LAMP = ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "textures/block/wrightport_lamp.png");
-
-    private final WrightportHatchModel model;
-
     public WrightportRenderer(BlockEntityRendererProvider.Context context) {
-        this.model = new WrightportHatchModel(context.bakeLayer(WrightsClient.WRIGHTPORT_HATCH_LAYER));
     }
 
     @Override
     public void render(WrightportBlockEntity port, float partialTick, PoseStack pose, MultiBufferSource buffers, int light, int overlay) {
-        model.setupAnim(port.hatchOpen(partialTick));
-        pose.pushPose();
-        pose.scale(1.0F / 16.0F, 1.0F / 16.0F, 1.0F / 16.0F);
-        VertexConsumer consumer = buffers.getBuffer(RenderType.entityCutoutNoCull(TEXTURE));
-        model.renderHatch(pose, consumer, light, OverlayTexture.NO_OVERLAY);
-        VertexConsumer lamps = buffers.getBuffer(RenderType.entityCutoutNoCull(LAMP));
-        model.renderLamps(pose, lamps, OverlayTexture.NO_OVERLAY, 0xFF000000 | colorOf(port));
-        pose.popPose();
+        int roofLight = port.getLevel() == null ? light : LevelRenderer.getLightColor(port.getLevel(), port.getBlockPos().above(2));
+        PartModels.renderIris(pose, buffers, PartModels.IRIS_BLADE, port.hatchOpen(partialTick),
+                true, 8.0F, 8.0F, 1.0F, 0.035F, roofLight);
+        PartModels.render(pose, buffers, PartModels.PORT_LAMPS, PartModels.FULL_BRIGHT, 0xFF000000 | colorOf(port));
+    }
+
+    /** The tower is two blocks tall and a little wider than its block. */
+    @Override
+    public AABB getRenderBoundingBox(WrightportBlockEntity port) {
+        BlockPos pos = port.getBlockPos();
+        return new AABB(pos.getX() - 0.1D, pos.getY(), pos.getZ() - 0.1D, pos.getX() + 1.1D, pos.getY() + 2.0D, pos.getZ() + 1.1D);
     }
 
     /** Red when empty, yellow when every wright is out, green when one is still home. */

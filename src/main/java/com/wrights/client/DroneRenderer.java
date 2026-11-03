@@ -5,11 +5,9 @@ import com.wrights.drone.WrightTier;
 import com.wrights.entity.DroneEntity;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.ItemRenderer;
@@ -20,13 +18,14 @@ import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 
 public class DroneRenderer extends EntityRenderer<DroneEntity> {
-    private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "textures/entity/drone.png");
-    private final DroneModel model;
+    private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "textures/item/part/shell.png");
+    /** Rotor hubs in model pixels, matching PODS in tools/gen_wright_models.py. */
+    private static final float[][] PODS = {{4.25F, 4.25F}, {11.75F, 4.25F}, {4.25F, 11.75F}, {11.75F, 11.75F}};
+    private static final float SCALE = 0.7F;
     private final ItemRenderer items;
 
     public DroneRenderer(EntityRendererProvider.Context context) {
         super(context);
-        this.model = new DroneModel(context.bakeLayer(WrightsClient.DRONE_LAYER));
         this.items = context.getItemRenderer();
         this.shadowRadius = 0.2F;
     }
@@ -34,15 +33,23 @@ public class DroneRenderer extends EntityRenderer<DroneEntity> {
     @Override
     public void render(DroneEntity entity, float yaw, float partialTick, PoseStack pose, MultiBufferSource buffers, int light) {
         pose.pushPose();
-        float bob = Mth.sin((entity.tickCount + partialTick) * 0.15F) * 0.03F;
+        float age = entity.tickCount + partialTick;
+        float bob = Mth.sin(age * 0.15F) * 0.03F;
         pose.translate(0.0F, 0.15F + bob, 0.0F);
         pose.mulPose(Axis.YP.rotationDegrees(180.0F - yaw));
-        pose.scale(-0.7F, -0.7F, 0.7F);
-        this.model.setupAnim(entity, 0.0F, 0.0F, entity.tickCount + partialTick, 0.0F, 0.0F);
-        VertexConsumer consumer = buffers.getBuffer(RenderType.entityCutoutNoCull(TEXTURE));
-        int color = WrightTier.modelColor(entity.tier());
-        this.model.renderToBuffer(pose, consumer, light, OverlayTexture.NO_OVERLAY, color);
-        this.model.renderLens(pose, consumer, light, OverlayTexture.NO_OVERLAY);
+        pose.scale(SCALE, SCALE, SCALE);
+        // Model space is 0..16 with the skids at y 3.4; center it and stand it on the origin.
+        pose.translate(-0.5F, -3.4F / 16.0F, -0.5F);
+        PartModels.render(pose, buffers, PartModels.DRONE_BODY, light, WrightTier.modelColor(entity.tier()));
+        float spin = age * 40.0F;
+        for (int i = 0; i < PODS.length; i++) {
+            pose.pushPose();
+            pose.translate(PODS[i][0] / 16.0F, 0.0F, PODS[i][1] / 16.0F);
+            pose.mulPose(Axis.YP.rotationDegrees(i == 0 || i == 3 ? spin : -spin));
+            pose.translate(-0.5F, 0.0F, -0.5F);
+            PartModels.render(pose, buffers, PartModels.DRONE_ROTOR, light, 0xFFFFFFFF);
+            pose.popPose();
+        }
         pose.popPose();
         // Place/Exchange outbound: place material. Mine / Exchange after swap (void off): haul. Home: carried.
         ItemStack cargo = entity.displayCargo();

@@ -1,7 +1,10 @@
 {
   "variants": {
-    "": {
+    "half=lower": {
       "model": "wrights:block/wrightport"
+    },
+    "half=upper": {
+      "model": "wrights:block/wrightport_upper"
     }
   }
 }

@@ -1,0 +1,100 @@
+{
+  "textures": {
+    "frame": "wrights:item/part/frame",
+    "steel": "wrights:item/part/steel",
+    "hazard": "wrights:item/part/hazard",
+    "panel": "wrights:item/part/port_panel",
+    "door": "wrights:item/part/port_door",
+    "heatsink": "wrights:item/part/heatsink",
+    "band": "wrights:item/part/duct_mk1",
+    "core": "wrights:item/part/port_core",
+    "glow": "wrights:item/part/core_glow",
+    "nozzle_side": "wrights:item/part/nozzle_side",
+    "bay": "wrights:item/part/bay",
+    "pillar": "wrights:item/part/pillar",
+    "led": "wrights:item/part/led_mk1",
+    "bezel": "wrights:item/part/duct_mk1",
+    "blade": "wrights:item/part/iris_blade",
+    "lamp": "wrights:item/part/lamp",
+    "particle": "wrights:item/part/frame"
+  },
+  "elements": [
+    {
+      "from": [
+        7.7,
+        30.1,
+        6.0
+      ],
+      "to": [
+        12.1,
+        30.15,
+        10.0
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#blade"
+        },
+        "east": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#blade"
+        },
+        "south": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#blade"
+        },
+        "west": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#blade"
+        },
+        "up": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#blade"
+        },
+        "down": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#blade"
+        }
+      },
+      "rotation": {
+        "angle": 22.5,
+        "axis": "y",
+        "origin": [
+          12.1,
+          30.1,
+          8
+        ]
+      }
+    }
+  ]
+}

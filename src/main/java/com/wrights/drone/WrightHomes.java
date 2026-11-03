@@ -47,14 +47,14 @@ public final class WrightHomes {
         return player.position().add(back.scale(-0.85D)).add(0.0D, 0.95D, 0.0D);
     }
 
-    /** Inside the bay, under the lid, where a returning wright disappears. */
+    /** Inside the roof bay of the two-block tower, under the iris, where a returning wright disappears. */
     public static Vec3 hatch(BlockPos port) {
-        return Vec3.atBottomCenterOf(port).add(0.0D, 0.42D, 0.0D);
+        return Vec3.atBottomCenterOf(port).add(0.0D, 1.72D, 0.0D);
     }
 
-    /** Just above the lid, where a departing wright clears the top. */
+    /** Just above the iris, where a departing wright clears the top. */
     public static Vec3 lip(BlockPos port) {
-        return Vec3.atBottomCenterOf(port).add(0.0D, 1.05D, 0.0D);
+        return Vec3.atBottomCenterOf(port).add(0.0D, 2.1D, 0.0D);
     }
 
     /** High ring a returning wright dives into the hatch from. */
