@@ -911,6 +911,8 @@
   "message.wrights.marked_same": "Marked wrights already have: %s",
   "message.wrights.marked_stripped": "Took the parts out of %s wrights",
   "message.wrights.marked_bare": "Marked wrights have no parts",
+  "message.wrights.inv_no_space": "Not enough inventory space for those items",
+  "message.wrights.marked_no_space": "Fitted %s. %s need inventory space for their old parts",
   "block.wrights.wrightport": "Wrightport",
   "block.wrights.wrightport.named": "Wrightport - %s",
   "block.wrights.wrightport.owner": "Owner: %s",

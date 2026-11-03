@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import net.minecraft.core.NonNullList;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
@@ -435,20 +436,32 @@ public final class HangarOps {
         }
         Swarm next = swarm;
         int taken = 0;
+        boolean blocked = false;
         if (backward) {
             for (int i = 0; i < count && !next.units().isEmpty(); i++) {
                 int index = next.units().size() - 1;
-                giveUnit(player, next.units().get(index));
+                if (!giveUnit(player, next.units().get(index))) {
+                    blocked = true;
+                    break;
+                }
                 next = next.removeUnit(index);
                 taken++;
             }
         } else if (start >= 0 && start < next.units().size()) {
-            giveUnit(player, next.units().get(start));
+            if (!giveUnit(player, next.units().get(start))) {
+                Messages.actionBar(player, "message.wrights.inv_no_space");
+                return swarm;
+            }
             next = next.removeUnit(start);
             taken = 1;
         }
-        if (taken > 0) {
+        if (blocked && taken == 0) {
+            Messages.actionBar(player, "message.wrights.inv_no_space");
+        } else if (taken > 0) {
             Messages.actionBar(player, "message.wrights.wrights_removed", taken);
+            if (blocked) {
+                Messages.actionBar(player, "message.wrights.inv_no_space");
+            }
         }
         return next;
     }
@@ -478,11 +491,17 @@ public final class HangarOps {
                     Component.translatable(empty ? slot.nameKey() : slot.fittedKey(target)));
             return swarm;
         }
+        Item need = target > WrightTier.BASIC ? slot.item(target) : null;
+        Item back = slot.item(tier);
+        if (!canSwapRefund(player, need, back)) {
+            Messages.actionBar(player, "message.wrights.inv_no_space");
+            return swarm;
+        }
+        boolean took = false;
         if (target > WrightTier.BASIC) {
-            Item part = slot.item(target);
-            ItemSource.Take taken = takeUpgrade(player, part, 1);
+            ItemSource.Take taken = takeUpgrade(player, need, 1);
             if (taken.result() == ItemSource.Result.CRAFTING) {
-                Messages.actionBar(player, "message.wrights.digital_crafted", Math.max(1, taken.crafted()), new ItemStack(part).getHoverName());
+                Messages.actionBar(player, "message.wrights.digital_crafted", Math.max(1, taken.crafted()), new ItemStack(need).getHoverName());
                 return swarm;
             }
             if (taken.result() != ItemSource.Result.OK) {
@@ -491,25 +510,51 @@ public final class HangarOps {
                 }
                 return swarm;
             }
+            took = true;
             Messages.actionBar(player, "message.wrights.part_fitted", Component.translatable(slot.fittedKey(target)));
         } else {
             Messages.actionBar(player, "message.wrights.part_removed", Component.translatable(slot.fittedKey(tier)));
         }
-        refund(player, slot, tier);
+        if (!refund(player, slot, tier)) {
+            if (took && need != null) {
+                // Space was checked first; restore the taken upgrade if refund somehow failed.
+                player.getInventory().add(new ItemStack(need));
+            }
+            Messages.actionBar(player, "message.wrights.inv_no_space");
+            return swarm;
+        }
         return swarm.withParts(index, parts.with(slot, target));
     }
 
-    /** Swaps one part without messages. Same swarm when the new part could not be taken. */
+    /**
+     * Swaps one part without messages. Same swarm when the new part could not be taken
+     * or the old part would not fit in the inventory.
+     */
     private static Swarm swapPart(ServerPlayer player, Swarm swarm, int index, PartSlot slot, int target) {
         Loadout parts = swarm.units().get(index).parts();
         int tier = parts.tier(slot);
         if (tier == target) {
             return swarm;
         }
-        if (target > WrightTier.BASIC && takeUpgrade(player, slot.item(target), 1).result() != ItemSource.Result.OK) {
+        Item need = target > WrightTier.BASIC ? slot.item(target) : null;
+        Item back = slot.item(tier);
+        if (need != null && !afford(player, need, 1)) {
             return swarm;
         }
-        refund(player, slot, tier);
+        if (!canSwapRefund(player, need, back)) {
+            return swarm;
+        }
+        if (need != null) {
+            // Stock only — marked bulk crafts are ordered separately.
+            ItemSource.Take taken = ItemSource.takeDetailed(player, need, 1, false);
+            if (taken.result() != ItemSource.Result.OK) {
+                return swarm;
+            }
+            noteUse(need, taken.fromDigital(), 0);
+        }
+        if (!refund(player, slot, tier)) {
+            return swarm;
+        }
         return swarm.withParts(index, parts.with(slot, target));
     }
 
@@ -526,12 +571,19 @@ public final class HangarOps {
         Swarm next = swarm;
         int moved = 0;
         int missing = 0;
+        int noSpace = 0;
         for (int index : picked) {
-            if (next.units().get(index).parts().tier(slot) == target) {
+            int tier = next.units().get(index).parts().tier(slot);
+            if (tier == target) {
                 continue;
             }
+            Item back = slot.item(tier);
             if (part != null && !afford(player, part, 1)) {
                 missing++;
+                continue;
+            }
+            if (!canSwapRefund(player, part, back)) {
+                noSpace++;
                 continue;
             }
             Swarm changed = swapPart(player, next, index, slot, target);
@@ -544,7 +596,9 @@ public final class HangarOps {
         }
         boolean crafting = missing > 0 && part != null && orderCraft(player, part, missing);
         if (moved == 0) {
-            if (missing == 0) {
+            if (noSpace > 0) {
+                Messages.actionBar(player, "message.wrights.inv_no_space");
+            } else if (missing == 0) {
                 Messages.actionBar(player, "message.wrights.marked_same", label);
             } else if (crafting) {
                 Messages.actionBar(player, "message.wrights.digital_crafting");
@@ -553,7 +607,9 @@ public final class HangarOps {
             }
             return swarm;
         }
-        if (missing > 0 && !crafting) {
+        if (noSpace > 0) {
+            Messages.actionBar(player, "message.wrights.marked_no_space", moved, noSpace);
+        } else if (missing > 0 && !crafting) {
             Messages.actionBar(player, "message.wrights.marked_short", moved, missing);
         } else {
             Messages.actionBar(player, "message.wrights.marked_fitted", moved, label);
@@ -580,16 +636,22 @@ public final class HangarOps {
         }
         Swarm next = swarm;
         int raised = 0;
+        boolean noSpace = false;
         for (int index : picked) {
             boolean any = false;
             for (PartSlot slot : PartSlot.values()) {
                 int tier = next.units().get(index).parts().tier(slot);
                 int goal = bestOnHand(player, slot, tier);
-                if (goal > tier) {
-                    Swarm changed = swapPart(player, next, index, slot, goal);
-                    any |= changed != next;
-                    next = changed;
+                if (goal <= tier) {
+                    continue;
                 }
+                if (!canSwapRefund(player, slot.item(goal), slot.item(tier))) {
+                    noSpace = true;
+                    continue;
+                }
+                Swarm changed = swapPart(player, next, index, slot, goal);
+                any |= changed != next;
+                next = changed;
             }
             if (any) {
                 raised++;
@@ -598,6 +660,10 @@ public final class HangarOps {
         if (raised > 0) {
             Messages.actionBar(player, "message.wrights.marked_raised", raised);
             return next;
+        }
+        if (noSpace) {
+            Messages.actionBar(player, "message.wrights.inv_no_space");
+            return swarm;
         }
         if (!allowCraft) {
             Messages.actionBar(player, "message.wrights.marked_raised_none");
@@ -645,28 +711,57 @@ public final class HangarOps {
     }
 
     private static Swarm stripMarked(ServerPlayer player, Swarm swarm, int[] units) {
+        int[] picked = unique(swarm, units);
+        if (picked.length == 0) {
+            Messages.actionBar(player, "message.wrights.no_wrights");
+            return swarm;
+        }
+        List<ItemStack> refunds = new ArrayList<>();
+        int withParts = 0;
+        for (int index : picked) {
+            Loadout parts = swarm.units().get(index).parts();
+            if (parts.isBasic()) {
+                continue;
+            }
+            withParts++;
+            for (PartSlot slot : PartSlot.values()) {
+                Item item = slot.item(parts.tier(slot));
+                if (item != null) {
+                    refunds.add(new ItemStack(item));
+                }
+            }
+        }
+        if (withParts == 0) {
+            Messages.actionBar(player, "message.wrights.marked_bare");
+            return swarm;
+        }
+        if (!canFitAll(player, refunds)) {
+            Messages.actionBar(player, "message.wrights.inv_no_space");
+            return swarm;
+        }
         Swarm next = swarm;
         int stripped = 0;
-        for (int index : unique(swarm, units)) {
+        for (int index : picked) {
             Loadout parts = next.units().get(index).parts();
             if (parts.isBasic()) {
                 continue;
             }
             for (PartSlot slot : PartSlot.values()) {
-                refund(player, slot, parts.tier(slot));
+                if (!refund(player, slot, parts.tier(slot))) {
+                    Messages.actionBar(player, "message.wrights.inv_no_space");
+                    return swarm;
+                }
             }
             next = next.withParts(index, Loadout.BASIC);
             stripped++;
         }
-        Messages.actionBar(player, stripped == 0 ? "message.wrights.marked_bare" : "message.wrights.marked_stripped", stripped);
+        Messages.actionBar(player, "message.wrights.marked_stripped", stripped);
         return next;
     }
 
-    private static void refund(ServerPlayer player, PartSlot slot, int tier) {
+    private static boolean refund(ServerPlayer player, PartSlot slot, int tier) {
         Item part = slot.item(tier);
-        if (part != null) {
-            giveStack(player, new ItemStack(part));
-        }
+        return part == null || giveStack(player, new ItemStack(part));
     }
 
     private static Swarm takeMarked(ServerPlayer player, Swarm swarm, int[] units) {
@@ -675,12 +770,23 @@ public final class HangarOps {
             Messages.actionBar(player, "message.wrights.no_wrights");
             return swarm;
         }
+        List<ItemStack> stacks = new ArrayList<>(picked.length);
+        for (int index : picked) {
+            stacks.add(WrightItem.stack(swarm.units().get(index)));
+        }
+        if (!canFitAll(player, stacks)) {
+            Messages.actionBar(player, "message.wrights.inv_no_space");
+            return swarm;
+        }
         int[] order = picked.clone();
         java.util.Arrays.sort(order);
         Swarm next = swarm;
         for (int i = order.length - 1; i >= 0; i--) {
             int index = order[i];
-            giveUnit(player, next.units().get(index));
+            if (!giveUnit(player, next.units().get(index))) {
+                Messages.actionBar(player, "message.wrights.inv_no_space");
+                return next;
+            }
             next = next.removeUnit(index);
         }
         Messages.actionBar(player, "message.wrights.wrights_removed", order.length);
@@ -781,32 +887,115 @@ public final class HangarOps {
         return taken;
     }
 
-    private static void giveStack(ServerPlayer player, ItemStack stack) {
+    /**
+     * Puts {@code stack} in the player inventory only. Returns false when it would not fully fit —
+     * never places on the cursor or drops on the ground.
+     */
+    private static boolean giveStack(ServerPlayer player, ItemStack stack) {
         if (stack.isEmpty()) {
-            return;
+            return true;
         }
-        player.getInventory().add(stack);
-        if (stack.isEmpty()) {
-            return;
+        if (player.getAbilities().instabuild) {
+            player.getInventory().add(stack.copy());
+            return true;
         }
-        ItemStack carried = player.containerMenu.getCarried();
-        if (carried.isEmpty()) {
-            player.containerMenu.setCarried(stack);
-            player.containerMenu.broadcastChanges();
-            return;
+        if (!canFit(player, stack)) {
+            return false;
         }
-        if (ItemStack.isSameItemSameComponents(carried, stack)) {
-            int room = carried.getMaxStackSize() - carried.getCount();
-            if (room > 0) {
-                int move = Math.min(room, stack.getCount());
-                carried.grow(move);
-                stack.shrink(move);
-                player.containerMenu.setCarried(carried);
-                player.containerMenu.broadcastChanges();
+        ItemStack copy = stack.copy();
+        player.getInventory().add(copy);
+        return copy.isEmpty();
+    }
+
+    /** True when every stack fits in the player inventory (main + hotbar). */
+    private static boolean canFitAll(ServerPlayer player, List<ItemStack> stacks) {
+        if (stacks == null || stacks.isEmpty() || player.getAbilities().instabuild) {
+            return true;
+        }
+        NonNullList<ItemStack> sim = copyPlayerItems(player);
+        for (ItemStack stack : stacks) {
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
+            ItemStack left = stack.copy();
+            mergeInto(sim, left);
+            if (!left.isEmpty()) {
+                return false;
             }
         }
-        if (!stack.isEmpty()) {
-            player.drop(stack, false);
+        return true;
+    }
+
+    private static boolean canFit(ServerPlayer player, ItemStack stack) {
+        return canFitAll(player, List.of(stack));
+    }
+
+    /**
+     * After optionally consuming one {@code need} from the player inventory (digital/chest takes
+     * free no inventory space), can the {@code refund} part fully fit?
+     */
+    private static boolean canSwapRefund(ServerPlayer player, Item need, Item refund) {
+        if (refund == null || player.getAbilities().instabuild) {
+            return true;
+        }
+        NonNullList<ItemStack> sim = copyPlayerItems(player);
+        if (need != null) {
+            removeFrom(sim, need, 1);
+        }
+        ItemStack left = new ItemStack(refund);
+        mergeInto(sim, left);
+        return left.isEmpty();
+    }
+
+    private static NonNullList<ItemStack> copyPlayerItems(ServerPlayer player) {
+        Inventory inventory = player.getInventory();
+        NonNullList<ItemStack> copy = NonNullList.withSize(inventory.items.size(), ItemStack.EMPTY);
+        for (int i = 0; i < inventory.items.size(); i++) {
+            ItemStack stack = inventory.items.get(i);
+            copy.set(i, stack.isEmpty() ? ItemStack.EMPTY : stack.copy());
+        }
+        return copy;
+    }
+
+    private static void mergeInto(NonNullList<ItemStack> items, ItemStack stack) {
+        if (stack.isEmpty()) {
+            return;
+        }
+        for (int i = 0; i < items.size() && !stack.isEmpty(); i++) {
+            ItemStack have = items.get(i);
+            if (have.isEmpty() || !ItemStack.isSameItemSameComponents(have, stack)) {
+                continue;
+            }
+            int room = have.getMaxStackSize() - have.getCount();
+            if (room <= 0) {
+                continue;
+            }
+            int move = Math.min(room, stack.getCount());
+            have.grow(move);
+            stack.shrink(move);
+        }
+        for (int i = 0; i < items.size() && !stack.isEmpty(); i++) {
+            if (!items.get(i).isEmpty()) {
+                continue;
+            }
+            int put = Math.min(stack.getMaxStackSize(), stack.getCount());
+            items.set(i, stack.split(put));
+        }
+    }
+
+    private static void removeFrom(NonNullList<ItemStack> items, Item item, int count) {
+        int left = count;
+        for (int i = 0; i < items.size() && left > 0; i++) {
+            ItemStack have = items.get(i);
+            if (have.isEmpty() || have.getItem() != item) {
+                continue;
+            }
+            int take = Math.min(left, have.getCount());
+            have.shrink(take);
+            left -= take;
+            if (have.isEmpty()) {
+                items.set(i, ItemStack.EMPTY);
+            }
         }
     }
 
@@ -831,8 +1020,8 @@ public final class HangarOps {
         storePort(player, kind, index, swarm, rename(player, swarm, unit, name));
     }
 
-    private static void giveUnit(ServerPlayer player, Swarm.Unit unit) {
-        giveStack(player, WrightItem.stack(unit));
+    private static boolean giveUnit(ServerPlayer player, Swarm.Unit unit) {
+        return giveStack(player, WrightItem.stack(unit));
     }
 
     private static Swarm build(ServerPlayer player, UUID owner, Swarm swarm) {

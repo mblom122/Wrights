@@ -606,18 +606,24 @@ final class WrightManagePanel {
             }
         }
         int buttons = dy + MARKED_TOP + slots.length * MARKED_ROW;
-        if (hit(mouseX, mouseY, dx + 12, buttons, dw - 24, 16)) {
-            screen.batch(HangarOps.BEST_PARTS, craftDigital ? 1 : 0, marked(screen, screen.swarm()));
+        if (hit(mouseX, mouseY, dx + 12, buttons, dw - 24, 14)) {
+            int[] marked = marked(screen, screen.swarm());
+            if (marked.length > 0) {
+                screen.batch(HangarOps.BEST_PARTS, craftDigital ? 1 : 0, marked);
+            }
             closeTop();
             return true;
         }
-        if (hit(mouseX, mouseY, dx + 12, buttons + 22, dw - 24, 16)) {
-            screen.batch(HangarOps.STRIP_MARKED, 0, marked(screen, screen.swarm()));
+        if (hit(mouseX, mouseY, dx + 12, buttons + 18, dw - 24, 14)) {
+            int[] marked = marked(screen, screen.swarm());
+            if (marked.length > 0) {
+                screen.batch(HangarOps.STRIP_MARKED, 0, marked);
+            }
             closeTop();
             return true;
         }
         if (canCraftDigitalUpgrades(screen, screen.swarm())
-                && hit(mouseX, mouseY, dx + 12, buttons + 44, dw - 24, 14)) {
+                && hit(mouseX, mouseY, dx + 12, buttons + 40, dw - 24, 14)) {
             craftDigital = !craftDigital;
             return true;
         }
@@ -659,12 +665,12 @@ final class WrightManagePanel {
             }
             int buttons = dy + MARKED_TOP + slots.length * MARKED_ROW;
             drawMini(graphics, screen, dx + 12, buttons, dw - 24, Component.translatable("screen.wrights.manage_best_parts"), tool, false, mouseX, mouseY);
-            drawMini(graphics, screen, dx + 12, buttons + 22, dw - 24, Component.translatable("screen.wrights.manage_strip"), tool, false, mouseX, mouseY);
+            drawMini(graphics, screen, dx + 12, buttons + 18, dw - 24, Component.translatable("screen.wrights.manage_strip"), tool, false, mouseX, mouseY);
             boolean canCraft = canCraftDigitalUpgrades(screen, swarm);
             if (!canCraft) {
                 craftDigital = false;
             }
-            int checkY = buttons + 44;
+            int checkY = buttons + 40;
             drawCheck(graphics, dx + 12, checkY + 2, craftDigital, canCraft, mouseX, mouseY);
             graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_craft_digital"),
                     dx + 26, checkY + 3, canCraft ? WrightsUi.TEXT : 0xFF6E7A86, false);
