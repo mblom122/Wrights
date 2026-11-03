@@ -1,5 +1,6 @@
 package com.wrights.blueprint;
 
+import com.wrights.job.ShapeJobs;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -16,7 +17,6 @@ import net.minecraft.world.level.block.state.BlockState;
 
 import com.wrights.WrightsConfig;
 import com.wrights.item.ControllerItem;
-import com.wrights.job.JobManager;
 import com.wrights.network.BlueprintNetwork;
 import com.wrights.network.BlueprintPayloads;
 import com.wrights.schematic.Requirements;
@@ -171,7 +171,7 @@ public final class ShapeLaunch {
         boolean deferSupplies = false;
         int drones = Math.max(0, payload.drones());
         boolean placeTool = !exchange && payload.placeTool();
-        boolean ok = JobManager.startShapeBuild(
+        boolean ok = ShapeJobs.startShapeBuild(
                 player,
                 min,
                 max,
@@ -303,7 +303,7 @@ public final class ShapeLaunch {
             }
         }
         String title = payload.title() == null || payload.title().isBlank() ? "Place" : payload.title();
-        boolean ok = JobManager.startPlaceCells(
+        boolean ok = ShapeJobs.startPlaceCells(
                 player,
                 cells,
                 voidBlocks,
