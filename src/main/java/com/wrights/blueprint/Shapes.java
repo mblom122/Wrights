@@ -1108,41 +1108,17 @@ public final class Shapes {
         int outMaxX = Integer.MIN_VALUE;
         int outMaxY = Integer.MIN_VALUE;
         int outMaxZ = Integer.MIN_VALUE;
-        int plane = clampPlane(axis);
+        // {@link #bounds} already tips by axis — only yaw around the pin here (same as {@link #blocksPinned}).
+        // Re-tipping would map a wall back onto the floor and make the wire AABB look like Floor.
         int[] xs = {local.min().getX(), local.max().getX()};
         int[] ys = {local.min().getY(), local.max().getY()};
         int[] zs = {local.min().getZ(), local.max().getZ()};
         for (int x : xs) {
             for (int y : ys) {
                 for (int z : zs) {
-                    // Tip first (same map as {@link #orient}), then yaw around world up — must match
-                    // {@link #containsWorld} or wall circles scan a flat AABB and resolve every cell OUT.
-                    int ox = x - pinLocal.getX();
-                    int oy = y - pinLocal.getY();
-                    int oz = z - pinLocal.getZ();
-                    int tx;
-                    int ty;
-                    int tz;
-                    switch (plane) {
-                        case AXIS_Z -> { // (x,y,z) -> (x,z,y)
-                            tx = ox;
-                            ty = oz;
-                            tz = oy;
-                        }
-                        case AXIS_X -> { // (x,y,z) -> (y,x,z)
-                            tx = oy;
-                            ty = ox;
-                            tz = oz;
-                        }
-                        default -> {
-                            tx = ox;
-                            ty = oy;
-                            tz = oz;
-                        }
-                    }
-                    long turned = yawAroundY(tx, tz, yaw);
+                    long turned = yawAroundY(x - pinLocal.getX(), z - pinLocal.getZ(), yaw);
                     int wx = px + turnedX(turned);
-                    int wy = py + ty;
+                    int wy = py + (y - pinLocal.getY());
                     int wz = pz + turnedZ(turned);
                     outMinX = Math.min(outMinX, wx);
                     outMinY = Math.min(outMinY, wy);
