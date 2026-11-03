@@ -438,7 +438,8 @@ public final class HangarOps {
         }
         boolean below = false;
         for (int index : picked) {
-            if (WrightTier.clamp(swarm.units().get(index).speed()) < WrightTier.NETHERITE) {
+            Swarm.Unit unit = swarm.units().get(index);
+            if (WrightTier.clamp(unit.speed()) < WrightTier.NETHERITE || WrightTier.clamp(unit.power()) < WrightTier.NETHERITE) {
                 below = true;
                 break;
             }
@@ -452,15 +453,22 @@ public final class HangarOps {
         for (int i = 0; i < picked.length; i++) {
             int tier = WrightTier.clamp(next.units().get(picked[i]).speed());
             int goal = highestAffordable(player, tier);
-            if (goal <= tier) {
-                continue;
+            if (goal > tier) {
+                Swarm changed = applyTier(player, next, picked[i], tier, goal);
+                if (changed != next) {
+                    next = changed;
+                    raised[i] = true;
+                }
             }
-            Swarm changed = applyTier(player, next, picked[i], tier, goal);
-            if (changed == next) {
-                continue;
+            int ops = WrightTier.clamp(next.units().get(picked[i]).power());
+            int opsGoal = highestAffordableOps(player, ops);
+            if (opsGoal > ops) {
+                Swarm changed = applyOps(player, next, picked[i], ops, opsGoal);
+                if (changed != next) {
+                    next = changed;
+                    raised[i] = true;
+                }
             }
-            next = changed;
-            raised[i] = true;
         }
         int count = 0;
         for (boolean one : raised) {
@@ -470,23 +478,37 @@ public final class HangarOps {
         }
         if (count == 0) {
             int[] missing = new int[WrightTier.NETHERITE + 1];
+            int[] missingOps = new int[WrightTier.NETHERITE + 1];
             for (int index : picked) {
                 int tier = WrightTier.clamp(swarm.units().get(index).speed());
-                if (tier >= WrightTier.NETHERITE) {
-                    continue;
-                }
-                int want = WrightTier.NETHERITE;
-                for (int step = WrightTier.NETHERITE; step > tier; step--) {
-                    if (ItemSource.craftable(player, WrightTier.upgradeItem(step))) {
-                        want = step;
-                        break;
+                if (tier < WrightTier.NETHERITE) {
+                    int want = WrightTier.NETHERITE;
+                    for (int step = WrightTier.NETHERITE; step > tier; step--) {
+                        if (ItemSource.craftable(player, WrightTier.upgradeItem(step))) {
+                            want = step;
+                            break;
+                        }
                     }
+                    missing[want]++;
                 }
-                missing[want]++;
+                int ops = WrightTier.clamp(swarm.units().get(index).power());
+                if (ops < WrightTier.NETHERITE) {
+                    int want = WrightTier.NETHERITE;
+                    for (int step = WrightTier.NETHERITE; step > ops; step--) {
+                        if (ItemSource.craftable(player, WrightTier.operationItem(step))) {
+                            want = step;
+                            break;
+                        }
+                    }
+                    missingOps[want]++;
+                }
             }
             boolean ordered = false;
             for (int step = WrightTier.COPPER; step <= WrightTier.NETHERITE; step++) {
                 if (missing[step] > 0 && orderCraft(player, WrightTier.upgradeItem(step), missing[step])) {
+                    ordered = true;
+                }
+                if (missingOps[step] > 0 && orderCraft(player, WrightTier.operationItem(step), missingOps[step])) {
                     ordered = true;
                 }
             }
@@ -510,6 +532,16 @@ public final class HangarOps {
             }
         }
         return best;
+    }
+
+    /** Highest operations tier above {@code tier} that only needs that tier's operations item. */
+    private static int highestAffordableOps(ServerPlayer player, int tier) {
+        for (int step = WrightTier.NETHERITE; step > tier; step--) {
+            if (canAffordOps(player, step)) {
+                return step;
+            }
+        }
+        return tier;
     }
 
     private static Swarm downOne(ServerPlayer player, Swarm swarm, int[] units) {
