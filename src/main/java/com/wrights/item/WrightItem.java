@@ -119,7 +119,9 @@ public class WrightItem extends Item {
             Component fitted = Component.translatable(slot.fittedKey(tier)).withColor(WrightTier.textColor(tier) & 0xFFFFFF);
             tooltip.add(Component.translatable("item.wrights.wright.part", Component.translatable(slot.nameKey()), fitted)
                     .withStyle(ChatFormatting.GRAY));
-            tooltip.add(Component.literal("  ").append(WrightPartItem.stat(slot, tier)).withStyle(ChatFormatting.DARK_GRAY));
+            for (Component line : WrightPartItem.stats(slot, tier)) {
+                tooltip.add(Component.literal("  ").append(line).withStyle(ChatFormatting.DARK_GRAY));
+            }
         }
         tooltip.add(energyLine(parts));
         tooltip.add(Component.translatable("item.wrights.wright.hint").withStyle(ChatFormatting.DARK_GRAY));

@@ -30,8 +30,8 @@ import com.wrights.network.BlueprintPayloads;
  */
 final class WrightManagePanel {
     private static final int ROW = 16;
-    /** Height of one part slot's block inside an expanded row. */
-    private static final int SECTION = 62;
+    /** Header + up to two stat bullets + fit/remove + tier chips. */
+    private static final int SECTION = 70;
     /** Part sections, then the energy line. */
     private static final int EXPAND = 20 + PartSlot.values().length * SECTION + 16;
     /** Marked dialog: first part row, and the height of each. */
@@ -394,23 +394,27 @@ final class WrightManagePanel {
         Component fitted = Component.translatable(slot.fittedKey(tier)).withColor(WrightTier.textColor(tier) & 0xFFFFFF);
         graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_part", Component.translatable(slot.nameKey()), fitted),
                 x, top, WrightsUi.TEXT, false);
-        graphics.drawString(screen.font(), WrightPartItem.stat(slot, tier), x, top + 12, WrightsUi.MUTED, false);
+        List<Component> lines = WrightPartItem.stats(slot, tier);
+        for (int i = 0; i < lines.size(); i++) {
+            graphics.drawString(screen.font(), lines.get(i), x, top + 11 + i * 10, WrightsUi.MUTED, false);
+        }
         boolean canRemove = tool && tier > WrightTier.BASIC;
         Component remove = Component.translatable("screen.wrights.manage_take_out");
+        int actionsY = top + 34;
         if (tier < WrightTier.APEX) {
             Component next = Component.translatable("screen.wrights.manage_fit", Component.translatable(WrightTier.nameKey(tier + 1)));
-            drawMini(graphics, screen, upX(), top + 26, upW(), next, tool && have(screen, slot, tier + 1), false, mouseX, mouseY);
-            drawMini(graphics, screen, downX(barPad), top + 26, downW(barPad), remove, canRemove, false, mouseX, mouseY);
+            drawMini(graphics, screen, upX(), actionsY, upW(), next, tool && have(screen, slot, tier + 1), false, mouseX, mouseY);
+            drawMini(graphics, screen, downX(barPad), actionsY, downW(barPad), remove, canRemove, false, mouseX, mouseY);
         } else {
-            drawMini(graphics, screen, upX(), top + 26, upW(), remove, canRemove, false, mouseX, mouseY);
+            drawMini(graphics, screen, upX(), actionsY, upW(), remove, canRemove, false, mouseX, mouseY);
         }
-        drawTierChoices(graphics, screen, panelX + 18, top + 44, panelW - 36 - barPad, slot, tier, mouseX, mouseY, tool);
+        drawTierChoices(graphics, screen, panelX + 18, top + 52, panelW - 36 - barPad, slot, tier, mouseX, mouseY, tool);
     }
 
     /** {@code local} is the click height inside this part's section. */
     private boolean partClick(ManageHost screen, Swarm swarm, int index, PartSlot slot, int local, double mouseX, int barPad) {
         int tier = swarm.units().get(index).parts().tier(slot);
-        if (local >= 26 && local < 40) {
+        if (local >= 34 && local < 48) {
             if (tier < WrightTier.APEX && mouseX >= upX() && mouseX < upX() + upW()) {
                 if (have(screen, slot, tier + 1) && screen.requireTool()) {
                     screen.edit(HangarOps.partNext(slot), index);
@@ -427,7 +431,7 @@ final class WrightManagePanel {
             }
             return false;
         }
-        if (local >= 44 && local < 58) {
+        if (local >= 52 && local < 66) {
             int picked = tierAt(mouseX, panelX + 18, panelW - 36 - barPad);
             if (picked >= WrightTier.BASIC && picked != tier && have(screen, slot, picked) && screen.requireTool()) {
                 screen.batch(HangarOps.partFit(slot), picked, new int[] { index });

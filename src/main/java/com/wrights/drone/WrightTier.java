@@ -138,13 +138,4 @@ public final class WrightTier {
         }
         return String.format(Locale.ROOT, "%.1f", bps);
     }
-
-    /** How much faster than Basic, as a percent (Basic → 0, Apex → more). */
-    public static int flyBoostPercent(int tier) {
-        double basic = flyBlocksPerSecond(BASIC);
-        if (basic <= 0.0D) {
-            return 0;
-        }
-        return (int) Math.round(100.0D * (flyBlocksPerSecond(tier) / basic - 1.0D));
-    }
 }

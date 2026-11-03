@@ -1,9 +1,11 @@
 package com.wrights.item;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
@@ -37,23 +39,32 @@ public class WrightPartItem extends Item {
 
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
-        tooltip.add(stat(slot, tier).withStyle(ChatFormatting.GRAY));
-        if (slot == PartSlot.FABRICATOR) {
-            tooltip.add(Component.translatable(reachKey(tier)).withStyle(ChatFormatting.DARK_GRAY));
-        } else if (slot == PartSlot.CORE) {
+        for (Component line : stats(slot, tier)) {
+            tooltip.add(line.copy().withStyle(ChatFormatting.GRAY));
+        }
+        if (slot == PartSlot.CORE) {
             tooltip.add(Component.translatable("item.wrights.core.match", tierName(tier)).withStyle(ChatFormatting.DARK_GRAY));
         }
         tooltip.add(Component.translatable("item.wrights.part.hint").withStyle(ChatFormatting.DARK_GRAY));
     }
 
-    /** What a part of this slot and tier does, e.g. "Flight Speed: 17.5 blocks/s (+250% boost)". */
-    public static net.minecraft.network.chat.MutableComponent stat(PartSlot slot, int tier) {
-        return switch (slot) {
-            case ROTOR -> Component.translatable("item.wrights.rotor.speed",
-                    WrightTier.flyRateLabel(tier), WrightTier.flyBoostPercent(tier));
-            case FABRICATOR -> Component.translatable("item.wrights.fabricator.blocks", WrightTier.operationCap(tier));
-            case CORE -> Component.translatable("item.wrights.core.rating", WrightTier.rotorDraw(tier));
-        };
+    /** Bullet lines for this part (Manage, wright tooltip, part tooltip). */
+    public static List<Component> stats(PartSlot slot, int tier) {
+        List<Component> lines = new ArrayList<>(2);
+        switch (slot) {
+            case ROTOR -> lines.add(Component.translatable("item.wrights.rotor.speed", WrightTier.flyRateLabel(tier)));
+            case FABRICATOR -> {
+                lines.add(Component.translatable("item.wrights.fabricator.actions", WrightTier.operationCap(tier)));
+                lines.add(Component.translatable(reachKey(tier)));
+            }
+            case CORE -> lines.add(Component.translatable("item.wrights.core.rating", WrightTier.rotorDraw(tier)));
+        }
+        return lines;
+    }
+
+    /** First stat line — kept for callers that only need one. */
+    public static MutableComponent stat(PartSlot slot, int tier) {
+        return stats(slot, tier).get(0).copy();
     }
 
     private static Component tierName(int tier) {
