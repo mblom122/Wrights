@@ -884,6 +884,7 @@
   "item.wrights.rotor.speed": "• Flight Speed: %s blocks/s",
   "item.wrights.core.rating": "Covers a rotor drawing up to %s%%. A faster rotor costs more energy, a slower one less.",
   "item.wrights.core.match": "Matched with a %s Rotor Assembly, blocks cost the base energy.",
+  "item.wrights.core.efficiency": "• FE Efficiency: %s%% power drain",
   "item.wrights.fabricator.actions": "• Actions: Up to %s blocks per operation",
   "item.wrights.fabricator.energy": "• Energy cost: %s FE per block",
   "item.wrights.fabricator.blocks": "One operation handles up to %s blocks — placing, mining, voiding, or undoing.",

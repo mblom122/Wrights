@@ -43,9 +43,6 @@ public class WrightPartItem extends Item {
         for (Component line : stats(slot, tier)) {
             tooltip.add(line.copy().withStyle(ChatFormatting.GRAY));
         }
-        if (slot == PartSlot.CORE) {
-            tooltip.add(Component.translatable("item.wrights.core.match", tierName(tier)).withStyle(ChatFormatting.DARK_GRAY));
-        }
         tooltip.add(Component.translatable("item.wrights.part.hint").withStyle(ChatFormatting.DARK_GRAY));
     }
 
@@ -61,7 +58,11 @@ public class WrightPartItem extends Item {
                 lines.add(Component.translatable("item.wrights.fabricator.energy", perBlock));
                 lines.add(Component.translatable(reachKey(tier)));
             }
-            case CORE -> lines.add(Component.translatable("item.wrights.core.rating", WrightTier.rotorDraw(tier)));
+            case CORE -> {
+                int drain = WrightTier.coreDrainBonusPercent(tier);
+                String signed = drain > 0 ? "+" + drain : Integer.toString(drain);
+                lines.add(Component.translatable("item.wrights.core.efficiency", signed));
+            }
         }
         return lines;
     }
@@ -69,10 +70,6 @@ public class WrightPartItem extends Item {
     /** First stat line — kept for callers that only need one. */
     public static MutableComponent stat(PartSlot slot, int tier) {
         return stats(slot, tier).get(0).copy();
-    }
-
-    private static Component tierName(int tier) {
-        return Component.translatable(WrightTier.nameKey(tier)).withColor(WrightTier.textColor(tier) & 0xFFFFFF);
     }
 
     /** Reach copy is per fabricator tier so Scout…Apex do not share one string. */
