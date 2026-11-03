@@ -346,6 +346,33 @@ final class WrightManagePanel {
         return true;
     }
 
+    /**
+     * Shift-click a part in the player inventory onto the selected wright.
+     * @return true when the click was handled (do not run normal quick-move)
+     */
+    boolean tryQuickFitPart(ManageHost screen, ItemStack stack) {
+        if (!open || stack == null || stack.isEmpty() || !(stack.getItem() instanceof WrightPartItem part)) {
+            return false;
+        }
+        Swarm swarm = screen.swarm();
+        if (expanded < 0 || expanded >= swarm.units().size()) {
+            return false;
+        }
+        if (away(screen, swarm, expanded) || !screen.requireTool()) {
+            return true;
+        }
+        int fitted = swarm.units().get(expanded).parts().tier(part.slot());
+        if (part.tier() == fitted || !have(screen, part.slot(), part.tier())) {
+            return true;
+        }
+        int[] targets = markedCount(screen, swarm) > 0 ? marked(screen, swarm) : new int[] { expanded };
+        if (targets.length == 0) {
+            targets = new int[] { expanded };
+        }
+        screen.batch(HangarOps.partFit(part.slot()), part.tier(), targets);
+        return true;
+    }
+
     private boolean hardwareClick(ManageHost screen, Swarm swarm, PartSlot slot) {
         if (expanded < 0 || expanded >= swarm.units().size()) {
             return true;

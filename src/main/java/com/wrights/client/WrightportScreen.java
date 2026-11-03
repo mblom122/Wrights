@@ -12,6 +12,8 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.inventory.Slot;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.block.WrightportBlockEntity;
@@ -377,6 +379,15 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
             graphics.pose().popPose();
         }
         this.renderTooltip(graphics, mouseX, mouseY);
+    }
+
+    @Override
+    protected void slotClicked(Slot slot, int slotId, int mouseButton, ClickType type) {
+        if (type == ClickType.QUICK_MOVE && slot != null
+                && manage.tryQuickFitPart(this, slot.getItem())) {
+            return;
+        }
+        super.slotClicked(slot, slotId, mouseButton, type);
     }
 
     @Override
