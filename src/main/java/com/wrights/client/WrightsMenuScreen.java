@@ -72,7 +72,7 @@ public class WrightsMenuScreen extends Screen {
     private WrightsButton newButton;
     private WrightsButton folderButton;
     WrightsButton sortButton;
-    private boolean sortOpen;
+    boolean sortOpen;
     private WrightsButton editButton;
     private WrightsButton deleteButton;
     private WrightsButton duplicateButton;
@@ -87,7 +87,7 @@ public class WrightsMenuScreen extends Screen {
     int detailSplit;
     private UUID modelAsked;
     private UUID spinId;
-    private boolean spinning;
+    boolean spinning;
     private float yaw = 35.0F;
     private float pitch = 28.0F;
     int modelX;
@@ -103,8 +103,8 @@ public class WrightsMenuScreen extends Screen {
     boolean shelfPressFolder;
     UUID shelfPressParent = Util.NIL_UUID;
     int shelfPressIndex;
-    private double shelfPressX;
-    private double shelfPressY;
+    double shelfPressX;
+    double shelfPressY;
     boolean shelfDragging;
     UUID dropParent = Util.NIL_UUID;
     int dropIndex = -1;
@@ -112,7 +112,7 @@ public class WrightsMenuScreen extends Screen {
     UUID dropHighlight;
     int dropLineY = -1;
     boolean options;
-    private boolean infoPage;
+    boolean infoPage;
     private boolean helpPage;
     private final HelpPanel helpPanel = new HelpPanel();
     WrightsButton bindInventory;
@@ -120,7 +120,7 @@ public class WrightsMenuScreen extends Screen {
     int infoScroll;
     int infoMaxScroll;
     private static int savedInfoScroll;
-    private boolean jobsPage;
+    boolean jobsPage;
     private boolean managePage;
     boolean mirrorPage;
     private boolean shapePage;
@@ -196,8 +196,8 @@ public class WrightsMenuScreen extends Screen {
     private int navScroll;
     int optionThumbY;
     int optionThumbH;
-    private boolean optionDragging;
-    private int optionDragGrab;
+    boolean optionDragging;
+    int optionDragGrab;
     int droneY;
     int droneX;
     int droneW;
@@ -1386,102 +1386,128 @@ public class WrightsMenuScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 0 && buildingPage() && hitSub(mouseX, mouseY, taskBlueprintsY())) {
-            mirrorPage = false;
-            shapePage = false;
-            exchangePage = false;
-            placePage = false;
-            savedMirror = false;
-            savedShape = false;
-            savedExchange = false;
-            savedPlace = false;
-            // Drop Shape/Mirror/Exchange/Place aim so reopening (e.g. after Edit → Cancel) stays on Blueprints.
-            if (requireTool()) {
-                WrightsClientState.selectBlueprintTool();
-            } else {
-                WrightsClientState.clearBuildAims();
+        if (button == 0 && buildingPage()) {
+            if (hitSub(mouseX, mouseY, taskBlueprintsY())) {
+                return chooseBuildMode(BuildMode.BLUEPRINTS);
             }
-            sortOpen = false;
-            setFocused(null);
-            refresh();
+            if (hitSub(mouseX, mouseY, taskPlaceY())) {
+                return chooseBuildMode(BuildMode.PLACE);
+            }
+            if (hitSub(mouseX, mouseY, taskMirrorY())) {
+                return chooseBuildMode(BuildMode.MIRROR);
+            }
+            if (hitSub(mouseX, mouseY, taskShapeY())) {
+                return chooseBuildMode(BuildMode.SHAPE);
+            }
+            if (hitSub(mouseX, mouseY, taskExchangeY())) {
+                return chooseBuildMode(BuildMode.EXCHANGE);
+            }
+        }
+        if (clickNav(mouseX, mouseY, button)) {
             return true;
         }
-        if (button == 0 && buildingPage() && hitSub(mouseX, mouseY, taskPlaceY())) {
-            placePage = true;
-            mirrorPage = false;
-            shapePage = false;
-            exchangePage = false;
-            savedPlace = true;
-            savedMirror = false;
-            savedShape = false;
-            savedExchange = false;
-            if (requireTool()) {
-                WrightsClientState.selectPlaceTool();
-            } else {
-                WrightsClientState.clearBuildAims();
+        if (helpPage) {
+            if (button == 0 && closeButton != null && closeButton.visible && closeButton.isMouseOver(mouseX, mouseY)) {
+                return super.mouseClicked(mouseX, mouseY, button);
             }
-            sortOpen = false;
-            setFocused(null);
-            refresh();
+            if (helpPanel.mouseClicked(mouseX, mouseY, button, this.font)) {
+                return true;
+            }
             return true;
         }
-        if (button == 0 && buildingPage() && hitSub(mouseX, mouseY, taskMirrorY())) {
-            mirrorPage = true;
-            placePage = false;
-            shapePage = false;
-            exchangePage = false;
-            savedMirror = true;
-            savedPlace = false;
-            savedShape = false;
-            savedExchange = false;
-            if (requireTool()) {
-                WrightsClientState.selectMirrorTool();
-            } else {
-                WrightsClientState.clearBuildAims();
+        if (managePage) {
+            if (button == 0 && portManagePanel.clickClearPortHighlights(mouseX, mouseY)) {
+                return true;
             }
-            sortOpen = false;
-            setFocused(null);
-            refresh();
+            if (button == 0 && portManagePanel.clickManageTabs(mouseX, mouseY)) {
+                return true;
+            }
+            if (button == 0 && manageTab == 0 && portManagePanel.clickPortList(mouseX, mouseY)) {
+                return true;
+            }
+            if (button == 0 && manageTab == 1 && portManagePanel.clickPlacedList(mouseX, mouseY)) {
+                return true;
+            }
+            if (manage.isOpen() && manage.mouseClicked(manageHost, mouseX, mouseY, button)) {
+                return true;
+            }
+            super.mouseClicked(mouseX, mouseY, button);
             return true;
         }
-        if (button == 0 && buildingPage() && hitSub(mouseX, mouseY, taskShapeY())) {
-            shapePage = true;
-            placePage = false;
-            mirrorPage = false;
-            exchangePage = false;
-            savedShape = true;
-            savedPlace = false;
-            savedMirror = false;
-            savedExchange = false;
-            if (requireTool()) {
-                WrightsClientState.selectShapeTool();
-            } else {
-                WrightsClientState.clearBuildAims();
+        if (jobsPage) {
+            if (button == 0 && jobsPanel.clickJob(mouseX, mouseY)) {
+                return true;
             }
-            sortOpen = false;
-            setFocused(null);
-            refresh();
+            // Close still works; everything else is consumed so shelf/manage widgets cannot steal hits.
+            if (button == 0 && closeButton != null && closeButton.visible && closeButton.isMouseOver(mouseX, mouseY)) {
+                return super.mouseClicked(mouseX, mouseY, button);
+            }
             return true;
         }
-        if (button == 0 && buildingPage() && hitSub(mouseX, mouseY, taskExchangeY())) {
-            exchangePage = true;
-            placePage = false;
-            shapePage = false;
-            mirrorPage = false;
-            savedExchange = true;
-            savedPlace = false;
-            savedShape = false;
-            savedMirror = false;
-            if (requireTool()) {
-                WrightsClientState.selectExchangeTool();
-            } else {
-                WrightsClientState.clearBuildAims();
+        if (options && button == 0) {
+            if (optionsPanel.click(mouseX, mouseY)) {
+                return true;
             }
-            sortOpen = false;
-            setFocused(null);
-            refresh();
+            return super.mouseClicked(mouseX, mouseY, button);
+        }
+        if (mirrorPage && buildingPage()) {
+            if (overWidget(mouseX, mouseY)) {
+                return super.mouseClicked(mouseX, mouseY, button);
+            }
+            if (button == 0) {
+                mirrorPanel.clickMirror(mouseX, mouseY);
+            }
             return true;
         }
+        if ((shapePage || exchangePage || placePage) && buildingPage()) {
+            if (overWidget(mouseX, mouseY)) {
+                return super.mouseClicked(mouseX, mouseY, button);
+            }
+            if (button == 0 && shapePanel != null && shapePanel.mouseClicked(mouseX, mouseY)) {
+                return true;
+            }
+            return true;
+        }
+        if (shelfPanel.clickShelf(mouseX, mouseY, button)) {
+            return true;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    private enum BuildMode {
+        BLUEPRINTS, PLACE, MIRROR, SHAPE, EXCHANGE
+    }
+
+    /** Switches the Building page to one mode; the saved flags make the choice stick when the menu reopens. */
+    private boolean chooseBuildMode(BuildMode mode) {
+        placePage = mode == BuildMode.PLACE;
+        mirrorPage = mode == BuildMode.MIRROR;
+        shapePage = mode == BuildMode.SHAPE;
+        exchangePage = mode == BuildMode.EXCHANGE;
+        savedPlace = placePage;
+        savedMirror = mirrorPage;
+        savedShape = shapePage;
+        savedExchange = exchangePage;
+        // BLUEPRINTS drops all aims so reopening (e.g. after Edit -> Cancel) stays on Blueprints.
+        if (requireTool()) {
+            switch (mode) {
+                case BLUEPRINTS -> WrightsClientState.selectBlueprintTool();
+                case PLACE -> WrightsClientState.selectPlaceTool();
+                case MIRROR -> WrightsClientState.selectMirrorTool();
+                case SHAPE -> WrightsClientState.selectShapeTool();
+                case EXCHANGE -> WrightsClientState.selectExchangeTool();
+            }
+        } else {
+            WrightsClientState.clearBuildAims();
+        }
+        sortOpen = false;
+        setFocused(null);
+        refresh();
+        return true;
+    }
+
+    /** Left-nav task buttons (Building, Jobs, Manage, Info, Options, Help). Returns true when one was hit. */
+    private boolean clickNav(double mouseX, double mouseY, int button) {
         if (button == 0 && hitTask(mouseX, mouseY, taskBuildingY())) {
             boolean stay = buildingPage();
             leaveManage();
@@ -1567,218 +1593,7 @@ public class WrightsMenuScreen extends Screen {
             refresh();
             return true;
         }
-        if (helpPage) {
-            if (button == 0 && closeButton != null && closeButton.visible && closeButton.isMouseOver(mouseX, mouseY)) {
-                return super.mouseClicked(mouseX, mouseY, button);
-            }
-            if (helpPanel.mouseClicked(mouseX, mouseY, button, this.font)) {
-                return true;
-            }
-            return true;
-        }
-        if (managePage) {
-            if (button == 0 && portManagePanel.clickClearPortHighlights(mouseX, mouseY)) {
-                return true;
-            }
-            if (button == 0 && portManagePanel.clickManageTabs(mouseX, mouseY)) {
-                return true;
-            }
-            if (button == 0 && manageTab == 0 && portManagePanel.clickPortList(mouseX, mouseY)) {
-                return true;
-            }
-            if (button == 0 && manageTab == 1 && portManagePanel.clickPlacedList(mouseX, mouseY)) {
-                return true;
-            }
-            if (manage.isOpen() && manage.mouseClicked(manageHost, mouseX, mouseY, button)) {
-                return true;
-            }
-            super.mouseClicked(mouseX, mouseY, button);
-            return true;
-        }
-        if (jobsPage) {
-            if (button == 0 && jobsPanel.clickJob(mouseX, mouseY)) {
-                return true;
-            }
-            // Close still works; everything else is consumed so shelf/manage widgets cannot steal hits.
-            if (button == 0 && closeButton != null && closeButton.visible && closeButton.isMouseOver(mouseX, mouseY)) {
-                return super.mouseClicked(mouseX, mouseY, button);
-            }
-            return true;
-        }
-        if (options && button == 0) {
-            optionsPanel.layoutOptions();
-            if (optionsPanel.hitOptionBar(mouseX, mouseY)) {
-                optionDragging = true;
-                optionDragGrab = (int) mouseY - optionThumbY;
-                return true;
-            }
-            if (optionsPanel.insideOptionView(mouseX, mouseY)) {
-                if (optionsPanel.overOptionHelp(mouseX, mouseY)) {
-                    return true;
-                }
-                if (optionsPanel.pickSwatch(mouseX, mouseY, wallSwatchY, 0) || optionsPanel.pickSwatch(mouseX, mouseY, edgeSwatchY, 1) || optionsPanel.pickSwatch(mouseX, mouseY, queueEdgeSwatchY, 2) || optionsPanel.pickSwatch(mouseX, mouseY, placeEdgeSwatchY, 3)) {
-                    return true;
-                }
-                if (mouseX >= markerX && mouseX < markerX + markerW && mouseY >= markerY && mouseY < markerY + 16) {
-                    WrightsClientConfig.setCornerMarkers(!WrightsClientConfig.CORNER_MARKERS.get());
-                    return true;
-                }
-                if (mouseX >= instantX && mouseX < instantX + instantW && mouseY >= instantY && mouseY < instantY + 16) {
-                    if (creativeVisit()) {
-                        boolean next = !WrightsClientConfig.INSTANT_JOBS.get();
-                        WrightsClientConfig.setInstantJobs(next);
-                        PacketDistributor.sendToServer(new BlueprintPayloads.SetPace(next));
-                    }
-                    return true;
-                }
-                if (mouseY >= droneY && mouseY < droneY + 16) {
-                    if (mouseX >= droneX && mouseX < droneX + droneW) {
-                        WrightsClientState.deployChosen = false;
-                        WrightsClientConfig.setDroneMax(true);
-                        WrightsClientState.applyDeploy();
-                        return true;
-                    }
-                    int step = 0;
-                    if (mouseX >= droneMinusX && mouseX < droneMinusX + 16) {
-                        step = -1;
-                    } else if (mouseX >= dronePlusX && mouseX < dronePlusX + 16) {
-                        step = 1;
-                    }
-                    if (step != 0) {
-                        WrightsClientState.deployChosen = false;
-                        int droneCap = WrightsConfig.maxWrightsPerJob(true);
-                        int current = WrightsClientConfig.DRONE_MAX.get()
-                                ? WrightsConfig.maxWrightsPerJob()
-                                : WrightsClientConfig.droneCount();
-                        WrightsClientConfig.setDroneCount(WrightsClientState.stepped(current, step, 1, droneCap));
-                        WrightsClientState.applyDeploy();
-                        return true;
-                    }
-                }
-                if (mouseX >= queueX && mouseX < queueX + queueW && mouseY >= queueY && mouseY < queueY + 16) {
-                    WrightsClientConfig.setQueueJobs(!WrightsClientConfig.QUEUE_JOBS.get());
-                    return true;
-                }
-                if (mouseX >= portOrderX && mouseX < portOrderX + portOrderW && mouseY >= portOrderY && mouseY < portOrderY + 16) {
-                    boolean next = !WrightsClientConfig.PORT_PLAYER_FIRST.get();
-                    WrightsClientConfig.setPortPlayerFirst(next);
-                    PacketDistributor.sendToServer(new BlueprintPayloads.SetPortOrder(next));
-                    return true;
-                }
-                if (mouseX >= buildMenuX && mouseX < buildMenuX + buildMenuW && mouseY >= buildMenuY && mouseY < buildMenuY + 16) {
-                    WrightsClientConfig.setBuildMenu(!WrightsClientConfig.BUILD_MENU.get());
-                    return true;
-                }
-                if (mouseX >= dockWatchX && mouseX < dockWatchX + dockWatchW && mouseY >= dockWatchY && mouseY < dockWatchY + 16) {
-                    WrightsClientConfig.setDockWatch(!WrightsClientConfig.DOCK_WATCH.get());
-                    return true;
-                }
-                if (mouseX >= supplyOrderX && mouseX < supplyOrderX + supplyOrderW && mouseY >= supplyOrderY && mouseY < supplyOrderY + 16) {
-                    this.minecraft.setScreen(new ShapePriorityScreen(this));
-                    return true;
-                }
-                if (mouseY >= jobDoneMinY && mouseY < jobDoneMinY + 16) {
-                    int step = 0;
-                    if (mouseX >= jobDoneMinusX && mouseX < jobDoneMinusX + 16) {
-                        step = -1;
-                    } else if (mouseX >= jobDonePlusX && mouseX < jobDonePlusX + 16) {
-                        step = 1;
-                    }
-                    if (step != 0) {
-                        int current = WrightsClientConfig.jobDoneMinSeconds();
-                        WrightsClientConfig.setJobDoneMinSeconds(WrightsClientState.stepped(current, step, 0, 120));
-                        return true;
-                    }
-                }
-                if (mouseX >= hudPlaceX && mouseX < hudPlaceX + hudPlaceW && mouseY >= hudPlaceY && mouseY < hudPlaceY + 16) {
-                    this.minecraft.setScreen(new HudPlaceScreen());
-                    return true;
-                }
-                if (mouseX >= modePlaceX && mouseX < modePlaceX + modePlaceW && mouseY >= modePlaceY && mouseY < modePlaceY + 16) {
-                    this.minecraft.setScreen(new ModePlaceScreen());
-                    return true;
-                }
-                if (hitSlider(mouseX, mouseY, wallSliderX, wallSliderY, wallSliderW)) {
-                    drag = 1;
-                    applyDrag(mouseX);
-                    return true;
-                }
-                if (hitSlider(mouseX, mouseY, edgeSliderX, edgeSliderY, edgeSliderW)) {
-                    drag = 2;
-                    applyDrag(mouseX);
-                    return true;
-                }
-                if (hitSlider(mouseX, mouseY, ghostSliderX, ghostSliderY, ghostSliderW)) {
-                    drag = 3;
-                    applyDrag(mouseX);
-                    return true;
-                }
-            }
-            return super.mouseClicked(mouseX, mouseY, button);
-        }
-        if (mirrorPage && buildingPage()) {
-            if (overWidget(mouseX, mouseY)) {
-                return super.mouseClicked(mouseX, mouseY, button);
-            }
-            if (button == 0) {
-                mirrorPanel.clickMirror(mouseX, mouseY);
-            }
-            return true;
-        }
-        if ((shapePage || exchangePage || placePage) && buildingPage()) {
-            if (overWidget(mouseX, mouseY)) {
-                return super.mouseClicked(mouseX, mouseY, button);
-            }
-            if (button == 0 && shapePanel != null && shapePanel.mouseClicked(mouseX, mouseY)) {
-                return true;
-            }
-            return true;
-        }
-        if (button == 0 && !options && !jobsPage && !infoPage && sortOpen && shelfPanel.pickSort(mouseX, mouseY)) {
-            return true;
-        }
-        if (button == 0 && !options && !jobsPage && !infoPage && shelfPanel.clickScope(mouseX, mouseY)) {
-            return true;
-        }
-        if (button == 0 && !options && !jobsPage && !infoPage && shelfPanel.clickTab(mouseX, mouseY)) {
-            return true;
-        }
-        if (button == 0 && !options && !jobsPage && !infoPage && sortOpen && (sortButton == null || !sortButton.isMouseOver(mouseX, mouseY))) {
-            sortOpen = false;
-            if (sortButton != null) {
-                sortButton.setPicked(false);
-            }
-            return true;
-        }
-        if (button == 0 && !options && !jobsPage && !infoPage && insideModel(mouseX, mouseY)) {
-            spinning = true;
-            return true;
-        }
-        if (button == 0 && !options && !jobsPage && !infoPage && insideList(mouseX, mouseY) && !rows.isEmpty() && !overWidget(mouseX, mouseY)) {
-            int shown = (int) ((mouseY - listY) / ROW);
-            int index = scroll + shown;
-            if (shown >= 0 && shown < visibleRows() && index < rows.size()) {
-                BlueprintList.Row entry = rows.get(index);
-                if (!entry.folder() && mouseX < listX + 14) {
-                    WrightsClientState.toggleFavoriteLocal(entry.id());
-                    PacketDistributor.sendToServer(new BlueprintPayloads.ShelfEdit(BlueprintPayloads.ShelfEdit.FAVORITE, entry.id(), false, Util.NIL_UUID, 0, ""));
-                    refresh();
-                    return true;
-                }
-                shelfPress = entry.id();
-                shelfAdditive = hasControlDown();
-                shelfRange = hasShiftDown();
-                shelfPressFolder = entry.folder();
-                shelfPressParent = entry.parent();
-                shelfPressIndex = entry.index();
-                shelfPressX = mouseX;
-                shelfPressY = mouseY;
-                shelfDragging = false;
-                dropIndex = -1;
-                return true;
-            }
-        }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return false;
     }
 
     @Override
@@ -1928,7 +1743,7 @@ public class WrightsMenuScreen extends Screen {
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
-    private boolean insideModel(double mouseX, double mouseY) {
+    boolean insideModel(double mouseX, double mouseY) {
         return !options && selected() != null && mouseX >= modelX && mouseX < modelX + modelW && mouseY >= modelY && mouseY < modelY + modelH;
     }
 
@@ -2534,7 +2349,7 @@ public class WrightsMenuScreen extends Screen {
     }
 
     /** Shelf buttons sit on the bottom edge of the list, so a click there belongs to the button. */
-    private boolean overWidget(double mouseX, double mouseY) {
+    boolean overWidget(double mouseX, double mouseY) {
         for (net.minecraft.client.gui.components.events.GuiEventListener child : this.children()) {
             if (child instanceof WrightsButton button && button.visible && button.isMouseOver(mouseX, mouseY)) {
                 return true;

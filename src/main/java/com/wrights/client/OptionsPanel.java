@@ -1,5 +1,8 @@
 package com.wrights.client;
 
+import com.wrights.network.BlueprintPayloads;
+import net.neoforged.neoforge.network.PacketDistributor;
+import net.minecraft.client.Minecraft;
 import com.wrights.client.WrightsMenuScreen.HelpSpot;
 import java.util.ArrayList;
 import java.util.List;
@@ -487,5 +490,117 @@ final class OptionsPanel {
         s.suppressOptions = true;
         box.setValue(Integer.toString(value));
         s.suppressOptions = false;
+    }
+
+    boolean click(double mouseX, double mouseY) {
+            layoutOptions();
+            if (hitOptionBar(mouseX, mouseY)) {
+                s.optionDragging = true;
+                s.optionDragGrab = (int) mouseY - s.optionThumbY;
+                return true;
+            }
+            if (insideOptionView(mouseX, mouseY)) {
+                if (overOptionHelp(mouseX, mouseY)) {
+                    return true;
+                }
+                if (pickSwatch(mouseX, mouseY, s.wallSwatchY, 0) || pickSwatch(mouseX, mouseY, s.edgeSwatchY, 1) || pickSwatch(mouseX, mouseY, s.queueEdgeSwatchY, 2) || pickSwatch(mouseX, mouseY, s.placeEdgeSwatchY, 3)) {
+                    return true;
+                }
+                if (mouseX >= s.markerX && mouseX < s.markerX + s.markerW && mouseY >= s.markerY && mouseY < s.markerY + 16) {
+                    WrightsClientConfig.setCornerMarkers(!WrightsClientConfig.CORNER_MARKERS.get());
+                    return true;
+                }
+                if (mouseX >= s.instantX && mouseX < s.instantX + s.instantW && mouseY >= s.instantY && mouseY < s.instantY + 16) {
+                    if (s.creativeVisit()) {
+                        boolean next = !WrightsClientConfig.INSTANT_JOBS.get();
+                        WrightsClientConfig.setInstantJobs(next);
+                        PacketDistributor.sendToServer(new BlueprintPayloads.SetPace(next));
+                    }
+                    return true;
+                }
+                if (mouseY >= s.droneY && mouseY < s.droneY + 16) {
+                    if (mouseX >= s.droneX && mouseX < s.droneX + s.droneW) {
+                        WrightsClientState.deployChosen = false;
+                        WrightsClientConfig.setDroneMax(true);
+                        WrightsClientState.applyDeploy();
+                        return true;
+                    }
+                    int step = 0;
+                    if (mouseX >= s.droneMinusX && mouseX < s.droneMinusX + 16) {
+                        step = -1;
+                    } else if (mouseX >= s.dronePlusX && mouseX < s.dronePlusX + 16) {
+                        step = 1;
+                    }
+                    if (step != 0) {
+                        WrightsClientState.deployChosen = false;
+                        int droneCap = WrightsConfig.maxWrightsPerJob(true);
+                        int current = WrightsClientConfig.DRONE_MAX.get()
+                                ? WrightsConfig.maxWrightsPerJob()
+                                : WrightsClientConfig.droneCount();
+                        WrightsClientConfig.setDroneCount(WrightsClientState.stepped(current, step, 1, droneCap));
+                        WrightsClientState.applyDeploy();
+                        return true;
+                    }
+                }
+                if (mouseX >= s.queueX && mouseX < s.queueX + s.queueW && mouseY >= s.queueY && mouseY < s.queueY + 16) {
+                    WrightsClientConfig.setQueueJobs(!WrightsClientConfig.QUEUE_JOBS.get());
+                    return true;
+                }
+                if (mouseX >= s.portOrderX && mouseX < s.portOrderX + s.portOrderW && mouseY >= s.portOrderY && mouseY < s.portOrderY + 16) {
+                    boolean next = !WrightsClientConfig.PORT_PLAYER_FIRST.get();
+                    WrightsClientConfig.setPortPlayerFirst(next);
+                    PacketDistributor.sendToServer(new BlueprintPayloads.SetPortOrder(next));
+                    return true;
+                }
+                if (mouseX >= s.buildMenuX && mouseX < s.buildMenuX + s.buildMenuW && mouseY >= s.buildMenuY && mouseY < s.buildMenuY + 16) {
+                    WrightsClientConfig.setBuildMenu(!WrightsClientConfig.BUILD_MENU.get());
+                    return true;
+                }
+                if (mouseX >= s.dockWatchX && mouseX < s.dockWatchX + s.dockWatchW && mouseY >= s.dockWatchY && mouseY < s.dockWatchY + 16) {
+                    WrightsClientConfig.setDockWatch(!WrightsClientConfig.DOCK_WATCH.get());
+                    return true;
+                }
+                if (mouseX >= s.supplyOrderX && mouseX < s.supplyOrderX + s.supplyOrderW && mouseY >= s.supplyOrderY && mouseY < s.supplyOrderY + 16) {
+                    s.minecraft().setScreen(new ShapePriorityScreen(s));
+                    return true;
+                }
+                if (mouseY >= s.jobDoneMinY && mouseY < s.jobDoneMinY + 16) {
+                    int step = 0;
+                    if (mouseX >= s.jobDoneMinusX && mouseX < s.jobDoneMinusX + 16) {
+                        step = -1;
+                    } else if (mouseX >= s.jobDonePlusX && mouseX < s.jobDonePlusX + 16) {
+                        step = 1;
+                    }
+                    if (step != 0) {
+                        int current = WrightsClientConfig.jobDoneMinSeconds();
+                        WrightsClientConfig.setJobDoneMinSeconds(WrightsClientState.stepped(current, step, 0, 120));
+                        return true;
+                    }
+                }
+                if (mouseX >= s.hudPlaceX && mouseX < s.hudPlaceX + s.hudPlaceW && mouseY >= s.hudPlaceY && mouseY < s.hudPlaceY + 16) {
+                    s.minecraft().setScreen(new HudPlaceScreen());
+                    return true;
+                }
+                if (mouseX >= s.modePlaceX && mouseX < s.modePlaceX + s.modePlaceW && mouseY >= s.modePlaceY && mouseY < s.modePlaceY + 16) {
+                    s.minecraft().setScreen(new ModePlaceScreen());
+                    return true;
+                }
+                if (s.hitSlider(mouseX, mouseY, s.wallSliderX, s.wallSliderY, s.wallSliderW)) {
+                    s.drag = 1;
+                    s.applyDrag(mouseX);
+                    return true;
+                }
+                if (s.hitSlider(mouseX, mouseY, s.edgeSliderX, s.edgeSliderY, s.edgeSliderW)) {
+                    s.drag = 2;
+                    s.applyDrag(mouseX);
+                    return true;
+                }
+                if (s.hitSlider(mouseX, mouseY, s.ghostSliderX, s.ghostSliderY, s.ghostSliderW)) {
+                    s.drag = 3;
+                    s.applyDrag(mouseX);
+                    return true;
+                }
+            }
+        return false;
     }
 }

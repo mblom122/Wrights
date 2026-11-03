@@ -668,4 +668,52 @@ final class ShelfPanel {
         }
         return index;
     }
+
+    boolean clickShelf(double mouseX, double mouseY, int button) {
+        if (button == 0 && !s.options && !s.jobsPage && !s.infoPage && s.sortOpen && pickSort(mouseX, mouseY)) {
+            return true;
+        }
+        if (button == 0 && !s.options && !s.jobsPage && !s.infoPage && clickScope(mouseX, mouseY)) {
+            return true;
+        }
+        if (button == 0 && !s.options && !s.jobsPage && !s.infoPage && clickTab(mouseX, mouseY)) {
+            return true;
+        }
+        if (button == 0 && !s.options && !s.jobsPage && !s.infoPage && s.sortOpen && (s.sortButton == null || !s.sortButton.isMouseOver(mouseX, mouseY))) {
+            s.sortOpen = false;
+            if (s.sortButton != null) {
+                s.sortButton.setPicked(false);
+            }
+            return true;
+        }
+        if (button == 0 && !s.options && !s.jobsPage && !s.infoPage && s.insideModel(mouseX, mouseY)) {
+            s.spinning = true;
+            return true;
+        }
+        if (button == 0 && !s.options && !s.jobsPage && !s.infoPage && s.insideList(mouseX, mouseY) && !s.rows.isEmpty() && !s.overWidget(mouseX, mouseY)) {
+            int shown = (int) ((mouseY - s.listY) / WrightsMenuScreen.ROW);
+            int index = s.scroll + shown;
+            if (shown >= 0 && shown < s.visibleRows() && index < s.rows.size()) {
+                BlueprintList.Row entry = s.rows.get(index);
+                if (!entry.folder() && mouseX < s.listX + 14) {
+                    WrightsClientState.toggleFavoriteLocal(entry.id());
+                    PacketDistributor.sendToServer(new BlueprintPayloads.ShelfEdit(BlueprintPayloads.ShelfEdit.FAVORITE, entry.id(), false, Util.NIL_UUID, 0, ""));
+                    s.refresh();
+                    return true;
+                }
+                s.shelfPress = entry.id();
+                s.shelfAdditive = Screen.hasControlDown();
+                s.shelfRange = Screen.hasShiftDown();
+                s.shelfPressFolder = entry.folder();
+                s.shelfPressParent = entry.parent();
+                s.shelfPressIndex = entry.index();
+                s.shelfPressX = mouseX;
+                s.shelfPressY = mouseY;
+                s.shelfDragging = false;
+                s.dropIndex = -1;
+                return true;
+            }
+        }
+        return false;
+    }
 }
