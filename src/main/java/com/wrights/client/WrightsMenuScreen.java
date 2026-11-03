@@ -417,7 +417,7 @@ public class WrightsMenuScreen extends Screen {
         moveButton = add(new WrightsButton(listX + importW + gap, bottom, moveW, 18, Component.translatable("menu.wrights.to_global"), button -> moveSelected()));
         newButton = add(new WrightsButton(listX + importW + gap + moveW + gap, bottom, otherW, 18, Component.translatable("menu.wrights.new"), button -> newBlueprint()));
         int detailButtonW = 58;
-        buildButton = add(new WrightsButton(detailX + detailW - 120, bottom, detailButtonW, 18, Component.translatable("menu.wrights.build"), button -> build()));
+        buildButton = add(new WrightsButton(detailX + detailW - 120, bottom, detailButtonW, 18, Component.translatable("menu.wrights.build"), button -> onBuildClick()));
         closeButton = add(new WrightsButton(detailX + detailW - detailButtonW, bottom, detailButtonW, 18, Component.translatable("menu.wrights.close"), button -> onClose()));
         renameButton = add(new WrightsButton(detailX + Math.max(48, detailW - 78), detailSplit + 52, 74, 14, Component.translatable("menu.wrights.rename"), button -> rename()));
         materialsButton = add(new WrightsButton(detailX + 4, detailSplit + 72, Math.max(40, detailW - 8), 16, Component.translatable("menu.wrights.materials"), button -> openMaterials()));
@@ -566,7 +566,6 @@ public class WrightsMenuScreen extends Screen {
         boolean world = !WrightsClientState.libraryGlobal;
         editButton.active = blueprint && !many;
         deleteButton.active = any;
-        buildButton.active = blueprint && tool && !many;
         renameButton.active = any && !many;
         deleteButton.setMessage(Component.translatable(any && confirming() ? "menu.wrights.delete_confirm" : "menu.wrights.delete"));
         if (any && !rename.isFocused()) {
@@ -582,8 +581,10 @@ public class WrightsMenuScreen extends Screen {
             suggestRename = false;
         }
         boolean capture = WrightsClientState.mode == WrightsClientState.Mode.CAPTURE;
-        boolean building = !options && !jobsPage && !infoPage && !managePage && !helpPage && !mirrorPage && !shapePage && !exchangePage && !placePage;
-        placeClose(building);
+        boolean toolModePage = !options && !jobsPage && !infoPage && !managePage && !helpPage
+                && (mirrorPage || shapePage || exchangePage || placePage);
+        boolean building = !options && !jobsPage && !infoPage && !managePage && !helpPage && !toolModePage;
+        placeClose(building, toolModePage);
         search.setX(listX);
         search.setY(searchY);
         int sortW = sortButton == null ? 0 : sortButton.getWidth();
@@ -609,7 +610,8 @@ public class WrightsMenuScreen extends Screen {
         editButton.visible = building && WrightsConfig.allowEdit();
         deleteButton.visible = building;
         placeShelfButtons(building, any);
-        buildButton.visible = building;
+        buildButton.visible = building || toolModePage;
+        buildButton.active = toolModePage ? tool : blueprint && tool && !many;
         renameButton.visible = building;
         discardButton.visible = building && (capture || WrightsClientState.mode == WrightsClientState.Mode.SAVING);
         resumeButton.visible = building && capture;
@@ -1478,7 +1480,10 @@ public class WrightsMenuScreen extends Screen {
         BLUEPRINTS, PLACE, MIRROR, SHAPE, EXCHANGE
     }
 
-    /** Switches the Building page to one mode; the saved flags make the choice stick when the menu reopens. */
+    /**
+     * Switches the Building page only. Does not arm the controller — browsing Shape / Place /
+     * Mirror / Exchange used to change the held mode. {@link #onBuildClick()} arms that mode.
+     */
     private boolean chooseBuildMode(BuildMode mode) {
         placePage = mode == BuildMode.PLACE;
         mirrorPage = mode == BuildMode.MIRROR;
@@ -1488,18 +1493,6 @@ public class WrightsMenuScreen extends Screen {
         savedMirror = mirrorPage;
         savedShape = shapePage;
         savedExchange = exchangePage;
-        // BLUEPRINTS drops all aims so reopening (e.g. after Edit -> Cancel) stays on Blueprints.
-        if (requireTool()) {
-            switch (mode) {
-                case BLUEPRINTS -> WrightsClientState.selectBlueprintTool();
-                case PLACE -> WrightsClientState.selectPlaceTool();
-                case MIRROR -> WrightsClientState.selectMirrorTool();
-                case SHAPE -> WrightsClientState.selectShapeTool();
-                case EXCHANGE -> WrightsClientState.selectExchangeTool();
-            }
-        } else {
-            WrightsClientState.clearBuildAims();
-        }
         sortOpen = false;
         setFocused(null);
         refresh();
@@ -1831,7 +1824,7 @@ public class WrightsMenuScreen extends Screen {
         return panelY + panelH - 6;
     }
 
-    private void placeClose(boolean blueprintPage) {
+    private void placeClose(boolean blueprintPage, boolean toolModePage) {
         if (closeButton == null) {
             return;
         }
@@ -1841,8 +1834,13 @@ public class WrightsMenuScreen extends Screen {
             return;
         }
         int right = panelX + panelW - 12;
+        int footY = wideCardBottom() - 8 - closeButton.getHeight();
         closeButton.setX(right - 10 - closeButton.getWidth());
-        closeButton.setY(wideCardBottom() - 8 - closeButton.getHeight());
+        closeButton.setY(footY);
+        if (toolModePage && buildButton != null) {
+            buildButton.setX(closeButton.getX() - 4 - buildButton.getWidth());
+            buildButton.setY(footY);
+        }
     }
 
     /** Build/Close always; Materials joins that row when the detail card is short. */
@@ -2179,6 +2177,36 @@ public class WrightsMenuScreen extends Screen {
             return;
         }
         PacketDistributor.sendToServer(new BlueprintPayloads.BeginEdit(summary.id()));
+    }
+
+    /** Blueprints Build, or arm Place / Mirror / Shape / Exchange from that page. */
+    private void onBuildClick() {
+        if (shapePage || placePage || mirrorPage || exchangePage) {
+            armToolMode();
+            return;
+        }
+        build();
+    }
+
+    /** Puts the controller on this page's mode with its current settings, then closes the menu. */
+    private void armToolMode() {
+        if (!requireTool()) {
+            return;
+        }
+        if (shapePage) {
+            WrightsClientState.selectShapeTool();
+        } else if (placePage) {
+            WrightsClientState.selectPlaceTool();
+        } else if (mirrorPage) {
+            WrightsClientState.selectMirrorTool();
+        } else if (exchangePage) {
+            WrightsClientState.selectExchangeTool();
+        } else {
+            return;
+        }
+        WrightsClientState.styleHudTicks = WrightsClientState.STYLE_HUD_TICKS;
+        WrightsClientState.styleAnnounce = true;
+        this.minecraft.setScreen(null);
     }
 
     void build() {
