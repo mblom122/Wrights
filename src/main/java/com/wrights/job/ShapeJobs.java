@@ -1,6 +1,6 @@
 package com.wrights.job;
 
-import com.wrights.job.JobManager.CrewGap;
+import com.wrights.job.CrewRoster.CrewGap;
 import com.wrights.job.JobManager.PlaceResult;
 import java.util.ArrayList;
 import java.util.List;
@@ -187,7 +187,7 @@ public final class ShapeJobs {
         int workBlocks = exchangeWork != null ? Math.max(1, exchangeWork.blockCount()) : Math.max(1, job.total());
         int room = Math.min(
                 WrightsConfig.usefulCrewFor(workBlocks, job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(),
-                        WrightHomes.bestOps(player, id -> !JobManager.claimedByOther(player, SchematicLibrary.get(player.getServer()), null, id))),
+                        WrightHomes.bestOps(player, id -> !CrewRoster.claimedByOther(player, SchematicLibrary.get(player.getServer()), null, id))),
                 WrightsConfig.maxWrightsPerJob(job));
         int wanted = drones > 0 ? Math.min(drones, room) : room;
         wanted = Math.max(1, wanted);
@@ -196,7 +196,7 @@ public final class ShapeJobs {
             job.setQueued(true);
             job.setCrewQuota(wanted);
         }
-        if (!JobManager.instant(player) && JobManager.freeUnits(player, library, job, 1).isEmpty() && !job.deferSupplies()) {
+        if (!JobManager.instant(player) && CrewRoster.freeUnits(player, library, job, 1).isEmpty() && !job.deferSupplies()) {
             job.setCrewQuota(wanted);
             job.setQueued(true);
             library.addJob(job);
@@ -503,8 +503,8 @@ public final class ShapeJobs {
     /** Assign up to {@code requested} free wrights to a streaming Shape / Exchange / Place job. */
     private static boolean assignShapeCrew(ServerPlayer player, BuildJob job, int requested) {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
-        JobManager.bindCrewIds(player, library);
-        int bestOps = WrightHomes.bestOps(player, id -> !JobManager.claimedByOther(player, library, job.id(), id));
+        CrewRoster.bindCrewIds(player, library);
+        int bestOps = WrightHomes.bestOps(player, id -> !CrewRoster.claimedByOther(player, library, job.id(), id));
         int stations = smallBoxCrew(job, bestOps);
         if (stations <= 0) {
             stations = planShapeStations(job, bestOps);
@@ -515,11 +515,11 @@ public final class ShapeJobs {
                         Math.max(1, job.total()), job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(), bestOps);
         int room = Math.min(fitted, WrightsConfig.maxWrightsPerJob(job));
         int wanted = Math.max(1, Math.min(requested > 0 ? requested : room, room));
-        List<WrightHomes.FreeWright> units = JobManager.freeUnits(player, library, job, wanted);
+        List<WrightHomes.FreeWright> units = CrewRoster.freeUnits(player, library, job, wanted);
         if (units.isEmpty()) {
-            JobManager.tellNoCrew(player, job, false);
-            if (JobManager.crewGap(player, job) != CrewGap.NONE_AVAILABLE) {
-                JobManager.glowClosestPort(player, player.getServer().getLevel(job.dimension()), job.min());
+            CrewRoster.tellNoCrew(player, job, false);
+            if (CrewRoster.crewGap(player, job) != CrewGap.NONE_AVAILABLE) {
+                CrewRoster.glowClosestPort(player, player.getServer().getLevel(job.dimension()), job.min());
             }
             return false;
         }
@@ -756,12 +756,12 @@ public final class ShapeJobs {
             job.setQueued(false);
         }
         if (job.queued()) {
-            JobManager.topUpQueued(player, library, job);
+            CrewRoster.topUpQueued(player, library, job);
             if (!job.hasCrew() && !JobManager.instant(player) && job.droneId() == null) {
                 return;
             }
         }
-        if (JobManager.holdWithoutDrones(player, library, job)) {
+        if (CrewRoster.holdWithoutDrones(player, library, job)) {
             job.setWaitKind(BuildJob.WAIT_NONE);
             return;
         }

@@ -423,17 +423,17 @@ public final class BlueprintNetwork {
 
     private static void jobDrones(BlueprintPayloads.SetJobDrones payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
-        context.enqueueWork(() -> com.wrights.job.JobManager.setJobDrones(player, payload.id(), payload.unit(), payload.add()));
+        context.enqueueWork(() -> com.wrights.job.CrewRoster.setJobDrones(player, payload.id(), payload.unit(), payload.add()));
     }
 
     private static void jobQuota(BlueprintPayloads.SetJobQuota payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
-        context.enqueueWork(() -> com.wrights.job.JobManager.setJobQuota(player, payload.id(), payload.quota()));
+        context.enqueueWork(() -> com.wrights.job.CrewRoster.setJobQuota(player, payload.id(), payload.quota()));
     }
 
     private static void moveDrone(BlueprintPayloads.MoveDrone payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
-        context.enqueueWork(() -> com.wrights.job.JobManager.moveDrone(player, payload.unit(), payload.job()));
+        context.enqueueWork(() -> com.wrights.job.CrewRoster.moveDrone(player, payload.unit(), payload.job()));
     }
 
     private static void visitWright(BlueprintPayloads.VisitWright payload, IPayloadContext context) {
@@ -452,8 +452,8 @@ public final class BlueprintNetwork {
     private static void deployAsk(BlueprintPayloads.DeployAsk payload, IPayloadContext context) {
         ServerPlayer player = (ServerPlayer) context.player();
         context.enqueueWork(() -> PacketDistributor.sendToPlayer(player, new BlueprintPayloads.DeployPool(
-                com.wrights.job.JobManager.freeWrightCount(player),
-                com.wrights.job.JobManager.storedWrightCount(player))));
+                com.wrights.job.CrewRoster.freeWrightCount(player),
+                com.wrights.job.CrewRoster.storedWrightCount(player))));
     }
 
     private static void clientDeployPool(BlueprintPayloads.DeployPool payload, IPayloadContext context) {
@@ -849,7 +849,7 @@ public final class BlueprintNetwork {
 
     public static void syncJobs(ServerPlayer player) {
         com.wrights.schematic.SchematicLibrary library = com.wrights.schematic.SchematicLibrary.get(player.getServer());
-        com.wrights.job.JobManager.bindCrewIds(player, library);
+        com.wrights.job.CrewRoster.bindCrewIds(player, library);
         java.util.List<BuildJob> jobs = new java.util.ArrayList<>(library.jobsFor(player.getUUID()));
         jobs.sort(java.util.Comparator.comparing(BuildJob::finished).thenComparing(java.util.Comparator.comparingInt(BuildJob::historyOrder).reversed()));
         java.util.List<BlueprintPayloads.JobLine> lines = new java.util.ArrayList<>();

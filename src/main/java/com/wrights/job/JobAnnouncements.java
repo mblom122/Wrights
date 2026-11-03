@@ -49,7 +49,7 @@ public final class JobAnnouncements {
             kind = JobEventLog.STOPPED;
         }
         String historyDetail = line.getString();
-        int crew = Math.max(job.crewQuota(), JobManager.assignedCount(job));
+        int crew = Math.max(job.crewQuota(), CrewRoster.assignedCount(job));
         if (crew > 0 && (kind == JobEventLog.COMPLETED || kind == JobEventLog.UNDONE)) {
             String crewBit = Component.translatable(
                     crew == 1 ? "history.wrights.crew_used_one" : "history.wrights.crew_used",
