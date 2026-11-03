@@ -118,7 +118,10 @@ public final class SelectionRenderer {
                 || WrightsClientState.exchangeToolActive()
                 || WrightsClientState.placeToolActive())) {
             drawShapeGhosts(pose, buffers, camera, minecraft);
-        } else if (guiOk && WrightsClientState.mode == WrightsClientState.Mode.BUILD && !WrightsClientState.bindSupply && !mirrorBlocks()) {
+        } else if (guiOk && WrightsClientState.mode == WrightsClientState.Mode.BUILD
+                && !WrightsClientState.bindSupply
+                && !WrightsClientState.portChestAim()
+                && !mirrorBlocks()) {
             drawPreview(pose, buffers, camera);
         } else if (guiOk && mirrorBlocks()) {
             drawMirrorBlockGhosts(pose, buffers, camera, minecraft);
@@ -128,8 +131,13 @@ public final class SelectionRenderer {
                 && (WrightsClientState.bindSupply || WrightsClientState.portChestAim() || WrightsClientState.supplyBound)) {
             drawSupplyMarkers(pose, buffers, camera, minecraft);
         }
+        // Mirror plane / shape anchor glow only while that tool is the active Build mode.
         drawMirror(pose, buffers, camera, minecraft);
-        drawShapeAnchorGlow(pose, buffers, camera, minecraft);
+        if (WrightsClientState.shapeToolActive()
+                || WrightsClientState.exchangeToolActive()
+                || WrightsClientState.placeToolActive()) {
+            drawShapeAnchorGlow(pose, buffers, camera, minecraft);
+        }
     }
 
     private static boolean mirrorBlocks() {

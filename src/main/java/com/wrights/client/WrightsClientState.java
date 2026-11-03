@@ -1770,6 +1770,7 @@ public final class WrightsClientState {
         }
         leaveCapture();
         clearBuildAims();
+        clearShapeLookSnap();
         mode = Mode.BUILD;
         bindPort = port.immutable();
         styleHudTicks = STYLE_HUD_TICKS;
