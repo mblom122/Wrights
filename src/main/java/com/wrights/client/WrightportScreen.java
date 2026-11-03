@@ -57,7 +57,7 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
             }
         });
         addRenderableWidget(boundaryButton);
-        chestButton = new WrightsButton(0, 0, 100, 16, Component.translatable("screen.wrights.port_chest"), button -> {
+        chestButton = new WrightsButton(0, 0, 88, 16, Component.translatable("screen.wrights.port_chest"), button -> {
             if (getMinecraft().player != null && net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
                 if (!controllerHeld()) {
                     getMinecraft().player.displayClientMessage(
