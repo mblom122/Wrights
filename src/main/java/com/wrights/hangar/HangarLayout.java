@@ -36,11 +36,11 @@ public final class HangarLayout {
 
     /** First player-inventory slot X relative to the screen leftPos. */
     public static int invSlotLeft() {
-        return 112;
+        return 113;
     }
 
     /** First player-inventory slot Y relative to the screen topPos. */
     public static int invSlotTop() {
-        return 247;
+        return 248;
     }
 }
