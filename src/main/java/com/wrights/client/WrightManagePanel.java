@@ -242,17 +242,14 @@ final class WrightManagePanel {
                     stack = new ItemStack(part);
                 }
             }
-            if (hover && selected && !locked) {
-                graphics.fill(x, y, x + HangarGui.PART_SLOT, y + 1, 0xFF3CFE9A);
-                graphics.fill(x, y + HangarGui.PART_SLOT - 1, x + HangarGui.PART_SLOT, y + HangarGui.PART_SLOT, 0xFF3CFE9A);
-                graphics.fill(x, y, x + 1, y + HangarGui.PART_SLOT, 0xFF3CFE9A);
-                graphics.fill(x + HangarGui.PART_SLOT - 1, y, x + HangarGui.PART_SLOT, y + HangarGui.PART_SLOT, 0xFF3CFE9A);
-            }
             if (!stack.isEmpty()) {
                 WrightsUi.slotItem(graphics, screen.font(), stack, x, y, HangarGui.PART_SLOT);
                 if (locked) {
                     graphics.fill(x + 1, y + 1, x + HangarGui.PART_SLOT - 1, y + HangarGui.PART_SLOT - 1, 0x88060C14);
                 }
+            }
+            if (hover && selected && !locked) {
+                HangarBay.hangarHoverTint(graphics, x, y, HangarGui.PART_SLOT);
             }
         }
     }

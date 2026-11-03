@@ -92,12 +92,11 @@ final class HangarBay {
         if (drawFrame) {
             int edge = selected ? WrightsUi.COPPER : hovered ? WrightsUi.BLUE : WrightsUi.MUTED;
             WrightsUi.slot(graphics, x, y, size, edge & 0xFFFFFF | 0xFF000000);
-        } else if (hovered || selected) {
-            int edge = selected ? 0xFFC47A3A : 0xFF3CFE9A;
-            graphics.fill(x, y, x + size, y + 1, edge);
-            graphics.fill(x, y + size - 1, x + size, y + size, edge);
-            graphics.fill(x, y, x + 1, y + size, edge);
-            graphics.fill(x + size - 1, y, x + size, y + size, edge);
+        } else if (selected) {
+            graphics.fill(x, y, x + size, y + 1, 0xFFC47A3A);
+            graphics.fill(x, y + size - 1, x + size, y + size, 0xFFC47A3A);
+            graphics.fill(x, y, x + 1, y + size, 0xFFC47A3A);
+            graphics.fill(x + size - 1, y, x + size, y + size, 0xFFC47A3A);
         }
         if (marked) {
             graphics.fill(x + 2, y + 2, x + 8, y + 8, 0xFF3CFE9A);
@@ -110,11 +109,22 @@ final class HangarBay {
                 graphics.fill(x + 1, y + 1, x + size - 1, y + size - 1, 0x88060C14);
             }
         }
+        if (hovered) {
+            hangarHoverTint(graphics, x, y, size);
+        }
         if (selected && drawFrame) {
             graphics.fill(x, y, x + size, y + 1, 0xFFC47A3A);
             graphics.fill(x, y + size - 1, x + size, y + size, 0xFFC47A3A);
             graphics.fill(x, y, x + 1, y + size, 0xFFC47A3A);
             graphics.fill(x + size - 1, y, x + size, y + size, 0xFFC47A3A);
         }
+    }
+
+    /** Vanilla-style white slot highlight, inset so the painted border stays visible. */
+    static void hangarHoverTint(GuiGraphics graphics, int x, int y, int size) {
+        if (size <= 2) {
+            return;
+        }
+        graphics.fill(x + 1, y + 1, x + size - 1, y + size - 1, 0x80FFFFFF);
     }
 }
