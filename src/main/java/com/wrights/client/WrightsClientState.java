@@ -136,6 +136,9 @@ public final class WrightsClientState {
     public static boolean supplyBound;
     public static BlockPos supplyPos;
     public static long supplyHighlightUntil;
+    /** Wrightport supply chest pulse (Bind Chest → Highlight). */
+    public static BlockPos portChestHighlightPos;
+    public static long portChestHighlightUntil;
     public static String portGlowDim = "";
     public static BlockPos portGlowPos;
     public static BlockPos portGlowAnchor;
@@ -782,6 +785,8 @@ public final class WrightsClientState {
         resumeSent = false;
         restorePlacementPending = false;
         bindPort = null;
+        portChestHighlightPos = null;
+        portChestHighlightUntil = 0L;
         clearShapeLookSnap();
         updateFlags();
     }
@@ -1813,6 +1818,19 @@ public final class WrightsClientState {
             return;
         }
         supplyHighlightUntil = System.currentTimeMillis() + 5000L;
+    }
+
+    /** Pulse the wrightport's bound chest in the world for 5 seconds. */
+    public static void highlightPortChest(BlockPos chest) {
+        if (chest == null) {
+            return;
+        }
+        portChestHighlightPos = chest.immutable();
+        portChestHighlightUntil = System.currentTimeMillis() + 5000L;
+    }
+
+    public static boolean portChestHighlighting() {
+        return portChestHighlightPos != null && System.currentTimeMillis() < portChestHighlightUntil;
     }
 
     /** Creative-only teleport to the bound supply chest. */

@@ -97,6 +97,7 @@ public final class SelectionRenderer {
         drawMarkedWrights(pose, buffers, camera, minecraft);
         // Highlighted jobs stay visible without the controller (same as marked ports / wrights).
         drawMarkedJobs(pose, buffers, camera, minecraft);
+        drawPortChestHighlight(pose, buffers, camera, minecraft);
         drawMirrorAnchorGlow(pose, buffers, camera, minecraft);
         drawMineMarks(pose, buffers, camera, minecraft);
         boolean placing = minecraft.screen instanceof PlacementScreen;
@@ -909,6 +910,23 @@ public final class SelectionRenderer {
         if (any) {
             buffers.endBatch(RenderType.lines());
         }
+    }
+
+    /** 5s pulse from the wrightport Bind Chest → Highlight button (no controller required). */
+    private static void drawPortChestHighlight(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
+        if (!WrightsClientState.portChestHighlighting() || minecraft.level == null) {
+            return;
+        }
+        BlockPos pos = WrightsClientState.portChestHighlightPos;
+        if (pos == null || !minecraft.level.isLoaded(pos)) {
+            return;
+        }
+        VertexConsumer lines = buffers.getBuffer(RenderType.lines());
+        float pulse = 0.4F + 0.6F * (float) Math.sin(System.currentTimeMillis() / 90.0D);
+        AABB glow = supplyBox(minecraft.level, pos).inflate(0.14D);
+        drawBox(pose, lines, glow, camera, 1.0F, 0.86F, 0.2F, pulse);
+        drawBox(pose, lines, glow.inflate(0.08D), camera, 1.0F, 0.96F, 0.55F, pulse * 0.7F);
+        buffers.endBatch(RenderType.lines());
     }
 
     private static void drawSupplyMarkers(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
