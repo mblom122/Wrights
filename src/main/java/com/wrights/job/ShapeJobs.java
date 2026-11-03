@@ -1089,7 +1089,12 @@ public final class ShapeJobs {
                     index = at;
                     usedAnchor = true;
                 } else {
-                    index = nextShapeIndex(level, player, job, hand, usable, shapeKind, shapePinLocal, true, scanCap);
+                    // Fill this hover's whole reach first, even across a share border, then look further.
+                    index = nextInReach(level, player, job, hand, drone, shapeKind, shapePinLocal);
+                    if (index < 0) {
+                        index = nextShapeIndex(
+                                level, player, job, hand, usable, shapeKind, shapePinLocal, true, scanCap);
+                    }
                     if (index < 0) {
                         index = nextShapeIndex(
                                 level, player, job, hand, usable, shapeKind, shapePinLocal, false, scanCap);
@@ -1365,6 +1370,58 @@ public final class ShapeJobs {
             return seed;
         }
         return -1;
+    }
+
+    /**
+     * Open, unclaimed cell inside this wright's reach from where it hovers now, owned or not.
+     * Without this a hover at the edge of a thin share only placed the share's own cells and left
+     * the rest of its reach for the neighbour, so full crews built one-block-wide lines.
+     * Another wright's aim is still respected, so nobody piles onto a claimed cell. Returns -1 when none.
+     */
+    private static int nextInReach(
+            ServerLevel level,
+            ServerPlayer player,
+            BuildJob job,
+            BuildJob.Hand hand,
+            DroneEntity drone,
+            com.wrights.blueprint.Shapes.Kind shapeKind,
+            BlockPos shapePinLocal) {
+        if (drone == null || job.min() == null) {
+            return -1;
+        }
+        int reach = WrightTier.operationReachSqr(handOps(hand));
+        BlockPos foot = BlockPos.containing(drone.getX(), drone.getY() - 0.85D, drone.getZ());
+        int best = -1;
+        int bestScore = Integer.MAX_VALUE;
+        for (int dy = -1; dy <= 1; dy++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    int dist = dx * dx + dy * dy + dz * dz;
+                    if (dist > reach) {
+                        continue;
+                    }
+                    BlockPos pos = foot.offset(dx, dy, dz);
+                    int index = job.scanIndex(pos);
+                    if (index < 0 || job.isShapeResolved(index) || WorkPicker.aimedByOther(job, hand, index)) {
+                        continue;
+                    }
+                    if (classifyShapeCell(level, player, job, hand, index, shapeKind, shapePinLocal, false)
+                            != ShapeCell.READY) {
+                        continue;
+                    }
+                    boolean owned = ownsShapeCell(
+                            job, hand, pos.getX() - job.min().getX(), pos.getY() - job.min().getY(),
+                            pos.getZ() - job.min().getZ());
+                    // Nearest first; at equal distance the wright's own cells go before a neighbour's.
+                    int score = dist * 2 + (owned ? 0 : 1);
+                    if (score < bestScore || (score == bestScore && index < best)) {
+                        bestScore = score;
+                        best = index;
+                    }
+                }
+            }
+        }
+        return best;
     }
 
     /** Operations tier for AOE sizing. */
