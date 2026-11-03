@@ -1,0 +1,37 @@
+{
+  "TEX_W": 512,
+  "TEX_H": 286,
+  "STORAGE": {
+    "ox": 174,
+    "oy": 207,
+    "slot": 28,
+    "gap": 6,
+    "cols": 5,
+    "rows": 2
+  },
+  "HARDWARE": {
+    "ox": 147,
+    "oy": 122,
+    "slot": 34,
+    "gap": 57,
+    "cols": 3,
+    "rows": 1
+  },
+  "BUTTONS": {
+    "ox": 448,
+    "oy": 68,
+    "slot": 20,
+    "gap": 6,
+    "cols": 1,
+    "rows": 3
+  },
+  "TITLE": [
+    170,
+    8,
+    340,
+    28
+  ],
+  "BTN_SIZE": 32,
+  "BTN_ATLAS_W": 96,
+  "BTN_ATLAS_H": 160
+}

@@ -5,11 +5,11 @@ import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.core.BlockPos;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -19,12 +19,9 @@ import com.wrights.drone.Swarm;
 import com.wrights.menu.WrightportMenu;
 import com.wrights.network.BlueprintPayloads;
 
-/** The placed wrightport. Same wright list as Manage, for this block alone. */
+/** Placed wrightport hangar — textured panel with Boundary / Bind / Highlight icons. */
 public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> implements ManageHost {
     private final WrightManagePanel manage = new WrightManagePanel();
-    private WrightsButton boundaryButton;
-    private WrightsButton chestButton;
-    private WrightsButton highlightChestButton;
     private EditBox nameBox;
     private String sentName = "";
     private boolean energyKnown;
@@ -33,14 +30,14 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
 
     public WrightportScreen(WrightportMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
-        this.imageWidth = 368;
-        this.imageHeight = 348;
+        this.imageWidth = HangarGui.WIDTH;
+        this.imageHeight = HangarGui.PANEL_H;
     }
 
     @Override
     protected void init() {
-        this.imageWidth = WrightsUi.fitW(368, this.width);
-        this.imageHeight = WrightsUi.fitH(348, this.height);
+        this.imageWidth = HangarGui.WIDTH;
+        this.imageHeight = HangarGui.PANEL_H;
         super.init();
         if (WrightsClientState.dockWaiting()) {
             if (getMinecraft().player != null) {
@@ -52,45 +49,17 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         manage.setActive(true);
         clearWidgets();
         manage.addWidgets(this);
-        boundaryButton = new WrightsButton(0, 0, 88, 16, Component.translatable("screen.wrights.boundary"), button -> {
-            if (getMinecraft().level != null) {
-                WrightportBounds.toggle(getMinecraft().level.dimension(), menu.pos());
-            }
-        });
-        addRenderableWidget(boundaryButton);
-        chestButton = new WrightsButton(0, 0, 88, 16, Component.translatable("screen.wrights.port_chest"), button -> {
-            if (getMinecraft().player != null && net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
-                if (!controllerHeld()) {
-                    getMinecraft().player.displayClientMessage(
-                            Component.translatable("message.wrights.need_controller"), true);
-                    return;
-                }
-                PacketDistributor.sendToServer(new BlueprintPayloads.BindPortChest(menu.pos(), net.minecraft.core.BlockPos.ZERO, true));
-                return;
-            }
-            // Close the port UI and put the held controller into Bind Chest aim for this wrightport.
-            if (WrightsClientState.beginPortChest(menu.pos())) {
-                getMinecraft().setScreen(null);
-            }
-        });
-        addRenderableWidget(chestButton);
-        highlightChestButton = new WrightsButton(0, 0, 88, 16, Component.translatable("screen.wrights.supply_highlight"), button -> {
-            BlockPos chest = boundChest();
-            if (chest != null) {
-                WrightsClientState.highlightPortChest(chest);
-                getMinecraft().setScreen(null);
-            }
-        });
-        addRenderableWidget(highlightChestButton);
-        nameBox = new EditBox(this.font, 0, 0, 140, 16, Component.translatable("screen.wrights.name"));
+        nameBox = new EditBox(this.font, 0, 0, HangarGui.TITLE_W, 14, Component.translatable("screen.wrights.name"));
         nameBox.setMaxLength(32);
         nameBox.setHint(Component.translatable("screen.wrights.name"));
+        nameBox.setBordered(false);
+        nameBox.setTextColor(WrightsUi.TEXT);
         if (getMinecraft().level != null && getMinecraft().level.getBlockEntity(menu.pos()) instanceof WrightportBlockEntity port) {
             sentName = port.label();
             nameBox.setValue(sentName);
         }
         addRenderableWidget(nameBox);
-        placeBoundary();
+        placeName();
     }
 
     private boolean canRename() {
@@ -121,7 +90,7 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
     }
 
     private void placeName() {
-        if (nameBox == null || boundaryButton == null) {
+        if (nameBox == null) {
             return;
         }
         boolean mine = canRename();
@@ -129,30 +98,9 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         if (!mine) {
             return;
         }
-        int right = boundaryButton.getX() - 6;
-        nameBox.setX(leftPos + 12);
-        nameBox.setY(topPos + 8);
-        nameBox.setWidth(Math.max(60, right - nameBox.getX()));
-    }
-
-    private void drawOwner(GuiGraphics graphics) {
-        if (getMinecraft().level == null || !(getMinecraft().level.getBlockEntity(menu.pos()) instanceof WrightportBlockEntity port)) {
-            return;
-        }
-        if (!canRename()) {
-            String title = this.font.plainSubstrByWidth(port.title().getString(), Math.max(40, imageWidth - 120));
-            graphics.drawString(this.font, title, leftPos + 12, topPos + 12, WrightsUi.TEXT, false);
-        }
-        Component owner = port.ownerLabel();
-        int chestReserve = 0;
-        if (chestButton != null && chestButton.visible) {
-            chestReserve = chestButton.getWidth() + 8;
-            if (!controllerHeld()) {
-                chestReserve += this.font.width(Component.translatable("screen.wrights.port_chest_need_controller")) + 8;
-            }
-        }
-        int limit = imageWidth - 24 - chestReserve;
-        graphics.drawString(this.font, this.font.plainSubstrByWidth(owner.getString(), Math.max(24, limit)), leftPos + 12, topPos + 28, WrightsUi.MUTED, false);
+        nameBox.setX(leftPos + HangarGui.TITLE_X + 4);
+        nameBox.setY(topPos + HangarGui.TITLE_Y + 3);
+        nameBox.setWidth(HangarGui.TITLE_W - 8);
     }
 
     private BlockPos boundChest() {
@@ -161,82 +109,6 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
             return null;
         }
         return port.supplyChest();
-    }
-
-    private void placeBoundary() {
-        if (boundaryButton == null) {
-            return;
-        }
-        boundaryButton.setX(leftPos + imageWidth - 16 - boundaryButton.getWidth());
-        boundaryButton.setY(topPos + 8);
-        // Same choice on/off language as Bind Chest (teal when active feature).
-        boundaryButton.setPicked(WrightportBounds.showing(menu.pos()));
-        if (chestButton != null) {
-            boolean mine = canRename();
-            boolean held = controllerHeld();
-            boolean bound = boundChest() != null;
-            chestButton.setShown(mine);
-            // setShown forces active; Bind Chest stays disabled until a controller is held.
-            chestButton.active = mine && held;
-            chestButton.setX(boundaryButton.getX());
-            chestButton.setY(boundaryButton.getY() + 18);
-            // Off = copper idle (no chest); on = teal (chest bound) — same as Boundary.
-            chestButton.setPicked(bound);
-            if (!chestButton.active) {
-                chestButton.setFocused(false);
-            }
-            if (highlightChestButton != null) {
-                highlightChestButton.setShown(mine && bound);
-                highlightChestButton.active = mine && bound;
-                highlightChestButton.setX(chestButton.getX());
-                highlightChestButton.setY(chestButton.getY() + chestButton.getHeight() + 3 + 9 + 4);
-                highlightChestButton.setPicked(WrightsClientState.portChestHighlighting()
-                        && boundChest() != null
-                        && boundChest().equals(WrightsClientState.portChestHighlightPos));
-            }
-        } else if (highlightChestButton != null) {
-            highlightChestButton.setShown(false);
-        }
-    }
-
-    private void drawChestNeedController(GuiGraphics graphics) {
-        if (chestButton == null || !chestButton.visible || controllerHeld()) {
-            return;
-        }
-        Component tip = Component.translatable("screen.wrights.port_chest_need_controller");
-        int maxW = Math.max(24, chestButton.getX() - (leftPos + 12) - 6);
-        String text = this.font.plainSubstrByWidth(tip.getString(), maxW);
-        int x = chestButton.getX() - 6 - this.font.width(text);
-        int y = chestButton.getY() + (chestButton.getHeight() - 8) / 2;
-        graphics.drawString(this.font, text, x, y, WrightsUi.RED, false);
-    }
-
-    private void drawChestCoords(GuiGraphics graphics) {
-        BlockPos chest = boundChest();
-        if (chest == null || chestButton == null || !chestButton.visible) {
-            return;
-        }
-        Component line = Component.translatable("screen.wrights.supply_at", chest.getX(), chest.getY(), chest.getZ());
-        String text = this.font.plainSubstrByWidth(line.getString(), chestButton.getWidth() + 24);
-        int x = chestButton.getX() + chestButton.getWidth() - this.font.width(text);
-        int y = chestButton.getY() + chestButton.getHeight() + 3;
-        graphics.drawString(this.font, text, x, y, WrightsUi.MUTED, false);
-    }
-
-    /** Bottom of Boundary / Bind Chest / coords / Highlight stack — energy sits under this. */
-    private int headerStackBottom() {
-        int y = topPos + 8 + 16;
-        if (canRename()) {
-            y = topPos + 8 + 18 + 16;
-            if (boundChest() != null) {
-                y += 3 + 9 + 4 + 16;
-            }
-        }
-        return y;
-    }
-
-    private int energyBarY() {
-        return headerStackBottom() + 6;
     }
 
     private boolean controllerHeld() {
@@ -252,6 +124,93 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
             return true;
         }
         return WrightsClientState.digitalBound;
+    }
+
+    private void drawPortButtons(GuiGraphics graphics, int mouseX, int mouseY) {
+        boolean mine = canRename();
+        boolean held = controllerHeld();
+        boolean bound = boundChest() != null;
+        boolean boundaryOn = WrightportBounds.showing(menu.pos());
+        boolean highlightOn = WrightsClientState.portChestHighlighting()
+                && boundChest() != null
+                && boundChest().equals(WrightsClientState.portChestHighlightPos);
+
+        boolean[] enabled = {
+                true,
+                mine && held,
+                mine && bound
+        };
+        boolean[] active = {
+                boundaryOn,
+                bound,
+                highlightOn
+        };
+        for (int i = 0; i < 3; i++) {
+            int x = HangarGui.buttonX(leftPos);
+            int y = HangarGui.buttonY(topPos, i);
+            boolean hover = mouseX >= x && mouseX < x + HangarGui.BTN_SLOT
+                    && mouseY >= y && mouseY < y + HangarGui.BTN_SLOT;
+            HangarGui.blitButton(graphics, leftPos, topPos, i, HangarGui.buttonState(enabled[i], active[i], hover && enabled[i]));
+        }
+    }
+
+    private boolean clickPortButton(double mouseX, double mouseY) {
+        int hit = HangarGui.buttonHit(leftPos, topPos, mouseX, mouseY);
+        if (hit < 0) {
+            return false;
+        }
+        boolean mine = canRename();
+        if (hit == HangarGui.BTN_BOUNDARY) {
+            if (getMinecraft().level != null) {
+                WrightportBounds.toggle(getMinecraft().level.dimension(), menu.pos());
+            }
+            return true;
+        }
+        if (hit == HangarGui.BTN_BIND) {
+            if (!mine) {
+                return true;
+            }
+            if (getMinecraft().player != null && net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
+                if (!controllerHeld()) {
+                    getMinecraft().player.displayClientMessage(
+                            Component.translatable("message.wrights.need_controller"), true);
+                    return true;
+                }
+                PacketDistributor.sendToServer(new BlueprintPayloads.BindPortChest(menu.pos(), BlockPos.ZERO, true));
+                return true;
+            }
+            if (WrightsClientState.beginPortChest(menu.pos())) {
+                getMinecraft().setScreen(null);
+            }
+            return true;
+        }
+        if (hit == HangarGui.BTN_HIGHLIGHT) {
+            BlockPos chest = boundChest();
+            if (mine && chest != null) {
+                WrightsClientState.highlightPortChest(chest);
+                getMinecraft().setScreen(null);
+            }
+            return true;
+        }
+        return true;
+    }
+
+    private void drawTooltips(GuiGraphics graphics, int mouseX, int mouseY) {
+        int hit = HangarGui.buttonHit(leftPos, topPos, mouseX, mouseY);
+        if (hit < 0) {
+            return;
+        }
+        Component tip = switch (hit) {
+            case HangarGui.BTN_BOUNDARY -> Component.translatable("screen.wrights.boundary");
+            case HangarGui.BTN_BIND -> !controllerHeld() && canRename()
+                    ? Component.translatable("screen.wrights.port_chest_need_controller")
+                    : Component.translatable("screen.wrights.port_chest");
+            case HangarGui.BTN_HIGHLIGHT -> Component.translatable("screen.wrights.supply_highlight");
+            default -> null;
+        };
+        if (tip != null) {
+            graphics.renderTooltip(this.font, tip, mouseX, mouseY);
+        }
     }
 
     @Override
@@ -331,22 +290,22 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
 
     @Override
     public int areaX() {
-        return leftPos + 4;
+        return leftPos;
     }
 
     @Override
     public int areaY() {
-        return Math.max(topPos + 60, energyBarY() + 16);
+        return topPos;
     }
 
     @Override
     public int areaW() {
-        return Math.max(160, imageWidth - 8);
+        return HangarGui.WIDTH;
     }
 
     @Override
     public int areaH() {
-        return Math.max(100, topPos + imageHeight - 8 - areaY());
+        return HangarGui.PANEL_H;
     }
 
     public void acceptEnergy(BlockPos pos, int stored, int capacity) {
@@ -365,12 +324,11 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
             stored = port.energyStored();
             capacity = port.energyCapacity();
         }
-        WrightsUi.energyBar(graphics, this.font, leftPos + 12, energyBarY(), Math.max(40, imageWidth - 24), stored, capacity);
+        HangarGui.drawEnergyGauge(graphics, leftPos, topPos, stored, capacity);
     }
 
     @Override
     public boolean toolHeld() {
-        // Hangar edits stay available from the block; Chest bind still needs a controller.
         return true;
     }
 
@@ -385,26 +343,23 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
 
     @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
-        WrightsUi.panel(graphics, leftPos, topPos, imageWidth, imageHeight);
+        HangarGui.blitPanel(graphics, leftPos, topPos);
     }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         this.renderBackground(graphics, mouseX, mouseY, partialTick);
         renderBg(graphics, partialTick, mouseX, mouseY);
-        manage.render(this, graphics, mouseX, mouseY);
-        placeBoundary();
         placeName();
-        drawOwner(graphics);
+        manage.render(this, graphics, mouseX, mouseY);
         drawEnergy(graphics);
-        drawChestNeedController(graphics);
-        drawChestCoords(graphics);
+        drawPortButtons(graphics, mouseX, mouseY);
         if (canRename() && !portHasSupply()) {
             graphics.drawString(
                     this.font,
                     Component.translatable("message.wrights.port_need_supply"),
                     leftPos + 12,
-                    topPos + imageHeight - 14,
+                    topPos + HangarGui.HEIGHT - 14,
                     WrightsUi.RED,
                     false);
         }
@@ -412,12 +367,16 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
             widget.render(graphics, mouseX, mouseY, partialTick);
         }
         manage.drawDigitalTip(this, graphics, mouseX, mouseY);
+        drawTooltips(graphics, mouseX, mouseY);
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (nameBox != null && nameBox.isFocused() && !nameBox.isMouseOver(mouseX, mouseY)) {
             commitName();
+        }
+        if (button == 0 && clickPortButton(mouseX, mouseY)) {
+            return true;
         }
         if (manage.mouseClicked(this, mouseX, mouseY, button)) {
             return true;
@@ -472,7 +431,6 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
                 setFocused(null);
                 return true;
             }
-            // Letters arrive in charTyped. Swallow the key so E does not close this screen.
             nameBox.keyPressed(keyCode, scanCode, modifiers);
             return true;
         }

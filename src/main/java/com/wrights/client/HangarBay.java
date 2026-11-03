@@ -7,13 +7,14 @@ import net.minecraft.world.item.ItemStack;
 import com.wrights.drone.Swarm;
 
 /**
- * Fixed 5×2 hangar grid. Slots are twice a normal inventory cell; each holds one wright.
+ * Fixed 5×2 hangar grid. Classic Manage uses large drawn slots; the textured hangar uses
+ * {@link HangarGui} cell size over painted frames.
  */
 final class HangarBay {
     static final int COLS = 5;
     static final int ROWS = 2;
     static final int SLOTS = Swarm.HANGAR_SLOTS;
-    /** Twice a vanilla 18px inventory slot. */
+    /** Twice a vanilla 18px inventory slot (classic Manage). */
     static final int SLOT = 36;
     static final int GAP = 4;
 
@@ -27,27 +28,47 @@ final class HangarBay {
     }
 
     static int width() {
-        return COLS * SLOT + (COLS - 1) * GAP;
+        return width(SLOT, GAP);
     }
 
     static int height() {
-        return ROWS * SLOT + (ROWS - 1) * GAP;
+        return height(SLOT, GAP);
+    }
+
+    static int width(int slot, int gap) {
+        return COLS * slot + (COLS - 1) * gap;
+    }
+
+    static int height(int slot, int gap) {
+        return ROWS * slot + (ROWS - 1) * gap;
     }
 
     static int slotX(int originX, int index) {
-        return originX + (index % COLS) * (SLOT + GAP);
+        return slotX(originX, index, SLOT, GAP);
     }
 
     static int slotY(int originY, int index) {
-        return originY + (index / COLS) * (SLOT + GAP);
+        return slotY(originY, index, SLOT, GAP);
+    }
+
+    static int slotX(int originX, int index, int slot, int gap) {
+        return originX + (index % COLS) * (slot + gap);
+    }
+
+    static int slotY(int originY, int index, int slot, int gap) {
+        return originY + (index / COLS) * (slot + gap);
     }
 
     /** Hangar index under the cursor, or -1. */
     static int hit(int originX, int originY, double mouseX, double mouseY) {
+        return hit(originX, originY, mouseX, mouseY, SLOT, GAP);
+    }
+
+    static int hit(int originX, int originY, double mouseX, double mouseY, int slot, int gap) {
         for (int i = 0; i < SLOTS; i++) {
-            int x = slotX(originX, i);
-            int y = slotY(originY, i);
-            if (mouseX >= x && mouseX < x + SLOT && mouseY >= y && mouseY < y + SLOT) {
+            int x = slotX(originX, i, slot, gap);
+            int y = slotY(originY, i, slot, gap);
+            if (mouseX >= x && mouseX < x + slot && mouseY >= y && mouseY < y + slot) {
                 return i;
             }
         }
@@ -56,24 +77,40 @@ final class HangarBay {
 
     static void drawSlot(GuiGraphics graphics, Font font, int x, int y, ItemStack stack, boolean marked,
             boolean selected, boolean locked, boolean hovered) {
-        int edge = selected ? WrightsUi.COPPER : hovered ? WrightsUi.BLUE : WrightsUi.MUTED;
-        WrightsUi.slot(graphics, x, y, SLOT, edge & 0xFFFFFF | 0xFF000000);
+        drawSlot(graphics, font, x, y, SLOT, stack, marked, selected, locked, hovered, true);
+    }
+
+    /**
+     * @param drawFrame when false, only the item / mark / selection sit on a painted texture slot
+     */
+    static void drawSlot(GuiGraphics graphics, Font font, int x, int y, int size, ItemStack stack, boolean marked,
+            boolean selected, boolean locked, boolean hovered, boolean drawFrame) {
+        if (drawFrame) {
+            int edge = selected ? WrightsUi.COPPER : hovered ? WrightsUi.BLUE : WrightsUi.MUTED;
+            WrightsUi.slot(graphics, x, y, size, edge & 0xFFFFFF | 0xFF000000);
+        } else if (hovered || selected) {
+            int edge = selected ? 0xFFC47A3A : 0xFF3CFE9A;
+            graphics.fill(x, y, x + size, y + 1, edge);
+            graphics.fill(x, y + size - 1, x + size, y + size, edge);
+            graphics.fill(x, y, x + 1, y + size, edge);
+            graphics.fill(x + size - 1, y, x + size, y + size, edge);
+        }
         if (marked) {
             graphics.fill(x + 2, y + 2, x + 8, y + 8, 0xFF3CFE9A);
             graphics.fill(x + 3, y + 3, x + 7, y + 7, 0xFF0C141C);
             graphics.fill(x + 4, y + 4, x + 6, y + 6, 0xFF3CFE9A);
         }
         if (!stack.isEmpty()) {
-            WrightsUi.slotItem(graphics, font, stack, x, y, SLOT);
+            WrightsUi.slotItem(graphics, font, stack, x, y, size);
             if (locked) {
-                graphics.fill(x + 1, y + 1, x + SLOT - 1, y + SLOT - 1, 0x88060C14);
+                graphics.fill(x + 1, y + 1, x + size - 1, y + size - 1, 0x88060C14);
             }
         }
-        if (selected) {
-            graphics.fill(x, y, x + SLOT, y + 1, 0xFFC47A3A);
-            graphics.fill(x, y + SLOT - 1, x + SLOT, y + SLOT, 0xFFC47A3A);
-            graphics.fill(x, y, x + 1, y + SLOT, 0xFFC47A3A);
-            graphics.fill(x + SLOT - 1, y, x + SLOT, y + SLOT, 0xFFC47A3A);
+        if (selected && drawFrame) {
+            graphics.fill(x, y, x + size, y + 1, 0xFFC47A3A);
+            graphics.fill(x, y + size - 1, x + size, y + size, 0xFFC47A3A);
+            graphics.fill(x, y, x + 1, y + size, 0xFFC47A3A);
+            graphics.fill(x + size - 1, y, x + size, y + size, 0xFFC47A3A);
         }
     }
 }
