@@ -40,6 +40,11 @@ public final class CraftDeliveries {
     private CraftDeliveries() {
     }
 
+    /** Forgets waiting deliveries when the server stops, so they cannot fire in another world. */
+    public static void reset() {
+        WAITING.clear();
+    }
+
     public static void push(Hangar hangar) {
         ACTIVE.set(hangar);
     }

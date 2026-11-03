@@ -45,7 +45,7 @@ public class WrightsMod {
         modBus.addListener(WrightsMod::registerCapabilities);
         container.registerConfig(ModConfig.Type.SERVER, WrightsConfig.SPEC);
         container.registerConfig(ModConfig.Type.CLIENT, WrightsClientConfig.SPEC);
-        LOGGER.info("Wrights 0.1.8 loaded for an isolated NeoForge 1.21.1 test");
+        LOGGER.info("Wrights loaded");
     }
 
     private static void registerCapabilities(RegisterCapabilitiesEvent event) {

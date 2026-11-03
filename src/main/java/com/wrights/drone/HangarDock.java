@@ -34,6 +34,12 @@ public final class HangarDock {
     private HangarDock() {
     }
 
+    /** Forgets in-flight fly-ins when the server stops. */
+    public static void reset() {
+        PENDING.clear();
+        TARGETS.clear();
+    }
+
     /** Uses the hangar currently pushed on {@link CraftDeliveries}. */
     public static void show(ServerPlayer player, List<Integer> tiers) {
         show(player, CraftDeliveries.active(), tiers);

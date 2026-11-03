@@ -51,6 +51,11 @@ public final class MirrorLaunch {
     private MirrorLaunch() {
     }
 
+    /** Forgets the last-place stamps when the server stops. */
+    public static void reset() {
+        LAST_PLACE.clear();
+    }
+
     /** Places the block in the other hand, then asks wrights to build the reflected copies. */
     public static void placeHeld(ServerPlayer player, BlueprintPayloads.MirrorPlace payload) {
         if (!ControllerItem.isHeld(player) || payload == null || WrightsConfig.refuse(player, WrightsConfig.allowMirrorBlocks())) {

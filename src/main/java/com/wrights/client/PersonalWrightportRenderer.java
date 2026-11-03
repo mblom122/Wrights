@@ -31,6 +31,9 @@ public class PersonalWrightportRenderer implements ICurioRenderer {
     private final PersonalWrightportModel model;
     private float doorOpen;
     private float doorOpenO;
+    private long scanTick = Long.MIN_VALUE;
+    private int scanEntity = -1;
+    private boolean scanTraffic;
 
     public PersonalWrightportRenderer(PersonalWrightportModel model) {
         this.model = model;
@@ -97,14 +100,20 @@ public class PersonalWrightportRenderer implements ICurioRenderer {
         });
     }
 
-    private static boolean trafficOpen(LivingEntity entity) {
+    /** Render runs every frame, but the scan only needs to run once per game tick per wearer. */
+    private boolean trafficOpen(LivingEntity entity) {
         if (entity.level() == null) {
             return false;
         }
-        Vec3 dock = behindClient(entity);
-        AABB box = new AABB(dock.x - 5.0D, dock.y - 1.5D, dock.z - 5.0D, dock.x + 5.0D, dock.y + 56.0D, dock.z + 5.0D);
-        return !entity.level().getEntitiesOfClass(DroneEntity.class, box, drone -> drone.isAlive()).isEmpty()
-                || PersonalPortFx.doorHold() > 0;
+        long tick = entity.level().getGameTime();
+        if (tick != scanTick || entity.getId() != scanEntity) {
+            Vec3 dock = behindClient(entity);
+            AABB box = new AABB(dock.x - 5.0D, dock.y - 1.5D, dock.z - 5.0D, dock.x + 5.0D, dock.y + 56.0D, dock.z + 5.0D);
+            scanTraffic = !entity.level().getEntitiesOfClass(DroneEntity.class, box, drone -> drone.isAlive()).isEmpty();
+            scanTick = tick;
+            scanEntity = entity.getId();
+        }
+        return scanTraffic || PersonalPortFx.doorHold() > 0;
     }
 
     private static Vec3 behindClient(LivingEntity entity) {

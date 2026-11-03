@@ -27,6 +27,11 @@ public final class DockRecovery {
     private DockRecovery() {
     }
 
+    /** Forgets pending notices when the server stops. */
+    public static void reset() {
+        NOTICES.clear();
+    }
+
     /**
      * Saves one wright. Tries {@code where} first, then any other owned port in range of that spot.
      * Returns the port it docked in, or null when the wright went to digital storage or the ground.

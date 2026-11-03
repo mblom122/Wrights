@@ -43,6 +43,8 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
     private float hatch;
     private float hatchPrev;
     private int hatchHold;
+    /** Last result of the wright scan above the port. Client-only. */
+    private boolean traffic;
     /** Corner lamps. Red until the server has looked at the crew. */
     private int lamp = WrightportLamp.RED;
     private final PortEnergy.Buffer energy = new PortEnergy.Buffer();
@@ -170,13 +172,16 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
     public void animateHatch() {
         this.hatchPrev = this.hatch;
         Level level = this.level;
-        boolean traffic = false;
-        if (level != null) {
+        // The column scan is the costly part, so look every few ticks. The hold below covers the gap.
+        if (level == null) {
+            this.traffic = false;
+        } else if (((level.getGameTime() + this.worldPosition.asLong()) & 3L) == 0L) {
             BlockPos pos = this.worldPosition;
             AABB box = new AABB(pos.getX() - 6.0D, pos.getY() - 0.5D, pos.getZ() - 6.0D,
                     pos.getX() + 7.0D, pos.getY() + 57.0D, pos.getZ() + 7.0D);
-            traffic = !level.getEntitiesOfClass(DroneEntity.class, box, Entity::isAlive).isEmpty();
+            this.traffic = !level.getEntitiesOfClass(DroneEntity.class, box, Entity::isAlive).isEmpty();
         }
+        boolean traffic = this.traffic;
         if (traffic) {
             this.hatchHold = 16;
         } else if (this.hatchHold > 0) {

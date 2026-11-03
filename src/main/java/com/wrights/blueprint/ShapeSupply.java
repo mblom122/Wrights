@@ -57,6 +57,7 @@ public final class ShapeSupply {
                     int id = clamp(Integer.parseInt(part.trim()));
                     seen.add(id);
                 } catch (NumberFormatException ignored) {
+                    // A damaged id is skipped so the rest of the list still loads.
                 }
             }
         }

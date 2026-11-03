@@ -22,6 +22,11 @@ public final class ManageLock {
     private ManageLock() {
     }
 
+    /** Releases every hold when the server stops. */
+    public static void reset() {
+        HOLDS.clear();
+    }
+
     public static void hold(ServerPlayer player, int kind, int index) {
         HOLDS.put(player.getUUID(), new Hold(kind, index, player.level().getGameTime()));
     }

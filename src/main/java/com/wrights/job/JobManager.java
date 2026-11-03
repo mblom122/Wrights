@@ -9326,6 +9326,13 @@ public final class JobManager {
     private static final Map<UUID, Flyer> FLYERS = new HashMap<>();
     private static int returnClock;
 
+    /** Drops flight bookkeeping so a world opened later in the same session starts clean. */
+    public static void reset() {
+        RETURNING.clear();
+        FLYERS.clear();
+        returnClock = 0;
+    }
+
     public static void noteFlyer(UUID unitId, DroneEntity drone) {
         if (unitId == null || drone == null || drone.level().isClientSide) {
             return;

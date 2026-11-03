@@ -80,6 +80,7 @@ public final class ShapeMaterials {
                     try {
                         weight = Integer.parseInt(bits[1].trim());
                     } catch (NumberFormatException ignored) {
+                        // A bad weight falls back to 1.
                     }
                 }
                 map.put(item, clampWeight(weight));
