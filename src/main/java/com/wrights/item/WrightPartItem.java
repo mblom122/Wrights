@@ -63,9 +63,7 @@ public class WrightPartItem extends Item {
                 lines.add(Component.translatable(reachKey(tier)));
             }
             case CORE -> {
-                int drain = WrightTier.coreDrainBonusPercent(tier);
-                String signed = drain > 0 ? "+" + drain : Integer.toString(drain);
-                lines.add(Component.translatable("item.wrights.core.efficiency", signed));
+                lines.add(Component.translatable("item.wrights.core.efficiency", WrightTier.coreDrainPercent(tier)));
             }
         }
         return lines;

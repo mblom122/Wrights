@@ -148,11 +148,11 @@ public final class WrightTier {
     }
 
     /**
-     * FE drain change vs an unequipped (Basic) core when the rotor is also Basic.
-     * Apex → {@code -50} (half cost); Scout → about {@code -13}.
+     * FE drain with a Basic rotor as a percent of Basic cost.
+     * Basic → {@code 100}; Apex → {@code 50}; Scout → about {@code 87}.
      */
-    public static int coreDrainBonusPercent(int core) {
-        return energyPercent(BASIC, core) - 100;
+    public static int coreDrainPercent(int core) {
+        return energyPercent(BASIC, core);
     }
 
     /** {@code base} Forge Energy scaled by {@link #energyPercent}, rounded up so a block never becomes free. */
