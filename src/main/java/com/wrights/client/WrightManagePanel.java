@@ -193,8 +193,8 @@ final class WrightManagePanel {
         int bayX = bayX();
         int bayY = bayY();
         for (int i = 0; i < HangarBay.SLOTS; i++) {
-            int sx = HangarBay.slotX(bayX, i, HangarGui.BAY_SLOT, HangarGui.BAY_GAP);
-            int sy = HangarBay.slotY(bayY, i, HangarGui.BAY_SLOT, HangarGui.BAY_GAP_Y);
+            int sx = HangarBay.hangarSlotX(bayX, i, HangarGui.BAY_SLOT, HangarGui.BAY_GAP);
+            int sy = HangarBay.hangarSlotY(bayY, i, HangarGui.BAY_SLOT, HangarGui.BAY_GAP_Y);
             boolean hovered = mouseX >= sx && mouseX < sx + HangarGui.BAY_SLOT
                     && mouseY >= sy && mouseY < sy + HangarGui.BAY_SLOT;
             if (i < swarm.units().size()) {
@@ -348,8 +348,8 @@ final class WrightManagePanel {
         if (slot < swarm.units().size()) {
             Swarm.Unit unit = swarm.units().get(slot);
             boolean locked = away(screen, swarm, slot);
-            int sx = HangarBay.slotX(bayX(), slot, HangarGui.BAY_SLOT, HangarGui.BAY_GAP);
-            int sy = HangarBay.slotY(bayY(), slot, HangarGui.BAY_SLOT, HangarGui.BAY_GAP_Y);
+            int sx = HangarBay.hangarSlotX(bayX(), slot, HangarGui.BAY_SLOT, HangarGui.BAY_GAP);
+            int sy = HangarBay.hangarSlotY(bayY(), slot, HangarGui.BAY_SLOT, HangarGui.BAY_GAP_Y);
             if (!locked && hit(mouseX, mouseY, sx + 2, sy + 2, 8, 8)) {
                 toggle(unit.id());
                 return true;

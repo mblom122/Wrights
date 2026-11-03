@@ -28,12 +28,12 @@ final class HangarGui {
     static final int INV_GAP = HangarLayout.INV_GAP;
     static final int SCREEN_H = HangarLayout.SCREEN_H;
 
-    /** Storage bay — nudged so corner wells match the painted frames (UL -1/+2, UR -2/+2, DL -1/+1, DR -2/+1). */
-    static final int BAY_X = HangarLayout.sx(173);
-    static final int BAY_Y = HangarLayout.sx(209);
+    /** Storage bay origin; per-slot well nudge is applied in {@link HangarBay#hangarSlotX}/{@link HangarBay#hangarSlotY}. */
+    static final int BAY_X = HangarLayout.sx(174);
+    static final int BAY_Y = HangarLayout.sx(207);
     static final int BAY_SLOT = HangarLayout.sx(28);
     static final int BAY_GAP = Math.max(1, HangarLayout.sx(6));
-    static final int BAY_GAP_Y = Math.max(1, HangarLayout.sx(5));
+    static final int BAY_GAP_Y = BAY_GAP;
 
     static final int PART_X = HangarLayout.sx(147);
     static final int PART_Y = HangarLayout.sx(122) + 1;

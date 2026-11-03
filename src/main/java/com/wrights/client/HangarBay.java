@@ -59,19 +59,44 @@ final class HangarBay {
         return originY + (index / COLS) * (slot + gapY);
     }
 
-    /** Hangar index under the cursor, or -1. */
+    /**
+     * Textured hangar bay X: uniform grid plus a left-nudge that lerps from 1px (col 0)
+     * to 2px (col 4), so middle columns sit between the corner offsets.
+     */
+    static int hangarSlotX(int originX, int index, int slot, int gapX) {
+        int col = index % COLS;
+        int dx = -Math.round(1.0F + col * (1.0F / (COLS - 1)));
+        return slotX(originX, index, slot, gapX) + dx;
+    }
+
+    /**
+     * Textured hangar bay Y: uniform grid plus a down-nudge that lerps from 2px (row 0)
+     * to 1px (row 1).
+     */
+    static int hangarSlotY(int originY, int index, int slot, int gapY) {
+        int row = index / COLS;
+        int dy = ROWS == 1 ? 2 : Math.round(2.0F - row * (1.0F / (ROWS - 1)));
+        return slotY(originY, index, slot, gapY) + dy;
+    }
+
+    /** Hangar index under the cursor, or -1 (uniform classic Manage grid). */
     static int hit(int originX, int originY, double mouseX, double mouseY) {
-        return hit(originX, originY, mouseX, mouseY, SLOT, GAP, GAP);
+        return hit(originX, originY, mouseX, mouseY, SLOT, GAP, GAP, false);
     }
 
     static int hit(int originX, int originY, double mouseX, double mouseY, int slot, int gap) {
-        return hit(originX, originY, mouseX, mouseY, slot, gap, gap);
+        return hit(originX, originY, mouseX, mouseY, slot, gap, gap, false);
     }
 
     static int hit(int originX, int originY, double mouseX, double mouseY, int slot, int gapX, int gapY) {
+        return hit(originX, originY, mouseX, mouseY, slot, gapX, gapY, true);
+    }
+
+    static int hit(int originX, int originY, double mouseX, double mouseY, int slot, int gapX, int gapY,
+            boolean texturedHangar) {
         for (int i = 0; i < SLOTS; i++) {
-            int x = slotX(originX, i, slot, gapX);
-            int y = slotY(originY, i, slot, gapY);
+            int x = texturedHangar ? hangarSlotX(originX, i, slot, gapX) : slotX(originX, i, slot, gapX);
+            int y = texturedHangar ? hangarSlotY(originY, i, slot, gapY) : slotY(originY, i, slot, gapY);
             if (mouseX >= x && mouseX < x + slot && mouseY >= y && mouseY < y + slot) {
                 return i;
             }

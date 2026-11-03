@@ -5,13 +5,14 @@
   "LAYOUT_H": 286,
   "SCALE": 0.75,
   "STORAGE": {
-    "ox": 173,
-    "oy": 209,
+    "ox": 174,
+    "oy": 207,
     "slot": 28,
     "gap": 6,
-    "gap_y": 5,
     "cols": 5,
-    "rows": 2
+    "rows": 2,
+    "nudge_left_cols": [1, 1, 2, 2, 2],
+    "nudge_down_rows": [2, 1]
   },
   "HARDWARE": {
     "ox": 147,
