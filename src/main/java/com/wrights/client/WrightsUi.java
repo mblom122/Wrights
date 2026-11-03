@@ -145,8 +145,9 @@ public final class WrightsUi {
 
     public static void choice(GuiGraphics graphics, int x, int y, int width, int height, boolean on, boolean hover, boolean enabled) {
         if (!enabled) {
-            graphics.fill(x, y, x + width, y + height, 0xFF141A22);
-            graphics.fill(x, y, x + width, y + Math.min(2, height), 0xFF2A3440);
+            // Greyed idle vs greyed selected — unbound must not read as pressed/clicked.
+            graphics.fill(x, y, x + width, y + height, on ? 0xFF1A2834 : 0xFF151C24);
+            graphics.fill(x, y, x + width, y + Math.min(2, height), on ? 0xFF3A5A62 : 0xFF2A3440);
             return;
         }
         graphics.fill(x, y, x + width, y + height, on ? CARD_ON : (hover ? CARD_HOVER : CARD));

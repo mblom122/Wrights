@@ -161,10 +161,14 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
             chestButton.active = mine && held;
             chestButton.setX(boundaryButton.getX());
             chestButton.setY(boundaryButton.getY() + 18);
+            // Teal selected only while a supply chest is bound — unbound stays idle.
             boolean bound = getMinecraft().level != null
                     && getMinecraft().level.getBlockEntity(menu.pos()) instanceof WrightportBlockEntity port
                     && port.supplyChest() != null;
             chestButton.setPicked(bound);
+            if (!chestButton.active) {
+                chestButton.setFocused(false);
+            }
         }
     }
 

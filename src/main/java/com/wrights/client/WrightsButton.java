@@ -32,8 +32,7 @@ public class WrightsButton extends Button {
         int x = getX();
         int y = getY();
         if (!this.active) {
-            graphics.fill(x, y, x + this.width, y + this.height, 0xFF141A22);
-            graphics.fill(x, y, x + this.width, y + Math.min(2, this.height), 0xFF2A3440);
+            WrightsUi.choice(graphics, x, y, this.width, this.height, this.picked, false, false);
         } else if (this.danger) {
             graphics.fill(x, y, x + this.width, y + this.height, this.isHovered() ? 0xFF3A2428 : 0xFF2A1C20);
             graphics.fill(x, y, x + this.width, y + Math.min(2, this.height), this.isHovered() ? WrightsUi.RED : 0xFF8E4048);
