@@ -7,8 +7,9 @@ import com.wrights.WrightsMod;
 import com.wrights.hangar.HangarLayout;
 
 /**
- * Textured hangar panel (wrightport + Manage). Source art is {@link HangarLayout#TEX_W}×{@link HangarLayout#TEX_H};
- * on-screen size is scaled by {@link HangarLayout#SCALE} so the player inventory fits underneath.
+ * Textured hangar panel (wrightport + Manage). Blits the high-res
+ * {@link HangarLayout#TEX_W}×{@link HangarLayout#TEX_H} art into the smaller on-screen
+ * {@link HangarLayout#WIDTH}×{@link HangarLayout#HEIGHT} panel (layout coords × {@link HangarLayout#SCALE}).
  */
 final class HangarGui {
     static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "textures/gui/hangar.png");
