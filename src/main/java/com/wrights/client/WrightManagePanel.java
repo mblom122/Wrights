@@ -700,7 +700,8 @@ final class WrightManagePanel {
             int chipX = x + (tier - WrightTier.BASIC) * (chip + gap);
             boolean selected = tier == current;
             boolean enabled = tool && (selected || have(screen, slot, tier));
-            drawMini(graphics, screen, chipX, y, chip, Component.translatable(WrightTier.nameKey(tier)), enabled, selected, mouseX, mouseY);
+            drawMini(graphics, screen, chipX, y, chip, Component.translatable(WrightTier.nameKey(tier)),
+                    enabled, selected, mouseX, mouseY, WrightTier.textColor(tier));
         }
     }
 
@@ -928,12 +929,17 @@ final class WrightManagePanel {
     }
 
     private static void drawMini(GuiGraphics graphics, ManageHost screen, int x, int y, int width, Component label, boolean enabled, boolean selected, int mouseX, int mouseY) {
+        drawMini(graphics, screen, x, y, width, label, enabled, selected, mouseX, mouseY, WrightsUi.TEXT);
+    }
+
+    private static void drawMini(GuiGraphics graphics, ManageHost screen, int x, int y, int width, Component label, boolean enabled, boolean selected, int mouseX, int mouseY, int ink) {
         boolean hover = enabled && mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + 14;
         int fill = !enabled && !selected ? 0xFF141A22 : (selected ? 0xFF2A4054 : (hover ? 0xFF2C3E52 : 0xFF1A2633));
         graphics.fill(x, y, x + width, y + 14, fill);
         int border = selected ? WrightsUi.COPPER : (enabled ? (hover ? WrightsUi.COPPER : 0xFF3D4E5E) : 0xFF2A3440);
         WrightsUi.border(graphics, x, y, width, 14, border);
         String text = screen.font().plainSubstrByWidth(label.getString(), Math.max(0, width - 6));
-        graphics.drawString(screen.font(), text, x + (width - screen.font().width(text)) / 2, y + 3, enabled || selected ? WrightsUi.TEXT : 0xFF6E7A86, false);
+        int color = enabled || selected ? ink : 0xFF6E7A86;
+        graphics.drawString(screen.font(), text, x + (width - screen.font().width(text)) / 2, y + 3, color, false);
     }
 }
