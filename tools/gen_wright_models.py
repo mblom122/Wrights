@@ -855,7 +855,7 @@ FLAT_DISPLAY = {
 }
 
 PACK_DISPLAY = {
-    "gui": {"rotation": [20, 160, 0], "translation": [0, -4.5, 0], "scale": [0.78, 0.78, 0.78]},
+    "gui": {"rotation": [20, 160, 0], "translation": [-1.3, -6, 0], "scale": [0.78, 0.78, 0.78]},
     "ground": {"rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [0.3, 0.3, 0.3]},
     "fixed": {"rotation": [0, 180, 0], "translation": [0, -4, 0], "scale": [0.6, 0.6, 0.6]},
     "head": {"rotation": [0, 180, 0], "translation": [0, -2, 0], "scale": [0.6, 0.6, 0.6]},
