@@ -1,5 +1,6 @@
 package com.wrights.compat.jade;
 
+import com.wrights.job.HandSlices;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -14,7 +15,6 @@ import com.wrights.WrightsMod;
 import com.wrights.drone.WrightTier;
 import com.wrights.entity.DroneEntity;
 import com.wrights.job.BuildJob;
-import com.wrights.job.JobManager;
 import com.wrights.schematic.Schematic;
 import com.wrights.schematic.SchematicLibrary;
 
@@ -161,7 +161,7 @@ public enum WrightJadeProvider implements IEntityComponentProvider, StreamServer
                 sizeZ = job.spanZ();
             }
             ServerPlayer player = level.getServer().getPlayerList().getPlayer(job.owner());
-            int held = player == null ? 0 : JobManager.countHeld(player, library, job);
+            int held = player == null ? 0 : HandSlices.countHeld(player, library, job);
             return new WrightStatus(nameOf(job, library), kind, done, total, job.progressSkipped(), held, sizeX, sizeY, sizeZ);
         }
 

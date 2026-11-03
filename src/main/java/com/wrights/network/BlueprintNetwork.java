@@ -1,5 +1,6 @@
 package com.wrights.network;
 
+import com.wrights.job.HandSlices;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -863,7 +864,7 @@ public final class BlueprintNetwork {
                     done,
                     total,
                     job.progressSkipped(),
-                    JobManager.countHeld(player, library, job),
+                    HandSlices.countHeld(player, library, job),
                     job.paused(),
                     job.kind() == BuildJob.Kind.COPY,
                     job.finished(),

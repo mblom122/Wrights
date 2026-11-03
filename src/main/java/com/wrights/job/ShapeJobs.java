@@ -1036,7 +1036,7 @@ public final class ShapeJobs {
                 setShapeHandStatus(level, hand, usable.get(0).state(), DroneEntity.WAIT_ITEMS);
                 continue;
             }
-            JobManager.claimAim(job, hand, at);
+            WorkPicker.claimAim(job, hand, at);
             hand.idle = false;
             BlockPos pos = job.scanPosAt(at);
             BlockState state = shapeNextState(job, usable, fillMode, random);
@@ -1124,7 +1124,7 @@ public final class ShapeJobs {
                 if (standKind != ShapeCell.READY) {
                     break;
                 }
-                JobManager.claimAim(job, hand, index);
+                WorkPicker.claimAim(job, hand, index);
                 BlockPos cell = job.scanPosAt(index);
                 // Primary aim: fly-arrive uses JobManager.DRONE_REACH_SQR (~1.5); ops reach can be 0–2 and
                 // used to reject the cell we just hovered over, leaving one wright "placing" forever.
@@ -1304,7 +1304,7 @@ public final class ShapeJobs {
         if (!shapeCanPayAny(player, level, job, usable)) {
             return JobManager.NEED_ITEMS;
         }
-        Vec3 origin = JobManager.handOrigin(level, hand);
+        Vec3 origin = WorkPicker.handOrigin(level, hand);
         if (origin != null && hand.aim >= 0 && hand.aim < job.total()) {
             ShapeCell probe = classifyShapeCell(level, player, job, hand, hand.aim, shapeKind, shapePinLocal, onlyOwned);
             if (probe == ShapeCell.READY) {
@@ -1426,7 +1426,7 @@ public final class ShapeJobs {
         BlockPos fly = job.min().offset(stand[0], stand[1], stand[2]);
         int anchor = job.scanIndex(fly);
         if (anchor >= 0) {
-            JobManager.claimAim(job, hand, anchor);
+            WorkPicker.claimAim(job, hand, anchor);
         }
         hand.idle = false;
         BlockState state = shapeNextState(job, usable, fillMode, random);
@@ -1469,7 +1469,7 @@ public final class ShapeJobs {
                             continue;
                         }
                         int cell = job.scanIndex(job.min().offset(x, y, z));
-                        if (cell < 0 || job.isShapeResolved(cell) || JobManager.aimedByOther(job, hand, cell)) {
+                        if (cell < 0 || job.isShapeResolved(cell) || WorkPicker.aimedByOther(job, hand, cell)) {
                             continue;
                         }
                         ShapeCell kind = classifyShapeCell(
@@ -1535,7 +1535,7 @@ public final class ShapeJobs {
         }
         if (anchor >= 0 && smallStandHasReady(
                 level, player, job, hand, shapeKind, shapePinLocal, stand, reach)) {
-            JobManager.claimAim(job, hand, anchor);
+            WorkPicker.claimAim(job, hand, anchor);
         }
         return JobManager.PATTERN_DONE;
     }
@@ -1635,7 +1635,7 @@ public final class ShapeJobs {
                         continue;
                     }
                     int index = job.min() == null ? -1 : job.scanIndex(job.min().offset(x, y, z));
-                    if (index < 0 || JobManager.aimedByOther(job, hand, index)) {
+                    if (index < 0 || WorkPicker.aimedByOther(job, hand, index)) {
                         continue;
                     }
                     if (classifyShapeCell(level, player, job, hand, index, shapeKind, shapePinLocal, true)
@@ -1705,7 +1705,7 @@ public final class ShapeJobs {
                         continue;
                     }
                     // Another wright already took this stamp. Do not split it.
-                    if (JobManager.aimedByOther(job, hand, index)) {
+                    if (WorkPicker.aimedByOther(job, hand, index)) {
                         return false;
                     }
                     if (classifyShapeCell(level, player, job, hand, index, shapeKind, shapePinLocal, false)
@@ -1769,7 +1769,7 @@ public final class ShapeJobs {
             if (!ownsShapeCell(job, hand, lx, ly, lz)) {
                 continue;
             }
-            if (JobManager.aimedByOther(job, hand, i)) {
+            if (WorkPicker.aimedByOther(job, hand, i)) {
                 examined++;
                 continue;
             }
@@ -1874,7 +1874,7 @@ public final class ShapeJobs {
                 for (int dz = -JobManager.CLUSTER_RADIUS; dz <= JobManager.CLUSTER_RADIUS; dz++) {
                     BlockPos pos = min.offset(ox + dx, oy + dy, oz + dz);
                     int index = job.scanIndex(pos);
-                    if (index < 0 || JobManager.aimedByOther(job, hand, index)) {
+                    if (index < 0 || WorkPicker.aimedByOther(job, hand, index)) {
                         continue;
                     }
                     if (!inOperationReachFromCell(BlockPos.containing(origin), pos, handOps(hand))) {
@@ -2031,7 +2031,7 @@ public final class ShapeJobs {
                 for (int dz = -radius; dz <= radius; dz++) {
                     BlockPos pos = min.offset(cx + dx, cy + dy, cz + dz);
                     int index = job.scanIndex(pos);
-                    if (index < 0 || JobManager.aimedByOther(job, hand, index)) {
+                    if (index < 0 || WorkPicker.aimedByOther(job, hand, index)) {
                         continue;
                     }
                     ShapeCell kind = classifyShapeCell(level, player, job, hand, index, shapeKind, shapePinLocal, onlyOwned);
@@ -2115,7 +2115,7 @@ public final class ShapeJobs {
             int scanCap) {
         BuildJob.Hand busiest = busiestShapeShare(level, player, job, hand, shapeKind, shapePinLocal, scanCap);
         if (busiest != null) {
-            Vec3 otherOrigin = JobManager.handOrigin(level, busiest);
+            Vec3 otherOrigin = WorkPicker.handOrigin(level, busiest);
             if (otherOrigin != null) {
                 int near = shapeClusterIndex(
                         level, player, job, hand, otherOrigin, JobManager.FLY_NEAR_SQR, JobManager.FLY_NEAR_RADIUS,
@@ -2166,7 +2166,7 @@ public final class ShapeJobs {
                 continue;
             }
             examined++;
-            if (JobManager.aimedByOther(job, hand, i)) {
+            if (WorkPicker.aimedByOther(job, hand, i)) {
                 continue;
             }
             ShapeCell kind = classifyShapeCell(level, player, job, hand, i, shapeKind, shapePinLocal, false);
@@ -2575,7 +2575,7 @@ public final class ShapeJobs {
             return true;
         }
         Schematic.Entry entry = new Schematic.Entry((short) 0, (short) 0, (short) 0, state, false);
-        return JobManager.hasPlaceCosts(player, level, job, null, entry);
+        return WorkPicker.hasPlaceCosts(player, level, job, null, entry);
     }
 
     /** Push Shape/Exchange current block + wait reason onto the assigned wright for Jade / info look. */

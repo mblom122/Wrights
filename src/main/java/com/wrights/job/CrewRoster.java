@@ -784,11 +784,11 @@ public final class CrewRoster {
                         hand.cursor = carried;
                     }
                 }
-                JobManager.evenOut(job, schematic);
+                HandSlices.evenOut(job, schematic);
             }
         } else {
             int before = job.hands().size();
-            JobManager.ensureSlices(job, true);
+            HandSlices.ensureSlices(job, true);
             while (job.hands().size() > speeds.size()) {
                 BuildJob.Hand removed = job.hands().remove(job.hands().size() - 1);
                 if (removed.entityId != null) {
@@ -813,7 +813,7 @@ public final class CrewRoster {
                 }
             }
             if (job.hands().size() != before) {
-                JobManager.evenOut(job, schematic);
+                HandSlices.evenOut(job, schematic);
             }
         }
         ServerLevel level = player.getServer().getLevel(job.dimension());
@@ -1072,7 +1072,7 @@ public final class CrewRoster {
             job.hands().get(i).ops = WrightTier.clamp(units.get(i).unit().power());
         }
         job.setCrewQuota(ids.size());
-        JobManager.evenOut(job, schematic);
+        HandSlices.evenOut(job, schematic);
         return job.hasCrew();
     }
 }
