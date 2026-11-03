@@ -1,9 +1,12 @@
 package com.wrights.drone;
 
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
+import com.wrights.WrightsConfig;
 import com.wrights.block.WrightportBlockEntity;
+import com.wrights.item.WrightItem;
 import com.wrights.menu.WrightportMenu;
 import com.wrights.util.Messages;
 
@@ -64,6 +67,52 @@ public final class WrightportOps {
         }
         port.setSwarm(next);
         open.broadcastChanges();
+    }
+
+    /**
+     * Shift-click a wright item from the hangar player inventory into the first free bay slot.
+     * Shrinks {@code stack} by one on success.
+     */
+    public static boolean quickDepositWright(ServerPlayer player, WrightportMenu menu, ItemStack stack) {
+        if (!(stack.getItem() instanceof WrightItem) || stack.isEmpty()) {
+            return false;
+        }
+        if (!(player.level() instanceof Level level)) {
+            return false;
+        }
+        if (!(level.getBlockEntity(menu.pos()) instanceof WrightportBlockEntity port)) {
+            return false;
+        }
+        if (!(player.containerMenu instanceof WrightportMenu open) || !open.pos().equals(menu.pos())) {
+            return false;
+        }
+        Swarm swarm = port.swarm();
+        if (swarm.units().size() >= Swarm.capacity()) {
+            Messages.actionBar(player, "message.wrights.drone_full", Swarm.capacity());
+            return false;
+        }
+        if (port.owner() == null) {
+            port.assignOwner(player.getUUID(), player.getGameProfile().getName());
+        }
+        java.util.UUID owner = port.owner() == null ? player.getUUID() : port.owner();
+        int capRoom = WrightLedger.room(player.serverLevel().getServer(), owner);
+        if (capRoom <= 0) {
+            Messages.actionBar(player, "message.wrights.wright_cap", WrightsConfig.maxWrightsOwned());
+            return false;
+        }
+        Loadout parts = WrightItem.parts(stack);
+        String name = WrightItem.nameOf(stack);
+        stack.shrink(1);
+        Swarm next = swarm.addUnit(parts, name);
+        HangarDock.show(player, java.util.List.of(parts));
+        port.setSwarm(next);
+        if (capRoom <= 1) {
+            Messages.actionBar(player, "message.wrights.wright_cap_added", 1, WrightsConfig.maxWrightsOwned());
+        } else {
+            Messages.actionBar(player, "message.wrights.wrights_added", 1);
+        }
+        open.broadcastChanges();
+        return true;
     }
 
     public static void batch(ServerPlayer player, WrightportMenu menu, int action, int value, int[] units) {

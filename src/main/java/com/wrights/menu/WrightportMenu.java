@@ -15,7 +15,10 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.block.ModBlocks;
 import com.wrights.block.WrightportBlockEntity;
+import com.wrights.drone.Swarm;
+import com.wrights.drone.WrightportOps;
 import com.wrights.hangar.HangarLayout;
+import com.wrights.item.WrightItem;
 import com.wrights.network.PortEnergySync;
 
 public class WrightportMenu extends AbstractContainerMenu {
@@ -103,21 +106,36 @@ public class WrightportMenu extends AbstractContainerMenu {
 
     @Override
     public ItemStack quickMoveStack(Player player, int index) {
-        ItemStack copy = ItemStack.EMPTY;
         Slot slot = this.slots.get(index);
-        if (slot == null || !slot.hasItem() || index < PLAYER_INV_START) {
+        if (slot == null || !slot.hasItem() || index < PLAYER_INV_START || index >= HOTBAR_END) {
             return ItemStack.EMPTY;
         }
         ItemStack stack = slot.getItem();
-        copy = stack.copy();
+        ItemStack copy = stack.copy();
+        // Shift-click a wright → first free hangar bay slot (not inv↔hotbar shuffle).
+        if (stack.getItem() instanceof WrightItem) {
+            if (player instanceof ServerPlayer server) {
+                if (!WrightportOps.quickDepositWright(server, this, stack)) {
+                    return ItemStack.EMPTY;
+                }
+            } else if (clientHangarRoom()) {
+                stack.shrink(1);
+            } else {
+                return ItemStack.EMPTY;
+            }
+            if (stack.isEmpty()) {
+                slot.setByPlayer(ItemStack.EMPTY);
+            } else {
+                slot.setChanged();
+            }
+            return copy;
+        }
         if (index < PLAYER_INV_END) {
             if (!moveItemStackTo(stack, PLAYER_INV_END, HOTBAR_END, true)) {
                 return ItemStack.EMPTY;
             }
-        } else if (index < HOTBAR_END) {
-            if (!moveItemStackTo(stack, PLAYER_INV_START, PLAYER_INV_END, false)) {
-                return ItemStack.EMPTY;
-            }
+        } else if (!moveItemStackTo(stack, PLAYER_INV_START, PLAYER_INV_END, false)) {
+            return ItemStack.EMPTY;
         }
         if (stack.isEmpty()) {
             slot.setByPlayer(ItemStack.EMPTY);
@@ -125,5 +143,12 @@ public class WrightportMenu extends AbstractContainerMenu {
             slot.setChanged();
         }
         return copy;
+    }
+
+    private boolean clientHangarRoom() {
+        if (!(player.level().getBlockEntity(pos) instanceof WrightportBlockEntity port)) {
+            return false;
+        }
+        return port.swarm().units().size() < Swarm.capacity();
     }
 }
