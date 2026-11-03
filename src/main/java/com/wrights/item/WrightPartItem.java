@@ -38,20 +38,19 @@ public class WrightPartItem extends Item {
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         tooltip.add(stat(slot, tier).withStyle(ChatFormatting.GRAY));
-        switch (slot) {
-            case FABRICATOR -> tooltip.add(Component.translatable(reachKey(tier)).withStyle(ChatFormatting.DARK_GRAY));
-            case ROTOR, CORE -> tooltip.add(Component.translatable("item.wrights." + slot.getSerializedName() + ".match",
-                    tierName(tier)).withStyle(ChatFormatting.DARK_GRAY));
+        if (slot == PartSlot.FABRICATOR) {
+            tooltip.add(Component.translatable(reachKey(tier)).withStyle(ChatFormatting.DARK_GRAY));
+        } else if (slot == PartSlot.CORE) {
+            tooltip.add(Component.translatable("item.wrights.core.match", tierName(tier)).withStyle(ChatFormatting.DARK_GRAY));
         }
         tooltip.add(Component.translatable("item.wrights.part.hint").withStyle(ChatFormatting.DARK_GRAY));
     }
 
-    /** What a part of this slot and tier does, e.g. "Flies 17.5 blocks/s near the build (Basic: 5)". */
+    /** What a part of this slot and tier does, e.g. "Flight Speed: 17.5 blocks/s (+250% boost)". */
     public static net.minecraft.network.chat.MutableComponent stat(PartSlot slot, int tier) {
         return switch (slot) {
             case ROTOR -> Component.translatable("item.wrights.rotor.speed",
-                    WrightTier.flyRateLabel(tier), WrightTier.flyRateLabel(WrightTier.BASIC),
-                    WrightTier.rotorDraw(tier));
+                    WrightTier.flyRateLabel(tier), WrightTier.flyBoostPercent(tier));
             case FABRICATOR -> Component.translatable("item.wrights.fabricator.blocks", WrightTier.operationCap(tier));
             case CORE -> Component.translatable("item.wrights.core.rating", WrightTier.rotorDraw(tier));
         };
