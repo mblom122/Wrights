@@ -126,7 +126,7 @@ public class WrightsMenuScreen extends Screen {
     private boolean dropInto;
     private UUID dropHighlight;
     private int dropLineY = -1;
-    private boolean options;
+    boolean options;
     private boolean infoPage;
     private boolean helpPage;
     private final HelpPanel helpPanel = new HelpPanel();
@@ -181,89 +181,75 @@ public class WrightsMenuScreen extends Screen {
     private long needControllerFlashUntil;
     private boolean lastToolHeld;
     int drag;
-    private int wallSliderX;
-    private int wallSliderY;
-    private int wallSliderW;
-    private int edgeSliderX;
-    private int edgeSliderY;
-    private int edgeSliderW;
-    private int ghostSliderX;
-    private int ghostSliderY;
-    private int ghostSliderW;
-    private int swatchX;
-    private int wallSwatchY;
-    private int edgeSwatchY;
-    private int queueEdgeSwatchY;
-    private int placeEdgeSwatchY;
-    private int markerX;
-    private int markerY;
-    private int markerW;
-    private int instantX;
-    private int instantY;
-    private int instantW;
-    private int optionScroll;
-    private int optionViewX;
-    private int optionViewY;
-    private int optionViewW;
-    private int optionViewH;
-    private int optionContentH;
+    int wallSliderX;
+    int wallSliderY;
+    int wallSliderW;
+    int edgeSliderX;
+    int edgeSliderY;
+    int edgeSliderW;
+    int ghostSliderX;
+    int ghostSliderY;
+    int ghostSliderW;
+    int wallSwatchY;
+    int edgeSwatchY;
+    int queueEdgeSwatchY;
+    int placeEdgeSwatchY;
+    int markerX;
+    int markerY;
+    int markerW;
+    int instantX;
+    int instantY;
+    int instantW;
+    int optionScroll;
+    int optionViewY;
+    int optionViewH;
+    int optionContentH;
     int mirrorScroll;
     int mirrorViewH;
     int mirrorContentH;
     /** Left task strip scroll (Building + subs + Jobs…). */
     private int navScroll;
-    private int optionThumbY;
-    private int optionThumbH;
+    int optionThumbY;
+    int optionThumbH;
     private boolean optionDragging;
     private int optionDragGrab;
-    private int hologramHeadY;
-    private int buildHeadY;
-    private int supplyHeadY;
-    private int messageHeadY;
-    private int optionPreviewX;
-    private int optionPreviewY;
-    private int droneY;
-    private int droneX;
-    private int droneW;
-    private int droneMinusX;
-    private int dronePlusX;
-    private int queueX;
-    private int queueY;
-    private int queueW;
-    private int buildMenuX;
-    private int buildMenuY;
-    private int buildMenuW;
-    private int dockWatchX;
-    private int dockWatchY;
-    private int dockWatchW;
-    private int portOrderX;
-    private int portOrderY;
-    private int portOrderW;
-    private int supplyOrderX;
-    private int supplyOrderY;
-    private int supplyOrderW;
-    private int optionPlaceY;
-    private int optionOffsetY;
-    private int optionShapeAirY;
-    private int jobDoneMinY;
-    private int jobDoneMinusX;
-    private int jobDonePlusX;
-    private int hudPlaceX;
-    private int hudPlaceY;
-    private int hudPlaceW;
-    private int modePlaceX;
-    private int modePlaceY;
-    private int modePlaceW;
-    private final List<HelpSpot> optionHelps = new ArrayList<>();
-    private Component optionTip;
-    private EditBox wallPercent;
-    private EditBox edgePercent;
-    private EditBox ghostPercent;
-    private EditBox placeX;
-    private EditBox placeY;
-    private EditBox placeZ;
-    private EditBox shapeAirOffset;
-    private boolean suppressOptions;
+    int droneY;
+    int droneX;
+    int droneW;
+    int droneMinusX;
+    int dronePlusX;
+    int queueX;
+    int queueY;
+    int queueW;
+    int buildMenuX;
+    int buildMenuY;
+    int buildMenuW;
+    int dockWatchX;
+    int dockWatchY;
+    int dockWatchW;
+    int portOrderX;
+    int portOrderY;
+    int portOrderW;
+    int supplyOrderX;
+    int supplyOrderY;
+    int supplyOrderW;
+    int jobDoneMinY;
+    int jobDoneMinusX;
+    int jobDonePlusX;
+    int hudPlaceX;
+    int hudPlaceY;
+    int hudPlaceW;
+    int modePlaceX;
+    int modePlaceY;
+    int modePlaceW;
+    EditBox wallPercent;
+    EditBox edgePercent;
+    EditBox ghostPercent;
+    EditBox placeX;
+    EditBox placeY;
+    EditBox placeZ;
+    EditBox shapeAirOffset;
+    boolean suppressOptions;
     private String searchText = "";
     private boolean applyingSearch;
 
@@ -280,6 +266,8 @@ public class WrightsMenuScreen extends Screen {
     private final PortManagePanel portManagePanel = new PortManagePanel(this);
 
     private final MirrorPanel mirrorPanel = new MirrorPanel(this);
+
+    private final OptionsPanel optionsPanel = new OptionsPanel(this);
 
     public WrightsMenuScreen() {
         super(Component.translatable("menu.wrights.title"));
@@ -660,14 +648,14 @@ public class WrightsMenuScreen extends Screen {
         placeZ.visible = showOptions;
         shapeAirOffset.visible = showOptions;
         if (showOptions) {
-            showPercent(wallPercent, WrightsClientConfig.WALL_TRANSPARENCY.get());
-            showPercent(edgePercent, WrightsClientConfig.EDGE_OPACITY.get());
-            showPercent(ghostPercent, WrightsClientConfig.GHOST_TRANSPARENCY.get());
-            showOffset(placeX, WrightsClientConfig.PLACE_X.get());
-            showOffset(placeY, WrightsClientConfig.PLACE_Y.get());
-            showOffset(placeZ, WrightsClientConfig.PLACE_Z.get());
-            showOffset(shapeAirOffset, WrightsClientConfig.SHAPE_AIR_OFFSET.get());
-            layoutOptions();
+            optionsPanel.showPercent(wallPercent, WrightsClientConfig.WALL_TRANSPARENCY.get());
+            optionsPanel.showPercent(edgePercent, WrightsClientConfig.EDGE_OPACITY.get());
+            optionsPanel.showPercent(ghostPercent, WrightsClientConfig.GHOST_TRANSPARENCY.get());
+            optionsPanel.showOffset(placeX, WrightsClientConfig.PLACE_X.get());
+            optionsPanel.showOffset(placeY, WrightsClientConfig.PLACE_Y.get());
+            optionsPanel.showOffset(placeZ, WrightsClientConfig.PLACE_Z.get());
+            optionsPanel.showOffset(shapeAirOffset, WrightsClientConfig.SHAPE_AIR_OFFSET.get());
+            optionsPanel.layoutOptions();
         }
         if (bindInventory != null) {
             bindInventory.visible = infoPage;
@@ -788,7 +776,7 @@ public class WrightsMenuScreen extends Screen {
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         if (options) {
-            layoutOptions();
+            optionsPanel.layoutOptions();
         }
         if (managePage) {
             portManagePanel.reconcilePlaced();
@@ -840,7 +828,7 @@ public class WrightsMenuScreen extends Screen {
             helpPanel.layout(hx, hy, hw, hh, this.font);
             helpPanel.render(graphics, this.font, mouseX, mouseY);
         } else if (options) {
-            renderOptions(graphics, mouseX, mouseY);
+            optionsPanel.renderOptions(graphics, mouseX, mouseY);
         } else if (infoPage) {
             if (System.currentTimeMillis() - WrightsClientState.digitalInfoAt > 2000L) {
                 requestDigitalInfo();
@@ -1228,373 +1216,7 @@ public class WrightsMenuScreen extends Screen {
         return (value / 1_000_000L) + "m";
     }
 
-    private int optionY(int local) {
-        return optionViewY + local - optionScroll;
-    }
-
-    private void layoutOptions() {
-        optionViewX = listX - 2;
-        optionViewY = panelY + 38;
-        optionViewW = panelX + panelW - 16 - optionViewX;
-        optionViewH = panelH - 76;
-        int x = optionViewX + 10;
-        int controls = optionControlsX(x);
-        int local = 2;
-        hologramHeadY = optionY(local);
-        // Keep the hologram sample clear of the color swatches on the left.
-        optionPreviewX = optionViewX + optionViewW - 16 - 48;
-        optionPreviewY = optionY(local);
-        local = 34;
-        wallSwatchY = optionY(local - 2);
-        local += 20;
-        int sliderW = Mth.clamp(optionViewX + optionViewW - 18 - controls - 42, 48, 120);
-        wallSliderX = controls;
-        wallSliderY = optionY(local);
-        wallSliderW = sliderW;
-        placeField(wallPercent, wallSliderX + wallSliderW + 8, wallSliderY - 4);
-        local += 22;
-        edgeSwatchY = optionY(local - 2);
-        local += 20;
-        edgeSliderX = controls;
-        edgeSliderY = optionY(local);
-        edgeSliderW = sliderW;
-        placeField(edgePercent, edgeSliderX + edgeSliderW + 8, edgeSliderY - 4);
-        local += 22;
-        queueEdgeSwatchY = optionY(local - 2);
-        local += 22;
-        placeEdgeSwatchY = optionY(local - 2);
-        local += 20;
-        ghostSliderX = controls;
-        ghostSliderY = optionY(local);
-        ghostSliderW = sliderW;
-        placeField(ghostPercent, ghostSliderX + ghostSliderW + 8, ghostSliderY - 4);
-        local += 24;
-        boolean marks = WrightsClientConfig.CORNER_MARKERS.get();
-        Component state = Component.translatable(marks ? "menu.wrights.on" : "menu.wrights.off");
-        markerW = Math.max(36, this.font.width(state) + 16);
-        markerX = controls;
-        markerY = optionY(local - 3);
-        local += 28;
-        buildHeadY = optionY(local);
-        local += 18;
-        boolean paceChoice = creativeVisit();
-        boolean instant = paceChoice && WrightsClientConfig.INSTANT_JOBS.get();
-        Component pace = Component.translatable(instant ? "menu.wrights.instant" : "menu.wrights.drone_pace");
-        instantW = Math.max(52, this.font.width(pace) + 16);
-        instantX = controls;
-        instantY = optionY(local - 3);
-        local += 24;
-        droneY = optionY(local - 3);
-        droneMinusX = controls;
-        dronePlusX = droneMinusX + 36;
-        Component maxLabel = Component.translatable("menu.wrights.drone_max", WrightsConfig.maxWrightsPerJob(true));
-        droneW = this.font.width(maxLabel) + 12;
-        droneX = dronePlusX + 22;
-        local += 24;
-        Component queueState = Component.translatable(WrightsClientConfig.QUEUE_JOBS.get() ? "menu.wrights.on" : "menu.wrights.off");
-        queueW = Math.max(36, this.font.width(queueState) + 16);
-        queueX = controls;
-        queueY = optionY(local - 3);
-        local += 24;
-        Component youFirst = Component.translatable("menu.wrights.port_player_first");
-        Component blockFirst = Component.translatable("menu.wrights.port_block_first");
-        portOrderW = Math.max(this.font.width(youFirst), this.font.width(blockFirst)) + 16;
-        portOrderX = controls;
-        portOrderY = optionY(local - 3);
-        local += 24;
-        Component menuState = Component.translatable(WrightsClientConfig.BUILD_MENU.get() ? "menu.wrights.on" : "menu.wrights.off");
-        buildMenuW = Math.max(36, this.font.width(menuState) + 16);
-        buildMenuX = controls;
-        buildMenuY = optionY(local - 3);
-        local += 24;
-        Component dockWatchState = Component.translatable(WrightsClientConfig.DOCK_WATCH.get() ? "menu.wrights.on" : "menu.wrights.off");
-        dockWatchW = Math.max(36, this.font.width(dockWatchState) + 16);
-        dockWatchX = controls;
-        dockWatchY = optionY(local - 3);
-        local += 24;
-        optionPlaceY = optionY(local);
-        local += 16;
-        optionOffsetY = optionY(local);
-        placeField(placeX, x + 12, optionOffsetY);
-        placeField(placeY, x + 82, optionOffsetY);
-        placeField(placeZ, x + 152, optionOffsetY);
-        local += 22;
-        optionShapeAirY = optionY(local - 3);
-        placeField(shapeAirOffset, controls, optionShapeAirY);
-        local += 28;
-        supplyHeadY = optionY(local);
-        local += 18;
-        Component editPriority = Component.translatable("menu.wrights.shape_priority_edit");
-        supplyOrderW = Math.max(88, this.font.width(editPriority) + 16);
-        supplyOrderX = controls;
-        supplyOrderY = optionY(local - 3);
-        local += 34;
-        messageHeadY = optionY(local);
-        local += 18;
-        jobDoneMinY = optionY(local - 3);
-        jobDoneMinusX = controls;
-        jobDonePlusX = jobDoneMinusX + 36;
-        local += 24;
-        Component moveMessages = Component.translatable("menu.wrights.hud_place");
-        Component moveModes = Component.translatable("menu.wrights.mode_place");
-        hudPlaceW = Math.max(120, this.font.width(moveMessages) + 16);
-        modePlaceW = Math.max(120, this.font.width(moveModes) + 16);
-        hudPlaceX = x;
-        hudPlaceY = optionY(local);
-        // Leave room for the ? help between the two buttons when they share a row.
-        modePlaceX = x + hudPlaceW + 18;
-        if (modePlaceX + modePlaceW > optionViewX + optionViewW - 16) {
-            modePlaceX = x;
-            modePlaceY = optionY(local + 20);
-            local += 20;
-        } else {
-            modePlaceY = hudPlaceY;
-        }
-        swatchX = controls;
-        optionContentH = local + 28;
-        int maxScroll = Math.max(0, optionContentH - optionViewH);
-        int clamped = Mth.clamp(optionScroll, 0, maxScroll);
-        if (clamped != optionScroll) {
-            optionScroll = clamped;
-            layoutOptions();
-            return;
-        }
-        showOptionBox(wallPercent);
-        showOptionBox(edgePercent);
-        showOptionBox(ghostPercent);
-        showOptionBox(placeX);
-        showOptionBox(placeY);
-        showOptionBox(placeZ);
-        showOptionBox(shapeAirOffset);
-        if (maxScroll > 0) {
-            optionThumbH = Math.max(16, optionViewH * optionViewH / optionContentH);
-            optionThumbY = optionViewY + (optionViewH - optionThumbH) * optionScroll / maxScroll;
-        } else {
-            optionThumbH = optionViewH;
-            optionThumbY = optionViewY;
-        }
-    }
-
-    /** Shared left edge for the option controls, past the longest label and its help mark. */
-    private int optionControlsX(int labelX) {
-        String[] keys = {
-                "menu.wrights.wall_color",
-                "menu.wrights.wall_transparency",
-                "menu.wrights.edge_color",
-                "menu.wrights.queue_edge",
-                "menu.wrights.place_edge",
-                "menu.wrights.edge_opacity",
-                "menu.wrights.ghost_transparency",
-                "menu.wrights.corner_markers",
-                "menu.wrights.build_speed",
-                "menu.wrights.drone_deploy",
-                "menu.wrights.queue_jobs",
-                "menu.wrights.port_order",
-                "menu.wrights.open_build_menu",
-                "menu.wrights.dock_watch",
-                "menu.wrights.shape_air_offset",
-                "menu.wrights.supply_order",
-                "menu.wrights.job_done_min"
-        };
-        int widest = 0;
-        for (String key : keys) {
-            widest = Math.max(widest, this.font.width(Component.translatable(key)));
-        }
-        int wanted = labelX + widest + 22;
-        int limit = optionViewX + optionViewW - 16 - 168;
-        return Math.max(labelX + 108, Math.min(wanted, Math.max(labelX + 108, limit)));
-    }
-
-    private void showOptionBox(EditBox box) {
-        int top = box.getY();
-        int bottom = top + box.getHeight();
-        box.visible = options && top >= optionViewY && bottom <= optionViewY + optionViewH;
-    }
-
-    private void renderOptions(GuiGraphics graphics, int mouseX, int mouseY) {
-        int x = optionViewX + 10;
-        optionHelps.clear();
-        optionTip = null;
-        graphics.enableScissor(optionViewX, optionViewY, optionViewX + optionViewW - 6, optionViewY + optionViewH);
-        int lineEnd = optionViewX + optionViewW - 16;
-        drawOptionSection(graphics, x, hologramHeadY, "menu.wrights.section_hologram", optionPreviewX - 8);
-        int preview = (Math.round(WrightsClientConfig.wallAlpha() * 255.0F) << 24) | WrightsClientConfig.wallRgb();
-        graphics.fill(optionPreviewX, optionPreviewY, optionPreviewX + 48, optionPreviewY + 28, preview);
-        WrightsUi.border(graphics, optionPreviewX, optionPreviewY, 48, 28, 0xFF000000 | WrightsClientConfig.edgeRgb());
-        graphics.drawString(this.font, Component.translatable("menu.wrights.wall_color"), x, wallSwatchY + 2, WrightsUi.MUTED, false);
-        drawSwatches(graphics, swatchX, wallSwatchY, WrightsClientConfig.wallRgb());
-        drawSlider(graphics, x, wallSliderY, wallSliderX, wallSliderW, WrightsClientConfig.WALL_TRANSPARENCY.get(), 100, Component.translatable("menu.wrights.wall_transparency"));
-        graphics.drawString(this.font, "%", wallPercent.getX() + 34, wallSliderY, WrightsUi.TEXT, false);
-        graphics.drawString(this.font, Component.translatable("menu.wrights.edge_color"), x, edgeSwatchY + 2, WrightsUi.MUTED, false);
-        drawSwatches(graphics, swatchX, edgeSwatchY, WrightsClientConfig.edgeRgb());
-        graphics.drawString(this.font, Component.translatable("menu.wrights.queue_edge"), x, queueEdgeSwatchY + 2, WrightsUi.MUTED, false);
-        drawSwatches(graphics, swatchX, queueEdgeSwatchY, WrightsClientConfig.queueEdgeRgb());
-        graphics.drawString(this.font, Component.translatable("menu.wrights.place_edge"), x, placeEdgeSwatchY + 2, WrightsUi.MUTED, false);
-        drawSwatches(graphics, swatchX, placeEdgeSwatchY, WrightsClientConfig.placeEdgeRgb());
-        drawSlider(graphics, x, edgeSliderY, edgeSliderX, edgeSliderW, WrightsClientConfig.EDGE_OPACITY.get(), 100, Component.translatable("menu.wrights.edge_opacity"));
-        graphics.drawString(this.font, "%", edgePercent.getX() + 34, edgeSliderY, WrightsUi.TEXT, false);
-        Component ghostLabel = Component.translatable("menu.wrights.ghost_transparency");
-        drawSlider(graphics, x, ghostSliderY, ghostSliderX, ghostSliderW, WrightsClientConfig.GHOST_TRANSPARENCY.get(), 100, ghostLabel);
-        graphics.drawString(this.font, "%", ghostPercent.getX() + 34, ghostSliderY, WrightsUi.TEXT, false);
-        drawOptionHelp(graphics, mouseX, mouseY, x, ghostSliderY, ghostLabel, ghostSliderX, ghostPercent.getX() + 42, Component.translatable("menu.wrights.ghost_hint"));
-        graphics.drawString(this.font, Component.translatable("menu.wrights.corner_markers"), x, markerY + 3, WrightsUi.MUTED, false);
-        boolean marks = WrightsClientConfig.CORNER_MARKERS.get();
-        Component state = Component.translatable(marks ? "menu.wrights.on" : "menu.wrights.off");
-        WrightsUi.choice(graphics, markerX, markerY, markerW, 16, marks, false);
-        graphics.drawCenteredString(this.font, state, markerX + markerW / 2, markerY + 4, WrightsUi.TEXT);
-        drawOptionSection(graphics, x, buildHeadY, "menu.wrights.section_building", lineEnd);
-        boolean paceChoice = creativeVisit();
-        boolean instant = paceChoice && WrightsClientConfig.INSTANT_JOBS.get();
-        Component speedLabel = Component.translatable("menu.wrights.build_speed");
-        graphics.drawString(this.font, speedLabel, x, instantY + 3, paceChoice ? WrightsUi.MUTED : 0xFF667480, false);
-        Component pace = Component.translatable(instant ? "menu.wrights.instant" : "menu.wrights.drone_pace");
-        int text = paceChoice ? WrightsUi.TEXT : 0xFF667480;
-        if (paceChoice) {
-            WrightsUi.choice(graphics, instantX, instantY, instantW, 16, instant, false);
-        } else {
-            graphics.fill(instantX, instantY, instantX + instantW, instantY + 16, 0xFF141C24);
-            graphics.fill(instantX, instantY, instantX + instantW, instantY + 2, 0xFF2A3440);
-        }
-        graphics.drawCenteredString(this.font, pace, instantX + instantW / 2, instantY + 4, text);
-        drawOptionHelp(graphics, mouseX, mouseY, x, instantY + 3, speedLabel, instantX, instantX + instantW, Component.translatable(paceChoice ? "menu.wrights.build_speed_hint" : "menu.wrights.build_speed_locked"));
-        Component droneLabel = Component.translatable("menu.wrights.drone_deploy");
-        graphics.drawString(this.font, droneLabel, x, droneY + 3, WrightsUi.MUTED, false);
-        WrightsUi.choice(graphics, droneMinusX, droneY, 16, 16, false, false);
-        graphics.drawCenteredString(this.font, "-", droneMinusX + 8, droneY + 4, WrightsUi.TEXT);
-        int droneCap = WrightsConfig.maxWrightsPerJob(true);
-        String count = Integer.toString(WrightsClientConfig.DRONE_MAX.get()
-                ? WrightsConfig.maxWrightsPerJob()
-                : WrightsClientConfig.droneCount());
-        graphics.drawCenteredString(this.font, count, droneMinusX + 26, droneY + 4, WrightsUi.TEXT);
-        WrightsUi.choice(graphics, dronePlusX, droneY, 16, 16, false, false);
-        graphics.drawCenteredString(this.font, "+", dronePlusX + 8, droneY + 4, WrightsUi.TEXT);
-        boolean atMax = WrightsClientConfig.DRONE_MAX.get();
-        WrightsUi.choice(graphics, droneX, droneY, droneW, 16, atMax, false);
-        graphics.drawCenteredString(this.font, Component.translatable("menu.wrights.drone_max", droneCap), droneX + droneW / 2, droneY + 4, WrightsUi.TEXT);
-        drawOptionHelp(graphics, mouseX, mouseY, x, droneY + 3, droneLabel, droneMinusX, droneX + droneW, Component.translatable("menu.wrights.drone_fixed_hint"));
-        boolean queueJobs = WrightsClientConfig.QUEUE_JOBS.get();
-        Component queueLabel = Component.translatable("menu.wrights.queue_jobs");
-        graphics.drawString(this.font, queueLabel, x, queueY + 3, WrightsUi.MUTED, false);
-        Component queueState = Component.translatable(queueJobs ? "menu.wrights.on" : "menu.wrights.off");
-        WrightsUi.choice(graphics, queueX, queueY, queueW, 16, queueJobs, false);
-        graphics.drawCenteredString(this.font, queueState, queueX + queueW / 2, queueY + 4, WrightsUi.TEXT);
-        drawOptionHelp(graphics, mouseX, mouseY, x, queueY + 3, queueLabel, queueX, queueX + queueW, Component.translatable("menu.wrights.queue_jobs_hint"));
-        boolean youFirst = WrightsClientConfig.PORT_PLAYER_FIRST.get();
-        Component portLabel = Component.translatable("menu.wrights.port_order");
-        graphics.drawString(this.font, portLabel, x, portOrderY + 3, WrightsUi.MUTED, false);
-        Component portOrder = Component.translatable(youFirst ? "menu.wrights.port_player_first" : "menu.wrights.port_block_first");
-        WrightsUi.choice(graphics, portOrderX, portOrderY, portOrderW, 16, youFirst, false);
-        graphics.drawCenteredString(this.font, portOrder, portOrderX + portOrderW / 2, portOrderY + 4, WrightsUi.TEXT);
-        drawOptionHelp(graphics, mouseX, mouseY, x, portOrderY + 3, portLabel, portOrderX, portOrderX + portOrderW, Component.translatable(youFirst ? "menu.wrights.port_order_player_hint" : "menu.wrights.port_order_block_hint"));
-        boolean openMenu = WrightsClientConfig.BUILD_MENU.get();
-        Component menuLabel = Component.translatable("menu.wrights.open_build_menu");
-        graphics.drawString(this.font, menuLabel, x, buildMenuY + 3, WrightsUi.MUTED, false);
-        Component menuState = Component.translatable(openMenu ? "menu.wrights.on" : "menu.wrights.off");
-        WrightsUi.choice(graphics, buildMenuX, buildMenuY, buildMenuW, 16, openMenu, false);
-        graphics.drawCenteredString(this.font, menuState, buildMenuX + buildMenuW / 2, buildMenuY + 4, WrightsUi.TEXT);
-        drawOptionHelp(graphics, mouseX, mouseY, x, buildMenuY + 3, menuLabel, buildMenuX, buildMenuX + buildMenuW, Component.translatable("menu.wrights.open_build_menu_hint"));
-        boolean dockWatch = WrightsClientConfig.DOCK_WATCH.get();
-        Component dockWatchLabel = Component.translatable("menu.wrights.dock_watch");
-        graphics.drawString(this.font, dockWatchLabel, x, dockWatchY + 3, WrightsUi.MUTED, false);
-        Component dockWatchState = Component.translatable(dockWatch ? "menu.wrights.on" : "menu.wrights.off");
-        WrightsUi.choice(graphics, dockWatchX, dockWatchY, dockWatchW, 16, dockWatch, false);
-        graphics.drawCenteredString(this.font, dockWatchState, dockWatchX + dockWatchW / 2, dockWatchY + 4, WrightsUi.TEXT);
-        drawOptionHelp(graphics, mouseX, mouseY, x, dockWatchY + 3, dockWatchLabel, dockWatchX, dockWatchX + dockWatchW, Component.translatable("menu.wrights.dock_watch_hint"));
-        Component placeLabel = Component.translatable("menu.wrights.place_offset");
-        graphics.drawString(this.font, placeLabel, x, optionPlaceY, WrightsUi.TEXT, false);
-        drawOptionHelp(graphics, mouseX, mouseY, x, optionPlaceY, placeLabel, 0, 0, Component.translatable("menu.wrights.place_hint").append("\n").append(Component.translatable("menu.wrights.place_axes")));
-        graphics.drawString(this.font, "X", x, optionOffsetY + 3, WrightsUi.MUTED, false);
-        graphics.drawString(this.font, "Y", x + 70, optionOffsetY + 3, WrightsUi.MUTED, false);
-        graphics.drawString(this.font, "Z", x + 140, optionOffsetY + 3, WrightsUi.MUTED, false);
-        Component shapeAirLabel = Component.translatable("menu.wrights.shape_air_offset");
-        graphics.drawString(this.font, shapeAirLabel, x, optionShapeAirY + 3, WrightsUi.MUTED, false);
-        int shapeAirBoxX = shapeAirOffset.getX();
-        drawOptionHelp(graphics, mouseX, mouseY, x, optionShapeAirY + 3, shapeAirLabel, shapeAirBoxX, shapeAirBoxX + shapeAirOffset.getWidth(),
-                Component.translatable("menu.wrights.shape_air_offset_hint"));
-        drawOptionSection(graphics, x, supplyHeadY, "menu.wrights.section_supply", lineEnd);
-        Component supplyLabel = Component.translatable("menu.wrights.supply_order");
-        graphics.drawString(this.font, supplyLabel, x, supplyOrderY + 3, WrightsUi.MUTED, false);
-        WrightsUi.choice(graphics, supplyOrderX, supplyOrderY, supplyOrderW, 16, false, false);
-        graphics.drawCenteredString(this.font, Component.translatable("menu.wrights.shape_priority_edit"), supplyOrderX + supplyOrderW / 2, supplyOrderY + 4, WrightsUi.TEXT);
-        String summary = WrightsClientConfig.supplyOrderSummary();
-        graphics.drawString(this.font, this.font.plainSubstrByWidth(summary, Math.max(40, optionViewW - 28)),
-                x, supplyOrderY + 20, WrightsUi.MUTED, false);
-        drawOptionHelp(graphics, mouseX, mouseY, x, supplyOrderY + 3, supplyLabel, supplyOrderX, supplyOrderX + supplyOrderW, Component.translatable("menu.wrights.supply_order_hint"));
-        drawOptionSection(graphics, x, messageHeadY, "menu.wrights.section_messages", lineEnd);
-        Component jobDoneLabel = Component.translatable("menu.wrights.job_done_min");
-        graphics.drawString(this.font, jobDoneLabel, x, jobDoneMinY + 3, WrightsUi.MUTED, false);
-        WrightsUi.choice(graphics, jobDoneMinusX, jobDoneMinY, 16, 16, false, false);
-        graphics.drawCenteredString(this.font, "-", jobDoneMinusX + 8, jobDoneMinY + 4, WrightsUi.TEXT);
-        String jobDoneCount = Integer.toString(WrightsClientConfig.jobDoneMinSeconds());
-        graphics.drawCenteredString(this.font, jobDoneCount, jobDoneMinusX + 26, jobDoneMinY + 4, WrightsUi.TEXT);
-        WrightsUi.choice(graphics, jobDonePlusX, jobDoneMinY, 16, 16, false, false);
-        graphics.drawCenteredString(this.font, "+", jobDonePlusX + 8, jobDoneMinY + 4, WrightsUi.TEXT);
-        graphics.drawString(this.font, Component.translatable("menu.wrights.job_done_min_unit"), jobDonePlusX + 22, jobDoneMinY + 4, WrightsUi.MUTED, false);
-        drawOptionHelp(graphics, mouseX, mouseY, x, jobDoneMinY + 3, jobDoneLabel, jobDoneMinusX, jobDonePlusX + 40, Component.translatable("menu.wrights.job_done_min_hint"));
-        WrightsUi.choice(graphics, hudPlaceX, hudPlaceY, hudPlaceW, 16, true, false);
-        graphics.drawCenteredString(this.font, Component.translatable("menu.wrights.hud_place"), hudPlaceX + hudPlaceW / 2, hudPlaceY + 4, WrightsUi.TEXT);
-        drawOptionHelp(graphics, mouseX, mouseY, hudPlaceX + hudPlaceW + 2, hudPlaceY + 2, Component.empty(), 0, 0, Component.translatable("menu.wrights.hud_place_hint"));
-        WrightsUi.choice(graphics, modePlaceX, modePlaceY, modePlaceW, 16, true, false);
-        graphics.drawCenteredString(this.font, Component.translatable("menu.wrights.mode_place"), modePlaceX + modePlaceW / 2, modePlaceY + 4, WrightsUi.TEXT);
-        drawOptionHelp(graphics, mouseX, mouseY, modePlaceX + modePlaceW + 2, modePlaceY + 2, Component.empty(), 0, 0, Component.translatable("menu.wrights.mode_place_hint"));
-        graphics.disableScissor();
-        if (optionTip != null) {
-            graphics.renderTooltip(this.font, this.font.split(optionTip, 240), mouseX, mouseY);
-        }
-        if (optionContentH > optionViewH) {
-            int barX = optionViewX + optionViewW - 5;
-            graphics.fill(barX, optionViewY, barX + 3, optionViewY + optionViewH, 0xFF24303A);
-            graphics.fill(barX, optionThumbY, barX + 3, optionThumbY + optionThumbH, WrightsUi.COPPER);
-        }
-    }
-
-    private void drawOptionHelp(GuiGraphics graphics, int mouseX, int mouseY, int labelX, int labelY, Component label, int controlX, int controlRight, Component tip) {
-        int helpX = labelX + this.font.width(label) + 4;
-        if (controlX > labelX && helpX + 12 > controlX - 2) {
-            helpX = controlRight + 6;
-        }
-        int helpY = labelY - 2;
-        if (helpY + 12 <= optionViewY || helpY >= optionViewY + optionViewH || helpX + 12 > optionViewX + optionViewW - 6) {
-            return;
-        }
-        boolean over = mouseX >= helpX && mouseX < helpX + 12 && mouseY >= helpY && mouseY < helpY + 12;
-        graphics.fill(helpX, helpY, helpX + 12, helpY + 12, 0xFF18222C);
-        WrightsUi.border(graphics, helpX, helpY, 12, 12, over ? WrightsUi.COPPER : 0xFF3D4E5E);
-        graphics.drawCenteredString(this.font, "?", helpX + 6, helpY + 2, over ? WrightsUi.COPPER : WrightsUi.MUTED);
-        optionHelps.add(new HelpSpot(helpX, helpY));
-        if (over) {
-            optionTip = tip;
-        }
-    }
-
-    private boolean overOptionHelp(double mouseX, double mouseY) {
-        for (HelpSpot spot : optionHelps) {
-            if (mouseX >= spot.x() && mouseX < spot.x() + 12 && mouseY >= spot.y() && mouseY < spot.y() + 12) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     record HelpSpot(int x, int y) {
-    }
-
-    private void drawOptionSection(GuiGraphics graphics, int x, int y, String key, int lineEnd) {
-        if (y != hologramHeadY) {
-            WrightsUi.sectionBreak(graphics, x, y - 8, Math.max(0, (optionViewX + optionViewW - 16) - x));
-        }
-        WrightsUi.section(graphics, this.font, x, y, key, lineEnd);
-    }
-
-    private void drawSwatches(GuiGraphics graphics, int x, int y, int selected) {
-        for (int i = 0; i < WrightsClientConfig.COLORS.length; i++) {
-            int color = WrightsClientConfig.COLORS[i];
-            int sx = x + i * 16;
-            graphics.fill(sx, y, sx + 12, y + 12, 0xFF000000 | color);
-            if (color == selected) {
-                WrightsUi.border(graphics, sx - 1, y - 1, 14, 14, WrightsUi.TEXT);
-            }
-        }
     }
 
     void drawSlider(GuiGraphics graphics, int labelX, int y, int x, int width, int along, int span, Component label) {
@@ -1605,13 +1227,6 @@ public class WrightsMenuScreen extends Screen {
         graphics.fill(x, trackY, x + Math.max(0, Math.min(width, filled)), trackY + 4, WrightsUi.COPPER);
         int knob = x + (int) ((width - 6) * (along / (double) Math.max(1, span)));
         graphics.fill(knob, trackY - 3, knob + 6, trackY + 7, WrightsUi.TEXT);
-    }
-
-    private void placeField(EditBox box, int x, int y) {
-        box.setX(x);
-        box.setY(y);
-        box.setWidth(28);
-        box.setHeight(14);
     }
 
     private boolean buildingPage() {
@@ -2452,17 +2067,17 @@ public class WrightsMenuScreen extends Screen {
             return true;
         }
         if (options && button == 0) {
-            layoutOptions();
-            if (hitOptionBar(mouseX, mouseY)) {
+            optionsPanel.layoutOptions();
+            if (optionsPanel.hitOptionBar(mouseX, mouseY)) {
                 optionDragging = true;
                 optionDragGrab = (int) mouseY - optionThumbY;
                 return true;
             }
-            if (insideOptionView(mouseX, mouseY)) {
-                if (overOptionHelp(mouseX, mouseY)) {
+            if (optionsPanel.insideOptionView(mouseX, mouseY)) {
+                if (optionsPanel.overOptionHelp(mouseX, mouseY)) {
                     return true;
                 }
-                if (pickSwatch(mouseX, mouseY, wallSwatchY, 0) || pickSwatch(mouseX, mouseY, edgeSwatchY, 1) || pickSwatch(mouseX, mouseY, queueEdgeSwatchY, 2) || pickSwatch(mouseX, mouseY, placeEdgeSwatchY, 3)) {
+                if (optionsPanel.pickSwatch(mouseX, mouseY, wallSwatchY, 0) || optionsPanel.pickSwatch(mouseX, mouseY, edgeSwatchY, 1) || optionsPanel.pickSwatch(mouseX, mouseY, queueEdgeSwatchY, 2) || optionsPanel.pickSwatch(mouseX, mouseY, placeEdgeSwatchY, 3)) {
                     return true;
                 }
                 if (mouseX >= markerX && mouseX < markerX + markerW && mouseY >= markerY && mouseY < markerY + 16) {
@@ -2778,18 +2393,6 @@ public class WrightsMenuScreen extends Screen {
         return !options && selected() != null && mouseX >= modelX && mouseX < modelX + modelW && mouseY >= modelY && mouseY < modelY + modelH;
     }
 
-    private boolean insideOptionView(double mouseX, double mouseY) {
-        return mouseX >= optionViewX && mouseX < optionViewX + optionViewW && mouseY >= optionViewY && mouseY < optionViewY + optionViewH;
-    }
-
-    private boolean hitOptionBar(double mouseX, double mouseY) {
-        if (optionContentH <= optionViewH) {
-            return false;
-        }
-        int barX = optionViewX + optionViewW - 8;
-        return mouseX >= barX && mouseX < optionViewX + optionViewW && mouseY >= optionViewY && mouseY < optionViewY + optionViewH;
-    }
-
     private boolean hitTask(double mouseX, double mouseY, int contentY) {
         if (contentY < 0 || !insideNav(mouseX, mouseY)) {
             return false;
@@ -2802,39 +2405,16 @@ public class WrightsMenuScreen extends Screen {
         return mouseX >= x - 4 && mouseX < x + width + 4 && mouseY >= y - 4 && mouseY < y + 16;
     }
 
-    private boolean pickSwatch(double mouseX, double mouseY, int y, int which) {
-        if (mouseY < y || mouseY >= y + 12) {
-            return false;
-        }
-        for (int i = 0; i < WrightsClientConfig.COLORS.length; i++) {
-            int x = swatchX + i * 16;
-            if (mouseX >= x && mouseX < x + 12) {
-                int color = WrightsClientConfig.COLORS[i];
-                if (which == 0) {
-                    WrightsClientConfig.setWallRgb(color);
-                } else if (which == 1) {
-                    WrightsClientConfig.setEdgeRgb(color);
-                } else if (which == 2) {
-                    WrightsClientConfig.setQueueEdgeRgb(color);
-                } else {
-                    WrightsClientConfig.setPlaceEdgeRgb(color);
-                }
-                return true;
-            }
-        }
-        return false;
-    }
-
     void applyDrag(double mouseX) {
         if (drag == 1) {
             WrightsClientConfig.setWallTransparency(along(mouseX, wallSliderX, wallSliderW, 0, 100));
-            showPercent(wallPercent, WrightsClientConfig.WALL_TRANSPARENCY.get());
+            optionsPanel.showPercent(wallPercent, WrightsClientConfig.WALL_TRANSPARENCY.get());
         } else if (drag == 2) {
             WrightsClientConfig.setEdgeOpacity(along(mouseX, edgeSliderX, edgeSliderW, 0, 100));
-            showPercent(edgePercent, WrightsClientConfig.EDGE_OPACITY.get());
+            optionsPanel.showPercent(edgePercent, WrightsClientConfig.EDGE_OPACITY.get());
         } else if (drag == 3) {
             WrightsClientConfig.setGhostTransparency(along(mouseX, ghostSliderX, ghostSliderW, 0, 100));
-            showPercent(ghostPercent, WrightsClientConfig.GHOST_TRANSPARENCY.get());
+            optionsPanel.showPercent(ghostPercent, WrightsClientConfig.GHOST_TRANSPARENCY.get());
         } else if (drag == 4) {
             int maxCopies = Math.max(1, WrightsConfig.maxMirrorCopies());
             WrightsClientConfig.MIRROR_PATTERN.set(along(mouseX, mirrorBodyX, mirrorCardW, 1, maxCopies));
@@ -2864,7 +2444,7 @@ public class WrightsMenuScreen extends Screen {
         EditBox box = new EditBox(this.font, 0, 0, 36, 14, Component.empty());
         box.setMaxLength(3);
         box.setFilter(text -> text.matches("-?\\d{0,2}"));
-        box.setResponder(value -> applyOffset(axis, value));
+        box.setResponder(value -> optionsPanel.applyOffset(axis, value));
         addRenderableWidget(box);
         return box;
     }
@@ -2885,40 +2465,6 @@ public class WrightsMenuScreen extends Screen {
         });
         addRenderableWidget(box);
         return box;
-    }
-
-    private void applyOffset(int axis, String value) {
-        if (suppressOptions || value.isEmpty() || value.equals("-")) {
-            return;
-        }
-        int parsed;
-        try {
-            parsed = Integer.parseInt(value);
-        } catch (NumberFormatException ignored) {
-            return;
-        }
-        int x = axis == 0 ? parsed : WrightsClientConfig.PLACE_X.get();
-        int y = axis == 1 ? parsed : WrightsClientConfig.PLACE_Y.get();
-        int z = axis == 2 ? parsed : WrightsClientConfig.PLACE_Z.get();
-        WrightsClientConfig.setPlace(x, y, z);
-    }
-
-    private void showPercent(EditBox box, int value) {
-        if (box.isFocused()) {
-            return;
-        }
-        suppressOptions = true;
-        box.setValue(Integer.toString(value));
-        suppressOptions = false;
-    }
-
-    private void showOffset(EditBox box, int value) {
-        if (box.isFocused()) {
-            return;
-        }
-        suppressOptions = true;
-        box.setValue(Integer.toString(value));
-        suppressOptions = false;
     }
 
     private static int along(double mouseX, int x, int width, int min, int max) {
@@ -3134,7 +2680,7 @@ public class WrightsMenuScreen extends Screen {
             }
             return true;
         }
-        if (options && insideOptionView(mouseX, mouseY)) {
+        if (options && optionsPanel.insideOptionView(mouseX, mouseY)) {
             int max = Math.max(0, optionContentH - optionViewH);
             optionScroll = Mth.clamp(optionScroll - (int) Math.signum(scrollY) * 16, 0, max);
             return true;
