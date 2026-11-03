@@ -497,6 +497,10 @@ public final class CrewRoster {
                 changed = true;
                 continue;
             }
+            if (!unitIsOut(player, job, id) && !ShapeJobs.homeCanPay(player, level, job, home)) {
+                changed = true;
+                continue;
+            }
             ids.add(id);
         }
         int need = quota - ids.size();
@@ -527,6 +531,9 @@ public final class CrewRoster {
                     continue;
                 }
                 if (owed != null && !owed.allows(player, level, job, free.homePort())) {
+                    continue;
+                }
+                if (!ShapeJobs.homeCanPay(player, level, job, free.homePort())) {
                     continue;
                 }
                 ids.add(id);
