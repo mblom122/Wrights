@@ -36,10 +36,13 @@ class SmallBoxStandsTest {
     }
 
     @Test
-    void sixBySixFloorIsFourThreeByThreeStamps() {
-        int[][] stands = SmallBoxStands.stands(6, 1, 6, false, SQUARE, REACH);
-        assertEquals(4, stands.length);
-        assertArrayEquals(new int[] {1, 0, 1}, stands[0]);
+    void sixBySixFloorStaysOnTheNearestFirstCrawler() {
+        assertEquals(0, SmallBoxStands.stands(6, 1, 6, false, SQUARE, REACH).length);
+    }
+
+    @Test
+    void longBeamStaysOnTheNearestFirstCrawler() {
+        assertEquals(0, SmallBoxStands.stands(12, 1, 1, false, SQUARE, REACH).length);
     }
 
     @Test
@@ -61,7 +64,31 @@ class SmallBoxStandsTest {
 
     @Test
     void appliesStopsAtMaxSide() {
-        assertTrue(SmallBoxStands.applies(16, 1, 16, REACH));
-        assertFalse(SmallBoxStands.applies(17, 1, 3, REACH));
+        assertTrue(SmallBoxStands.applies(3, 3, 3, REACH));
+        assertFalse(SmallBoxStands.applies(4, 1, 3, REACH));
+    }
+
+    @Test
+    void oneWideSlabOfABiggerShapeStandsOnItsMiddle() {
+        // A wright whose share of a larger job is a 1x3x3 slab, planned as a plain solid box.
+        int[][] stands = SmallBoxStands.stands(1, 3, 3, false, CUBE, REACH);
+        assertEquals(1, stands.length);
+        assertArrayEquals(new int[] {0, 1, 1}, stands[0]);
+    }
+
+    @Test
+    void slabWiderThanThreeKeepsTheCrawler() {
+        assertFalse(SmallBoxStands.applies(1, 6, 6, REACH));
+        assertEquals(0, SmallBoxStands.stands(1, 6, 6, false, CUBE, REACH).length);
+    }
+
+    @Test
+    void repeatedCallsGiveTheSameStands() {
+        int[][] first = SmallBoxStands.stands(3, 3, 3, false, CUBE, REACH);
+        int[][] second = SmallBoxStands.stands(3, 3, 3, false, CUBE, REACH);
+        assertEquals(first.length, second.length);
+        for (int i = 0; i < first.length; i++) {
+            assertArrayEquals(first[i], second[i]);
+        }
     }
 }

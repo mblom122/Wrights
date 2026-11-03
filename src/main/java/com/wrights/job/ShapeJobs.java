@@ -1392,11 +1392,55 @@ public final class ShapeJobs {
     }
 
     /**
-     * One hover for a small shape, the way main's plate and small-box plans work.
-     * A 3×3×3 sphere is the center. A 6×1×6 floor is four 3×3 stamps.
-     * Nothing is placed until the wright is standing on that stamp, so the reach
-     * sphere covers the whole piece in one operation. Fat shapes and long ones return
-     * {@link #JobManager.PATTERN_SKIP} and keep the old crawler.
+     * The part of the job box one wright stamps from predefined stands. A job that is itself 3×3×3
+     * or smaller is one piece for every wright. A bigger job is cut into slabs (see
+     * {@link #ensureShapeShares}); a wright whose own slab happens to be 3×3×3 or smaller stamps
+     * that slab from the same predefined stands instead of crawling it. Offsets are local to the job box.
+     */
+    private record SmallPiece(int ox, int oy, int oz, int sx, int sy, int sz, boolean whole) {
+        BlockPos at(BuildJob job, int x, int y, int z) {
+            return job.min().offset(ox + x, oy + y, oz + z);
+        }
+    }
+
+    /** This wright's piece, or null when it keeps the nearest-first crawler. */
+    private static SmallPiece smallPiece(BuildJob job, BuildJob.Hand hand, int reach) {
+        if (job == null || hand == null || job.min() == null) {
+            return null;
+        }
+        if (com.wrights.blueprint.SmallBoxStands.applies(job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(), reach)) {
+            return new SmallPiece(0, 0, 0, job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(), true);
+        }
+        if (job.hands().size() <= 1 || hand.shareFrom < 0 || hand.shareTo <= hand.shareFrom) {
+            return null;
+        }
+        ShapeStrip strip = shapeStrip(job);
+        int from = Math.max(0, hand.shareFrom);
+        int to = Math.min(shapeAxisSpan(job), hand.shareTo);
+        int width = to - from;
+        if (width <= 0) {
+            return null;
+        }
+        SmallPiece piece = strip.alongX
+                ? new SmallPiece(from, 0, 0, width, strip.sy, strip.sz, false)
+                : strip.alongZ
+                        ? new SmallPiece(0, 0, from, strip.sx, strip.sy, width, false)
+                        : new SmallPiece(0, from, 0, strip.sx, width, strip.sz, false);
+        return com.wrights.blueprint.SmallBoxStands.applies(piece.sx(), piece.sy(), piece.sz(), reach) ? piece : null;
+    }
+
+    /** Stands for a piece. A slab of a bigger shape is planned as a plain solid box. */
+    private static int[][] pieceStands(BuildJob job, SmallPiece piece, int reach) {
+        int kind = piece.whole() ? job.shapeKind() : com.wrights.blueprint.Shapes.Kind.CUBE.ordinal();
+        boolean hollow = piece.whole() && job.shapeHollow();
+        return com.wrights.blueprint.SmallBoxStands.stands(piece.sx(), piece.sy(), piece.sz(), hollow, kind, reach);
+    }
+
+    /**
+     * One hover for a small piece, the way main's small-box plans work.
+     * A 3×3×3 sphere is the center. Nothing is placed until the wright is standing on that stamp,
+     * so the reach sphere covers the whole piece in one operation. Pieces larger than 3×3×3 return
+     * {@link #JobManager.PATTERN_SKIP} and keep the nearest-first crawler.
      */
     private static int tickSmallPattern(
             ServerLevel level,
@@ -1410,20 +1454,24 @@ public final class ShapeJobs {
             com.wrights.blueprint.Shapes.Kind shapeKind,
             BlockPos shapePinLocal) {
         int reach = WrightTier.operationReachSqr(handOps(hand));
-        if (!com.wrights.blueprint.SmallBoxStands.applies(
-                job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(), reach)) {
+        SmallPiece piece = smallPiece(job, hand, reach);
+        if (piece == null) {
             return JobManager.PATTERN_SKIP;
         }
-        resolveSmallOutside(level, player, job, hand, shapeKind, shapePinLocal);
-        int[] stand = chooseSmallStand(level, player, job, hand, shapeKind, shapePinLocal);
-        if (stand == null || job.min() == null) {
+        resolveSmallOutside(level, player, job, hand, piece, shapeKind, shapePinLocal);
+        int[] stand = chooseSmallStand(level, player, job, hand, piece, shapeKind, shapePinLocal);
+        if (stand == null) {
+            if (!piece.whole()) {
+                // Slab finished: the crawler path decides between rebalancing, helping and idling.
+                return JobManager.PATTERN_SKIP;
+            }
             hand.idle = true;
             hand.aim = -1;
             hand.shareRemain = 0;
             setShapeHandStatus(level, hand, null, DroneEntity.WAIT_IDLE);
             return JobManager.PATTERN_DONE;
         }
-        BlockPos fly = job.min().offset(stand[0], stand[1], stand[2]);
+        BlockPos fly = piece.at(job, stand[0], stand[1], stand[2]);
         int anchor = job.scanIndex(fly);
         if (anchor >= 0) {
             WorkPicker.claimAim(job, hand, anchor);
@@ -1456,19 +1504,16 @@ public final class ShapeJobs {
         }
         int budget = CellPlacement.placeBudget(hand);
         int placed = 0;
-        int sx = job.boxSizeX();
-        int sy = job.boxSizeY();
-        int sz = job.boxSizeZ();
         while (placed < budget) {
             int index = -1;
             int bestDist = Integer.MAX_VALUE;
-            for (int z = 0; z < sz; z++) {
-                for (int y = 0; y < sy; y++) {
-                    for (int x = 0; x < sx; x++) {
+            for (int z = 0; z < piece.sz(); z++) {
+                for (int y = 0; y < piece.sy(); y++) {
+                    for (int x = 0; x < piece.sx(); x++) {
                         if (!com.wrights.blueprint.SmallBoxStands.covers(stand, x, y, z, reach)) {
                             continue;
                         }
-                        int cell = job.scanIndex(job.min().offset(x, y, z));
+                        int cell = job.scanIndex(piece.at(job, x, y, z));
                         if (cell < 0 || job.isShapeResolved(cell) || WorkPicker.aimedByOther(job, hand, cell)) {
                             continue;
                         }
@@ -1534,7 +1579,7 @@ public final class ShapeJobs {
             hand.opStand = anchor;
         }
         if (anchor >= 0 && smallStandHasReady(
-                level, player, job, hand, shapeKind, shapePinLocal, stand, reach)) {
+                level, player, job, hand, piece, shapeKind, shapePinLocal, stand, reach)) {
             WorkPicker.claimAim(job, hand, anchor);
         }
         return JobManager.PATTERN_DONE;
@@ -1546,18 +1591,13 @@ public final class ShapeJobs {
             ServerPlayer player,
             BuildJob job,
             BuildJob.Hand hand,
+            SmallPiece piece,
             com.wrights.blueprint.Shapes.Kind shapeKind,
             BlockPos shapePinLocal) {
-        if (job.min() == null) {
-            return;
-        }
-        int sx = job.boxSizeX();
-        int sy = job.boxSizeY();
-        int sz = job.boxSizeZ();
-        for (int z = 0; z < sz; z++) {
-            for (int y = 0; y < sy; y++) {
-                for (int x = 0; x < sx; x++) {
-                    int index = job.scanIndex(job.min().offset(x, y, z));
+        for (int z = 0; z < piece.sz(); z++) {
+            for (int y = 0; y < piece.sy(); y++) {
+                for (int x = 0; x < piece.sx(); x++) {
+                    int index = job.scanIndex(piece.at(job, x, y, z));
                     if (index < 0 || job.isShapeResolved(index)) {
                         continue;
                     }
@@ -1593,8 +1633,8 @@ public final class ShapeJobs {
     }
 
     /**
-     * World block this wright should stand on for a 3×3×3-or-smaller shape, or null when the
-     * shape is larger (those keep the existing route).
+     * World block this wright should stand on for its small piece, or null when the piece is
+     * larger than 3×3×3 (those keep the nearest-first crawler).
      */
     private static BlockPos smallBoxStand(
             ServerLevel level,
@@ -1603,11 +1643,15 @@ public final class ShapeJobs {
             BuildJob.Hand hand,
             com.wrights.blueprint.Shapes.Kind shapeKind,
             BlockPos shapePinLocal) {
-        int[] local = chooseSmallStand(level, player, job, hand, shapeKind, shapePinLocal);
-        if (local == null || job.min() == null) {
+        SmallPiece piece = smallPiece(job, hand, WrightTier.operationReachSqr(handOps(hand)));
+        if (piece == null) {
             return null;
         }
-        return job.min().offset(local[0], local[1], local[2]);
+        int[] local = chooseSmallStand(level, player, job, hand, piece, shapeKind, shapePinLocal);
+        if (local == null) {
+            return null;
+        }
+        return piece.at(job, local[0], local[1], local[2]);
     }
 
     /** A READY cell of this wright's predefined stand, or {@code -1} when the cheatsheet does not apply. */
@@ -1618,23 +1662,24 @@ public final class ShapeJobs {
             BuildJob.Hand hand,
             com.wrights.blueprint.Shapes.Kind shapeKind,
             BlockPos shapePinLocal) {
-        int[] stand = chooseSmallStand(level, player, job, hand, shapeKind, shapePinLocal);
+        int reach = WrightTier.operationReachSqr(handOps(hand));
+        SmallPiece piece = smallPiece(job, hand, reach);
+        if (piece == null) {
+            return -1;
+        }
+        int[] stand = chooseSmallStand(level, player, job, hand, piece, shapeKind, shapePinLocal);
         if (stand == null) {
             return -1;
         }
-        int reach = WrightTier.operationReachSqr(handOps(hand));
         int best = -1;
         int bestDist = Integer.MAX_VALUE;
-        int sx = job.boxSizeX();
-        int sy = job.boxSizeY();
-        int sz = job.boxSizeZ();
-        for (int z = 0; z < sz; z++) {
-            for (int y = 0; y < sy; y++) {
-                for (int x = 0; x < sx; x++) {
+        for (int z = 0; z < piece.sz(); z++) {
+            for (int y = 0; y < piece.sy(); y++) {
+                for (int x = 0; x < piece.sx(); x++) {
                     if (!com.wrights.blueprint.SmallBoxStands.covers(stand, x, y, z, reach)) {
                         continue;
                     }
-                    int index = job.min() == null ? -1 : job.scanIndex(job.min().offset(x, y, z));
+                    int index = job.scanIndex(piece.at(job, x, y, z));
                     if (index < 0 || WorkPicker.aimedByOther(job, hand, index)) {
                         continue;
                     }
@@ -1661,21 +1706,21 @@ public final class ShapeJobs {
             ServerPlayer player,
             BuildJob job,
             BuildJob.Hand hand,
+            SmallPiece piece,
             com.wrights.blueprint.Shapes.Kind shapeKind,
             BlockPos shapePinLocal) {
-        if (job == null || hand == null) {
+        if (job == null || hand == null || piece == null) {
             return null;
         }
         int reach = WrightTier.operationReachSqr(handOps(hand));
-        int[][] stands = com.wrights.blueprint.SmallBoxStands.stands(
-                job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(), job.shapeHollow(), job.shapeKind(), reach);
+        int[][] stands = pieceStands(job, piece, reach);
         if (stands.length == 0) {
             return null;
         }
         int lane = Math.max(0, hand.lane);
         for (int step = 0; step < stands.length; step++) {
             int[] stand = stands[(lane + step) % stands.length];
-            if (smallStandHasReady(level, player, job, hand, shapeKind, shapePinLocal, stand, reach)) {
+            if (smallStandHasReady(level, player, job, hand, piece, shapeKind, shapePinLocal, stand, reach)) {
                 return stand;
             }
         }
@@ -1687,20 +1732,18 @@ public final class ShapeJobs {
             ServerPlayer player,
             BuildJob job,
             BuildJob.Hand hand,
+            SmallPiece piece,
             com.wrights.blueprint.Shapes.Kind shapeKind,
             BlockPos shapePinLocal,
             int[] stand,
             int reach) {
-        int sx = job.boxSizeX();
-        int sy = job.boxSizeY();
-        int sz = job.boxSizeZ();
-        for (int z = 0; z < sz; z++) {
-            for (int y = 0; y < sy; y++) {
-                for (int x = 0; x < sx; x++) {
+        for (int z = 0; z < piece.sz(); z++) {
+            for (int y = 0; y < piece.sy(); y++) {
+                for (int x = 0; x < piece.sx(); x++) {
                     if (!com.wrights.blueprint.SmallBoxStands.covers(stand, x, y, z, reach)) {
                         continue;
                     }
-                    int index = job.min() == null ? -1 : job.scanIndex(job.min().offset(x, y, z));
+                    int index = job.scanIndex(piece.at(job, x, y, z));
                     if (index < 0 || job.isShapeResolved(index)) {
                         continue;
                     }
