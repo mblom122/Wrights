@@ -189,15 +189,7 @@ public class JobHistoryScreen extends Screen {
         }
 
         int lineY = y + 16;
-        String stats = statsLine(event);
-        if (!stats.isBlank()) {
-            graphics.drawString(
-                    this.font,
-                    this.font.plainSubstrByWidth(stats, width - 16),
-                    x + 8,
-                    lineY,
-                    WrightsUi.SIZE,
-                    false);
+        if (drawStats(graphics, x + 8, lineY, width - 16, event)) {
             lineY += 11;
         }
         String location = event.location() == null ? "" : event.location();
@@ -223,34 +215,42 @@ public class JobHistoryScreen extends Screen {
                 false);
     }
 
-    /** Same size / blocks / duration strip the Jobs cards use. */
-    private static String statsLine(BlueprintPayloads.HistoryLine event) {
+    /**
+     * Size in the standard SIZE blue; blocks and Took stay muted — same strip as Jobs cards.
+     * @return true when anything was drawn
+     */
+    private boolean drawStats(GuiGraphics graphics, int x, int y, int maxW, BlueprintPayloads.HistoryLine event) {
         boolean hasSize = event.sizeX() > 0 && event.sizeY() > 0 && event.sizeZ() > 0;
         boolean hasBlocks = event.blocks() > 0;
         boolean hasTime = event.elapsedSeconds() > 0;
         if (!hasSize && !hasBlocks && !hasTime) {
-            return "";
+            return false;
         }
-        StringBuilder out = new StringBuilder();
+        int cursor = x;
+        int right = x + maxW;
         if (hasSize) {
-            out.append(Component.translatable(
-                    "menu.wrights.size", event.sizeX(), event.sizeY(), event.sizeZ()).getString());
+            String size = Component.translatable(
+                    "menu.wrights.size", event.sizeX(), event.sizeY(), event.sizeZ()).getString();
+            String clipped = this.font.plainSubstrByWidth(size, Math.max(0, right - cursor));
+            graphics.drawString(this.font, clipped, cursor, y, WrightsUi.SIZE, false);
+            cursor += this.font.width(clipped);
         }
-        if (hasBlocks) {
-            if (!out.isEmpty()) {
-                out.append(" - ");
-            }
-            out.append(Component.translatable(
-                    "menu.wrights.job_preview_blocks", WrightsUi.count(event.blocks())).getString());
+        if (hasBlocks && cursor < right) {
+            String sep = hasSize ? " - " : "";
+            String blocks = Component.translatable(
+                    "menu.wrights.job_preview_blocks", WrightsUi.count(event.blocks())).getString();
+            String bit = this.font.plainSubstrByWidth(sep + blocks, Math.max(0, right - cursor));
+            graphics.drawString(this.font, bit, cursor, y, WrightsUi.MUTED, false);
+            cursor += this.font.width(bit);
         }
-        if (hasTime) {
-            if (!out.isEmpty()) {
-                out.append(" · ");
-            }
-            out.append(Component.translatable(
-                    "history.wrights.took", WrightsClientState.formatSeconds(event.elapsedSeconds())).getString());
+        if (hasTime && cursor < right) {
+            String sep = hasSize || hasBlocks ? " · " : "";
+            String took = Component.translatable(
+                    "history.wrights.took", WrightsClientState.formatSeconds(event.elapsedSeconds())).getString();
+            String bit = this.font.plainSubstrByWidth(sep + took, Math.max(0, right - cursor));
+            graphics.drawString(this.font, bit, cursor, y, WrightsUi.MUTED, false);
         }
-        return out.toString();
+        return true;
     }
 
     private void drawBar(GuiGraphics graphics, int x, int y, int h, int mouseX, int mouseY) {
