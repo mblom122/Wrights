@@ -229,6 +229,7 @@ final class WrightManagePanel {
         boolean selected = expanded >= 0 && expanded < swarm.units().size();
         boolean locked = selected && away(screen, swarm, expanded);
         Loadout parts = selected ? swarm.units().get(expanded).parts() : null;
+        PartSlot dropHint = dropPartSlot(screen);
         for (int i = 0; i < slots.length; i++) {
             int x = HangarGui.partSlotX(panelX, i);
             int y = HangarGui.partSlotY(panelY);
@@ -248,10 +249,27 @@ final class WrightManagePanel {
                     graphics.fill(x + 1, y + 1, x + HangarGui.PART_SLOT - 1, y + HangarGui.PART_SLOT - 1, 0x88060C14);
                 }
             }
-            if (hover && selected && !locked) {
+            boolean validDrop = selected && !locked && dropHint == slots[i];
+            if ((hover && selected && !locked) || validDrop) {
                 HangarBay.hangarHoverTint(graphics, x, y, HangarGui.PART_SLOT);
             }
         }
+    }
+
+    /** Part slot that accepts the stack on the cursor (inventory pickup), or null. */
+    private static PartSlot dropPartSlot(ManageHost screen) {
+        ItemStack carried = carriedStack(screen);
+        if (carried.getItem() instanceof WrightPartItem part) {
+            return part.slot();
+        }
+        return null;
+    }
+
+    private static ItemStack carriedStack(ManageHost screen) {
+        if (screen.minecraft().player == null || screen.minecraft().player.containerMenu == null) {
+            return ItemStack.EMPTY;
+        }
+        return screen.minecraft().player.containerMenu.getCarried();
     }
 
     private Component noticeTip() {
@@ -330,6 +348,10 @@ final class WrightManagePanel {
     }
 
     private static ItemStack heldPart(ManageHost screen) {
+        ItemStack carried = carriedStack(screen);
+        if (carried.getItem() instanceof WrightPartItem) {
+            return carried;
+        }
         if (screen.minecraft().player == null) {
             return ItemStack.EMPTY;
         }
