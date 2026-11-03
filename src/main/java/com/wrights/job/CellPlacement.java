@@ -41,9 +41,11 @@ public final class CellPlacement {
     private CellPlacement() {
     }
 
+    /**
+     * Blocks one hover may place, mine, void, or undo. Shared for every job kind —
+     * Apex is the full 19-cell sphere. Do not clamp to {@code blocksPerTick}.
+     */
     static int placeBudget(BuildJob.Hand hand) {
-        // One operation is one hover. The tier cap (Netherite 19) is the lag bound;
-        // clamping it to blocksPerTick split a 19-block sphere into a second tick and a second op.
         return Math.max(1, WrightTier.operationCap(ShapeJobs.handOps(hand)));
     }
 

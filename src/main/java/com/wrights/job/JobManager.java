@@ -1270,7 +1270,8 @@ public final class JobManager {
             return;
         }
         drone.setWorkStatus(soloShow, ItemStack.EMPTY, DroneEntity.WAIT_NONE);
-        int budget = Math.min(WrightsConfig.BLOCKS_PER_TICK.getAsInt(), WrightTier.operationCap(drone.ops()));
+        // Same ops budget as crew (place / mine / void) — do not clamp to blocksPerTick.
+        int budget = Math.max(1, WrightTier.operationCap(drone.ops()));
         int burst = 0;
         for (int i = 0; i < budget; i++) {
             int index = i == 0 ? at : WorkPicker.nextSolo(level, player, schematic, job);
