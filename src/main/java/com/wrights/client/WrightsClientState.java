@@ -1750,8 +1750,18 @@ public final class WrightsClientState {
         return Mth.clamp(current + Integer.signum(direction) * step, min, max);
     }
 
+    /** Leave the wrightport screen and aim a chest for that port (HUD: Right-click a chest…). */
     public static void beginPortChest(BlockPos port) {
+        clearBuildAims();
         bindPort = port == null ? null : port.immutable();
+        if (bindPort != null) {
+            styleHudTicks = STYLE_HUD_TICKS;
+            styleAnnounce = true;
+            Minecraft minecraft = Minecraft.getInstance();
+            if (minecraft.player != null) {
+                minecraft.player.displayClientMessage(Component.translatable("hud.wrights.port_chest"), true);
+            }
+        }
     }
 
     public static void finishPortChest(BlockPos chest) {
