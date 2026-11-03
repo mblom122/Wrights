@@ -218,7 +218,7 @@ def make_upgrade(name: str, accent, accent_l) -> None:
     px(img, 6, 8, WHITE)
     px(img, 9, 8, WHITE)
     rivets(img, [(4, 3), (11, 3), (4, 12), (11, 12)])
-    save(img, f"item/wright_upgrade_{name}.png")
+    save(img, f"item/wrightport_upgrade_{name}.png")
 
 
 def make_blueprint(filled: bool) -> None:

@@ -53,11 +53,11 @@ public final class WrightTier {
 
     public static int textColor(int tier) {
         return switch (clamp(tier)) {
-            case COPPER -> 0xFFE08A45;
-            case IRON -> 0xFFD8DCE2;
-            case GOLD -> 0xFFF6D56A;
-            case DIAMOND -> 0xFF7EF0E8;
-            case NETHERITE -> 0xFFE0C2D0;
+            case COPPER -> 0xFFFFB45A;
+            case IRON -> 0xFF8CF59C;
+            case GOLD -> 0xFF7FE0FF;
+            case DIAMOND -> 0xFFC6A2FF;
+            case NETHERITE -> 0xFFFF6F86;
             default -> 0xFFD5DCE4;
         };
     }
