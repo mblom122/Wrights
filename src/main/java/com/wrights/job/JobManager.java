@@ -79,6 +79,13 @@ import com.wrights.util.Messages;
 @EventBusSubscriber(modid = WrightsMod.MOD_ID)
 public final class JobManager {
     private static final double DRONE_REACH_SQR = 2.25D;
+    /** Small-pattern tick did not apply; the strip crawler runs. */
+    private static final int PATTERN_SKIP = 0;
+    /** This hand's stand was handled (placed, flying, or idle). */
+    private static final int PATTERN_DONE = 1;
+    private static final int PATTERN_ITEMS = 2;
+    private static final int PATTERN_CHUNK = 3;
+    private static final int PATTERN_ENERGY = 4;
     /**
      * Sentinel for a place-reach cluster probe. The legal cells are the operations sphere
      * ({@link WrightTier#operationReachSqr}), not this euclidean distance. Flight probes use {@link #FLY_NEAR_SQR}.
@@ -1895,6 +1902,23 @@ public final class JobManager {
                 setShapeHandStatus(level, hand, null, DroneEntity.WAIT_SHELTER);
                 continue;
             }
+            int patterned = tickSmallPattern(
+                    level, player, library, job, hand, usable, fillMode, random, shapeKind, shapePinLocal);
+            if (patterned == PATTERN_ENERGY) {
+                stallForEnergy(level, player, library, job);
+                return;
+            }
+            if (patterned == PATTERN_CHUNK) {
+                waitingChunk = true;
+                continue;
+            }
+            if (patterned == PATTERN_ITEMS) {
+                waitingItems = true;
+                continue;
+            }
+            if (patterned == PATTERN_DONE) {
+                continue;
+            }
             int at = nextShapeIndex(level, player, job, hand, usable, shapeKind, shapePinLocal, true, scanCap);
             if (at < 0 && !splitThisTick && tryRebalanceShapeShare(player, library, level, job, hand, usable, shapeKind, shapePinLocal, scanCap)) {
                 splitThisTick = true;
@@ -2283,7 +2307,198 @@ public final class JobManager {
         return dx * dx + dy * dy + dz * dz <= WrightTier.operationReachSqr(ops);
     }
 
-    /** Predefined stand count for a box that fits in 3×3×3. {@code 0} leaves crew sizing alone. */
+    /**
+     * One hover for a small shape, the way main's plate and small-box plans work.
+     * A 3×3×3 sphere is the center. A 6×1×6 floor is four 3×3 stamps.
+     * Nothing is placed until the wright is standing on that stamp, so the reach
+     * sphere covers the whole piece in one operation. Fat shapes and long ones return
+     * {@link #PATTERN_SKIP} and keep the old crawler.
+     */
+    private static int tickSmallPattern(
+            ServerLevel level,
+            ServerPlayer player,
+            SchematicLibrary library,
+            BuildJob job,
+            BuildJob.Hand hand,
+            java.util.List<com.wrights.blueprint.ShapeMaterials.Entry> usable,
+            com.wrights.blueprint.ShapeMaterials.FillMode fillMode,
+            java.util.Random random,
+            com.wrights.blueprint.Shapes.Kind shapeKind,
+            BlockPos shapePinLocal) {
+        int reach = WrightTier.operationReachSqr(handOps(hand));
+        if (!com.wrights.blueprint.SmallBoxStands.applies(
+                job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(), reach)) {
+            return PATTERN_SKIP;
+        }
+        resolveSmallOutside(level, player, job, hand, shapeKind, shapePinLocal);
+        int[] stand = chooseSmallStand(level, player, job, hand, shapeKind, shapePinLocal);
+        if (stand == null || job.min() == null) {
+            hand.idle = true;
+            hand.aim = -1;
+            hand.shareRemain = 0;
+            setShapeHandStatus(level, hand, null, DroneEntity.WAIT_IDLE);
+            return PATTERN_DONE;
+        }
+        BlockPos fly = job.min().offset(stand[0], stand[1], stand[2]);
+        int anchor = job.scanIndex(fly);
+        if (anchor >= 0) {
+            claimAim(job, hand, anchor);
+        }
+        hand.idle = false;
+        BlockState state = shapeNextState(job, usable, fillMode, random);
+        if (state == null) {
+            hand.aim = -1;
+            parkForItems(level, player, hand);
+            setShapeHandStatus(level, hand, usable.isEmpty() ? null : usable.get(0).state(), DroneEntity.WAIT_ITEMS);
+            return PATTERN_ITEMS;
+        }
+        DroneEntity drone = ensureHand(level, player, job, hand, fly);
+        if (drone != null) {
+            drone.setTier(hand.speed);
+            drone.setOps(handOps(hand));
+        }
+        if (drone == null) {
+            setShapeHandStatus(level, hand, state, DroneEntity.WAIT_CHUNK);
+            return PATTERN_CHUNK;
+        }
+        Vec3 hover = Vec3.atCenterOf(fly).add(0.0D, 0.85D + (hand.lane % 2) * 0.45D, 0.0D);
+        if (drone.launching() || !wrightOnStand(drone, fly)) {
+            if (!drone.launching()) {
+                drone.moveToward(hover, flyStep(hand.speed, drone.distanceToSqr(hover)));
+            }
+            hand.lastPos = drone.blockPosition();
+            drone.setWorkStatus(BlockFilters.icon(state), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
+            return PATTERN_DONE;
+        }
+        int budget = placeBudget(hand);
+        int placed = 0;
+        int sx = job.boxSizeX();
+        int sy = job.boxSizeY();
+        int sz = job.boxSizeZ();
+        while (placed < budget) {
+            int index = -1;
+            int bestDist = Integer.MAX_VALUE;
+            for (int z = 0; z < sz; z++) {
+                for (int y = 0; y < sy; y++) {
+                    for (int x = 0; x < sx; x++) {
+                        if (!com.wrights.blueprint.SmallBoxStands.covers(stand, x, y, z, reach)) {
+                            continue;
+                        }
+                        int cell = job.scanIndex(job.min().offset(x, y, z));
+                        if (cell < 0 || job.isShapeResolved(cell) || aimedByOther(job, hand, cell)) {
+                            continue;
+                        }
+                        ShapeCell kind = classifyShapeCell(
+                                level, player, job, hand, cell, shapeKind, shapePinLocal, false);
+                        if (kind == ShapeCell.OUT) {
+                            resolveShapeCell(job, hand, cell, false);
+                            continue;
+                        }
+                        if (kind == ShapeCell.SKIP) {
+                            resolveShapeCell(job, hand, cell, true);
+                            continue;
+                        }
+                        if (kind != ShapeCell.READY) {
+                            continue;
+                        }
+                        int dist = (x - stand[0]) * (x - stand[0])
+                                + (y - stand[1]) * (y - stand[1])
+                                + (z - stand[2]) * (z - stand[2]);
+                        if (dist < bestDist) {
+                            bestDist = dist;
+                            index = cell;
+                        }
+                    }
+                }
+            }
+            if (index < 0) {
+                break;
+            }
+            BlockPos cell = job.scanPosAt(index);
+            BlockState placeState = shapeNextState(job, usable, fillMode, random);
+            if (placeState == null) {
+                parkForItems(level, player, hand);
+                setShapeHandStatus(level, hand, usable.get(0).state(), DroneEntity.WAIT_ITEMS);
+                return PATTERN_ITEMS;
+            }
+            int dx = cell.getX() - job.min().getX();
+            int dy = cell.getY() - job.min().getY();
+            int dz = cell.getZ() - job.min().getZ();
+            Schematic.Entry entry = new Schematic.Entry((short) dx, (short) dy, (short) dz, placeState, false);
+            PlaceResult result = placeOne(level, player, job, cell, entry, false, hand, drone);
+            if (result == PlaceResult.PAUSE) {
+                job.setWaitKind(BuildJob.WAIT_CHUNK);
+                setShapeHandStatus(level, hand, placeState, DroneEntity.WAIT_CHUNK);
+                library.setDirty();
+                return PATTERN_CHUNK;
+            }
+            if (result == PlaceResult.WAIT) {
+                parkForItems(level, player, hand);
+                setShapeHandStatus(level, hand, placeState, DroneEntity.WAIT_ITEMS);
+                return PATTERN_ITEMS;
+            }
+            if (result == PlaceResult.ENERGY) {
+                return PATTERN_ENERGY;
+            }
+            resolveShapeCell(job, hand, index, false);
+            job.shapeOrderAdvance();
+            drone.setWorkStatus(BlockFilters.icon(placeState), ItemStack.EMPTY, DroneEntity.WAIT_NONE);
+            placed++;
+        }
+        if (placed > 0 && hand.opStand != anchor) {
+            job.operationOne();
+            hand.opStand = anchor;
+        }
+        if (anchor >= 0 && smallStandHasReady(
+                level, player, job, hand, shapeKind, shapePinLocal, stand, reach)) {
+            claimAim(job, hand, anchor);
+        }
+        return PATTERN_DONE;
+    }
+
+    /** Air outside the shape, and cells that cannot be placed, do not need a hover. */
+    private static void resolveSmallOutside(
+            ServerLevel level,
+            ServerPlayer player,
+            BuildJob job,
+            BuildJob.Hand hand,
+            com.wrights.blueprint.Shapes.Kind shapeKind,
+            BlockPos shapePinLocal) {
+        if (job.min() == null) {
+            return;
+        }
+        int sx = job.boxSizeX();
+        int sy = job.boxSizeY();
+        int sz = job.boxSizeZ();
+        for (int z = 0; z < sz; z++) {
+            for (int y = 0; y < sy; y++) {
+                for (int x = 0; x < sx; x++) {
+                    int index = job.scanIndex(job.min().offset(x, y, z));
+                    if (index < 0 || job.isShapeResolved(index)) {
+                        continue;
+                    }
+                    ShapeCell kind = classifyShapeCell(
+                            level, player, job, hand, index, shapeKind, shapePinLocal, false);
+                    if (kind == ShapeCell.OUT) {
+                        resolveShapeCell(job, hand, index, false);
+                    } else if (kind == ShapeCell.SKIP) {
+                        resolveShapeCell(job, hand, index, true);
+                    }
+                }
+            }
+        }
+    }
+
+    /** True when the block under the wright is {@code stand}. Reach is measured from that block. */
+    private static boolean wrightOnStand(DroneEntity drone, BlockPos stand) {
+        if (drone == null || stand == null) {
+            return false;
+        }
+        BlockPos foot = BlockPos.containing(drone.getX(), drone.getY() - 0.85D, drone.getZ());
+        return foot.equals(stand);
+    }
+
+    /** Predefined stand count for a small shape. {@code 0} leaves crew sizing alone. */
     private static int smallBoxCrew(BuildJob job, int ops) {
         if (job == null) {
             return 0;
@@ -2402,10 +2617,14 @@ public final class JobManager {
                         continue;
                     }
                     int index = job.min() == null ? -1 : job.scanIndex(job.min().offset(x, y, z));
-                    if (index < 0 || job.isShapeResolved(index) || aimedByOther(job, hand, index)) {
+                    if (index < 0 || job.isShapeResolved(index)) {
                         continue;
                     }
-                    if (classifyShapeCell(level, player, job, hand, index, shapeKind, shapePinLocal, true)
+                    // Another wright already took this stamp. Do not split it.
+                    if (aimedByOther(job, hand, index)) {
+                        return false;
+                    }
+                    if (classifyShapeCell(level, player, job, hand, index, shapeKind, shapePinLocal, false)
                             == ShapeCell.READY) {
                         return true;
                     }
