@@ -95,7 +95,7 @@ public final class ShapeJobs {
             boolean deferSupplies,
             boolean exchange,
             String exchangeFrom) {
-        return startShapeBuild(player, min, max, center, kind, size, height, thickness, axis, yaw, pivot, hollow, voidBlocks, materials, fillMode, orderBatch, seed, supplyOrder, deferSupplies, exchange, exchangeFrom, false, 0, false);
+        return startShapeBuild(player, min, max, center, kind, size, height, thickness, axis, yaw, pivot, hollow, voidBlocks, materials, fillMode, orderBatch, seed, supplyOrder, deferSupplies, exchange, exchangeFrom, false, 0, false, true);
     }
 
     public static boolean startShapeBuild(
@@ -121,7 +121,7 @@ public final class ShapeJobs {
             boolean exchange,
             String exchangeFrom,
             boolean exchangeSilk) {
-        return startShapeBuild(player, min, max, center, kind, size, height, thickness, axis, yaw, pivot, hollow, voidBlocks, materials, fillMode, orderBatch, seed, supplyOrder, deferSupplies, exchange, exchangeFrom, exchangeSilk, 0, false);
+        return startShapeBuild(player, min, max, center, kind, size, height, thickness, axis, yaw, pivot, hollow, voidBlocks, materials, fillMode, orderBatch, seed, supplyOrder, deferSupplies, exchange, exchangeFrom, exchangeSilk, 0, false, true);
     }
 
     public static boolean startShapeBuild(
@@ -148,7 +148,8 @@ public final class ShapeJobs {
             String exchangeFrom,
             boolean exchangeSilk,
             int drones,
-            boolean placeTool) {
+            boolean placeTool,
+            boolean queue) {
         if (player == null || min == null || max == null) {
             return false;
         }
@@ -196,7 +197,7 @@ public final class ShapeJobs {
             job.setQueued(true);
             job.setCrewQuota(wanted);
         }
-        if (!JobManager.instant(player) && CrewRoster.freeUnits(player, library, job, 1).isEmpty() && !job.deferSupplies()) {
+        if (queue && !JobManager.instant(player) && CrewRoster.freeUnits(player, library, job, 1).isEmpty() && !job.deferSupplies()) {
             job.setCrewQuota(wanted);
             job.setQueued(true);
             library.addJob(job);
@@ -204,20 +205,6 @@ public final class ShapeJobs {
                 attachExchangeHologram(player, library, queuedLevel, job, exchangeWork);
             }
             JobManager.noteQueued(player, job, wanted);
-            BlueprintNetwork.syncJobs(player);
-            return true;
-        }
-        String unpaid = JobManager.instant(player) || job.deferSupplies() ? null : unpaidReason(player, library, job);
-        if (unpaid != null) {
-            // Wait at home for materials rather than fly out and find the port's chest and digital store empty.
-            job.setCrewQuota(wanted);
-            job.setQueued(true);
-            job.setWaitKind(BuildJob.WAIT_ITEMS);
-            library.addJob(job);
-            if (player.level() instanceof ServerLevel queuedLevel) {
-                attachExchangeHologram(player, library, queuedLevel, job, exchangeWork);
-            }
-            Messages.actionBar(player, unpaid);
             BlueprintNetwork.syncJobs(player);
             return true;
         }
@@ -533,13 +520,14 @@ public final class ShapeJobs {
         List<WrightHomes.FreeWright> free = CrewRoster.freeUnits(player, library, job, Integer.MAX_VALUE);
         List<WrightHomes.FreeWright> units = new ArrayList<>();
         for (WrightHomes.FreeWright unit : free) {
-            if (units.size() >= wanted) {
-                break;
-            }
-            if (level == null || (JobSupply.portSupplyReady(level, player, unit.homePort())
-                    && homeCanPay(player, level, job, unit.homePort()))) {
+            if (units.size() < wanted && level != null && JobSupply.portSupplyReady(level, player, unit.homePort())
+                    && homeCanPay(player, level, job, unit.homePort())) {
                 units.add(unit);
             }
+        }
+        // Nobody can pay: a forced start still sends wrights, and the job stalls until stock arrives.
+        if (units.isEmpty()) {
+            units = free.subList(0, Math.min(wanted, free.size()));
         }
         if (units.isEmpty()) {
             CrewRoster.tellNoCrew(player, job, false);
@@ -760,7 +748,7 @@ public final class ShapeJobs {
         // Stalled Shape/Exchange: wait at home until Replace-with / materials are available again.
         if (job.waitKind() == BuildJob.WAIT_ITEMS && !fast) {
             BlockState owed = shapeOwedState(level, job, usable, fillMode, random, shapeKind, shapePinLocal);
-            if (owed != null && !crewCanPay(player, library, level, job, owed)) {
+            if (owed != null && !crewCanPay(player, library, level, job, usable)) {
                 if (job.droneId() != null) {
                     publishShapeDroneStatus(level, job, owed, DroneEntity.WAIT_ITEMS);
                     DroneFleet.parkSolo(level, player, job);
@@ -2219,35 +2207,13 @@ public final class ShapeJobs {
     }
 
     /**
-     * Why no free wright can start this job from its own supply, as a message key, or null when one can.
-     * Null too when nobody is free, so the caller's no-crew handling still runs.
+     * Some wright on the job, or a free one in range, could pay for at least one of the job's materials from its
+     * own supply. Part of the stock is enough: the job builds what it can and stalls again when it runs out.
      */
-    private static String unpaidReason(ServerPlayer player, SchematicLibrary library, BuildJob job) {
-        ServerLevel level = player.getServer().getLevel(job.dimension());
-        if (level == null || job.mineVoid()) {
-            return null;
-        }
-        List<WrightHomes.FreeWright> free = CrewRoster.freeUnits(player, library, job, Integer.MAX_VALUE);
-        if (free.isEmpty()) {
-            return null;
-        }
-        boolean supplied = false;
-        for (WrightHomes.FreeWright unit : free) {
-            if (!JobSupply.portSupplyReady(level, player, unit.homePort())) {
-                continue;
-            }
-            supplied = true;
-            if (homeCanPay(player, level, job, unit.homePort())) {
-                return null;
-            }
-        }
-        return supplied ? "message.wrights.port_need_materials" : "message.wrights.port_need_supply";
-    }
-
-    /** Some wright on the job, or a free one in range, could pay for {@code state} from its own supply. */
-    private static boolean crewCanPay(ServerPlayer player, SchematicLibrary library, ServerLevel level, BuildJob job, BlockState state) {
+    private static boolean crewCanPay(ServerPlayer player, SchematicLibrary library, ServerLevel level, BuildJob job,
+            java.util.List<com.wrights.blueprint.ShapeMaterials.Entry> usable) {
         for (BuildJob.Hand hand : job.hands()) {
-            if (shapeCanPay(player, level, job, hand, state)) {
+            if (shapeCanPayAny(player, level, job, hand, usable)) {
                 return true;
             }
         }
@@ -2257,7 +2223,7 @@ public final class ShapeJobs {
             }
             BuildJob.Hand hand = new BuildJob.Hand();
             hand.homePort = free.homePort();
-            if (shapeCanPay(player, level, job, hand, state)) {
+            if (shapeCanPayAny(player, level, job, hand, usable)) {
                 return true;
             }
         }

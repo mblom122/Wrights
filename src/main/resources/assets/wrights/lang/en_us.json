@@ -52,7 +52,6 @@
   "message.wrights.port_chest_owner": "That wrightport is not yours",
   "message.wrights.port_chest_cancel": "Chest binding cancelled",
   "message.wrights.port_need_supply": "Bind a chest to this wrightport, or bind digital storage",
-  "message.wrights.port_need_materials": "Waiting for materials: no wrightport chest or digital storage in range has them yet",
   "message.wrights.digital_bound_ae2": "Bound to Applied Energistics network",
   "message.wrights.digital_bound_rs": "Bound to Refined Storage network",
   "message.wrights.digital_unbound": "Digital storage unbound",

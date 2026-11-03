@@ -169,7 +169,8 @@ public final class ShapeLaunch {
             }
         }
         // Build anyway starts with what you have; when stock runs out the wright goes home and waits.
-        boolean deferSupplies = false;
+        // With Queue builds on, Build anyway queues the job instead, and wrights leave once a port has stock.
+        boolean deferSupplies = payload.force() && payload.queue() && !creative;
         int drones = Math.max(0, payload.drones());
         boolean placeTool = !exchange && payload.placeTool();
         boolean ok = ShapeJobs.startShapeBuild(
@@ -196,7 +197,8 @@ public final class ShapeLaunch {
                 fromMaterials,
                 silk,
                 drones,
-                placeTool);
+                placeTool,
+                payload.queue());
         if (!ok) {
             Messages.actionBar(player, exchange ? "message.wrights.exchange_failed" : "message.wrights.shape_failed");
             return;

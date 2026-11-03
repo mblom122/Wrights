@@ -2000,7 +2000,8 @@ public final class WrightsClientState {
                 "",
                 false,
                 WrightsClientConfig.droneCountFor(false),
-                false);
+                false,
+                WrightsClientConfig.QUEUE_JOBS.get());
         PacketDistributor.sendToServer(pendingShape);
         if (lookPinned) {
             clearShapeLookSnap();
@@ -2079,7 +2080,8 @@ public final class WrightsClientState {
                 from == null ? "" : from,
                 WrightsClientConfig.exchangeSilk(),
                 WrightsClientConfig.droneCountFor(true),
-                false);
+                false,
+                WrightsClientConfig.QUEUE_JOBS.get());
         PacketDistributor.sendToServer(pendingShape);
         if (lookPinned) {
             clearShapeLookSnap();
@@ -2195,7 +2197,8 @@ public final class WrightsClientState {
                 "",
                 false,
                 WrightsClientConfig.droneCountFor(true),
-                true);
+                true,
+                WrightsClientConfig.QUEUE_JOBS.get());
         PacketDistributor.sendToServer(pendingShape);
         if (lookPinned) {
             clearShapeLookSnap();

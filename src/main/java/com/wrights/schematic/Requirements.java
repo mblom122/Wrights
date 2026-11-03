@@ -109,13 +109,37 @@ public final class Requirements {
             ResourceKey<Level> dimension,
             BlockPos jobMin,
             BlockPos jobMax) {
+        boolean personal = jobMin == null || personalCanBuild(player, jobMin, jobMax);
         List<Cost> stocked = new ArrayList<>(costs.size());
         for (Cost cost : costs) {
             Item item = Item.byId(cost.itemId());
-            int chests = supplyCount(player, supply, dimension, item) + portSupplyCount(player, jobMin, jobMax, item);
-            stocked.add(new Cost(cost.itemId(), cost.count(), playerCount(player, item), chests, digitalCount(player, item)));
+            int chests = (personal ? supplyCount(player, supply, dimension, item) : 0) + portSupplyCount(player, jobMin, jobMax, item);
+            stocked.add(new Cost(cost.itemId(), cost.count(), personal ? playerCount(player, item) : 0, chests, digitalCount(player, item)));
         }
         return stocked;
+    }
+
+    /**
+     * Your inventory and bound chest only feed personal wrights; placed ports spend their own chest and digital.
+     * True when a personal wright can take this job, or when no wright is free and the crew is not known yet.
+     */
+    private static boolean personalCanBuild(ServerPlayer player, BlockPos jobMin, BlockPos jobMax) {
+        if (player == null || !(player.level() instanceof ServerLevel level)) {
+            return true;
+        }
+        BlockPos max = jobMax == null ? jobMin : jobMax;
+        boolean near = com.wrights.drone.WrightHomes.playerCovers(player, level.dimension(), jobMin, max);
+        List<com.wrights.drone.WrightHomes.FreeWright> free = com.wrights.drone.WrightHomes.freeFor(
+                player, level, jobMin, max, near, false, id -> true, Integer.MAX_VALUE);
+        if (free.isEmpty()) {
+            return true;
+        }
+        for (com.wrights.drone.WrightHomes.FreeWright unit : free) {
+            if (unit.personal()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
