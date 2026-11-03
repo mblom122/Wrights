@@ -16,7 +16,8 @@ import com.wrights.item.WrightPartItem;
 /** A place on the wright chassis that holds one part. Each slot takes parts of tier Scout through Apex. */
 public enum PartSlot implements StringRepresentable {
     ROTOR,
-    FABRICATOR;
+    FABRICATOR,
+    CORE;
 
     public static final Codec<PartSlot> CODEC = StringRepresentable.fromEnum(PartSlot::values);
 
@@ -38,10 +39,14 @@ public enum PartSlot implements StringRepresentable {
 
     /** This slot's part items, Scout first. */
     public List<DeferredItem<WrightPartItem>> parts() {
-        return this == ROTOR ? ModItems.ROTORS : ModItems.FABRICATORS;
+        return switch (this) {
+            case ROTOR -> ModItems.ROTORS;
+            case FABRICATOR -> ModItems.FABRICATORS;
+            case CORE -> ModItems.CORES;
+        };
     }
 
-    /** "Rotor Assembly", "Fabricator Head". */
+    /** "Rotor Assembly", "Fabricator Head", "Power Core". */
     public String nameKey() {
         return "part.wrights." + id;
     }

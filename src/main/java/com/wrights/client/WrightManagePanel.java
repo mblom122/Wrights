@@ -30,9 +30,10 @@ import com.wrights.network.BlueprintPayloads;
  */
 final class WrightManagePanel {
     private static final int ROW = 16;
-    private static final int EXPAND = 148;
     /** Height of one part slot's block inside an expanded row. */
     private static final int SECTION = 62;
+    /** Part sections, then the energy line. */
+    private static final int EXPAND = 20 + PartSlot.values().length * SECTION + 16;
     /** Marked dialog: first part row, and the height of each. */
     private static final int MARKED_TOP = 70;
     private static final int MARKED_ROW = 30;
@@ -249,7 +250,7 @@ final class WrightManagePanel {
                 continue;
             }
             Swarm.Unit unit = swarm.units().get(i);
-            int tier = Math.max(unit.rotor(), unit.fabricator());
+            int tier = unit.parts().topTier();
             if (y + ROW >= listTop && y < listBottom) {
                 boolean mark = checked.contains(unit.id());
                 if (mark || i == expanded) {
@@ -270,6 +271,7 @@ final class WrightManagePanel {
                     for (int k = 0; k < slots.length; k++) {
                         drawPartSection(graphics, screen, unit, slots[k], listX + 10, y + sectionTop(k), mouseX, mouseY, barPad, tool);
                     }
+                    graphics.drawString(screen.font(), com.wrights.item.WrightItem.energyLine(unit.parts()), listX + 10, y + sectionTop(slots.length), WrightsUi.TEXT, false);
                 }
                 y += EXPAND;
             }
@@ -494,7 +496,7 @@ final class WrightManagePanel {
 
     private boolean dialogClick(ManageHost screen, double mouseX, double mouseY) {
         int dw = Math.min(312, Math.max(220, screen.screenWidth() - 24));
-        int dh = dialog == ADD ? 176 : 214;
+        int dh = dialog == ADD ? 176 : MARKED_TOP + PartSlot.values().length * MARKED_ROW + 84;
         int dx = (screen.screenWidth() - dw) / 2;
         int dy = (screen.screenHeight() - dh) / 2;
         if (mouseX < dx || mouseY < dy || mouseX >= dx + dw || mouseY >= dy + dh) {
@@ -574,7 +576,7 @@ final class WrightManagePanel {
 
     private void renderDialog(ManageHost screen, GuiGraphics graphics, Swarm swarm, int mouseX, int mouseY) {
         int dw = Math.min(312, Math.max(220, screen.screenWidth() - 24));
-        int dh = dialog == ADD ? 176 : 214;
+        int dh = dialog == ADD ? 176 : MARKED_TOP + PartSlot.values().length * MARKED_ROW + 84;
         int dx = (screen.screenWidth() - dw) / 2;
         int dy = (screen.screenHeight() - dh) / 2;
         graphics.fill(0, 0, screen.screenWidth(), screen.screenHeight(), 0x88060C14);

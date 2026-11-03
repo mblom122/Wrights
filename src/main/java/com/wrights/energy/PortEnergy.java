@@ -168,6 +168,11 @@ public final class PortEnergy {
         }
     }
 
+    /** The configured {@code base} cost of one block for this wright's rotor and Power Core; Basic without a hand. */
+    public static int costFor(BuildJob.Hand hand, int base) {
+        return hand == null ? base : hand.energyCost(base);
+    }
+
     public static boolean tryPay(ServerLevel level, ServerPlayer player, BuildJob.Hand hand, int cost) {
         if (cost <= 0) {
             return true;
@@ -201,15 +206,16 @@ public final class PortEnergy {
         }
     }
 
-    /** True when the job can pay for one more block of the given cost. */
-    public static boolean canFund(ServerLevel level, ServerPlayer player, BuildJob job, int cost) {
-        if (cost <= 0) {
+    /** True when some wright on the job can pay for one more block of the given base cost. */
+    public static boolean canFund(ServerLevel level, ServerPlayer player, BuildJob job, int base) {
+        if (base <= 0) {
             return true;
         }
         if (job == null || job.hands().isEmpty()) {
-            return player != null && available(player) >= cost;
+            return player != null && available(player) >= base;
         }
         for (BuildJob.Hand hand : job.hands()) {
+            int cost = hand.energyCost(base);
             if (hand.homePort != null && level != null && level.isLoaded(hand.homePort)) {
                 BlockEntity entity = level.getBlockEntity(hand.homePort);
                 if (entity instanceof WrightportBlockEntity port && port.energyStored() >= cost) {

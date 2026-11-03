@@ -16,6 +16,7 @@ public final class DigitalCatalog {
         items.add(ModItems.WRIGHT.get());
         ModItems.ROTORS.forEach(part -> items.add(part.get()));
         ModItems.FABRICATORS.forEach(part -> items.add(part.get()));
+        ModItems.CORES.forEach(part -> items.add(part.get()));
         return List.copyOf(items);
     }
 }

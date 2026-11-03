@@ -43,6 +43,10 @@ public record Swarm(List<Unit> units, int assign) {
             return parts.fabricator();
         }
 
+        public int core() {
+            return parts.core();
+        }
+
         public Component title(int number) {
             if (name == null || name.isBlank()) {
                 return Component.translatable("screen.wrights.drone_name", number);
@@ -70,7 +74,7 @@ public record Swarm(List<Unit> units, int assign) {
             Codec.INT.optionalFieldOf("power").forGetter(unit -> Optional.empty()),
             Codec.STRING.optionalFieldOf("name", "").forGetter(Unit::name)
     ).apply(instance, (id, parts, speed, power, name) -> new Unit(id,
-            parts.orElseGet(() -> new Loadout(speed.orElse(WrightTier.BASIC), power.orElse(WrightTier.BASIC))), name)));
+            parts.orElseGet(() -> new Loadout(speed.orElse(WrightTier.BASIC), power.orElse(WrightTier.BASIC), WrightTier.BASIC)), name)));
 
     public static final Codec<Swarm> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             UNIT_CODEC.listOf().optionalFieldOf("units", List.of()).forGetter(Swarm::units),

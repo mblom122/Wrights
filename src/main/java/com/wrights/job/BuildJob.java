@@ -1286,6 +1286,7 @@ public final class BuildJob {
                 handTag.putInt("lanes", hand.lanes);
                 handTag.putInt("rotor", hand.rotor);
                 handTag.putInt("fabricator", hand.fabricator);
+                handTag.putInt("core", hand.core);
                 handTag.putInt("placeCredit", hand.placeCredit);
                 handTag.putInt("cursor", hand.cursor);
                 handTag.putInt("shareFrom", hand.shareFrom);
@@ -1497,6 +1498,7 @@ public final class BuildJob {
                 hand.lanes = handTag.getInt("lanes");
                 hand.rotor = handTag.contains("rotor") ? handTag.getInt("rotor") : handTag.getInt("speed");
                 hand.fabricator = handTag.contains("fabricator") ? handTag.getInt("fabricator") : handTag.getInt("ops");
+                hand.core = handTag.getInt("core");
                 hand.placeCredit = handTag.getInt("placeCredit");
                 hand.cursor = handTag.getInt("cursor");
                 hand.shareFrom = handTag.contains("shareFrom") ? handTag.getInt("shareFrom") : -1;
@@ -1669,6 +1671,23 @@ public final class BuildJob {
         public int rotor;
         /** Fabricator tier; how many blocks one operation reaches. */
         public int fabricator;
+        /** Power Core tier; with the rotor, sets the energy each block costs. */
+        public int core;
+
+        public com.wrights.drone.Loadout parts() {
+            return new com.wrights.drone.Loadout(rotor, fabricator, core);
+        }
+
+        /** Copies a unit's fabricator and core; the rotor comes with the crew layout. */
+        public void fit(com.wrights.drone.Loadout parts) {
+            fabricator = parts.fabricator();
+            core = parts.core();
+        }
+
+        /** {@code base} Forge Energy for one block, after this wright's rotor draw and core. */
+        public int energyCost(int base) {
+            return com.wrights.drone.WrightTier.energyCost(base, rotor, core);
+        }
         /**
          * Shape/Exchange ownership along the long box axis, in local blocks
          * {@code [shareFrom, shareTo)}. {@code -1} until the crew assigns shares.

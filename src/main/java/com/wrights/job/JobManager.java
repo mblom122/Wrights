@@ -1846,7 +1846,7 @@ public final class JobManager {
             }
             DroneEntity drone = DroneFleet.ensureHand(level, player, job, hand, stand);
             if (drone != null) {
-                drone.setParts(new com.wrights.drone.Loadout(hand.rotor, hand.fabricator));
+                drone.setParts(hand.parts());
             }
             if (drone == null) {
                 waitingChunk = true;
@@ -2028,7 +2028,7 @@ public final class JobManager {
             BlockPos stand = job.min().offset(peek.x(), peek.y(), peek.z());
             DroneEntity drone = DroneFleet.ensureHand(level, player, job, hand, stand);
             if (drone != null) {
-                drone.setParts(new com.wrights.drone.Loadout(hand.rotor, hand.fabricator));
+                drone.setParts(hand.parts());
             }
             if (drone == null) {
                 continue;

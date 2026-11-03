@@ -33,14 +33,20 @@ public final class ModItems {
 
     public static final DeferredItem<WrightItem> WRIGHT = ITEMS.register("wright", () -> new WrightItem(new net.minecraft.world.item.Item.Properties().stacksTo(64)));
 
+    /**
+     * Metal names the parts were registered under before they were renamed; kept as aliases so saved items load.
+     * Must stay above {@link #ROTORS} — static init runs top-to-bottom and {@link #parts} reads this.
+     */
+    private static final String[] RETIRED_TIERS = { "copper", "iron", "gold", "diamond", "netherite" };
+
     /** Rotor Assembly Scout (mk1) through Apex (mk5). */
     public static final List<DeferredItem<WrightPartItem>> ROTORS = parts(PartSlot.ROTOR);
 
     /** Fabricator Head Scout (mk1) through Apex (mk5). */
     public static final List<DeferredItem<WrightPartItem>> FABRICATORS = parts(PartSlot.FABRICATOR);
 
-    /** Metal names the parts were registered under before they were renamed; kept as aliases so saved items load. */
-    private static final String[] RETIRED_TIERS = { "copper", "iron", "gold", "diamond", "netherite" };
+    /** Power Core Scout (mk1) through Apex (mk5). */
+    public static final List<DeferredItem<WrightPartItem>> CORES = parts(PartSlot.CORE);
 
     private static List<DeferredItem<WrightPartItem>> parts(PartSlot slot) {
         List<DeferredItem<WrightPartItem>> parts = new ArrayList<>();
@@ -49,9 +55,15 @@ public final class ModItems {
             String id = slot.getSerializedName() + "_mk" + mark;
             parts.add(ITEMS.register(id, () -> new WrightPartItem(new Item.Properties().stacksTo(64)
                     .rarity(mark == WrightTier.APEX ? Rarity.UNCOMMON : Rarity.COMMON), slot, mark)));
-            String retired = (slot == PartSlot.ROTOR ? "wright_upgrade_" : "wright_ops_") + RETIRED_TIERS[mark - 1];
-            ITEMS.addAlias(ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, retired),
-                    ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, id));
+            String retired = switch (slot) {
+                case ROTOR -> "wright_upgrade_";
+                case FABRICATOR -> "wright_ops_";
+                case CORE -> null;
+            };
+            if (retired != null) {
+                ITEMS.addAlias(ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, retired + RETIRED_TIERS[mark - 1]),
+                        ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, id));
+            }
         }
         return List.copyOf(parts);
     }

@@ -534,7 +534,7 @@ public final class ShapeJobs {
         job.setCrewUnits(ids);
         for (int i = 0; i < job.hands().size() && i < units.size(); i++) {
             job.hands().get(i).homePort = units.get(i).homePort();
-            job.hands().get(i).fabricator = WrightTier.clamp(units.get(i).unit().fabricator());
+            job.hands().get(i).fit(units.get(i).unit().parts());
             // Each hand walks the AABB from 0; ownership filters which cells it places.
             job.hands().get(i).cursor = 0;
             job.hands().get(i).aim = -1;
@@ -1049,7 +1049,7 @@ public final class ShapeJobs {
             }
             DroneEntity drone = DroneFleet.ensureHand(level, player, job, hand, pos);
             if (drone != null) {
-                drone.setParts(new com.wrights.drone.Loadout(hand.rotor, hand.fabricator));
+                drone.setParts(hand.parts());
             }
             if (drone == null) {
                 waitingChunk = true;
@@ -1528,7 +1528,7 @@ public final class ShapeJobs {
         }
         DroneEntity drone = DroneFleet.ensureHand(level, player, job, hand, fly);
         if (drone != null) {
-            drone.setParts(new com.wrights.drone.Loadout(hand.rotor, hand.fabricator));
+            drone.setParts(hand.parts());
         }
         if (drone == null) {
             setShapeHandStatus(level, hand, state, DroneEntity.WAIT_CHUNK);

@@ -43,14 +43,21 @@ public class WrightItem extends Item {
 
     /** One unnamed wright of every part combination, Basic first. Used to match crafting patterns. */
     public static List<ItemStack> variants() {
-        List<ItemStack> all = new ArrayList<>();
-        for (int rotor = WrightTier.BASIC; rotor <= WrightTier.APEX; rotor++) {
-            for (int fabricator = WrightTier.BASIC; fabricator <= WrightTier.APEX; fabricator++) {
-                all.add(stack(new Loadout(rotor, fabricator), "", 1));
+        if (variants == null) {
+            List<ItemStack> all = new ArrayList<>();
+            for (int rotor = WrightTier.BASIC; rotor <= WrightTier.APEX; rotor++) {
+                for (int fabricator = WrightTier.BASIC; fabricator <= WrightTier.APEX; fabricator++) {
+                    for (int core = WrightTier.BASIC; core <= WrightTier.APEX; core++) {
+                        all.add(stack(new Loadout(rotor, fabricator, core), "", 1));
+                    }
+                }
             }
+            variants = List.copyOf(all);
         }
-        return all;
+        return variants.stream().map(ItemStack::copy).toList();
     }
+
+    private static List<ItemStack> variants;
 
     public static Loadout parts(ItemStack stack) {
         Loadout parts = stack.get(ModDataComponents.WRIGHT_PARTS.get());
@@ -58,7 +65,7 @@ public class WrightItem extends Item {
             return parts;
         }
         Integer retired = stack.get(ModDataComponents.RETIRED_WRIGHT_TIER.get());
-        return retired == null ? Loadout.BASIC : new Loadout(retired, WrightTier.BASIC);
+        return retired == null ? Loadout.BASIC : Loadout.BASIC.with(PartSlot.ROTOR, retired);
     }
 
     public static void writeParts(ItemStack stack, Loadout parts) {
@@ -96,7 +103,7 @@ public class WrightItem extends Item {
     @Override
     public Component getName(ItemStack stack) {
         Loadout parts = parts(stack);
-        int color = WrightTier.textColor(Math.max(parts.rotor(), parts.fabricator())) & 0xFFFFFF;
+        int color = WrightTier.textColor(parts.topTier()) & 0xFFFFFF;
         String called = nameOf(stack);
         if (!called.isBlank()) {
             return Component.translatable("screen.wrights.drone_named", called).withColor(color);
@@ -114,7 +121,17 @@ public class WrightItem extends Item {
                     .withStyle(ChatFormatting.GRAY));
             tooltip.add(Component.literal("  ").append(WrightPartItem.stat(slot, tier)).withStyle(ChatFormatting.DARK_GRAY));
         }
+        tooltip.add(energyLine(parts));
         tooltip.add(Component.translatable("item.wrights.wright.hint").withStyle(ChatFormatting.DARK_GRAY));
+    }
+
+    /** "Energy: 87% of the block cost", green below 100%, red above. */
+    public static Component energyLine(Loadout parts) {
+        int percent = parts.energyPercent();
+        ChatFormatting color = percent < 100 ? ChatFormatting.GREEN : percent > 100 ? ChatFormatting.RED : ChatFormatting.GRAY;
+        String key = parts.rotor() == parts.core() && parts.rotor() > WrightTier.BASIC
+                ? "item.wrights.wright.energy_matched" : "item.wrights.wright.energy";
+        return Component.translatable(key, Component.literal(percent + "%").withStyle(color)).withStyle(ChatFormatting.GRAY);
     }
 
     /** Right-click a part onto a wright: fits it, and the part it replaces goes to the cursor. */

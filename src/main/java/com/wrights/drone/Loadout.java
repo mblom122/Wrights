@@ -8,40 +8,55 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 
 /** The part fitted in each {@link PartSlot} of one wright. Tier {@link WrightTier#BASIC} means the slot is empty. */
-public record Loadout(int rotor, int fabricator) {
-    public static final Loadout BASIC = new Loadout(WrightTier.BASIC, WrightTier.BASIC);
+public record Loadout(int rotor, int fabricator, int core) {
+    public static final Loadout BASIC = new Loadout(WrightTier.BASIC, WrightTier.BASIC, WrightTier.BASIC);
 
     public static final Codec<Loadout> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.INT.optionalFieldOf("rotor", WrightTier.BASIC).forGetter(Loadout::rotor),
-            Codec.INT.optionalFieldOf("fabricator", WrightTier.BASIC).forGetter(Loadout::fabricator)
+            Codec.INT.optionalFieldOf("fabricator", WrightTier.BASIC).forGetter(Loadout::fabricator),
+            Codec.INT.optionalFieldOf("core", WrightTier.BASIC).forGetter(Loadout::core)
     ).apply(instance, Loadout::new));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, Loadout> STREAM_CODEC = StreamCodec.composite(
             ByteBufCodecs.VAR_INT, Loadout::rotor,
             ByteBufCodecs.VAR_INT, Loadout::fabricator,
+            ByteBufCodecs.VAR_INT, Loadout::core,
             Loadout::new);
 
     public Loadout {
         rotor = WrightTier.clamp(rotor);
         fabricator = WrightTier.clamp(fabricator);
+        core = WrightTier.clamp(core);
     }
 
     public int tier(PartSlot slot) {
         return switch (slot) {
             case ROTOR -> rotor;
             case FABRICATOR -> fabricator;
+            case CORE -> core;
         };
     }
 
     public Loadout with(PartSlot slot, int tier) {
         return switch (slot) {
-            case ROTOR -> new Loadout(tier, fabricator);
-            case FABRICATOR -> new Loadout(rotor, tier);
+            case ROTOR -> new Loadout(tier, fabricator, core);
+            case FABRICATOR -> new Loadout(rotor, tier, core);
+            case CORE -> new Loadout(rotor, fabricator, tier);
         };
     }
 
+    /** Highest tier fitted in any slot; sets the wright's accent colour. */
+    public int topTier() {
+        return Math.max(rotor, Math.max(fabricator, core));
+    }
+
+    /** Percent of the configured block cost this wright pays. */
+    public int energyPercent() {
+        return WrightTier.energyPercent(rotor, core);
+    }
+
     public boolean isBasic() {
-        return rotor == WrightTier.BASIC && fabricator == WrightTier.BASIC;
+        return rotor == WrightTier.BASIC && fabricator == WrightTier.BASIC && core == WrightTier.BASIC;
     }
 
     public boolean isMax() {

@@ -34,6 +34,7 @@ public class DroneEntity extends Entity {
     private static final EntityDataAccessor<String> JOB_ID = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Integer> ROTOR = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> FABRICATOR = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> CORE = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<ItemStack> CARRIED = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.ITEM_STACK);
     private static final EntityDataAccessor<ItemStack> CURRENT_BLOCK = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.ITEM_STACK);
     private static final EntityDataAccessor<ItemStack> NEXT_BLOCK = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.ITEM_STACK);
@@ -298,6 +299,7 @@ public class DroneEntity extends Entity {
         builder.define(JOB_ID, "");
         builder.define(ROTOR, com.wrights.drone.WrightTier.BASIC);
         builder.define(FABRICATOR, com.wrights.drone.WrightTier.BASIC);
+        builder.define(CORE, com.wrights.drone.WrightTier.BASIC);
         builder.define(CARRIED, ItemStack.EMPTY);
         builder.define(CURRENT_BLOCK, ItemStack.EMPTY);
         builder.define(NEXT_BLOCK, ItemStack.EMPTY);
@@ -460,13 +462,19 @@ public class DroneEntity extends Entity {
         return com.wrights.drone.WrightTier.clamp(this.entityData.get(FABRICATOR));
     }
 
+    /** Power Core tier; sets energy per block and which core is drawn on the chassis. */
+    public int core() {
+        return com.wrights.drone.WrightTier.clamp(this.entityData.get(CORE));
+    }
+
     public com.wrights.drone.Loadout parts() {
-        return new com.wrights.drone.Loadout(rotor(), fabricator());
+        return new com.wrights.drone.Loadout(rotor(), fabricator(), core());
     }
 
     public void setParts(com.wrights.drone.Loadout parts) {
         this.entityData.set(ROTOR, parts.rotor());
         this.entityData.set(FABRICATOR, parts.fabricator());
+        this.entityData.set(CORE, parts.core());
     }
 
     public Optional<UUID> jobId() {
@@ -609,7 +617,8 @@ public class DroneEntity extends Entity {
         if (tag.contains("Parts")) {
             com.wrights.drone.Loadout.CODEC.parse(net.minecraft.nbt.NbtOps.INSTANCE, tag.get("Parts")).result().ifPresent(this::setParts);
         } else if (tag.contains("Tier")) {
-            setParts(new com.wrights.drone.Loadout(tag.getInt("Tier"), tag.contains("Ops") ? tag.getInt("Ops") : tag.getInt("Tier")));
+            setParts(new com.wrights.drone.Loadout(tag.getInt("Tier"), tag.contains("Ops") ? tag.getInt("Ops") : tag.getInt("Tier"),
+                    com.wrights.drone.WrightTier.BASIC));
         }
         setReturning(tag.getBoolean("Returning"));
         if (tag.hasUUID("Owner")) {

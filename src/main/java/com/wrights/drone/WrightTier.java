@@ -6,7 +6,8 @@ import net.minecraft.util.Mth;
 
 /**
  * Part tiers, Basic (no part fitted) through Apex. Every {@link PartSlot} uses the same ladder.
- * A rotor tier sets flight speed; a fabricator tier sets how many blocks one operation touches.
+ * A rotor tier sets flight speed and energy draw; a fabricator tier sets how many blocks one operation touches;
+ * a Power Core tier sets how much of the rotor's draw it covers.
  */
 public final class WrightTier {
     public static final int BASIC = 0;
@@ -101,6 +102,34 @@ public final class WrightTier {
     /** Near-build flight distance covered in one second (20 ticks × {@link #flyClose}). */
     public static double flyBlocksPerSecond(int tier) {
         return flyClose(tier) * 20.0D;
+    }
+
+    /**
+     * Energy a rotor tier draws per block, in percent of Basic. A Power Core of a tier is rated for the rotor of
+     * the same tier: it divides by the same figure, so a matched pair works at the Basic cost.
+     */
+    public static int rotorDraw(int tier) {
+        return switch (clamp(tier)) {
+            case SCOUT -> 115;
+            case RANGER -> 130;
+            case VECTOR -> 150;
+            case TEMPEST -> 175;
+            case APEX -> 200;
+            default -> 100;
+        };
+    }
+
+    /** Percent of the configured block cost a wright pays: its rotor's draw over its core's rating. */
+    public static int energyPercent(int rotor, int core) {
+        return Math.round(100.0F * rotorDraw(rotor) / rotorDraw(core));
+    }
+
+    /** {@code base} Forge Energy scaled by {@link #energyPercent}, rounded up so a block never becomes free. */
+    public static int energyCost(int base, int rotor, int core) {
+        if (base <= 0) {
+            return base;
+        }
+        return (int) Math.max(1L, ((long) base * rotorDraw(rotor) + rotorDraw(core) - 1) / rotorDraw(core));
     }
 
     /** Short label for tooltips / Manage (e.g. {@code 5}, {@code 17.5}, {@code 55}). */

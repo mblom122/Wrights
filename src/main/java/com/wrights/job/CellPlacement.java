@@ -158,7 +158,7 @@ public final class CellPlacement {
             return PlaceResult.WAIT;
         }
         if (!freePlace(player)) {
-            int cost = WrightsConfig.energyCost(job, false, false);
+            int cost = com.wrights.energy.PortEnergy.costFor(hand, WrightsConfig.energyCost(job, false, false));
             if (cost > 0 && !com.wrights.energy.PortEnergy.tryPay(level, player, hand, cost)) {
                 return PlaceResult.ENERGY;
             }
@@ -334,7 +334,7 @@ public final class CellPlacement {
         }
         int paidEnergy = 0;
         if (!freePlace(player)) {
-            int cost = WrightsConfig.energyCost(job, clearFirst, mirrorPlace(job));
+            int cost = com.wrights.energy.PortEnergy.costFor(hand, WrightsConfig.energyCost(job, clearFirst, mirrorPlace(job)));
             if (cost > 0 && !com.wrights.energy.PortEnergy.tryPay(level, player, hand, cost)) {
                 return PlaceResult.ENERGY;
             }

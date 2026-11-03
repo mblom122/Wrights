@@ -87,7 +87,7 @@ public final class DroneFleet {
 
     private static void paint(DroneEntity drone, BuildJob job) {
         BuildJob.Hand lead = job.hands().isEmpty() ? null : job.hands().get(0);
-        drone.setParts(lead == null ? com.wrights.drone.Loadout.BASIC : new com.wrights.drone.Loadout(lead.rotor, lead.fabricator));
+        drone.setParts(lead == null ? com.wrights.drone.Loadout.BASIC : lead.parts());
     }
 
     static DroneEntity ensureHand(ServerLevel level, ServerPlayer player, BuildJob job, BuildJob.Hand hand, BlockPos workPos) {
@@ -262,7 +262,7 @@ public final class DroneFleet {
             BlockPos where = next != null
                     ? next
                     : (drone != null ? drone.blockPosition() : (hand.lastPos != null ? hand.lastPos : job.min()));
-            BlockPos docked = DockRecovery.recover(level, player, where, id, new com.wrights.drone.Loadout(hand.rotor, hand.fabricator), name);
+            BlockPos docked = DockRecovery.recover(level, player, where, id, hand.parts(), name);
             dirty = true;
             if (docked != null) {
                 noteDocked(level.getServer(), id, docked);

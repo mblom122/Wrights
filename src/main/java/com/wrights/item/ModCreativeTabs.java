@@ -24,6 +24,7 @@ public final class ModCreativeTabs {
                 output.accept(ModItems.WRIGHT.get());
                 ModItems.ROTORS.forEach(part -> output.accept(part.get()));
                 ModItems.FABRICATORS.forEach(part -> output.accept(part.get()));
+                ModItems.CORES.forEach(part -> output.accept(part.get()));
                 output.accept(ModItems.PERSONAL_WRIGHTPORT.get());
                 output.accept(ModBlocks.WRIGHTPORT_ITEM.get());
             })
