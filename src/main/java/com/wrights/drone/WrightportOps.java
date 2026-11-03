@@ -77,12 +77,12 @@ public final class WrightportOps {
             return;
         }
         Swarm swarm = port.swarm();
-        int[] home = action == HangarOps.ADD_COUNT ? units : HangarOps.homeUnits(player, swarm, units);
-        if (action != HangarOps.ADD_COUNT && units != null && units.length > 0 && home.length == 0) {
+        int[] home = HangarOps.isAdd(action) ? units : HangarOps.homeUnits(player, swarm, units);
+        if (!HangarOps.isAdd(action) && units != null && units.length > 0 && home.length == 0) {
             Messages.actionBar(player, "message.wrights.wright_away");
             return;
         }
-        if (port.owner() == null && action == HangarOps.ADD_COUNT) {
+        if (port.owner() == null && HangarOps.isAdd(action)) {
             port.assignOwner(player.getUUID(), player.getGameProfile().getName());
         }
         CraftDeliveries.push(CraftDeliveries.Hangar.placed(

@@ -20,7 +20,7 @@ import com.wrights.menu.WrightportMenu;
 import com.wrights.network.BlueprintPayloads;
 
 /** Placed wrightport hangar — textured panel with Boundary / Bind / Highlight icons. */
-public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> implements ManageHost {
+public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> implements ManageHost, JeiPreview {
     private final WrightManagePanel manage = new WrightManagePanel();
     private boolean energyKnown;
     private int energyStored;
@@ -37,7 +37,8 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         this.imageWidth = HangarGui.WIDTH;
         this.imageHeight = HangarGui.SCREEN_H;
         super.init();
-        // Sit a bit higher than dead-center so hangar + inventory clear the hotbar area.
+        // Leave a JEI lane on the right; sit a bit higher so hangar + inventory clear the hotbar.
+        this.leftPos = JeiPreview.left(this.width, this.imageWidth);
         this.topPos = Math.max(4, (this.height - this.imageHeight) / 3);
         if (WrightsClientState.dockWaiting()) {
             if (getMinecraft().player != null) {
@@ -262,6 +263,36 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
     @Override
     public int areaH() {
         return HangarGui.PANEL_H;
+    }
+
+    @Override
+    public int jeiLeft() {
+        return leftPos;
+    }
+
+    @Override
+    public int jeiTop() {
+        return topPos;
+    }
+
+    @Override
+    public int jeiWidth() {
+        return imageWidth;
+    }
+
+    @Override
+    public int jeiHeight() {
+        return imageHeight;
+    }
+
+    @Override
+    public int jeiScreenWidth() {
+        return width;
+    }
+
+    @Override
+    public int jeiScreenHeight() {
+        return height;
     }
 
     public void acceptEnergy(BlockPos pos, int stored, int capacity) {

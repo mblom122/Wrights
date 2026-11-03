@@ -42,6 +42,10 @@ public final class HangarOps {
     public static final int BEST_PARTS = 3;
     public static final int TAKE_MARKED = 4;
     public static final int STRIP_MARKED = 5;
+    /** Pull inventory + digital stock only (no craft order). */
+    public static final int ADD_STOCK = 6;
+    /** Order a craft for new wrights (no inventory pull). */
+    public static final int ADD_CRAFT = 7;
     /** Batch action: fit the tier in {@code value} to every marked wright. Plus {@link PartSlot#ordinal()}; see {@link #partFit}. */
     private static final int PART_FIT = 40;
 
@@ -103,8 +107,8 @@ public final class HangarOps {
             return;
         }
         Swarm swarm = Swarm.from(stack);
-        int[] home = action == ADD_COUNT ? units : homeUnits(player, swarm, units);
-        if (action != ADD_COUNT && units != null && units.length > 0 && home.length == 0) {
+        int[] home = isAdd(action) ? units : homeUnits(player, swarm, units);
+        if (!isAdd(action) && units != null && units.length > 0 && home.length == 0) {
             Messages.actionBar(player, "message.wrights.wright_away");
             ManageLock.hold(player, kind, index);
             return;
@@ -126,6 +130,8 @@ public final class HangarOps {
         try {
             return switch (action) {
                 case ADD_COUNT -> insertCount(player, owner, swarm, value);
+                case ADD_STOCK -> insertStock(player, owner, swarm, value);
+                case ADD_CRAFT -> insertCraft(player, owner, swarm, value);
                 case BEST_PARTS -> bestParts(player, swarm, units);
                 case TAKE_MARKED -> takeMarked(player, swarm, units);
                 case STRIP_MARKED -> stripMarked(player, swarm, units);
@@ -223,7 +229,66 @@ public final class HangarOps {
         return insertCount(player, owner, swarm, wanted(mode, room));
     }
 
+    static boolean isAdd(int action) {
+        return action == ADD_COUNT || action == ADD_STOCK || action == ADD_CRAFT;
+    }
+
     private static Swarm insertCount(ServerPlayer player, UUID owner, Swarm swarm, int count) {
+        int room = peekAddRoom(player, owner, swarm);
+        if (room <= 0 || count <= 0) {
+            return insertPulled(player, owner, swarm, count, new Pull(List.of(), 0));
+        }
+        return insertPulled(player, owner, swarm, count, pullWrights(player, Math.min(room, count)));
+    }
+
+    private static Swarm insertStock(ServerPlayer player, UUID owner, Swarm swarm, int count) {
+        int room = peekAddRoom(player, owner, swarm);
+        if (room <= 0 || count <= 0) {
+            return insertPulled(player, owner, swarm, count, new Pull(List.of(), 0));
+        }
+        return insertPulled(player, owner, swarm, count, pullWrightsStock(player, Math.min(room, count)));
+    }
+
+    private static int peekAddRoom(ServerPlayer player, UUID owner, Swarm swarm) {
+        int portRoom = Swarm.capacity() - swarm.units().size();
+        if (portRoom <= 0) {
+            return 0;
+        }
+        return Math.min(portRoom, WrightLedger.room(player.serverLevel().getServer(), owner));
+    }
+
+    private static Swarm insertCraft(ServerPlayer player, UUID owner, Swarm swarm, int count) {
+        int room = addRoom(player, owner, swarm);
+        if (room <= 0 || count <= 0) {
+            return swarm;
+        }
+        int want = Math.min(room, count);
+        if (player.getAbilities().instabuild) {
+            return insertPulled(player, owner, swarm, want, new Pull(creativeTaken(want), 0));
+        }
+        if (orderCraft(player, ModItems.WRIGHT.get(), want)) {
+            Messages.actionBar(player, "message.wrights.digital_crafting");
+        } else if (!DigitalNetworks.craftFailureExplained()) {
+            Messages.actionBar(player, "message.wrights.need_wright_item");
+        }
+        return swarm;
+    }
+
+    private static int addRoom(ServerPlayer player, UUID owner, Swarm swarm) {
+        int portRoom = Swarm.capacity() - swarm.units().size();
+        if (portRoom <= 0) {
+            Messages.actionBar(player, "message.wrights.drone_full", Swarm.capacity());
+            return 0;
+        }
+        int capRoom = WrightLedger.room(player.serverLevel().getServer(), owner);
+        if (capRoom <= 0) {
+            Messages.actionBar(player, "message.wrights.wright_cap", WrightsConfig.maxWrightsOwned());
+            return 0;
+        }
+        return Math.min(portRoom, capRoom);
+    }
+
+    private static Swarm insertPulled(ServerPlayer player, UUID owner, Swarm swarm, int count, Pull pulled) {
         int portRoom = Swarm.capacity() - swarm.units().size();
         if (portRoom <= 0) {
             Messages.actionBar(player, "message.wrights.drone_full", Swarm.capacity());
@@ -238,8 +303,10 @@ public final class HangarOps {
         if (count <= 0) {
             return swarm;
         }
-        Pull pulled = pullWrights(player, Math.min(room, count));
         List<Taken> tiers = pulled.tiers();
+        if (tiers.size() > room) {
+            tiers = new ArrayList<>(tiers.subList(0, room));
+        }
         if (tiers.isEmpty()) {
             if (pulled.crafting() > 0) {
                 Messages.actionBar(player, "message.wrights.digital_crafting");
@@ -261,7 +328,31 @@ public final class HangarOps {
         return next;
     }
 
+    private static List<Taken> creativeTaken(int count) {
+        List<Taken> tiers = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            tiers.add(new Taken(Loadout.BASIC, ""));
+        }
+        return tiers;
+    }
+
     private static Pull pullWrights(ServerPlayer player, int count) {
+        Pull stock = pullWrightsStock(player, count);
+        List<Taken> tiers = new ArrayList<>(stock.tiers());
+        int need = count - tiers.size();
+        int crafting = 0;
+        if (!player.getAbilities().instabuild && need > 0 && orderCraft(player, ModItems.WRIGHT.get(), need)) {
+            crafting = need;
+        }
+        if (player.getAbilities().instabuild) {
+            while (tiers.size() < count) {
+                tiers.add(new Taken(Loadout.BASIC, ""));
+            }
+        }
+        return new Pull(tiers, crafting);
+    }
+
+    private static Pull pullWrightsStock(ServerPlayer player, int count) {
         List<Taken> tiers = new ArrayList<>();
         if (count <= 0) {
             return new Pull(tiers, 0);
@@ -315,17 +406,12 @@ public final class HangarOps {
         if (fromDigital > 0) {
             noteUse(ModItems.WRIGHT.get(), fromDigital, 0);
         }
-        need = count - tiers.size();
-        int crafting = 0;
-        if (!player.getAbilities().instabuild && need > 0 && orderCraft(player, ModItems.WRIGHT.get(), need)) {
-            crafting = need;
-        }
         if (player.getAbilities().instabuild) {
             while (tiers.size() < count) {
                 tiers.add(new Taken(Loadout.BASIC, ""));
             }
         }
-        return new Pull(tiers, crafting);
+        return new Pull(tiers, 0);
     }
 
     private record Taken(Loadout parts, String name) {
