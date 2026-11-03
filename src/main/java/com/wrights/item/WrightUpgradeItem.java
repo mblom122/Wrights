@@ -51,9 +51,10 @@ public class WrightUpgradeItem extends Item {
                     .withStyle(ChatFormatting.DARK_GRAY));
             return;
         }
-        int score = WrightTier.speed(tier);
-        int bonus = WrightTier.speedBonusPercent(tier);
-        tooltip.add(Component.translatable("item.wrights.wright_upgrade.speed", score, bonus)
+        tooltip.add(Component.translatable(
+                        "item.wrights.wright_upgrade.speed",
+                        WrightTier.flyRateLabel(tier),
+                        WrightTier.flyRateLabel(WrightTier.BASE))
                 .withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("item.wrights.wright_upgrade.effect")
                 .withStyle(ChatFormatting.DARK_GRAY));

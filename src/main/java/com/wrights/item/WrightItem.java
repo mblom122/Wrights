@@ -64,13 +64,14 @@ public class WrightItem extends Item {
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         int tier = tier(stack);
-        int score = WrightTier.speed(tier);
-        int bonus = WrightTier.speedBonusPercent(tier);
-        if (bonus > 0) {
-            tooltip.add(Component.translatable("item.wrights.wright.speed", score, bonus)
+        if (tier > WrightTier.BASE) {
+            tooltip.add(Component.translatable(
+                            "item.wrights.wright.speed",
+                            WrightTier.flyRateLabel(tier),
+                            WrightTier.flyRateLabel(WrightTier.BASE))
                     .withStyle(ChatFormatting.GRAY));
         } else {
-            tooltip.add(Component.translatable("item.wrights.wright.speed_basic", score)
+            tooltip.add(Component.translatable("item.wrights.wright.speed_basic", WrightTier.flyRateLabel(tier))
                     .withStyle(ChatFormatting.GRAY));
         }
         tooltip.add(Component.translatable("item.wrights.wright.hint").withStyle(ChatFormatting.DARK_GRAY));

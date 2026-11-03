@@ -263,8 +263,8 @@ final class WrightManagePanel {
                             screen.font(),
                             Component.translatable(
                                     "screen.wrights.manage_pace",
-                                    WrightTier.speed(tier),
-                                    WrightTier.speedBonusPercent(tier)),
+                                    WrightTier.flyRateLabel(tier),
+                                    WrightTier.flyRateLabel(WrightTier.BASE)),
                             listX + 10,
                             y + 20,
                             WrightsUi.TEXT,

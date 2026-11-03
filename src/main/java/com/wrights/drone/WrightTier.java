@@ -1,5 +1,7 @@
 package com.wrights.drone;
 
+import java.util.Locale;
+
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.Item;
 
@@ -127,6 +129,20 @@ public final class WrightTier {
         int score = speed(tier);
         // 200 → 0.25, 1200 → 2.75
         return 0.25D + 2.5D * (score - SPEED_BASE) / (double) (SPEED_NETHERITE - SPEED_BASE);
+    }
+
+    /** Near-build flight distance covered in one second (20 ticks × {@link #flyClose}). */
+    public static double flyBlocksPerSecond(int tier) {
+        return flyClose(tier) * 20.0D;
+    }
+
+    /** Short label for tooltips / Manage (e.g. {@code 5}, {@code 17.5}, {@code 55}). */
+    public static String flyRateLabel(int tier) {
+        double bps = flyBlocksPerSecond(tier);
+        if (Math.abs(bps - Math.rint(bps)) < 1.0E-6D) {
+            return Integer.toString((int) Math.rint(bps));
+        }
+        return String.format(Locale.ROOT, "%.1f", bps);
     }
 
     /** The crafted item that raises a wright of {@code tier - 1} to this tier. Stock has none. */
