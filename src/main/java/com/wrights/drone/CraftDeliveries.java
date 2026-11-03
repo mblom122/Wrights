@@ -156,13 +156,13 @@ public final class CraftDeliveries {
             Messages.actionBar(player, "message.wrights.drone_full", Swarm.capacity());
             return 0;
         }
-        List<Integer> tiers = pull(player, Math.min(room, want));
+        List<Loadout> tiers = pull(player, Math.min(room, want));
         if (tiers.isEmpty()) {
             return 0;
         }
         Swarm next = swarm;
-        for (int tier : tiers) {
-            next = next.addUnit(tier, "");
+        for (Loadout parts : tiers) {
+            next = next.addUnit(parts, "");
         }
         WrightportPlaces.write(player, hangar.kind, hangar.index, next);
         ManageLock.hold(player, hangar.kind, hangar.index);
@@ -184,13 +184,13 @@ public final class CraftDeliveries {
             Messages.actionBar(player, "message.wrights.drone_full", Swarm.capacity());
             return 0;
         }
-        List<Integer> tiers = pull(player, Math.min(room, want));
+        List<Loadout> tiers = pull(player, Math.min(room, want));
         if (tiers.isEmpty()) {
             return 0;
         }
         Swarm next = swarm;
-        for (int tier : tiers) {
-            next = next.addUnit(tier, "");
+        for (Loadout parts : tiers) {
+            next = next.addUnit(parts, "");
         }
         port.setSwarm(next);
         PlacedPortManage.swarm(player, hangar.dimension.location().toString(), hangar.pos);
@@ -211,13 +211,13 @@ public final class CraftDeliveries {
         return Math.min(portRoom, capRoom);
     }
 
-    private static List<Integer> pull(ServerPlayer player, int want) {
+    private static List<Loadout> pull(ServerPlayer player, int want) {
         DigitalLink link = ItemSource.linkOf(player);
         ServerLevel level = DigitalNetworks.levelOf(player, link == null ? null : link.pos());
         if (level == null || want <= 0) {
             return List.of();
         }
-        return DigitalNetworks.extractWrights(player, level, link, want);
+        return DigitalNetworks.extractWrights(player, level, link, want).stream().map(com.wrights.item.WrightItem::parts).toList();
     }
 
     public record Hangar(UUID owner, int kind, int index, ResourceKey<Level> dimension, BlockPos pos) {

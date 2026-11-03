@@ -46,7 +46,7 @@ public final class CellPlacement {
      * Apex is the full 19-cell sphere. Do not clamp to {@code blocksPerTick}.
      */
     static int placeBudget(BuildJob.Hand hand) {
-        return Math.max(1, WrightTier.operationCap(ShapeJobs.handOps(hand)));
+        return Math.max(1, WrightTier.operationCap(ShapeJobs.handFabricator(hand)));
     }
 
     static double flyStep(int speed, double distanceSqr) {

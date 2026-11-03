@@ -10,7 +10,7 @@
     "G": { "item": "minecraft:glass_pane" },
     "M": { "item": "minecraft:gold_ingot" },
     "A": { "item": "minecraft:amethyst_shard" },
-    "P": { "item": "wrights:wright_ops_iron" }
+    "P": { "item": "wrights:fabricator_mk2" }
   },
-  "result": { "id": "wrights:wright_ops_gold", "count": 1 }
+  "result": { "id": "wrights:fabricator_mk3", "count": 1 }
 }

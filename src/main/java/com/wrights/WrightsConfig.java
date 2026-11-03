@@ -343,11 +343,11 @@ public final class WrightsConfig {
 
     /** Cells along a straight line one hover can cover at this operations tier. Basic is 1; every other tier is 3. */
     public static int placeAoeLine(int ops) {
-        return WrightTier.clamp(ops) <= WrightTier.BASE ? 1 : 3;
+        return WrightTier.clamp(ops) <= WrightTier.BASIC ? 1 : 3;
     }
 
     public static int placeAoeLine() {
-        return placeAoeLine(WrightTier.NETHERITE);
+        return placeAoeLine(WrightTier.APEX);
     }
 
     /**
@@ -367,7 +367,7 @@ public final class WrightsConfig {
     }
 
     public static int placeAoeCapacity(int sizeX, int sizeY, int sizeZ) {
-        return placeAoeCapacity(sizeX, sizeY, sizeZ, WrightTier.NETHERITE);
+        return placeAoeCapacity(sizeX, sizeY, sizeZ, WrightTier.APEX);
     }
 
     /**
@@ -376,7 +376,7 @@ public final class WrightsConfig {
      * {@code shareBlocks} is this wright's slice when known (else pass the full job size).
      */
     public static boolean optimizePlaceRoute(int blocks, int sizeX, int sizeY, int sizeZ, int wrights, int shareBlocks) {
-        return optimizePlaceRoute(blocks, sizeX, sizeY, sizeZ, wrights, shareBlocks, WrightTier.NETHERITE);
+        return optimizePlaceRoute(blocks, sizeX, sizeY, sizeZ, wrights, shareBlocks, WrightTier.APEX);
     }
 
     public static boolean optimizePlaceRoute(int blocks, int sizeX, int sizeY, int sizeZ, int wrights, int shareBlocks, int ops) {
@@ -396,7 +396,7 @@ public final class WrightsConfig {
      * At Netherite a 1×9 beam is three stations (3+3+3). Basic covers only the cell it occupies.
      */
     public static int usefulCrewFor(int blocks, int sizeX, int sizeY, int sizeZ) {
-        return usefulCrewFor(blocks, sizeX, sizeY, sizeZ, WrightTier.NETHERITE);
+        return usefulCrewFor(blocks, sizeX, sizeY, sizeZ, WrightTier.APEX);
     }
 
     public static int usefulCrewFor(int blocks, int sizeX, int sizeY, int sizeZ, int ops) {

@@ -2,6 +2,7 @@ package com.wrights.item;
 
 import com.mojang.serialization.Codec;
 import com.wrights.WrightsMod;
+import com.wrights.drone.Loadout;
 
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.component.DataComponentType;
@@ -50,10 +51,16 @@ public final class ModDataComponents {
                     .persistent(GlobalPos.CODEC)
                     .networkSynchronized(GlobalPos.STREAM_CODEC));
 
-    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> WRIGHT_TIER =
+    /** Parts fitted to a wright item. Absent on a Basic wright. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Loadout>> WRIGHT_PARTS =
+            DATA_COMPONENTS.registerComponentType("wright_parts", builder -> builder
+                    .persistent(Loadout.CODEC)
+                    .networkSynchronized(Loadout.STREAM_CODEC));
+
+    /** Rotor tier on wright items saved before parts. Registered so those stacks still load; read once into {@link #WRIGHT_PARTS}. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> RETIRED_WRIGHT_TIER =
             DATA_COMPONENTS.registerComponentType("wright_tier", builder -> builder
-                    .persistent(Codec.INT)
-                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+                    .persistent(Codec.INT));
 
     /** Forge Energy stored on a wrightport / personal wrightport item (0 when empty or newly crafted). */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> PORT_ENERGY =

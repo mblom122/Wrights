@@ -48,7 +48,6 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.WrightsMod;
 import com.wrights.drone.CraftDeliveries;
-import com.wrights.drone.WrightTier;
 import com.wrights.network.BlueprintPayloads;
 import com.wrights.item.ModItems;
 import com.wrights.item.WrightItem;
@@ -154,8 +153,8 @@ public final class Ae2DigitalAccess implements DigitalAccess {
             return true;
         }
         if (item == ModItems.WRIGHT.get()) {
-            for (int tier = WrightTier.BASE; tier <= WrightTier.NETHERITE; tier++) {
-                AEItemKey key = AEItemKey.of(WrightItem.stack(tier, 1));
+            for (ItemStack variant : WrightItem.variants()) {
+                AEItemKey key = AEItemKey.of(variant);
                 if (key != null && crafting.isCraftable(key)) {
                     return true;
                 }
@@ -500,8 +499,8 @@ public final class Ae2DigitalAccess implements DigitalAccess {
     }
 
     @Override
-    public List<Integer> extractWrights(ServerPlayer player, ServerLevel level, GlobalPos pos, int count) {
-        List<Integer> tiers = new ArrayList<>();
+    public List<ItemStack> extractWrights(ServerPlayer player, ServerLevel level, GlobalPos pos, int count) {
+        List<ItemStack> tiers = new ArrayList<>();
         IGrid grid = grid(level, pos);
         if (grid == null || count <= 0) {
             return tiers;
@@ -524,7 +523,7 @@ public final class Ae2DigitalAccess implements DigitalAccess {
             if (inventory.extract(found, 1L, Actionable.MODULATE, src) <= 0L) {
                 break;
             }
-            tiers.add(WrightItem.tier(found.toStack()));
+            tiers.add(found.toStack());
         }
         return tiers;
     }
@@ -536,8 +535,8 @@ public final class Ae2DigitalAccess implements DigitalAccess {
             return plain;
         }
         if (item == ModItems.WRIGHT.get()) {
-            for (int tier = WrightTier.BASE; tier <= WrightTier.NETHERITE; tier++) {
-                AEItemKey key = AEItemKey.of(WrightItem.stack(tier, 1));
+            for (ItemStack variant : WrightItem.variants()) {
+                AEItemKey key = AEItemKey.of(variant);
                 if (key != null && crafting.isCraftable(key)) {
                     return key;
                 }

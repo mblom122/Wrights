@@ -1662,9 +1662,9 @@ public final class WrightsClientState {
     private static int bestFreeOps() {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player == null) {
-            return com.wrights.drone.WrightTier.NETHERITE;
+            return com.wrights.drone.WrightTier.APEX;
         }
-        return com.wrights.drone.WrightHomes.bestOps(minecraft.player, WrightsClientState::wrightFree);
+        return com.wrights.drone.WrightHomes.bestFabricator(minecraft.player, WrightsClientState::wrightFree);
     }
 
     private static int knownFree() {

@@ -2,26 +2,23 @@
   "type": "minecraft:crafting_shaped",
   "category": "equipment",
   "pattern": [
-    "GIG",
-    "RPR",
+    "GCG",
+    "RCR",
     "GGG"
   ],
   "key": {
     "G": {
       "item": "minecraft:glass_pane"
     },
-    "I": {
-      "item": "minecraft:iron_ingot"
+    "C": {
+      "item": "minecraft:copper_ingot"
     },
     "R": {
       "item": "minecraft:redstone"
-    },
-    "P": {
-      "item": "wrights:wright_upgrade_copper"
     }
   },
   "result": {
-    "id": "wrights:wright_upgrade_iron",
+    "id": "wrights:rotor_mk1",
     "count": 1
   }
 }

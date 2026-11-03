@@ -41,11 +41,11 @@ public final class HangarDock {
     }
 
     /** Uses the hangar currently pushed on {@link CraftDeliveries}. */
-    public static void show(ServerPlayer player, List<Integer> tiers) {
+    public static void show(ServerPlayer player, List<Loadout> tiers) {
         show(player, CraftDeliveries.active(), tiers);
     }
 
-    public static void show(ServerPlayer player, @Nullable CraftDeliveries.Hangar hangar, List<Integer> tiers) {
+    public static void show(ServerPlayer player, @Nullable CraftDeliveries.Hangar hangar, List<Loadout> tiers) {
         if (player == null || hangar == null || tiers == null || tiers.isEmpty()) {
             return;
         }
@@ -64,13 +64,13 @@ public final class HangarDock {
     }
 
     private static void spawn(ServerPlayer player, ServerLevel level, CraftDeliveries.Hangar hangar,
-            @Nullable BlockPos port, List<Integer> tiers) {
+            @Nullable BlockPos port, List<Loadout> tiers) {
         TARGETS.put(player.getUUID(), hangar);
         Set<UUID> pending = PENDING.computeIfAbsent(player.getUUID(), id -> new LinkedHashSet<>());
         int count = tiers.size();
         for (int i = 0; i < count; i++) {
             DroneEntity drone = new DroneEntity(ModEntities.DRONE.get(), level);
-            drone.setTier(Math.max(1, tiers.get(i)));
+            drone.setParts(tiers.get(i));
             drone.dockIn(player, port, i, count);
             level.addFreshEntity(drone);
             pending.add(drone.getUUID());

@@ -11,5 +11,5 @@
     "C": { "item": "minecraft:copper_ingot" },
     "A": { "item": "minecraft:amethyst_shard" }
   },
-  "result": { "id": "wrights:wright_ops_copper", "count": 1 }
+  "result": { "id": "wrights:fabricator_mk1", "count": 1 }
 }

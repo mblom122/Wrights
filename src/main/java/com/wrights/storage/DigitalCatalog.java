@@ -12,17 +12,10 @@ public final class DigitalCatalog {
     }
 
     public static List<Item> items() {
-        return List.of(
-                ModItems.WRIGHT.get(),
-                ModItems.UPGRADE_COPPER.get(),
-                ModItems.UPGRADE_IRON.get(),
-                ModItems.UPGRADE_GOLD.get(),
-                ModItems.UPGRADE_DIAMOND.get(),
-                ModItems.UPGRADE_NETHERITE.get(),
-                ModItems.OPS_COPPER.get(),
-                ModItems.OPS_IRON.get(),
-                ModItems.OPS_GOLD.get(),
-                ModItems.OPS_DIAMOND.get(),
-                ModItems.OPS_NETHERITE.get());
+        List<Item> items = new java.util.ArrayList<>();
+        items.add(ModItems.WRIGHT.get());
+        ModItems.ROTORS.forEach(part -> items.add(part.get()));
+        ModItems.FABRICATORS.forEach(part -> items.add(part.get()));
+        return List.copyOf(items);
     }
 }

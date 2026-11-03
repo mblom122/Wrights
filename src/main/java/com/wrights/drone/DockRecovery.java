@@ -33,43 +33,25 @@ public final class DockRecovery {
     }
 
     /**
-     * Saves one wright. Tries {@code where} first, then any other owned port in range of that spot.
-     * Returns the port it docked in, or null when the wright went to digital storage or the ground.
+     * Saves one wright with its parts and name. Tries {@code where} first, then any other owned port in range
+     * of that spot. Returns the port it docked in, or null when the wright went to digital storage or the ground.
      */
     @Nullable
-    public static BlockPos recover(ServerLevel level, ServerPlayer player, BlockPos where, @Nullable UUID unitId, int tier) {
-        return recover(level, player, where, unitId, tier, "");
-    }
-
-    /**
-     * Saves one wright. Tries {@code where} first, then any other owned port in range of that spot.
-     * Returns the port it docked in, or null when the wright went to digital storage or the ground.
-     */
-    @Nullable
-    public static BlockPos recover(ServerLevel level, ServerPlayer player, BlockPos where, @Nullable UUID unitId, int tier, @Nullable String name) {
-        return recover(level, player, where, unitId, tier, tier, name);
-    }
-
-    /**
-     * Saves one wright. {@code power} is its operations tier. Older callers that only know speed
-     * pass that tier again so a wright in flight before the split keeps its reach.
-     */
-    @Nullable
-    public static BlockPos recover(ServerLevel level, ServerPlayer player, BlockPos where, @Nullable UUID unitId, int tier, int power, @Nullable String name) {
+    public static BlockPos recover(ServerLevel level, ServerPlayer player, BlockPos where, @Nullable UUID unitId, Loadout parts, @Nullable String name) {
         if (level == null || where == null) {
             return null;
         }
-        if (redock(level, player, where, unitId, tier, power, name)) {
+        if (redock(level, player, where, unitId, parts, name)) {
             notice(player, level, null, where, Where.DOCK);
             return where;
         }
         UUID owner = player == null ? null : player.getUUID();
         BlockPos other = WrightHomes.openPort(level, where, owner, null);
-        if (other != null && !other.equals(where) && redock(level, player, other, unitId, tier, power, name)) {
+        if (other != null && !other.equals(where) && redock(level, player, other, unitId, parts, name)) {
             notice(player, level, null, other, Where.DOCK);
             return other;
         }
-        ItemStack stack = WrightItem.stack(tier, 1);
+        ItemStack stack = WrightItem.stack(parts, name == null ? "" : name, 1);
         BlockPos digitalAt = insertDigital(player, level, stack);
         if (stack.isEmpty()) {
             notice(player, level, digitalAt, where, Where.DIGITAL);
@@ -80,7 +62,7 @@ public final class DockRecovery {
         return null;
     }
 
-    private static boolean redock(ServerLevel level, ServerPlayer player, BlockPos where, @Nullable UUID unitId, int tier, int power, @Nullable String name) {
+    private static boolean redock(ServerLevel level, ServerPlayer player, BlockPos where, @Nullable UUID unitId, Loadout parts, @Nullable String name) {
         if (!level.isLoaded(where)) {
             return false;
         }
@@ -96,8 +78,8 @@ public final class DockRecovery {
             return true;
         }
         Swarm next = unitId == null
-                ? port.swarm().addUnit(tier)
-                : port.swarm().adopt(new Swarm.Unit(unitId, tier, WrightTier.clamp(power), name == null ? "" : name));
+                ? port.swarm().addUnit(parts, name == null ? "" : name)
+                : port.swarm().adopt(new Swarm.Unit(unitId, parts, name == null ? "" : name));
         if (next == port.swarm()) {
             return false;
         }

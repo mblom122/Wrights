@@ -140,7 +140,7 @@ public final class HelpTopics {
                     line("H", "help.wrights.manage.h2"),
                     line("P", "help.wrights.manage.p_personal"),
                     line("P", "help.wrights.manage.p_ports"),
-                    line("P", "help.wrights.manage.p_upgrades"),
+                    line("P", "help.wrights.manage.p_parts"),
                     line("T", "help.wrights.manage.tip")
             };
             case "info" -> new Line[] {

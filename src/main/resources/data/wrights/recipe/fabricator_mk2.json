@@ -2,15 +2,15 @@
   "type": "minecraft:crafting_shaped",
   "category": "equipment",
   "pattern": [
-    "GMG",
+    "GIG",
     "APA",
     "GGG"
   ],
   "key": {
     "G": { "item": "minecraft:glass_pane" },
-    "M": { "item": "minecraft:netherite_ingot" },
+    "I": { "item": "minecraft:iron_ingot" },
     "A": { "item": "minecraft:amethyst_shard" },
-    "P": { "item": "wrights:wright_ops_diamond" }
+    "P": { "item": "wrights:fabricator_mk1" }
   },
-  "result": { "id": "wrights:wright_ops_netherite", "count": 1 }
+  "result": { "id": "wrights:fabricator_mk2", "count": 1 }
 }

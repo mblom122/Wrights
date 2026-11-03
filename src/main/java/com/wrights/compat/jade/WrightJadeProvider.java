@@ -33,7 +33,7 @@ public enum WrightJadeProvider implements IEntityComponentProvider, StreamServer
     @Override
     public void appendTooltip(ITooltip tooltip, EntityAccessor accessor, IPluginConfig config) {
         if (accessor.getEntity() instanceof DroneEntity drone) {
-            tooltip.add(Component.translatable("jade.wrights.tier", Component.translatable(WrightTier.nameKey(drone.tier()))));
+            tooltip.add(Component.translatable("jade.wrights.tier", Component.translatable(WrightTier.nameKey(drone.rotor()))));
             int reason = drone.waitReason();
             boolean waitingItemsOrFloor = reason == DroneEntity.WAIT_ITEMS || reason == DroneEntity.WAIT_FLOOR;
             // Wait line already names the stuck block — skip a duplicate "Placing".

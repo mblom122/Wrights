@@ -65,7 +65,7 @@ public final class HoverWork {
         if (wrightOnStand(drone, stand)) {
             return false;
         }
-        drone.moveToward(hover, CellPlacement.flyStep(hand == null ? drone.tier() : hand.speed, drone.distanceToSqr(hover)));
+        drone.moveToward(hover, CellPlacement.flyStep(hand == null ? drone.rotor() : hand.rotor, drone.distanceToSqr(hover)));
         if (hand != null) {
             hand.lastPos = drone.blockPosition();
         }
@@ -127,7 +127,7 @@ public final class HoverWork {
             BuildJob job,
             BuildJob.Hand hand,
             int seedIndex) {
-        int reach = WrightTier.operationReachSqr(ShapeJobs.handOps(hand));
+        int reach = WrightTier.operationReachSqr(ShapeJobs.handFabricator(hand));
         if (reach < 2 || job.min() == null) {
             return null;
         }
@@ -253,7 +253,7 @@ public final class HoverWork {
     }
 
     /**
-     * Remove up to the ops budget of refunds in reach of the current hover.
+     * Remove up to the fabricator budget of refunds in reach of the current hover.
      * {@code CHUNK} means abort the tick (chunk gate); otherwise keep going.
      */
     public static Result burstRemove(
@@ -269,7 +269,7 @@ public final class HoverWork {
         }
         int budget = hand != null
                 ? CellPlacement.placeBudget(hand)
-                : Math.max(1, WrightTier.operationCap(drone.ops()));
+                : Math.max(1, WrightTier.operationCap(drone.fabricator()));
         int removed = 0;
         for (int n = 0; n < budget; n++) {
             int at = hand == null
@@ -287,7 +287,7 @@ public final class HoverWork {
                 if (drone.distanceToSqr(Vec3.atCenterOf(pos)) > JobManager.PLACE_NEAR_SQR) {
                     break;
                 }
-            } else if (!ShapeJobs.inOperationReachFromHover(drone.position(), pos, ShapeJobs.handOps(hand))) {
+            } else if (!ShapeJobs.inOperationReachFromHover(drone.position(), pos, ShapeJobs.handFabricator(hand))) {
                 break;
             }
             job.takeRefund(at);

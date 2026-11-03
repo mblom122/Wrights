@@ -584,7 +584,7 @@ public final class WrightsClientConfig {
             return 0;
         }
         int wanted = droneCountFor(exchangeOrPlace);
-        int useful = WrightsConfig.usefulCrewFor(blocks, sizeX, sizeY, sizeZ, com.wrights.drone.WrightTier.NETHERITE);
+        int useful = WrightsConfig.usefulCrewFor(blocks, sizeX, sizeY, sizeZ, com.wrights.drone.WrightTier.APEX);
         return Math.max(1, Math.min(wanted, Math.min(freeDrones, Math.min(useful, WrightsConfig.maxWrightsPerJob(exchangeOrPlace)))));
     }
 

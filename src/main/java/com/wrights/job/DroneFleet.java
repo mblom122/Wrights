@@ -86,9 +86,8 @@ public final class DroneFleet {
     }
 
     private static void paint(DroneEntity drone, BuildJob job) {
-        int tier = job.hands().isEmpty() ? 1 : job.hands().get(0).speed;
-        drone.setTier(tier);
-        drone.setOps(job.hands().isEmpty() ? tier : ShapeJobs.handOps(job.hands().get(0)));
+        BuildJob.Hand lead = job.hands().isEmpty() ? null : job.hands().get(0);
+        drone.setParts(lead == null ? com.wrights.drone.Loadout.BASIC : new com.wrights.drone.Loadout(lead.rotor, lead.fabricator));
     }
 
     static DroneEntity ensureHand(ServerLevel level, ServerPlayer player, BuildJob job, BuildJob.Hand hand, BlockPos workPos) {
@@ -240,7 +239,7 @@ public final class DroneFleet {
                 }
             }
             WrightportPlaces.removeUnit(player, id);
-            int tier = WrightTier.clamp(hand.speed);
+            int tier = WrightTier.clamp(hand.rotor);
             BlockPos next = WrightHomes.openPort(level, job.min(), job.owner(), reserved);
             DroneEntity drone = null;
             if (hand.entityId != null && level.getEntity(hand.entityId) instanceof DroneEntity found && found.isAlive()) {
@@ -263,7 +262,7 @@ public final class DroneFleet {
             BlockPos where = next != null
                     ? next
                     : (drone != null ? drone.blockPosition() : (hand.lastPos != null ? hand.lastPos : job.min()));
-            BlockPos docked = DockRecovery.recover(level, player, where, id, tier, ShapeJobs.handOps(hand), name);
+            BlockPos docked = DockRecovery.recover(level, player, where, id, new com.wrights.drone.Loadout(hand.rotor, hand.fabricator), name);
             dirty = true;
             if (docked != null) {
                 noteDocked(level.getServer(), id, docked);

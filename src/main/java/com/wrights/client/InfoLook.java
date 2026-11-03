@@ -352,7 +352,7 @@ public final class InfoLook {
 
     private static List<Component> droneLines(DroneEntity drone) {
         List<Component> lines = new ArrayList<>();
-        lines.add(Component.translatable("hud.wrights.info_wright", Component.translatable(com.wrights.drone.WrightTier.nameKey(drone.tier()))));
+        lines.add(Component.translatable("hud.wrights.info_wright", Component.translatable(com.wrights.drone.WrightTier.nameKey(drone.rotor()))));
         BlueprintPayloads.JobLine job = drone.jobId().map(InfoLook::job).orElse(null);
         if (job != null) {
             lines.add(Component.translatable("hud.wrights.info_wright_job", job.name()));

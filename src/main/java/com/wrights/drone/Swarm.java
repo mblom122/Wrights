@@ -2,6 +2,7 @@ package com.wrights.drone;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import com.mojang.serialization.Codec;
@@ -19,36 +20,27 @@ import com.wrights.WrightsConfig;
 import com.wrights.item.ModDataComponents;
 
 /**
- * The drones stored in one wrightport. {@code speed} is flight. {@code power} is how many
- * blocks one operation can touch. {@code opsMigrated} is false on swarms saved before the
- * split, so the old speed tier is copied into power once.
+ * The wrights stored in one wrightport. Each {@link Unit} keeps its fitted parts and its name.
  */
 public record Swarm(List<Unit> units, int assign) {
-    public static final int MAX_SPEED = 5;
-
     /** How many wrights one wrightport may hold. Comes from the server config. */
     public static int capacity() {
         return WrightsConfig.maxWrightsCarried();
     }
     public static final Swarm EMPTY = new Swarm(List.of(), 1);
 
-    public record Unit(UUID id, int speed, int power, String name, boolean opsMigrated) {
+    public record Unit(UUID id, Loadout parts, String name) {
         public Unit {
             name = cleanName(name);
-            power = Mth.clamp(power, WrightTier.BASE, WrightTier.NETHERITE);
+            parts = parts == null ? Loadout.BASIC : parts;
         }
 
-        /** A wright created in code. Operations start where the caller set them, and are not migrated again. */
-        public Unit(UUID id, int speed, int power, String name) {
-            this(id, speed, power, name, true);
+        public int rotor() {
+            return parts.rotor();
         }
 
-        public Unit(UUID id, int speed) {
-            this(id, speed, WrightTier.BASE, "");
-        }
-
-        public Unit(UUID id, int speed, int power) {
-            this(id, speed, power, "");
+        public int fabricator() {
+            return parts.fabricator();
         }
 
         public Component title(int number) {
@@ -70,13 +62,15 @@ public record Swarm(List<Unit> units, int assign) {
         return text;
     }
 
+    /** Reads {@code speed}/{@code power} from units saved before parts; writes only {@code parts}. */
     public static final Codec<Unit> UNIT_CODEC = RecordCodecBuilder.create(instance -> instance.group(
             UUIDUtil.CODEC.fieldOf("id").forGetter(Unit::id),
-            Codec.INT.optionalFieldOf("speed", 1).forGetter(Unit::speed),
-            Codec.INT.optionalFieldOf("power", 0).forGetter(Unit::power),
-            Codec.STRING.optionalFieldOf("name", "").forGetter(Unit::name),
-            Codec.BOOL.optionalFieldOf("ops", false).forGetter(Unit::opsMigrated)
-    ).apply(instance, Unit::new));
+            Loadout.CODEC.optionalFieldOf("parts").forGetter(unit -> Optional.of(unit.parts())),
+            Codec.INT.optionalFieldOf("speed").forGetter(unit -> Optional.empty()),
+            Codec.INT.optionalFieldOf("power").forGetter(unit -> Optional.empty()),
+            Codec.STRING.optionalFieldOf("name", "").forGetter(Unit::name)
+    ).apply(instance, (id, parts, speed, power, name) -> new Unit(id,
+            parts.orElseGet(() -> new Loadout(speed.orElse(WrightTier.BASIC), power.orElse(WrightTier.BASIC))), name)));
 
     public static final Codec<Swarm> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             UNIT_CODEC.listOf().optionalFieldOf("units", List.of()).forGetter(Swarm::units),
@@ -93,26 +87,7 @@ public record Swarm(List<Unit> units, int assign) {
         if (swarm == null) {
             return EMPTY;
         }
-        Swarm migrated = swarm.migrated();
-        if (migrated != swarm) {
-            write(stack, migrated);
-        }
-        return migrated;
-    }
-
-    /** Copies each wright's speed tier into operations the first time an old swarm is read. */
-    public Swarm migrated() {
-        boolean dirty = false;
-        List<Unit> next = new ArrayList<>(units.size());
-        for (Unit unit : units) {
-            if (unit.opsMigrated()) {
-                next.add(unit);
-                continue;
-            }
-            dirty = true;
-            next.add(new Unit(unit.id(), unit.speed(), WrightTier.clamp(unit.speed()), unit.name(), true));
-        }
-        return dirty ? new Swarm(List.copyOf(next), assign) : this;
+        return swarm;
     }
 
     public static void write(ItemStack stack, Swarm swarm) {
@@ -126,38 +101,16 @@ public record Swarm(List<Unit> units, int assign) {
         return Mth.clamp(assign, 1, units.size());
     }
 
-    public List<Integer> speeds(int count) {
-        int n = Math.min(Math.max(0, count), units.size());
-        List<Integer> speeds = new ArrayList<>(n);
-        for (int i = 0; i < n; i++) {
-            speeds.add(Mth.clamp(units.get(i).speed(), WrightTier.BASE, MAX_SPEED));
-        }
-        return speeds;
-    }
-
-    public List<Integer> assignedSpeeds() {
-        int count = assignCount();
-        List<Integer> speeds = new ArrayList<>(count);
-        for (int i = 0; i < count; i++) {
-            speeds.add(Mth.clamp(units.get(i).speed(), WrightTier.BASE, MAX_SPEED));
-        }
-        return speeds;
-    }
-
     public Swarm addUnit() {
-        return addUnit(WrightTier.BASE);
+        return addUnit(Loadout.BASIC, "");
     }
 
-    public Swarm addUnit(int speed) {
-        return addUnit(speed, "");
-    }
-
-    public Swarm addUnit(int speed, String name) {
+    public Swarm addUnit(Loadout parts, String name) {
         if (units.size() >= capacity()) {
             return this;
         }
         List<Unit> next = new ArrayList<>(units);
-        next.add(new Unit(UUID.randomUUID(), Mth.clamp(speed, WrightTier.BASE, MAX_SPEED), WrightTier.BASE, name, true));
+        next.add(new Unit(UUID.randomUUID(), parts, name));
         int keep = assign <= 0 ? 1 : assign;
         return new Swarm(List.copyOf(next), keep);
     }
@@ -168,7 +121,7 @@ public record Swarm(List<Unit> units, int assign) {
             return this;
         }
         List<Unit> next = new ArrayList<>(units);
-        next.add(new Unit(unit.id(), Mth.clamp(unit.speed(), WrightTier.BASE, MAX_SPEED), unit.power(), unit.name(), unit.opsMigrated()));
+        next.add(unit);
         return new Swarm(List.copyOf(next), assign);
     }
 
@@ -209,27 +162,13 @@ public record Swarm(List<Unit> units, int assign) {
         return new Swarm(List.copyOf(next), assign);
     }
 
-    public Swarm withSpeed(int index, int speed) {
-        if (index < 0 || index >= units.size()) {
+    public Swarm withParts(int index, Loadout parts) {
+        if (index < 0 || index >= units.size() || units.get(index).parts().equals(parts)) {
             return this;
         }
         List<Unit> next = new ArrayList<>(units);
         Unit unit = next.get(index);
-        next.set(index, new Unit(unit.id(), Mth.clamp(speed, WrightTier.BASE, MAX_SPEED), unit.power(), unit.name(), unit.opsMigrated()));
-        return new Swarm(List.copyOf(next), assign);
-    }
-
-    public Swarm withPower(int index, int power) {
-        if (index < 0 || index >= units.size()) {
-            return this;
-        }
-        List<Unit> next = new ArrayList<>(units);
-        Unit unit = next.get(index);
-        int nextPower = WrightTier.clamp(power);
-        if (unit.power() == nextPower && unit.opsMigrated()) {
-            return this;
-        }
-        next.set(index, new Unit(unit.id(), unit.speed(), nextPower, unit.name(), true));
+        next.set(index, new Unit(unit.id(), parts, unit.name()));
         return new Swarm(List.copyOf(next), assign);
     }
 
@@ -243,7 +182,7 @@ public record Swarm(List<Unit> units, int assign) {
             return this;
         }
         List<Unit> next = new ArrayList<>(units);
-        next.set(index, new Unit(unit.id(), unit.speed(), unit.power(), nextName, unit.opsMigrated()));
+        next.set(index, new Unit(unit.id(), unit.parts(), nextName));
         return new Swarm(List.copyOf(next), assign);
     }
 

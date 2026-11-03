@@ -277,7 +277,7 @@ public final class WorkPicker {
         boolean nearest = origin != null;
         if (nearest && aimStillOpen(level, player, schematic, job, hand, include, false)) {
             Schematic.Entry aimed = schematic.entry(hand.aim);
-            if (ShapeJobs.inOperationReachFromHover(origin, job.min().offset(aimed.x(), aimed.y(), aimed.z()), ShapeJobs.handOps(hand))) {
+            if (ShapeJobs.inOperationReachFromHover(origin, job.min().offset(aimed.x(), aimed.y(), aimed.z()), ShapeJobs.handFabricator(hand))) {
                 return hand.aim;
             }
             // Flying to a distant aim: grab any ready cell we can place without turning around.
@@ -365,7 +365,7 @@ public final class WorkPicker {
         Vec3 origin = workOrigin(level, job, hand);
         if (origin != null && aimStillOpen(level, player, schematic, job, hand, null, takeOwned)) {
             Schematic.Entry aimed = schematic.entry(hand.aim);
-            if (ShapeJobs.inOperationReachFromHover(origin, job.min().offset(aimed.x(), aimed.y(), aimed.z()), ShapeJobs.handOps(hand))) {
+            if (ShapeJobs.inOperationReachFromHover(origin, job.min().offset(aimed.x(), aimed.y(), aimed.z()), ShapeJobs.handFabricator(hand))) {
                 return hand.aim;
             }
             int local = scanCluster(level, player, schematic, job, hand, origin, JobManager.PLACE_NEAR_SQR, JobManager.CLUSTER_RADIUS, null, takeOwned, true);
@@ -481,7 +481,7 @@ public final class WorkPicker {
                     double dist = entryDistSqr(job, entry, origin);
                     BlockPos cell = job.min().offset(entry.x(), entry.y(), entry.z());
                     if (reachSqr <= JobManager.PLACE_NEAR_SQR) {
-                        if (!ShapeJobs.inOperationReachFromHover(origin, cell, ShapeJobs.handOps(hand))) {
+                        if (!ShapeJobs.inOperationReachFromHover(origin, cell, ShapeJobs.handFabricator(hand))) {
                             continue;
                         }
                     } else if (dist > reachSqr) {
@@ -949,7 +949,7 @@ public final class WorkPicker {
             return -1;
         }
         Vec3 origin = level == null ? null : handOrigin(level, hand);
-        int ops = ShapeJobs.handOps(hand);
+        int fabricator = ShapeJobs.handFabricator(hand);
         int near = -1;
         double nearDist = Double.MAX_VALUE;
         int closest = -1;
@@ -964,7 +964,7 @@ public final class WorkPicker {
             }
             BlockPos pos = job.min().offset(refund.x(), refund.y(), refund.z());
             double dist = origin.distanceToSqr(Vec3.atCenterOf(pos));
-            boolean inHover = ShapeJobs.inOperationReachFromHover(origin, pos, ops)
+            boolean inHover = ShapeJobs.inOperationReachFromHover(origin, pos, fabricator)
                     || dist <= JobManager.PLACE_NEAR_SQR;
             if (inHover && (near < 0 || dist < nearDist || (dist == nearDist && i > near))) {
                 near = i;

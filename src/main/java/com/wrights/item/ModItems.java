@@ -1,8 +1,14 @@
 package com.wrights.item;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.wrights.WrightsMod;
+import com.wrights.drone.PartSlot;
 import com.wrights.drone.WrightTier;
 
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Rarity;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -27,27 +33,28 @@ public final class ModItems {
 
     public static final DeferredItem<WrightItem> WRIGHT = ITEMS.register("wright", () -> new WrightItem(new net.minecraft.world.item.Item.Properties().stacksTo(64)));
 
-    public static final DeferredItem<WrightUpgradeItem> UPGRADE_COPPER = ITEMS.register("wright_upgrade_copper",
-            () -> new WrightUpgradeItem(new net.minecraft.world.item.Item.Properties().stacksTo(64), WrightTier.COPPER));
-    public static final DeferredItem<WrightUpgradeItem> UPGRADE_IRON = ITEMS.register("wright_upgrade_iron",
-            () -> new WrightUpgradeItem(new net.minecraft.world.item.Item.Properties().stacksTo(64), WrightTier.IRON));
-    public static final DeferredItem<WrightUpgradeItem> UPGRADE_GOLD = ITEMS.register("wright_upgrade_gold",
-            () -> new WrightUpgradeItem(new net.minecraft.world.item.Item.Properties().stacksTo(64), WrightTier.GOLD));
-    public static final DeferredItem<WrightUpgradeItem> UPGRADE_DIAMOND = ITEMS.register("wright_upgrade_diamond",
-            () -> new WrightUpgradeItem(new net.minecraft.world.item.Item.Properties().stacksTo(64), WrightTier.DIAMOND));
-    public static final DeferredItem<WrightUpgradeItem> UPGRADE_NETHERITE = ITEMS.register("wright_upgrade_netherite",
-            () -> new WrightUpgradeItem(new net.minecraft.world.item.Item.Properties().stacksTo(64).rarity(Rarity.UNCOMMON), WrightTier.NETHERITE));
+    /** Rotor Assembly Scout (mk1) through Apex (mk5). */
+    public static final List<DeferredItem<WrightPartItem>> ROTORS = parts(PartSlot.ROTOR);
 
-    public static final DeferredItem<WrightUpgradeItem> OPS_COPPER = ITEMS.register("wright_ops_copper",
-            () -> new WrightUpgradeItem(new net.minecraft.world.item.Item.Properties().stacksTo(64), WrightTier.COPPER, true));
-    public static final DeferredItem<WrightUpgradeItem> OPS_IRON = ITEMS.register("wright_ops_iron",
-            () -> new WrightUpgradeItem(new net.minecraft.world.item.Item.Properties().stacksTo(64), WrightTier.IRON, true));
-    public static final DeferredItem<WrightUpgradeItem> OPS_GOLD = ITEMS.register("wright_ops_gold",
-            () -> new WrightUpgradeItem(new net.minecraft.world.item.Item.Properties().stacksTo(64), WrightTier.GOLD, true));
-    public static final DeferredItem<WrightUpgradeItem> OPS_DIAMOND = ITEMS.register("wright_ops_diamond",
-            () -> new WrightUpgradeItem(new net.minecraft.world.item.Item.Properties().stacksTo(64), WrightTier.DIAMOND, true));
-    public static final DeferredItem<WrightUpgradeItem> OPS_NETHERITE = ITEMS.register("wright_ops_netherite",
-            () -> new WrightUpgradeItem(new net.minecraft.world.item.Item.Properties().stacksTo(64).rarity(Rarity.UNCOMMON), WrightTier.NETHERITE, true));
+    /** Fabricator Head Scout (mk1) through Apex (mk5). */
+    public static final List<DeferredItem<WrightPartItem>> FABRICATORS = parts(PartSlot.FABRICATOR);
+
+    /** Metal names the parts were registered under before they were renamed; kept as aliases so saved items load. */
+    private static final String[] RETIRED_TIERS = { "copper", "iron", "gold", "diamond", "netherite" };
+
+    private static List<DeferredItem<WrightPartItem>> parts(PartSlot slot) {
+        List<DeferredItem<WrightPartItem>> parts = new ArrayList<>();
+        for (int tier = WrightTier.SCOUT; tier <= WrightTier.APEX; tier++) {
+            int mark = tier;
+            String id = slot.getSerializedName() + "_mk" + mark;
+            parts.add(ITEMS.register(id, () -> new WrightPartItem(new Item.Properties().stacksTo(64)
+                    .rarity(mark == WrightTier.APEX ? Rarity.UNCOMMON : Rarity.COMMON), slot, mark)));
+            String retired = (slot == PartSlot.ROTOR ? "wright_upgrade_" : "wright_ops_") + RETIRED_TIERS[mark - 1];
+            ITEMS.addAlias(ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, retired),
+                    ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, id));
+        }
+        return List.copyOf(parts);
+    }
 
     private ModItems() {
     }

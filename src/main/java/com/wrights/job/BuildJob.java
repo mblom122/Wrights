@@ -354,19 +354,19 @@ public final class BuildJob {
         }
     }
 
-    public void setCrew(List<Integer> speeds, int sizeX, int sizeY, int sizeZ) {
+    public void setCrew(List<Integer> rotors, int sizeX, int sizeY, int sizeZ) {
         hands.clear();
         crewUnits.clear();
         awaitDrones = false;
         spanX = Math.max(1, sizeX);
         spanY = Math.max(1, sizeY);
         spanZ = Math.max(1, sizeZ);
-        int lanes = speeds.size();
+        int lanes = rotors.size();
         for (int i = 0; i < lanes; i++) {
             Hand hand = new Hand();
             hand.lane = i;
             hand.lanes = lanes;
-            hand.speed = com.wrights.drone.WrightTier.clamp(speeds.get(i));
+            hand.rotor = com.wrights.drone.WrightTier.clamp(rotors.get(i));
             hands.add(hand);
         }
         refreshCrewSource();
@@ -449,13 +449,13 @@ public final class BuildJob {
         awaitDrones = true;
     }
 
-    public List<UUID> resizeCrew(List<Integer> speeds, int sizeX, int sizeY, int sizeZ, boolean rescan) {
+    public List<UUID> resizeCrew(List<Integer> rotors, int sizeX, int sizeY, int sizeZ, boolean rescan) {
         if (hands.isEmpty()) {
             spanX = Math.max(1, sizeX);
             spanY = Math.max(1, sizeY);
             spanZ = Math.max(1, sizeZ);
         }
-        int lanes = speeds.size();
+        int lanes = rotors.size();
         boolean scan = hands.size() != lanes || (hands.isEmpty() && rescan);
         List<UUID> dropped = new ArrayList<>();
         List<Hand> next = new ArrayList<>();
@@ -463,7 +463,7 @@ public final class BuildJob {
             Hand hand = i < hands.size() ? hands.get(i) : new Hand();
             hand.lane = i;
             hand.lanes = lanes;
-            hand.speed = com.wrights.drone.WrightTier.clamp(speeds.get(i));
+            hand.rotor = com.wrights.drone.WrightTier.clamp(rotors.get(i));
             if (scan) {
                 hand.cursor = 0;
                 hand.rescan = true;
@@ -1284,8 +1284,8 @@ public final class BuildJob {
                 CompoundTag handTag = new CompoundTag();
                 handTag.putInt("lane", hand.lane);
                 handTag.putInt("lanes", hand.lanes);
-                handTag.putInt("speed", hand.speed);
-                handTag.putInt("ops", hand.ops);
+                handTag.putInt("rotor", hand.rotor);
+                handTag.putInt("fabricator", hand.fabricator);
                 handTag.putInt("placeCredit", hand.placeCredit);
                 handTag.putInt("cursor", hand.cursor);
                 handTag.putInt("shareFrom", hand.shareFrom);
@@ -1495,8 +1495,8 @@ public final class BuildJob {
                 Hand hand = new Hand();
                 hand.lane = handTag.getInt("lane");
                 hand.lanes = handTag.getInt("lanes");
-                hand.speed = handTag.getInt("speed");
-                hand.ops = handTag.contains("ops") ? handTag.getInt("ops") : hand.speed;
+                hand.rotor = handTag.contains("rotor") ? handTag.getInt("rotor") : handTag.getInt("speed");
+                hand.fabricator = handTag.contains("fabricator") ? handTag.getInt("fabricator") : handTag.getInt("ops");
                 hand.placeCredit = handTag.getInt("placeCredit");
                 hand.cursor = handTag.getInt("cursor");
                 hand.shareFrom = handTag.contains("shareFrom") ? handTag.getInt("shareFrom") : -1;
@@ -1665,9 +1665,10 @@ public final class BuildJob {
     public static final class Hand {
         public int lane;
         public int lanes;
-        public int speed = 1;
-        /** Operations tier for place/mine reach. Separate from {@link #speed} flight. */
-        public int ops;
+        /** Rotor tier; flight speed. */
+        public int rotor;
+        /** Fabricator tier; how many blocks one operation reaches. */
+        public int fabricator;
         /**
          * Shape/Exchange ownership along the long box axis, in local blocks
          * {@code [shareFrom, shareTo)}. {@code -1} until the crew assigns shares.

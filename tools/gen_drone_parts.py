@@ -1,6 +1,5 @@
-"""Generate the 3D drone-part upgrade items: Rotor Assembly (speed) and Fabricator Head (operations).
-
-Registry ids stay wright_upgrade_<tier> / wright_ops_<tier> so saved worlds keep their items.
+"""Generate the 3D drone-part items: Rotor Assembly (rotor_mk1..5, flight) and Fabricator Head
+(fabricator_mk1..5, blocks per operation).
 Run from the repo root: python tools/gen_drone_parts.py
 """
 from __future__ import annotations
@@ -19,13 +18,13 @@ MODELS = ASSETS / "models" / "item"
 
 S = 32
 
-# Registry suffix -> (mark, accent, accent light)
+# Scout..Apex: (mark, accent, accent light)
 TIERS = [
-    ("copper", 1, (255, 150, 40), (255, 214, 140)),
-    ("iron", 2, (80, 236, 110), (196, 255, 204)),
-    ("gold", 3, (60, 206, 255), (190, 240, 255)),
-    ("diamond", 4, (170, 112, 255), (226, 204, 255)),
-    ("netherite", 5, (255, 52, 88), (255, 186, 198)),
+    (1, (255, 150, 40), (255, 214, 140)),
+    (2, (80, 236, 110), (196, 255, 204)),
+    (3, (60, 206, 255), (190, 240, 255)),
+    (4, (170, 112, 255), (226, 204, 255)),
+    (5, (255, 52, 88), (255, 186, 198)),
 ]
 
 GUN = (64, 69, 80)
@@ -567,14 +566,14 @@ def main():
     tex_nozzle()
     tex_nozzle_side()
     write_model("drone_part", PARENT)
-    for name, mark, accent, light in TIERS:
+    for mark, accent, light in TIERS:
         tag = f"mk{mark}"
         tex_blade(tag, accent, light)
         tex_led(tag, accent, light)
         tex_lens(tag, accent, light)
         tex_duct(tag, accent, light)
-        write_model(f"wright_upgrade_{name}", rotor(tag, mark))
-        write_model(f"wright_ops_{name}", fabricator(tag, mark))
+        write_model(f"rotor_mk{mark}", rotor(tag, mark))
+        write_model(f"fabricator_mk{mark}", fabricator(tag, mark))
 
 
 if __name__ == "__main__":

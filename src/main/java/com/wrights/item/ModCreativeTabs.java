@@ -22,16 +22,8 @@ public final class ModCreativeTabs {
                 output.accept(ModItems.BLUEPRINT.get());
                 output.accept(ModItems.BLUEPRINT_FOLDER.get());
                 output.accept(ModItems.WRIGHT.get());
-                output.accept(ModItems.UPGRADE_COPPER.get());
-                output.accept(ModItems.UPGRADE_IRON.get());
-                output.accept(ModItems.UPGRADE_GOLD.get());
-                output.accept(ModItems.UPGRADE_DIAMOND.get());
-                output.accept(ModItems.UPGRADE_NETHERITE.get());
-                output.accept(ModItems.OPS_COPPER.get());
-                output.accept(ModItems.OPS_IRON.get());
-                output.accept(ModItems.OPS_GOLD.get());
-                output.accept(ModItems.OPS_DIAMOND.get());
-                output.accept(ModItems.OPS_NETHERITE.get());
+                ModItems.ROTORS.forEach(part -> output.accept(part.get()));
+                ModItems.FABRICATORS.forEach(part -> output.accept(part.get()));
                 output.accept(ModItems.PERSONAL_WRIGHTPORT.get());
                 output.accept(ModBlocks.WRIGHTPORT_ITEM.get());
             })

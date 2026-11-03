@@ -16,10 +16,12 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
 import com.wrights.drone.HangarOps;
+import com.wrights.drone.PartSlot;
 import com.wrights.drone.Swarm;
 import com.wrights.drone.WrightTier;
 import com.wrights.item.ModItems;
 import com.wrights.item.WrightItem;
+import com.wrights.item.WrightPartItem;
 import com.wrights.network.BlueprintPayloads;
 
 /**
@@ -29,13 +31,18 @@ import com.wrights.network.BlueprintPayloads;
 final class WrightManagePanel {
     private static final int ROW = 16;
     private static final int EXPAND = 148;
+    /** Height of one part slot's block inside an expanded row. */
+    private static final int SECTION = 62;
+    /** Marked dialog: first part row, and the height of each. */
+    private static final int MARKED_TOP = 70;
+    private static final int MARKED_ROW = 30;
     private static final int NONE = 0;
     private static final int ADD = 1;
     private static final int MARKED = 2;
 
     private WrightsButton addButton;
     private WrightsButton removeButton;
-    private WrightsButton upgradeButton;
+    private WrightsButton partsButton;
     private WrightsButton backButton;
     private EditBox countBox;
     private EditBox nameBox;
@@ -124,9 +131,9 @@ final class WrightManagePanel {
 
     void addWidgets(ManageHost screen) {
         place(screen);
-        upgradeButton = new WrightsButton(panelX + 12, panelY + panelH - 54, panelW - 24, 16, Component.translatable("screen.wrights.manage_upgrade_marked"), button -> openMarked(screen));
-        upgradeButton.active = false;
-        screen.addButton(upgradeButton);
+        partsButton = new WrightsButton(panelX + 12, panelY + panelH - 54, panelW - 24, 16, Component.translatable("screen.wrights.manage_parts_marked"), button -> openMarked(screen));
+        partsButton.active = false;
+        screen.addButton(partsButton);
         addButton = new WrightsButton(panelX + 12, panelY + panelH - 32, 100, 16, Component.translatable("screen.wrights.manage_add"), button -> openAdd(screen));
         screen.addButton(addButton);
         removeButton = new WrightsButton(panelX + 120, panelY + panelH - 32, 128, 16, Component.translatable("screen.wrights.manage_remove"), button -> removeSelected(screen), true);
@@ -149,10 +156,10 @@ final class WrightManagePanel {
 
     void layoutChrome(ManageHost screen) {
         place(screen);
-        if (upgradeButton != null) {
-            upgradeButton.setX(panelX + 12);
-            upgradeButton.setY(panelY + panelH - 54);
-            upgradeButton.setWidth(Math.max(40, panelW - 24));
+        if (partsButton != null) {
+            partsButton.setX(panelX + 12);
+            partsButton.setY(panelY + panelH - 54);
+            partsButton.setWidth(Math.max(40, panelW - 24));
         }
         int y = panelY + panelH - 32;
         if (addButton != null) {
@@ -189,9 +196,9 @@ final class WrightManagePanel {
         boolean chrome = dialog == NONE;
         boolean tool = screen.toolHeld();
         int canAdd = allThatFit(screen);
-        if (upgradeButton != null) {
-            upgradeButton.setShown(open && chrome);
-            upgradeButton.active = open && chrome && tool && marked > 0;
+        if (partsButton != null) {
+            partsButton.setShown(open && chrome);
+            partsButton.active = open && chrome && tool && marked > 0;
         }
         if (addButton != null) {
             addButton.setShown(open && chrome);
@@ -242,7 +249,7 @@ final class WrightManagePanel {
                 continue;
             }
             Swarm.Unit unit = swarm.units().get(i);
-            int tier = WrightTier.clamp(unit.speed());
+            int tier = Math.max(unit.rotor(), unit.fabricator());
             if (y + ROW >= listTop && y < listBottom) {
                 boolean mark = checked.contains(unit.id());
                 if (mark || i == expanded) {
@@ -259,48 +266,10 @@ final class WrightManagePanel {
             if (i == expanded) {
                 placeNameBox(screen, swarm, i, y, listTop, listBottom);
                 if (y + EXPAND > listTop && y < listBottom) {
-                    graphics.drawString(
-                            screen.font(),
-                            Component.translatable(
-                                    "screen.wrights.manage_pace",
-                                    WrightTier.flyRateLabel(tier),
-                                    WrightTier.flyRateLabel(WrightTier.BASE)),
-                            listX + 10,
-                            y + 20,
-                            WrightsUi.TEXT,
-                            false);
-                    boolean canDowngrade = tool && tier > WrightTier.BASE;
-                    if (tier < WrightTier.NETHERITE) {
-                        Component next = Component.translatable(WrightTier.nameKey(tier + 1));
-                        graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_next", next), listX + 10, y + 32, WrightsUi.MUTED, false);
-                        boolean have = tool && canAfford(screen, tier, tier + 1);
-                        drawMini(graphics, screen, upX(), y + 46, upW(), Component.translatable("screen.wrights.manage_upgrade", next), have, false, mouseX, mouseY);
-                        drawMini(graphics, screen, downX(barPad), y + 46, downW(barPad), Component.translatable("screen.wrights.manage_remove_upgrade"), canDowngrade, false, mouseX, mouseY);
-                    } else {
-                        graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_best"), listX + 10, y + 32, WrightsUi.MUTED, false);
-                        drawMini(graphics, screen, upX(), y + 46, upW(), Component.translatable("screen.wrights.manage_remove_upgrade"), canDowngrade, false, mouseX, mouseY);
+                    PartSlot[] slots = PartSlot.values();
+                    for (int k = 0; k < slots.length; k++) {
+                        drawPartSection(graphics, screen, unit, slots[k], listX + 10, y + sectionTop(k), mouseX, mouseY, barPad, tool);
                     }
-                    drawTiers(graphics, screen, y + 64, tier, mouseX, mouseY, barPad, tool);
-                    int ops = WrightTier.clamp(unit.power());
-                    graphics.drawString(
-                            screen.font(),
-                            Component.translatable("screen.wrights.manage_ops", WrightTier.operationCap(ops)),
-                            listX + 10,
-                            y + 82,
-                            WrightsUi.TEXT,
-                            false);
-                    boolean opsDown = tool && ops > WrightTier.BASE;
-                    if (ops < WrightTier.NETHERITE) {
-                        Component nextOps = Component.translatable(WrightTier.nameKey(ops + 1));
-                        graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_ops_next", nextOps), listX + 10, y + 94, WrightsUi.MUTED, false);
-                        boolean haveOps = tool && canAffordOps(screen, ops + 1);
-                        drawMini(graphics, screen, upX(), y + 108, upW(), Component.translatable("screen.wrights.manage_ops_upgrade", nextOps), haveOps, false, mouseX, mouseY);
-                        drawMini(graphics, screen, downX(barPad), y + 108, downW(barPad), Component.translatable("screen.wrights.manage_ops_remove"), opsDown, false, mouseX, mouseY);
-                    } else {
-                        graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_ops_best"), listX + 10, y + 94, WrightsUi.MUTED, false);
-                        drawMini(graphics, screen, upX(), y + 108, upW(), Component.translatable("screen.wrights.manage_ops_remove"), opsDown, false, mouseX, mouseY);
-                    }
-                    drawTiers(graphics, screen, y + 126, ops, mouseX, mouseY, barPad, tool);
                 }
                 y += EXPAND;
             }
@@ -400,60 +369,70 @@ final class WrightManagePanel {
             }
             y += ROW;
             if (expanded == i) {
-                int tier = WrightTier.clamp(swarm.units().get(i).speed());
-                if (local >= y + 46 && local < y + 60) {
-                    if (tier < WrightTier.NETHERITE && mouseX >= upX() && mouseX < upX() + upW()) {
-                        if (canAfford(screen, tier, tier + 1) && screen.requireTool()) {
-                            screen.edit(HangarOps.UPGRADE, i);
-                        }
+                PartSlot[] slots = PartSlot.values();
+                for (int k = 0; k < slots.length; k++) {
+                    if (partClick(screen, swarm, i, slots[k], local - y - sectionTop(k), mouseX, barPad)) {
                         return true;
                     }
-                    int downX = tier < WrightTier.NETHERITE ? downX(barPad) : upX();
-                    int downW = tier < WrightTier.NETHERITE ? downW(barPad) : upW();
-                    if (tier > WrightTier.BASE && mouseX >= downX && mouseX < downX + downW) {
-                        if (screen.requireTool()) {
-                            screen.edit(HangarOps.DOWNGRADE, i);
-                        }
-                        return true;
-                    }
-                }
-                if (local >= y + 64 && local < y + 78) {
-                    int picked = tierAt(mouseX, panelX + 18, panelW - 36 - barPad);
-                    if (picked >= WrightTier.BASE && picked != tier && (picked < tier || canAfford(screen, tier, picked))
-                            && screen.requireTool()) {
-                        screen.batch(HangarOps.TO_TIER, picked, new int[] { i });
-                    }
-                    return true;
-                }
-                int ops = WrightTier.clamp(swarm.units().get(i).power());
-                if (local >= y + 108 && local < y + 122) {
-                    if (ops < WrightTier.NETHERITE && mouseX >= upX() && mouseX < upX() + upW()) {
-                        if (canAffordOps(screen, ops + 1) && screen.requireTool()) {
-                            screen.edit(HangarOps.OPS_UPGRADE, i);
-                        }
-                        return true;
-                    }
-                    int opsDownX = ops < WrightTier.NETHERITE ? downX(barPad) : upX();
-                    int opsDownW = ops < WrightTier.NETHERITE ? downW(barPad) : upW();
-                    if (ops > WrightTier.BASE && mouseX >= opsDownX && mouseX < opsDownX + opsDownW) {
-                        if (screen.requireTool()) {
-                            screen.edit(HangarOps.OPS_DOWNGRADE, i);
-                        }
-                        return true;
-                    }
-                }
-                if (local >= y + 126 && local < y + 140) {
-                    int pickedOps = tierAt(mouseX, panelX + 18, panelW - 36 - barPad);
-                    if (pickedOps >= WrightTier.BASE && pickedOps != ops && (pickedOps < ops || canAffordOps(screen, pickedOps))
-                            && screen.requireTool()) {
-                        screen.batch(HangarOps.OPS_TO_TIER, pickedOps, new int[] { i });
-                    }
-                    return true;
                 }
                 y += EXPAND;
             }
         }
         return true;
+    }
+
+    /** Top of part section {@code k} inside an expanded row. */
+    private static int sectionTop(int k) {
+        return 20 + k * SECTION;
+    }
+
+    private void drawPartSection(GuiGraphics graphics, ManageHost screen, Swarm.Unit unit, PartSlot slot, int x, int top,
+            int mouseX, int mouseY, int barPad, boolean tool) {
+        int tier = unit.parts().tier(slot);
+        Component fitted = Component.translatable(slot.fittedKey(tier)).withColor(WrightTier.textColor(tier) & 0xFFFFFF);
+        graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_part", Component.translatable(slot.nameKey()), fitted),
+                x, top, WrightsUi.TEXT, false);
+        graphics.drawString(screen.font(), WrightPartItem.stat(slot, tier), x, top + 12, WrightsUi.MUTED, false);
+        boolean canRemove = tool && tier > WrightTier.BASIC;
+        Component remove = Component.translatable("screen.wrights.manage_take_out");
+        if (tier < WrightTier.APEX) {
+            Component next = Component.translatable("screen.wrights.manage_fit", Component.translatable(WrightTier.nameKey(tier + 1)));
+            drawMini(graphics, screen, upX(), top + 26, upW(), next, tool && have(screen, slot, tier + 1), false, mouseX, mouseY);
+            drawMini(graphics, screen, downX(barPad), top + 26, downW(barPad), remove, canRemove, false, mouseX, mouseY);
+        } else {
+            drawMini(graphics, screen, upX(), top + 26, upW(), remove, canRemove, false, mouseX, mouseY);
+        }
+        drawTierChoices(graphics, screen, panelX + 18, top + 44, panelW - 36 - barPad, slot, tier, mouseX, mouseY, tool);
+    }
+
+    /** {@code local} is the click height inside this part's section. */
+    private boolean partClick(ManageHost screen, Swarm swarm, int index, PartSlot slot, int local, double mouseX, int barPad) {
+        int tier = swarm.units().get(index).parts().tier(slot);
+        if (local >= 26 && local < 40) {
+            if (tier < WrightTier.APEX && mouseX >= upX() && mouseX < upX() + upW()) {
+                if (have(screen, slot, tier + 1) && screen.requireTool()) {
+                    screen.edit(HangarOps.partNext(slot), index);
+                }
+                return true;
+            }
+            int removeX = tier < WrightTier.APEX ? downX(barPad) : upX();
+            int removeW = tier < WrightTier.APEX ? downW(barPad) : upW();
+            if (tier > WrightTier.BASIC && mouseX >= removeX && mouseX < removeX + removeW) {
+                if (screen.requireTool()) {
+                    screen.edit(HangarOps.partRemove(slot), index);
+                }
+                return true;
+            }
+            return false;
+        }
+        if (local >= 44 && local < 58) {
+            int picked = tierAt(mouseX, panelX + 18, panelW - 36 - barPad);
+            if (picked >= WrightTier.BASIC && picked != tier && have(screen, slot, picked) && screen.requireTool()) {
+                screen.batch(HangarOps.partFit(slot), picked, new int[] { index });
+            }
+            return true;
+        }
+        return false;
     }
 
     boolean mouseScrolled(ManageHost screen, double mouseX, double mouseY, double delta) {
@@ -515,7 +494,7 @@ final class WrightManagePanel {
 
     private boolean dialogClick(ManageHost screen, double mouseX, double mouseY) {
         int dw = Math.min(312, Math.max(220, screen.screenWidth() - 24));
-        int dh = dialog == ADD ? 176 : 196;
+        int dh = dialog == ADD ? 176 : 214;
         int dx = (screen.screenWidth() - dw) / 2;
         int dy = (screen.screenHeight() - dh) / 2;
         if (mouseX < dx || mouseY < dy || mouseX >= dx + dw || mouseY >= dy + dh) {
@@ -570,18 +549,23 @@ final class WrightManagePanel {
             return true;
         }
         int tier = tierAt(mouseX, dx + 12, dw - 24);
-        if (tier >= WrightTier.BASE && mouseY >= dy + 78 && mouseY < dy + 94) {
-            screen.batch(HangarOps.TO_TIER, tier, marked(screen, screen.swarm()));
+        PartSlot[] slots = PartSlot.values();
+        for (int k = 0; k < slots.length; k++) {
+            int chips = dy + MARKED_TOP + k * MARKED_ROW + 10;
+            if (tier >= WrightTier.BASIC && mouseY >= chips && mouseY < chips + 14) {
+                screen.batch(HangarOps.partFit(slots[k]), tier, marked(screen, screen.swarm()));
+                closeTop();
+                return true;
+            }
+        }
+        int buttons = dy + MARKED_TOP + slots.length * MARKED_ROW;
+        if (hit(mouseX, mouseY, dx + 12, buttons, dw - 24, 16)) {
+            screen.batch(HangarOps.BEST_PARTS, 0, marked(screen, screen.swarm()));
             closeTop();
             return true;
         }
-        if (hit(mouseX, mouseY, dx + 12, dy + 102, dw - 24, 16)) {
-            screen.batch(HangarOps.MAX_AFFORD, 0, marked(screen, screen.swarm()));
-            closeTop();
-            return true;
-        }
-        if (hit(mouseX, mouseY, dx + 12, dy + 124, dw - 24, 16)) {
-            screen.batch(HangarOps.DOWN_ONE, 0, marked(screen, screen.swarm()));
+        if (hit(mouseX, mouseY, dx + 12, buttons + 22, dw - 24, 16)) {
+            screen.batch(HangarOps.STRIP_MARKED, 0, marked(screen, screen.swarm()));
             closeTop();
             return true;
         }
@@ -590,7 +574,7 @@ final class WrightManagePanel {
 
     private void renderDialog(ManageHost screen, GuiGraphics graphics, Swarm swarm, int mouseX, int mouseY) {
         int dw = Math.min(312, Math.max(220, screen.screenWidth() - 24));
-        int dh = dialog == ADD ? 176 : 196;
+        int dh = dialog == ADD ? 176 : 214;
         int dx = (screen.screenWidth() - dw) / 2;
         int dy = (screen.screenHeight() - dh) / 2;
         graphics.fill(0, 0, screen.screenWidth(), screen.screenHeight(), 0x88060C14);
@@ -631,27 +615,27 @@ final class WrightManagePanel {
                 hintY += 10;
             }
             boolean tool = screen.toolHeld();
-            drawTierChoices(graphics, screen, dx + 12, dy + 78, dw - 24, -1, mouseX, mouseY, tool);
-            drawMini(graphics, screen, dx + 12, dy + 102, dw - 24, Component.translatable("screen.wrights.manage_max"), tool, false, mouseX, mouseY);
-            drawMini(graphics, screen, dx + 12, dy + 124, dw - 24, Component.translatable("screen.wrights.manage_down_one"), tool, false, mouseX, mouseY);
+            PartSlot[] slots = PartSlot.values();
+            for (int k = 0; k < slots.length; k++) {
+                int top = dy + MARKED_TOP + k * MARKED_ROW;
+                graphics.drawString(screen.font(), Component.translatable(slots[k].nameKey()), dx + 12, top, WrightsUi.TEXT, false);
+                drawTierChoices(graphics, screen, dx + 12, top + 10, dw - 24, slots[k], -1, mouseX, mouseY, tool);
+            }
+            int buttons = dy + MARKED_TOP + slots.length * MARKED_ROW;
+            drawMini(graphics, screen, dx + 12, buttons, dw - 24, Component.translatable("screen.wrights.manage_best_parts"), tool, false, mouseX, mouseY);
+            drawMini(graphics, screen, dx + 12, buttons + 22, dw - 24, Component.translatable("screen.wrights.manage_strip"), tool, false, mouseX, mouseY);
         }
         drawMini(graphics, screen, dx + dw - 78, dy + dh - 26, 66, Component.translatable("screen.wrights.manage_cancel"), true, false, mouseX, mouseY);
     }
 
-    private void drawTiers(GuiGraphics graphics, ManageHost screen, int y, int current, int mouseX, int mouseY, int barPad, boolean tool) {
-        drawTierChoices(graphics, screen, panelX + 18, y, panelW - 36 - barPad, current, mouseX, mouseY, tool);
-    }
-
-    private void drawTierChoices(GuiGraphics graphics, ManageHost screen, int x, int y, int width, int current, int mouseX, int mouseY, boolean tool) {
+    private void drawTierChoices(GuiGraphics graphics, ManageHost screen, int x, int y, int width, PartSlot slot, int current,
+            int mouseX, int mouseY, boolean tool) {
         int gap = 4;
-        int steps = WrightTier.NETHERITE - WrightTier.BASE;
+        int steps = WrightTier.APEX - WrightTier.BASIC;
         int chip = (width - gap * steps) / (steps + 1);
-        for (int tier = WrightTier.BASE; tier <= WrightTier.NETHERITE; tier++) {
-            int chipX = x + (tier - WrightTier.BASE) * (chip + gap);
-            boolean enabled = tool && (current < WrightTier.BASE || tier != current);
-            if (enabled && current >= WrightTier.BASE && tier > current) {
-                enabled = canAfford(screen, current, tier);
-            }
+        for (int tier = WrightTier.BASIC; tier <= WrightTier.APEX; tier++) {
+            int chipX = x + (tier - WrightTier.BASIC) * (chip + gap);
+            boolean enabled = tool && tier != current && (current < WrightTier.BASIC || have(screen, slot, tier));
             drawMini(graphics, screen, chipX, y, chip, Component.translatable(WrightTier.nameKey(tier)), enabled || tier == current, tier == current, mouseX, mouseY);
         }
     }
@@ -662,7 +646,7 @@ final class WrightManagePanel {
 
     private int tierAt(double mouseX, int x, int width) {
         int gap = 4;
-        int steps = WrightTier.NETHERITE - WrightTier.BASE;
+        int steps = WrightTier.APEX - WrightTier.BASIC;
         int chip = (width - gap * steps) / (steps + 1);
         if (chip <= 0 || mouseX < x) {
             return -1;
@@ -675,7 +659,7 @@ final class WrightManagePanel {
         if (mouseX >= chipX + chip) {
             return -1;
         }
-        return WrightTier.BASE + index;
+        return WrightTier.BASIC + index;
     }
 
     private void place(ManageHost screen) {
@@ -905,28 +889,16 @@ final class WrightManagePanel {
         return screen.minecraft().player.getInventory().countItem(item);
     }
 
-    /** Destination operations item only — intermediate steps are not required. */
-    private static boolean canAffordOps(ManageHost screen, int target) {
-        if (target <= WrightTier.BASE) {
+    /** True when the {@code tier} part of {@code slot} is held, stored, or craftable. Basic needs nothing. */
+    private static boolean have(ManageHost screen, PartSlot slot, int tier) {
+        Item part = slot.item(tier);
+        if (part == null) {
             return true;
         }
         if (screen.minecraft().player != null && screen.minecraft().player.getAbilities().instabuild) {
             return true;
         }
-        Item upgrade = WrightTier.operationItem(target);
-        return upgrade == null || count(screen, upgrade) > 0 || digitalStock(upgrade) > 0L || digitalCraftable(upgrade);
-    }
-
-    /** Destination upgrade only — intermediate steps are not required. */
-    private static boolean canAfford(ManageHost screen, int tier, int target) {
-        if (target <= tier) {
-            return true;
-        }
-        if (screen.minecraft().player != null && screen.minecraft().player.getAbilities().instabuild) {
-            return true;
-        }
-        Item upgrade = WrightTier.upgradeItem(target);
-        return upgrade == null || count(screen, upgrade) > 0 || digitalStock(upgrade) > 0L || digitalCraftable(upgrade);
+        return count(screen, part) > 0 || digitalStock(part) > 0L || digitalCraftable(part);
     }
 
     private static BlueprintPayloads.DigitalInfoLine digitalLine(Item item) {
@@ -953,8 +925,8 @@ final class WrightManagePanel {
     }
 
     private void hideChrome() {
-        if (upgradeButton != null) {
-            upgradeButton.setShown(false);
+        if (partsButton != null) {
+            partsButton.setShown(false);
         }
         if (addButton != null) {
             addButton.setShown(false);

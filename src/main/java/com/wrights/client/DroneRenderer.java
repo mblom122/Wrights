@@ -40,7 +40,7 @@ public class DroneRenderer extends EntityRenderer<DroneEntity> {
         pose.scale(SCALE, SCALE, SCALE);
         // Model space is 0..16 with the skids at y 3.4; center it and stand it on the origin.
         pose.translate(-0.5F, -3.4F / 16.0F, -0.5F);
-        PartModels.render(pose, buffers, PartModels.DRONE_BODY, light, WrightTier.modelColor(entity.tier()));
+        PartModels.render(pose, buffers, PartModels.DRONE_BODY, light, WrightTier.modelColor(entity.rotor()));
         float spin = age * 40.0F;
         for (int i = 0; i < PODS.length; i++) {
             pose.pushPose();

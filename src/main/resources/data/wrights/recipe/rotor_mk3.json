@@ -17,11 +17,11 @@
       "item": "minecraft:redstone"
     },
     "P": {
-      "item": "wrights:wright_upgrade_iron"
+      "item": "wrights:rotor_mk2"
     }
   },
   "result": {
-    "id": "wrights:wright_upgrade_gold",
+    "id": "wrights:rotor_mk3",
     "count": 1
   }
 }

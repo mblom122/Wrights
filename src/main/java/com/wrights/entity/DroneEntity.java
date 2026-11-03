@@ -32,7 +32,8 @@ import com.wrights.schematic.SchematicLibrary;
 
 public class DroneEntity extends Entity {
     private static final EntityDataAccessor<String> JOB_ID = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.STRING);
-    private static final EntityDataAccessor<Integer> TIER = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> ROTOR = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> FABRICATOR = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<ItemStack> CARRIED = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.ITEM_STACK);
     private static final EntityDataAccessor<ItemStack> CURRENT_BLOCK = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.ITEM_STACK);
     private static final EntityDataAccessor<ItemStack> NEXT_BLOCK = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.ITEM_STACK);
@@ -128,7 +129,7 @@ public class DroneEntity extends Entity {
         this.stranded = false;
         ServerPlayer player = this.ownerId == null ? null : server.getServer().getPlayerList().getPlayer(this.ownerId);
         BlockPos where = this.homePort != null ? this.homePort : this.blockPosition();
-        BlockPos docked = com.wrights.drone.DockRecovery.recover(server, player, where, this.unitId, this.tier(), this.ops(), this.unitName);
+        BlockPos docked = com.wrights.drone.DockRecovery.recover(server, player, where, this.unitId, parts(), this.unitName);
         if (this.unitId == null) {
             return;
         }
@@ -295,7 +296,8 @@ public class DroneEntity extends Entity {
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         builder.define(JOB_ID, "");
-        builder.define(TIER, com.wrights.drone.WrightTier.BASE);
+        builder.define(ROTOR, com.wrights.drone.WrightTier.BASIC);
+        builder.define(FABRICATOR, com.wrights.drone.WrightTier.BASIC);
         builder.define(CARRIED, ItemStack.EMPTY);
         builder.define(CURRENT_BLOCK, ItemStack.EMPTY);
         builder.define(NEXT_BLOCK, ItemStack.EMPTY);
@@ -448,23 +450,23 @@ public class DroneEntity extends Entity {
         setWorkStatus(ItemStack.EMPTY, ItemStack.EMPTY, WAIT_NONE);
     }
 
-    public int tier() {
-        return com.wrights.drone.WrightTier.clamp(this.entityData.get(TIER));
+    /** Rotor tier; sets flight speed and which rotors are drawn. */
+    public int rotor() {
+        return com.wrights.drone.WrightTier.clamp(this.entityData.get(ROTOR));
     }
 
-    public void setTier(int tier) {
-        this.entityData.set(TIER, com.wrights.drone.WrightTier.clamp(tier));
+    /** Fabricator tier; sets operation reach and which fabricator head is drawn. */
+    public int fabricator() {
+        return com.wrights.drone.WrightTier.clamp(this.entityData.get(FABRICATOR));
     }
 
-    /** Operations tier carried only so a lost dock can restore it. -1 means "use the speed tier" (old flights). */
-    private int ops = -1;
-
-    public int ops() {
-        return this.ops < 0 ? tier() : com.wrights.drone.WrightTier.clamp(this.ops);
+    public com.wrights.drone.Loadout parts() {
+        return new com.wrights.drone.Loadout(rotor(), fabricator());
     }
 
-    public void setOps(int ops) {
-        this.ops = com.wrights.drone.WrightTier.clamp(ops);
+    public void setParts(com.wrights.drone.Loadout parts) {
+        this.entityData.set(ROTOR, parts.rotor());
+        this.entityData.set(FABRICATOR, parts.fabricator());
     }
 
     public Optional<UUID> jobId() {
@@ -498,7 +500,7 @@ public class DroneEntity extends Entity {
         if (!blockHome && distSqr < 25.0D) {
             return 0.5D;
         }
-        double step = WrightTier.flyClose(this.tier());
+        double step = WrightTier.flyClose(this.rotor());
         if (distSqr > 64.0D) {
             step *= 2.1D;
         }
@@ -604,11 +606,10 @@ public class DroneEntity extends Entity {
         if (tag.hasUUID("JobId")) {
             setJobId(tag.getUUID("JobId"));
         }
-        if (tag.contains("Tier")) {
-            setTier(tag.getInt("Tier"));
-        }
-        if (tag.contains("Ops")) {
-            setOps(tag.getInt("Ops"));
+        if (tag.contains("Parts")) {
+            com.wrights.drone.Loadout.CODEC.parse(net.minecraft.nbt.NbtOps.INSTANCE, tag.get("Parts")).result().ifPresent(this::setParts);
+        } else if (tag.contains("Tier")) {
+            setParts(new com.wrights.drone.Loadout(tag.getInt("Tier"), tag.contains("Ops") ? tag.getInt("Ops") : tag.getInt("Tier")));
         }
         setReturning(tag.getBoolean("Returning"));
         if (tag.hasUUID("Owner")) {
@@ -633,10 +634,7 @@ public class DroneEntity extends Entity {
     @Override
     protected void addAdditionalSaveData(CompoundTag tag) {
         jobId().ifPresent(id -> tag.putUUID("JobId", id));
-        tag.putInt("Tier", tier());
-        if (this.ops >= 0) {
-            tag.putInt("Ops", this.ops);
-        }
+        com.wrights.drone.Loadout.CODEC.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, parts()).result().ifPresent(parts -> tag.put("Parts", parts));
         tag.putBoolean("Returning", returning());
         if (this.ownerId != null) {
             tag.putUUID("Owner", this.ownerId);
@@ -661,7 +659,7 @@ public class DroneEntity extends Entity {
     private void finishReturn(ServerLevel level, ServerPlayer player, BlockPos where) {
         if (this.stranded) {
             this.stranded = false;
-            BlockPos docked = com.wrights.drone.DockRecovery.recover(level, player, where, this.unitId, this.tier(), this.ops(), this.unitName);
+            BlockPos docked = com.wrights.drone.DockRecovery.recover(level, player, where, this.unitId, parts(), this.unitName);
             if (this.unitId != null) {
                 if (docked != null) {
                     com.wrights.job.DroneFleet.noteDocked(level.getServer(), this.unitId, docked);

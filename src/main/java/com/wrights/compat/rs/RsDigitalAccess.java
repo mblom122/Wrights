@@ -38,7 +38,6 @@ import com.refinedmods.refinedstorage.common.api.support.network.item.NetworkIte
 import com.refinedmods.refinedstorage.common.controller.ControllerBlockEntity;
 import com.refinedmods.refinedstorage.common.support.resource.ItemResource;
 
-import com.wrights.drone.WrightTier;
 import com.wrights.item.ModItems;
 import com.wrights.item.WrightItem;
 import com.wrights.storage.DigitalAccess;
@@ -150,8 +149,8 @@ public final class RsDigitalAccess implements DigitalAccess {
             return true;
         }
         if (item == ModItems.WRIGHT.get()) {
-            for (int tier = WrightTier.BASE; tier <= WrightTier.NETHERITE; tier++) {
-                if (matchesCraft(crafting, ItemResource.ofItemStack(WrightItem.stack(tier, 1)))) {
+            for (ItemStack variant : WrightItem.variants()) {
+                if (matchesCraft(crafting, ItemResource.ofItemStack(variant))) {
                     return true;
                 }
             }
@@ -293,8 +292,8 @@ public final class RsDigitalAccess implements DigitalAccess {
     }
 
     @Override
-    public List<Integer> extractWrights(ServerPlayer player, ServerLevel level, GlobalPos pos, int count) {
-        List<Integer> tiers = new ArrayList<>();
+    public List<ItemStack> extractWrights(ServerPlayer player, ServerLevel level, GlobalPos pos, int count) {
+        List<ItemStack> tiers = new ArrayList<>();
         Network network = network(level, pos);
         if (network == null || count <= 0) {
             return tiers;
@@ -317,8 +316,7 @@ public final class RsDigitalAccess implements DigitalAccess {
             if (storage.extract(found, 1L, Action.EXECUTE, actor) <= 0L) {
                 break;
             }
-            ItemStack stack = found.toItemStack();
-            tiers.add(WrightItem.tier(stack));
+            tiers.add(found.toItemStack());
         }
         return tiers;
     }
@@ -333,8 +331,8 @@ public final class RsDigitalAccess implements DigitalAccess {
             return plain;
         }
         if (item == ModItems.WRIGHT.get()) {
-            for (int tier = WrightTier.BASE; tier <= WrightTier.NETHERITE; tier++) {
-                ItemResource keyed = ItemResource.ofItemStack(WrightItem.stack(tier, 1));
+            for (ItemStack variant : WrightItem.variants()) {
+                ItemResource keyed = ItemResource.ofItemStack(variant);
                 if (matchesCraft(crafting, keyed)) {
                     return keyed;
                 }

@@ -15,7 +15,6 @@ import net.neoforged.fml.ModList;
 
 import com.wrights.util.Messages;
 
-import com.wrights.drone.WrightTier;
 
 /**
  * Soft gate for AE2 / Refined Storage. Core code only talks to this class; adapters are
@@ -183,7 +182,7 @@ public final class DigitalNetworks {
                 && access.requestCraft(player, level, link.pos(), item, amount);
     }
 
-    public static List<Integer> extractWrights(ServerPlayer player, ServerLevel level, DigitalLink link, int count) {
+    public static List<net.minecraft.world.item.ItemStack> extractWrights(ServerPlayer player, ServerLevel level, DigitalLink link, int count) {
         if (count <= 0 || link == null || !link.bound()) {
             return List.of();
         }
@@ -191,12 +190,7 @@ public final class DigitalNetworks {
         if (access == null || !access.online(level, link.pos())) {
             return List.of();
         }
-        List<Integer> tiers = access.extractWrights(player, level, link.pos(), count);
-        List<Integer> clamped = new ArrayList<>(tiers.size());
-        for (int tier : tiers) {
-            clamped.add(WrightTier.clamp(tier));
-        }
-        return clamped;
+        return access.extractWrights(player, level, link.pos(), count);
     }
 
     public static ServerLevel levelOf(ServerPlayer player, GlobalPos pos) {

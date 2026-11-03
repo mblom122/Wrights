@@ -416,7 +416,7 @@ public class JobDroneScreen extends Screen {
                 assigned.add(Entry.assigned(
                         unit,
                         label,
-                        found == null ? 0 : WrightTier.clamp(found.speed()),
+                        found == null ? 0 : WrightTier.clamp(found.rotor()),
                         hand,
                         job.hold(),
                         "screen.wrights.drone_remove"));
@@ -443,7 +443,7 @@ public class JobDroneScreen extends Screen {
             }
             String other = otherJob(unit.id());
             String label = unit.title(i + 1).getString();
-            int tier = WrightTier.clamp(unit.speed());
+            int tier = WrightTier.clamp(unit.rotor());
             if (other == null) {
                 // Worn-port wrights reach the job only while you are in range of it.
                 if (inRange) {

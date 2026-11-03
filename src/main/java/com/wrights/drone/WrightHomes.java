@@ -492,15 +492,15 @@ public final class WrightHomes {
         return count;
     }
 
-    /** Highest operations tier among units that pass {@code include}. Netherite when none are visible. */
-    public static int bestOps(Player player, Predicate<UUID> include) {
+    /** Highest fabricator tier among units that pass {@code include}. Apex when none are visible. */
+    public static int bestFabricator(Player player, Predicate<UUID> include) {
         int best = -1;
         if (player == null) {
-            return WrightTier.NETHERITE;
+            return WrightTier.APEX;
         }
         for (Swarm.Unit unit : Wrightports.swarm(player).units()) {
             if (include.test(unit.id())) {
-                best = Math.max(best, WrightTier.clamp(unit.power()));
+                best = Math.max(best, WrightTier.clamp(unit.fabricator()));
             }
         }
         Level level = player.level();
@@ -531,13 +531,13 @@ public final class WrightHomes {
                     }
                     for (Swarm.Unit unit : port.swarm().units()) {
                         if (include.test(unit.id())) {
-                            best = Math.max(best, WrightTier.clamp(unit.power()));
+                            best = Math.max(best, WrightTier.clamp(unit.fabricator()));
                         }
                     }
                 }
             }
         }
-        return best < 0 ? WrightTier.NETHERITE : best;
+        return best < 0 ? WrightTier.APEX : best;
     }
 
     public static List<FreeWright> freeNear(ServerPlayer player, Predicate<UUID> free, int limit) {

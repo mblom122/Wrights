@@ -392,7 +392,7 @@ public class DroneRosterScreen extends Screen {
                 where = where + " · " + Component.translatable(statusKey).getString();
             }
             int whereColor = "screen.wrights.roster_flying".equals(statusKey) ? WrightsUi.TEAL : (statusKey == null || "menu.wrights.running".equals(statusKey) ? WrightsUi.MUTED : WrightsUi.GOLD);
-            WrightRow row = new WrightRow(unit.id(), unit.title(i + 1).getString(), WrightTier.clamp(unit.speed()), where == null ? "" : where, whereColor);
+            WrightRow row = new WrightRow(unit.id(), unit.title(i + 1).getString(), WrightTier.clamp(unit.rotor()), where == null ? "" : where, whereColor);
             if (where == null) {
                 freeRows.add(row);
             } else {

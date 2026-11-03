@@ -389,11 +389,11 @@ public final class CrewRoster {
             sizeY = Math.max(1, job.spanY());
             sizeZ = Math.max(1, job.spanZ());
         }
-        int useful = WrightsConfig.usefulCrewFor(blocks, sizeX, sizeY, sizeZ, WrightTier.NETHERITE);
+        int useful = WrightsConfig.usefulCrewFor(blocks, sizeX, sizeY, sizeZ, WrightTier.APEX);
         return Math.min(useful, WrightsConfig.maxWrightsPerJob(job));
     }
 
-    static int crewRoom(Schematic schematic, BuildJob job, int ops) {
+    static int crewRoom(Schematic schematic, BuildJob job, int fabricator) {
         int blocks;
         if (job.kind() == BuildJob.Kind.SHAPE || schematic == null) {
             blocks = Math.max(1, job.total());
@@ -424,7 +424,7 @@ public final class CrewRoster {
             sizeY = Math.max(1, job.spanY());
             sizeZ = Math.max(1, job.spanZ());
         }
-        int useful = WrightsConfig.usefulCrewFor(blocks, sizeX, sizeY, sizeZ, ops);
+        int useful = WrightsConfig.usefulCrewFor(blocks, sizeX, sizeY, sizeZ, fabricator);
         return Math.min(useful, WrightsConfig.maxWrightsPerJob(job));
     }
 
@@ -700,11 +700,11 @@ public final class CrewRoster {
     }
 
     private static void fitCrew(ServerPlayer player, SchematicLibrary library, BuildJob job, List<UUID> ids) {
-        List<Integer> speeds = new ArrayList<>();
-        List<Integer> powers = new ArrayList<>();
+        List<Integer> rotors = new ArrayList<>();
+        List<Integer> fabricators = new ArrayList<>();
         List<UUID> kept = new ArrayList<>();
         List<BlockPos> homes = new ArrayList<>();
-        int bestOps = WrightTier.BASE;
+        int bestFabricator = WrightTier.BASIC;
         ServerLevel jobLevel = player.getServer().getLevel(job.dimension());
         for (UUID unitId : ids) {
             DroneFleet.releaseHomeWaiter(player, library, unitId, job.id());
@@ -712,15 +712,15 @@ public final class CrewRoster {
             if (found == null) {
                 continue;
             }
-            speeds.add(WrightTier.clamp(found.unit().speed()));
-            int power = WrightTier.clamp(found.unit().power());
-            powers.add(power);
-            bestOps = Math.max(bestOps, power);
+            rotors.add(WrightTier.clamp(found.unit().rotor()));
+            int fabricator = WrightTier.clamp(found.unit().fabricator());
+            fabricators.add(fabricator);
+            bestFabricator = Math.max(bestFabricator, fabricator);
             kept.add(unitId);
             homes.add(found.homePort());
         }
         Schematic schematic = job.schematicId() == null ? null : library.schematic(job.schematicId()).orElse(null);
-        int room = kept.isEmpty() ? 0 : crewRoom(schematic, job, bestOps);
+        int room = kept.isEmpty() ? 0 : crewRoom(schematic, job, bestFabricator);
         // Never eject wrights already on the job when Manage adds one — only cap growth.
         int already = 0;
         for (UUID unitId : kept) {
@@ -735,9 +735,9 @@ public final class CrewRoster {
             }
             while (kept.size() > limit) {
                 kept.remove(kept.size() - 1);
-                speeds.remove(speeds.size() - 1);
-                if (!powers.isEmpty()) {
-                    powers.remove(powers.size() - 1);
+                rotors.remove(rotors.size() - 1);
+                if (!fabricators.isEmpty()) {
+                    fabricators.remove(fabricators.size() - 1);
                 }
                 if (!homes.isEmpty()) {
                     homes.remove(homes.size() - 1);
@@ -779,9 +779,9 @@ public final class CrewRoster {
             }
             int carried = job.hasCrew() ? 0 : job.cursor();
             if (schematic == null) {
-                dropped = job.resizeCrew(speeds, sizeX, sizeY, sizeZ, job.hasCrew() || job.cursor() > 0);
+                dropped = job.resizeCrew(rotors, sizeX, sizeY, sizeZ, job.hasCrew() || job.cursor() > 0);
             } else {
-                job.setCrew(speeds, sizeX, sizeY, sizeZ);
+                job.setCrew(rotors, sizeX, sizeY, sizeZ);
                 if (carried > 0) {
                     for (BuildJob.Hand hand : job.hands()) {
                         hand.cursor = carried;
@@ -792,7 +792,7 @@ public final class CrewRoster {
         } else {
             int before = job.hands().size();
             HandSlices.ensureSlices(job, true);
-            while (job.hands().size() > speeds.size()) {
+            while (job.hands().size() > rotors.size()) {
                 BuildJob.Hand removed = job.hands().remove(job.hands().size() - 1);
                 if (removed.entityId != null) {
                     dropped.add(removed.entityId);
@@ -801,7 +801,7 @@ public final class CrewRoster {
                     job.hands().get(0).slices.addAll(removed.slices);
                 }
             }
-            while (job.hands().size() < speeds.size()) {
+            while (job.hands().size() < rotors.size()) {
                 BuildJob.Hand extra = new BuildJob.Hand();
                 extra.idle = true;
                 job.hands().add(extra);
@@ -810,9 +810,9 @@ public final class CrewRoster {
                 BuildJob.Hand hand = job.hands().get(i);
                 hand.lane = i;
                 hand.lanes = job.hands().size();
-                hand.speed = WrightTier.clamp(speeds.get(i));
-                if (i < powers.size()) {
-                    hand.ops = powers.get(i);
+                hand.rotor = WrightTier.clamp(rotors.get(i));
+                if (i < fabricators.size()) {
+                    hand.fabricator = fabricators.get(i);
                 }
             }
             if (job.hands().size() != before) {
@@ -827,8 +827,8 @@ public final class CrewRoster {
         job.setCrewUnits(kept);
         for (int i = 0; i < job.hands().size() && i < homes.size(); i++) {
             job.hands().get(i).homePort = homes.get(i);
-            if (i < powers.size()) {
-                job.hands().get(i).ops = powers.get(i);
+            if (i < fabricators.size()) {
+                job.hands().get(i).fabricator = fabricators.get(i);
             }
         }
     }
@@ -1051,7 +1051,7 @@ public final class CrewRoster {
             Messages.actionBar(player, "message.wrights.drone_block_cap", 0);
             return false;
         }
-        int room = crewRoom(schematic, job, WrightHomes.bestOps(player, id -> !claimedByOther(player, library, job.id(), id)));
+        int room = crewRoom(schematic, job, WrightHomes.bestFabricator(player, id -> !claimedByOther(player, library, job.id(), id)));
         int wanted = requested > 0 ? Math.min(requested, room) : room;
         ServerLevel level = player.getServer().getLevel(job.dimension());
         List<WrightHomes.FreeWright> units = freeUnits(player, library, job, wanted);
@@ -1071,18 +1071,18 @@ public final class CrewRoster {
             }
             return false;
         }
-        List<Integer> speeds = new ArrayList<>();
+        List<Integer> rotors = new ArrayList<>();
         List<UUID> ids = new ArrayList<>();
         for (WrightHomes.FreeWright unit : units) {
             DroneFleet.releaseHomeWaiter(player, library, unit.unit().id(), job.id());
-            speeds.add(WrightTier.clamp(unit.unit().speed()));
+            rotors.add(WrightTier.clamp(unit.unit().rotor()));
             ids.add(unit.unit().id());
         }
-        job.setCrew(speeds, sizeX, sizeY, sizeZ);
+        job.setCrew(rotors, sizeX, sizeY, sizeZ);
         job.setCrewUnits(ids);
         for (int i = 0; i < job.hands().size() && i < units.size(); i++) {
             job.hands().get(i).homePort = units.get(i).homePort();
-            job.hands().get(i).ops = WrightTier.clamp(units.get(i).unit().power());
+            job.hands().get(i).fabricator = WrightTier.clamp(units.get(i).unit().fabricator());
         }
         job.setCrewQuota(ids.size());
         HandSlices.evenOut(job, schematic);

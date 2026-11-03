@@ -187,7 +187,7 @@ public final class ShapeJobs {
         int workBlocks = exchangeWork != null ? Math.max(1, exchangeWork.blockCount()) : Math.max(1, job.total());
         int room = Math.min(
                 WrightsConfig.usefulCrewFor(workBlocks, job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(),
-                        WrightHomes.bestOps(player, id -> !CrewRoster.claimedByOther(player, SchematicLibrary.get(player.getServer()), null, id))),
+                        WrightHomes.bestFabricator(player, id -> !CrewRoster.claimedByOther(player, SchematicLibrary.get(player.getServer()), null, id))),
                 WrightsConfig.maxWrightsPerJob(job));
         int wanted = drones > 0 ? Math.min(drones, room) : room;
         wanted = Math.max(1, wanted);
@@ -373,11 +373,11 @@ public final class ShapeJobs {
     }
 
     /**
-     * How many hovers this shape needs at {@code ops}. Only for small shapes: a full cover of a
+     * How many hovers this shape needs at {@code fabricator}. Only for small shapes: a full cover of a
      * 16³ box is hundreds of milliseconds and would hitch the server. {@code -1} means "too big,
      * use the cheap grid estimate".
      */
-    private static int planShapeStations(BuildJob job, int ops) {
+    private static int planShapeStations(BuildJob job, int fabricator) {
         if (job == null || job.kind() != BuildJob.Kind.SHAPE) {
             return -1;
         }
@@ -394,8 +394,8 @@ public final class ShapeJobs {
                 job.shapeHollow(),
                 job.shapeAxis(),
                 job.shapePivot());
-        int reach = WrightTier.operationReachSqr(ops);
-        int cap = Math.max(1, WrightTier.operationCap(ops));
+        int reach = WrightTier.operationReachSqr(fabricator);
+        int cap = Math.max(1, WrightTier.operationCap(fabricator));
         int[] xs = new int[total];
         int[] ys = new int[total];
         int[] zs = new int[total];
@@ -504,15 +504,15 @@ public final class ShapeJobs {
     private static boolean assignShapeCrew(ServerPlayer player, BuildJob job, int requested) {
         SchematicLibrary library = SchematicLibrary.get(player.getServer());
         CrewRoster.bindCrewIds(player, library);
-        int bestOps = WrightHomes.bestOps(player, id -> !CrewRoster.claimedByOther(player, library, job.id(), id));
-        int stations = smallBoxCrew(job, bestOps);
+        int bestFabricator = WrightHomes.bestFabricator(player, id -> !CrewRoster.claimedByOther(player, library, job.id(), id));
+        int stations = smallBoxCrew(job, bestFabricator);
         if (stations <= 0) {
-            stations = planShapeStations(job, bestOps);
+            stations = planShapeStations(job, bestFabricator);
         }
         int fitted = stations > 0
                 ? stations
                 : WrightsConfig.usefulCrewFor(
-                        Math.max(1, job.total()), job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(), bestOps);
+                        Math.max(1, job.total()), job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(), bestFabricator);
         int room = Math.min(fitted, WrightsConfig.maxWrightsPerJob(job));
         int wanted = Math.max(1, Math.min(requested > 0 ? requested : room, room));
         List<WrightHomes.FreeWright> units = CrewRoster.freeUnits(player, library, job, wanted);
@@ -523,18 +523,18 @@ public final class ShapeJobs {
             }
             return false;
         }
-        List<Integer> speeds = new ArrayList<>();
+        List<Integer> rotors = new ArrayList<>();
         List<UUID> ids = new ArrayList<>();
         for (WrightHomes.FreeWright unit : units) {
             DroneFleet.releaseHomeWaiter(player, library, unit.unit().id(), job.id());
-            speeds.add(WrightTier.clamp(unit.unit().speed()));
+            rotors.add(WrightTier.clamp(unit.unit().rotor()));
             ids.add(unit.unit().id());
         }
-        job.setCrew(speeds, job.boxSizeX(), job.boxSizeY(), job.boxSizeZ());
+        job.setCrew(rotors, job.boxSizeX(), job.boxSizeY(), job.boxSizeZ());
         job.setCrewUnits(ids);
         for (int i = 0; i < job.hands().size() && i < units.size(); i++) {
             job.hands().get(i).homePort = units.get(i).homePort();
-            job.hands().get(i).ops = WrightTier.clamp(units.get(i).unit().power());
+            job.hands().get(i).fabricator = WrightTier.clamp(units.get(i).unit().fabricator());
             // Each hand walks the AABB from 0; ownership filters which cells it places.
             job.hands().get(i).cursor = 0;
             job.hands().get(i).aim = -1;
@@ -1049,8 +1049,7 @@ public final class ShapeJobs {
             }
             DroneEntity drone = DroneFleet.ensureHand(level, player, job, hand, pos);
             if (drone != null) {
-                drone.setTier(hand.speed);
-                drone.setOps(handOps(hand));
+                drone.setParts(new com.wrights.drone.Loadout(hand.rotor, hand.fabricator));
             }
             if (drone == null) {
                 waitingChunk = true;
@@ -1118,13 +1117,13 @@ public final class ShapeJobs {
                 }
                 WorkPicker.claimAim(job, hand, index);
                 BlockPos cell = job.scanPosAt(index);
-                // Primary aim: fly-arrive uses JobManager.DRONE_REACH_SQR (~1.5); ops reach can be 0–2 and
+                // Primary aim: fly-arrive uses JobManager.DRONE_REACH_SQR (~1.5); fabricator reach can be 0–2 and
                 // used to reject the cell we just hovered over, leaving one wright "placing" forever.
                 if (placed == 0) {
                     if (drone.distanceToSqr(Vec3.atCenterOf(cell)) > JobManager.PLACE_NEAR_SQR) {
                         break;
                     }
-                } else if (!inOperationReachFromHover(drone.position(), cell, handOps(hand))) {
+                } else if (!inOperationReachFromHover(drone.position(), cell, handFabricator(hand))) {
                     break;
                 }
                 BlockState placeState = shapeNextState(job, usable, fillMode, random);
@@ -1299,7 +1298,7 @@ public final class ShapeJobs {
         if (origin != null && hand.aim >= 0 && hand.aim < job.total()) {
             ShapeCell probe = classifyShapeCell(level, player, job, hand, hand.aim, shapeKind, shapePinLocal, onlyOwned);
             if (probe == ShapeCell.READY) {
-                if (inOperationReachFromHover(origin, job.scanPosAt(hand.aim), handOps(hand))) {
+                if (inOperationReachFromHover(origin, job.scanPosAt(hand.aim), handFabricator(hand))) {
                     return hand.aim;
                 }
                 int local = shapeClusterIndex(
@@ -1375,7 +1374,7 @@ public final class ShapeJobs {
         if (drone == null || job.min() == null) {
             return -1;
         }
-        int reach = WrightTier.operationReachSqr(handOps(hand));
+        int reach = WrightTier.operationReachSqr(handFabricator(hand));
         BlockPos foot = BlockPos.containing(drone.getX(), drone.getY() - 0.85D, drone.getZ());
         int best = -1;
         int bestScore = Integer.MAX_VALUE;
@@ -1411,27 +1410,27 @@ public final class ShapeJobs {
     }
 
     /** Operations tier for AOE sizing. */
-    static int handOps(BuildJob.Hand hand) {
-        return hand == null ? WrightTier.BASE : WrightTier.clamp(hand.ops);
+    static int handFabricator(BuildJob.Hand hand) {
+        return hand == null ? WrightTier.BASIC : WrightTier.clamp(hand.fabricator);
     }
 
-    /** True when {@code pos} is still within this hover's place reach for the given ops tier. */
-    static boolean inOperationReachFromHover(Vec3 hover, BlockPos pos, int ops) {
+    /** True when {@code pos} is still within this hover's place reach for the given fabricator tier. */
+    static boolean inOperationReachFromHover(Vec3 hover, BlockPos pos, int fabricator) {
         if (hover == null || pos == null) {
             return false;
         }
-        return inOperationReachFromCell(BlockPos.containing(hover.x, hover.y - 0.85D, hover.z), pos, ops);
+        return inOperationReachFromCell(BlockPos.containing(hover.x, hover.y - 0.85D, hover.z), pos, fabricator);
     }
 
     /** Sphere around a block the wright would stand in. Corners of the 3×3×3 are outside. */
-    private static boolean inOperationReachFromCell(BlockPos anchor, BlockPos cell, int ops) {
+    private static boolean inOperationReachFromCell(BlockPos anchor, BlockPos cell, int fabricator) {
         if (anchor == null || cell == null) {
             return false;
         }
         int dx = cell.getX() - anchor.getX();
         int dy = cell.getY() - anchor.getY();
         int dz = cell.getZ() - anchor.getZ();
-        return dx * dx + dy * dy + dz * dz <= WrightTier.operationReachSqr(ops);
+        return dx * dx + dy * dy + dz * dz <= WrightTier.operationReachSqr(fabricator);
     }
 
     /**
@@ -1496,7 +1495,7 @@ public final class ShapeJobs {
             java.util.Random random,
             com.wrights.blueprint.Shapes.Kind shapeKind,
             BlockPos shapePinLocal) {
-        int reach = WrightTier.operationReachSqr(handOps(hand));
+        int reach = WrightTier.operationReachSqr(handFabricator(hand));
         SmallPiece piece = smallPiece(job, hand, reach);
         if (piece == null) {
             return JobManager.PATTERN_SKIP;
@@ -1529,8 +1528,7 @@ public final class ShapeJobs {
         }
         DroneEntity drone = DroneFleet.ensureHand(level, player, job, hand, fly);
         if (drone != null) {
-            drone.setTier(hand.speed);
-            drone.setOps(handOps(hand));
+            drone.setParts(new com.wrights.drone.Loadout(hand.rotor, hand.fabricator));
         }
         if (drone == null) {
             setShapeHandStatus(level, hand, state, DroneEntity.WAIT_CHUNK);
@@ -1651,11 +1649,11 @@ public final class ShapeJobs {
     }
 
     /** Predefined stand count for a small shape. {@code 0} leaves crew sizing alone. */
-    private static int smallBoxCrew(BuildJob job, int ops) {
+    private static int smallBoxCrew(BuildJob job, int fabricator) {
         if (job == null) {
             return 0;
         }
-        int reach = WrightTier.operationReachSqr(ops);
+        int reach = WrightTier.operationReachSqr(fabricator);
         return com.wrights.blueprint.SmallBoxStands.count(
                 job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(), job.shapeHollow(), job.shapeKind(), reach);
     }
@@ -1671,7 +1669,7 @@ public final class ShapeJobs {
             BuildJob.Hand hand,
             com.wrights.blueprint.Shapes.Kind shapeKind,
             BlockPos shapePinLocal) {
-        SmallPiece piece = smallPiece(job, hand, WrightTier.operationReachSqr(handOps(hand)));
+        SmallPiece piece = smallPiece(job, hand, WrightTier.operationReachSqr(handFabricator(hand)));
         if (piece == null) {
             return null;
         }
@@ -1690,7 +1688,7 @@ public final class ShapeJobs {
             BuildJob.Hand hand,
             com.wrights.blueprint.Shapes.Kind shapeKind,
             BlockPos shapePinLocal) {
-        int reach = WrightTier.operationReachSqr(handOps(hand));
+        int reach = WrightTier.operationReachSqr(handFabricator(hand));
         SmallPiece piece = smallPiece(job, hand, reach);
         if (piece == null) {
             return -1;
@@ -1740,7 +1738,7 @@ public final class ShapeJobs {
         if (job == null || hand == null || piece == null) {
             return null;
         }
-        int reach = WrightTier.operationReachSqr(handOps(hand));
+        int reach = WrightTier.operationReachSqr(handFabricator(hand));
         int[][] stands = pieceStands(job, piece, reach);
         if (stands.length == 0) {
             return null;
@@ -1794,7 +1792,7 @@ public final class ShapeJobs {
         int lanes = Math.max(1, hand == null ? 1 : hand.lanes);
         int total = Math.max(0, job.total());
         int share = Math.max(1, (total + lanes - 1) / lanes);
-        return share <= WrightsConfig.placeAoeCapacity(job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(), handOps(hand));
+        return share <= WrightsConfig.placeAoeCapacity(job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(), handFabricator(hand));
     }
 
     /** Dense hover scoring while this hand's AOE share still fits a couple waves; else closest-first. */
@@ -1803,7 +1801,7 @@ public final class ShapeJobs {
         int total = Math.max(0, job.total());
         int share = Math.max(1, (total + lanes - 1) / lanes);
         return WrightsConfig.optimizePlaceRoute(
-                total, job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(), lanes, share, handOps(hand));
+                total, job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(), lanes, share, handFabricator(hand));
     }
 
     /**
@@ -1883,7 +1881,7 @@ public final class ShapeJobs {
         // One place-AOE share, far, or pre-launch: densest hover (station center).
         // Larger shares that are already nearby: near-first, denser only within JobManager.SEED_SLACK_SQR.
         boolean oneHover = shapeOneStation(job, hand) || candidateCount <= WrightsConfig.placeAoeCapacity(
-                job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(), handOps(hand));
+                job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(), handFabricator(hand));
         boolean far = origin == null || nearestDist > JobManager.FLY_NEAR_SQR || oneHover || job.total() <= 512;
         int best = nearest;
         int bestScore = shapeClusterReadyCount(
@@ -1948,7 +1946,7 @@ public final class ShapeJobs {
                     if (index < 0 || WorkPicker.aimedByOther(job, hand, index)) {
                         continue;
                     }
-                    if (!inOperationReachFromCell(BlockPos.containing(origin), pos, handOps(hand))) {
+                    if (!inOperationReachFromCell(BlockPos.containing(origin), pos, handFabricator(hand))) {
                         continue;
                     }
                     if (classifyShapeCell(level, player, job, hand, index, shapeKind, shapePinLocal, onlyOwned)
@@ -2111,7 +2109,7 @@ public final class ShapeJobs {
                     }
                     double dist = origin.distanceToSqr(Vec3.atCenterOf(pos));
                     if (reachSqr <= JobManager.PLACE_NEAR_SQR) {
-                        if (!inOperationReachFromHover(origin, pos, handOps(hand))) {
+                        if (!inOperationReachFromHover(origin, pos, handFabricator(hand))) {
                             continue;
                         }
                     } else if (dist > reachSqr) {
@@ -2132,7 +2130,7 @@ public final class ShapeJobs {
         if (nearest < 0 || !preferDense || denseCandidates == null || denseCount <= 1) {
             return nearest;
         }
-        int aoe = WrightsConfig.placeAoeCapacity(job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(), handOps(hand));
+        int aoe = WrightsConfig.placeAoeCapacity(job.boxSizeX(), job.boxSizeY(), job.boxSizeZ(), handFabricator(hand));
         boolean oneHover = denseCount <= aoe;
         int best = nearest;
         int bestScore = shapeClusterReadyCount(
