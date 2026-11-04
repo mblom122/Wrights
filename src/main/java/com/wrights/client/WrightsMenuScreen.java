@@ -26,7 +26,7 @@ import com.wrights.drone.WrightportPlaces;
 import com.wrights.item.PersonalWrightportItem;
 import com.wrights.network.BlueprintPayloads;
 
-public class WrightsMenuScreen extends Screen {
+public class WrightsMenuScreen extends Screen implements JeiPreview {
     static final int ROW = 18;
     private static final int PAGE_BUILDING = 0;
     private static final int PAGE_JOBS = 1;
@@ -487,7 +487,8 @@ public class WrightsMenuScreen extends Screen {
     private void layout() {
         panelW = WrightsUi.fitW(540, this.width);
         panelH = WrightsUi.fitH(mirrorPage || shapePage || exchangePage || placePage ? 480 : 360, this.height);
-        panelX = WrightsUi.centerX(panelW, this.width);
+        // Leave a lane on the right so JEI can stay open beside Manage / hangar.
+        panelX = JeiPreview.left(this.width, panelW);
         panelY = WrightsUi.centerY(panelH, this.height);
         listX = panelX + 126;
         headingY = panelY + 36;
@@ -2084,6 +2085,36 @@ public class WrightsMenuScreen extends Screen {
     @Override
     public boolean isPauseScreen() {
         return false;
+    }
+
+    @Override
+    public int jeiLeft() {
+        return panelX;
+    }
+
+    @Override
+    public int jeiTop() {
+        return panelY;
+    }
+
+    @Override
+    public int jeiWidth() {
+        return panelW;
+    }
+
+    @Override
+    public int jeiHeight() {
+        return panelH;
+    }
+
+    @Override
+    public int jeiScreenWidth() {
+        return this.width;
+    }
+
+    @Override
+    public int jeiScreenHeight() {
+        return this.height;
     }
 
     private void closeKeepingMode() {
