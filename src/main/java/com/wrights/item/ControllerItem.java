@@ -76,9 +76,7 @@ public class ControllerItem extends Item {
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         tooltip.add(Component.translatable("item.wrights.controller.hint.menu").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("item.wrights.controller.hint.tool").withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.translatable("item.wrights.controller.hint.corners").withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.translatable("item.wrights.controller.hint.copy").withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.translatable("item.wrights.controller.hint.paste").withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("item.wrights.controller.hint.modes").withStyle(ChatFormatting.GRAY));
         GlobalPos linked = stack.get(ModDataComponents.AE_LINK.get());
         if (linked != null) {
             tooltip.add(Component.translatable(
