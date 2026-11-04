@@ -18,13 +18,14 @@ import net.minecraft.world.item.ItemStack;
 
 public class DroneRenderer extends EntityRenderer<DroneEntity> {
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(WrightsMod.MOD_ID, "textures/item/part/shell.png");
-    private static final float SCALE = 0.7F;
+    /** World body scale (25% smaller than the old 0.7). */
+    private static final float SCALE = 0.7F * 0.75F;
     private final ItemRenderer items;
 
     public DroneRenderer(EntityRendererProvider.Context context) {
         super(context);
         this.items = context.getItemRenderer();
-        this.shadowRadius = 0.2F;
+        this.shadowRadius = 0.15F;
     }
 
     @Override
@@ -44,9 +45,9 @@ public class DroneRenderer extends EntityRenderer<DroneEntity> {
         ItemStack cargo = entity.displayCargo();
         if (!cargo.isEmpty()) {
             pose.pushPose();
-            pose.translate(0.0D, -0.35D * dock, 0.0D);
+            pose.translate(0.0D, -0.26D * dock, 0.0D);
             pose.mulPose(Axis.YP.rotationDegrees((entity.tickCount + partialTick) * 3.0F));
-            float cargoScale = 0.55F * dock;
+            float cargoScale = 0.41F * dock;
             pose.scale(cargoScale, cargoScale, cargoScale);
             this.items.renderStatic(cargo, ItemDisplayContext.GROUND, light, OverlayTexture.NO_OVERLAY, pose, buffers, entity.level(), entity.getId());
             pose.popPose();

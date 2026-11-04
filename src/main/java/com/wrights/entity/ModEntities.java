@@ -13,7 +13,7 @@ public final class ModEntities {
 
     public static final DeferredHolder<EntityType<?>, EntityType<DroneEntity>> DRONE = ENTITIES.register("drone", () -> EntityType.Builder
             .<DroneEntity>of(DroneEntity::new, MobCategory.MISC)
-            .sized(0.6F, 0.3F)
+            .sized(0.45F, 0.225F)
             .clientTrackingRange(10)
             .updateInterval(1)
             .fireImmune()
