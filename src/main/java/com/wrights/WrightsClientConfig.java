@@ -1028,10 +1028,29 @@ public final class WrightsClientConfig {
 
     public static void setShapeSize(int size) {
         SHAPE_SIZE.set(com.wrights.blueprint.Shapes.clampSize(size));
-        if (exchangeEqualSides() || shapeEqualSides()) {
+        // Only lock matching edges for Square/Box or Exchange Floor/Wall equal-sides.
+        // Ring/Cylinder/etc. must never inherit a leftover Floor equal-sides flag.
+        if (dimsLockedEqual()) {
             syncEqualSideDims();
         }
         save();
+    }
+
+    /**
+     * True when Size should copy onto Height (and Box Depth). Ring and other free-form
+     * shapes stay independent even if Exchange Floor/Wall equal-sides is still on.
+     */
+    private static boolean dimsLockedEqual() {
+        if (shapeEqualSides()) {
+            return true;
+        }
+        if (!exchangeEqualSides()) {
+            return false;
+        }
+        com.wrights.blueprint.Shapes.Kind kind = com.wrights.blueprint.Shapes.Kind.byId(SHAPE_KIND.get());
+        // Exchange plates use RECTANGLE when equal and SQUARE when free.
+        return kind == com.wrights.blueprint.Shapes.Kind.RECTANGLE
+                || kind == com.wrights.blueprint.Shapes.Kind.SQUARE;
     }
 
     public static void setShapeHeight(int height) {
@@ -1463,27 +1482,31 @@ public final class WrightsClientConfig {
         }
     }
 
-    /** Keep Height = Size while Floor/Wall equal-sides is on. */
+    /** Keep Height = Size while Floor/Wall equal-sides is on for that plate kind. */
     public static void syncExchangeEqualDims() {
-        if (exchangeEqualSides()) {
+        if (dimsLockedEqual()) {
             syncEqualSideDims();
         }
     }
 
     /** Keep Square / Box edges matched while Shape Equal sides is on. */
     public static void syncShapeEqualDims() {
-        if (shapeEqualSides()) {
+        if (dimsLockedEqual()) {
             syncEqualSideDims();
         }
     }
 
     /** Copy Size onto Height (and Box Depth) without re-entering {@link #setShapeSize}. */
     private static void syncEqualSideDims() {
+        if (!dimsLockedEqual()) {
+            return;
+        }
         int size = SHAPE_SIZE.get();
         if (SHAPE_HEIGHT.get() != size) {
             SHAPE_HEIGHT.set(size);
         }
         com.wrights.blueprint.Shapes.Kind kind = com.wrights.blueprint.Shapes.Kind.byId(SHAPE_KIND.get());
+        // Box cube lock only — Ring thickness must stay independent of diameter.
         if (kind == com.wrights.blueprint.Shapes.Kind.BOX && SHAPE_THICKNESS.get() != size) {
             SHAPE_THICKNESS.set(size);
         }
