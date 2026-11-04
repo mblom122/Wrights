@@ -1819,6 +1819,7 @@ public final class JobManager {
                     hand.idle = true;
                     hand.aim = -1;
                     publishHandStatus(level, player, schematic, job, hand, DroneEntity.WAIT_IDLE);
+                    DroneFleet.tickIdle(level, player, hand);
                     continue;
                 }
             }
@@ -1828,8 +1829,10 @@ public final class JobManager {
                 hand.idle = true;
                 hand.aim = -1;
                 publishHandStatus(level, player, schematic, job, hand, DroneEntity.WAIT_IDLE);
+                DroneFleet.tickIdle(level, player, hand);
                 continue;
             }
+            hand.idleTicks = 0;
             WorkPicker.claimAim(job, hand, index);
             hand.awaitingItems = false;
             hand.idle = false;

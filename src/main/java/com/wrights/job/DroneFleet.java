@@ -421,6 +421,27 @@ public final class DroneFleet {
         recallHand(level, player, hand);
     }
 
+    /** A crew wright with no work for this long flies home instead of hovering on site. */
+    static final int IDLE_HOME_TICKS = 100;
+
+    /**
+     * Count one idle tick for a wright still on site; after {@link #IDLE_HOME_TICKS} send it home.
+     * It keeps its crew slot and relaunches from home once a cell opens up again.
+     */
+    static void tickIdle(ServerLevel level, ServerPlayer player, BuildJob.Hand hand) {
+        if (hand.entityId == null) {
+            hand.idleTicks = 0;
+            return;
+        }
+        if (++hand.idleTicks < IDLE_HOME_TICKS) {
+            return;
+        }
+        hand.idleTicks = 0;
+        hand.awaitingItems = false;
+        hand.waitingOnOthers = false;
+        recallHand(level, player, hand);
+    }
+
     /** Send this wright home. It stays on the crew and comes back when it has something to place. */
     private static void recallHand(ServerLevel level, ServerPlayer player, BuildJob.Hand hand) {
         if (hand.entityId == null) {

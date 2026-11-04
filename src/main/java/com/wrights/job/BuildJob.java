@@ -1704,6 +1704,8 @@ public final class BuildJob {
         public int probe;
         public boolean rescan;
         public boolean idle;
+        /** Consecutive ticks with no work while still out on site. Not saved. */
+        public int idleTicks;
         /** This tick the only work left is a block another wright has to place first. Not saved. */
         public boolean waitingOnOthers;
         /** Home because every block it can reach needs an item its supply does not have. Not saved. */

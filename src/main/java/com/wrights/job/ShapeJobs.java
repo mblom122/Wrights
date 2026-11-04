@@ -753,6 +753,15 @@ public final class ShapeJobs {
                     publishShapeDroneStatus(level, job, owed, DroneEntity.WAIT_ITEMS);
                     DroneFleet.parkSolo(level, player, job);
                 }
+                // The crew tick does not run while stalled — any wright still out (mid-approach or
+                // idle when the stock ran out) would hang there in its last state forever.
+                for (BuildJob.Hand hand : job.hands()) {
+                    if (hand.entityId != null) {
+                        setShapeHandStatus(level, hand, owed, DroneEntity.WAIT_ITEMS);
+                        DroneFleet.parkForItems(level, player, hand);
+                    }
+                    hand.idleTicks = 0;
+                }
                 library.setDirty();
                 return;
             }
@@ -1041,13 +1050,15 @@ public final class ShapeJobs {
                 hand.aim = -1;
                 hand.shareRemain = 0;
                 setShapeHandStatus(level, hand, null, DroneEntity.WAIT_IDLE);
+                DroneFleet.tickIdle(level, player, hand);
                 continue;
             }
+            hand.idleTicks = 0;
             if (at == JobManager.NEED_ITEMS) {
                 waitingItems = true;
                 hand.aim = -1;
-                DroneFleet.parkForItems(level, player, hand);
                 setShapeHandStatus(level, hand, usable.get(0).state(), DroneEntity.WAIT_ITEMS);
+                DroneFleet.parkForItems(level, player, hand);
                 continue;
             }
             WorkPicker.claimAim(job, hand, at);
@@ -1057,8 +1068,8 @@ public final class ShapeJobs {
             if (state == null) {
                 waitingItems = true;
                 hand.aim = -1;
-                DroneFleet.parkForItems(level, player, hand);
                 setShapeHandStatus(level, hand, usable.get(0).state(), DroneEntity.WAIT_ITEMS);
+                DroneFleet.parkForItems(level, player, hand);
                 continue;
             }
             DroneEntity drone = DroneFleet.ensureHand(level, player, job, hand, pos);
@@ -1083,6 +1094,7 @@ public final class ShapeJobs {
             int placed = 0;
             int scanned = 0;
             boolean usedAnchor = false;
+            boolean handItems = false;
             while (placed < budget && scanned < scanCap && job.cursor() < job.total()) {
                 int index;
                 if (!usedAnchor) {
@@ -1102,7 +1114,7 @@ public final class ShapeJobs {
                 }
                 if (index < 0 || index == JobManager.NEED_ITEMS) {
                     if (index == JobManager.NEED_ITEMS) {
-                        waitingItems = true;
+                        handItems = true;
                     }
                     break;
                 }
@@ -1142,7 +1154,7 @@ public final class ShapeJobs {
                 }
                 BlockState placeState = shapeNextState(job, usable, fillMode, random);
                 if (placeState == null) {
-                    waitingItems = true;
+                    handItems = true;
                     break;
                 }
                 int dx = cell.getX() - job.min().getX();
@@ -1164,7 +1176,7 @@ public final class ShapeJobs {
                     return;
                 }
                 if (result == PlaceResult.WAIT) {
-                    waitingItems = true;
+                    handItems = true;
                     break;
                 }
                 if (result == PlaceResult.ENERGY) {
@@ -1180,9 +1192,11 @@ public final class ShapeJobs {
             if (placed > 0) {
                 HoverWork.countOp(job, hand, fly);
             }
-            if (waitingItems) {
-                DroneFleet.parkForItems(level, player, hand);
+            // Per wright: another hand running dry must not park one whose own supply still pays.
+            if (handItems) {
+                waitingItems = true;
                 setShapeHandStatus(level, hand, usable.get(0).state(), DroneEntity.WAIT_ITEMS);
+                DroneFleet.parkForItems(level, player, hand);
             }
         }
         if (waitingChunk) {
@@ -1536,8 +1550,8 @@ public final class ShapeJobs {
         BlockState state = shapeNextState(job, usable, fillMode, random);
         if (state == null) {
             hand.aim = -1;
-            DroneFleet.parkForItems(level, player, hand);
             setShapeHandStatus(level, hand, usable.isEmpty() ? null : usable.get(0).state(), DroneEntity.WAIT_ITEMS);
+            DroneFleet.parkForItems(level, player, hand);
             return JobManager.PATTERN_ITEMS;
         }
         DroneEntity drone = DroneFleet.ensureHand(level, player, job, hand, fly);
@@ -1596,8 +1610,8 @@ public final class ShapeJobs {
             BlockPos cell = job.scanPosAt(index);
             BlockState placeState = shapeNextState(job, usable, fillMode, random);
             if (placeState == null) {
-                DroneFleet.parkForItems(level, player, hand);
                 setShapeHandStatus(level, hand, usable.get(0).state(), DroneEntity.WAIT_ITEMS);
+                DroneFleet.parkForItems(level, player, hand);
                 return JobManager.PATTERN_ITEMS;
             }
             int dx = cell.getX() - job.min().getX();
@@ -1612,8 +1626,8 @@ public final class ShapeJobs {
                 return JobManager.PATTERN_CHUNK;
             }
             if (result == PlaceResult.WAIT) {
-                DroneFleet.parkForItems(level, player, hand);
                 setShapeHandStatus(level, hand, placeState, DroneEntity.WAIT_ITEMS);
+                DroneFleet.parkForItems(level, player, hand);
                 return JobManager.PATTERN_ITEMS;
             }
             if (result == PlaceResult.ENERGY) {
