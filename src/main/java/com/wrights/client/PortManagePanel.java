@@ -396,7 +396,7 @@ final class PortManagePanel {
             int goW = s.jobButtonWidth("menu.wrights.visit");
             if (hitWide(mouseX, mouseY, right, buttonY, goW)) {
                 if (s.requireTool()) {
-                    pickPlaced(port);
+                    openPlaced(port);
                     PacketDistributor.sendToServer(new BlueprintPayloads.PlacedVisit(port.dimension(), port.pos()));
                 }
                 return true;
@@ -416,11 +416,22 @@ final class PortManagePanel {
             WrightsClientState.togglePortMark(port.dimension(), port.pos());
             return true;
         }
-        pickPlaced(port);
+        togglePlaced(port);
         return true;
     }
 
-    private void pickPlaced(BlueprintPayloads.PlacedPort port) {
+    private void togglePlaced(BlueprintPayloads.PlacedPort port) {
+        if (samePort(port, s.placedPick)) {
+            finishPortRename(true);
+            s.placedPick = null;
+            wrightScroll = 0;
+            s.refresh();
+            return;
+        }
+        openPlaced(port);
+    }
+
+    private void openPlaced(BlueprintPayloads.PlacedPort port) {
         finishPortRename(true);
         s.placedPick = port;
         wrightScroll = 0;
