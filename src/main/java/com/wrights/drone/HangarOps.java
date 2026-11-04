@@ -792,8 +792,20 @@ public final class HangarOps {
         return next;
     }
 
+    private static int carriedCount(ServerPlayer player, Item item) {
+        if (item == null || player.containerMenu == null) {
+            return 0;
+        }
+        ItemStack carried = player.containerMenu.getCarried();
+        return !carried.isEmpty() && carried.is(item) ? carried.getCount() : 0;
+    }
+
+    /** Bag / chest / digital plus the stack on the cursor. */
     private static boolean afford(ServerPlayer player, Item item, int count) {
-        return player.getAbilities().instabuild || ItemSource.canAfford(player, item, count);
+        if (count <= 0 || item == null || player.getAbilities().instabuild) {
+            return true;
+        }
+        return carriedCount(player, item) + ItemSource.available(player, item) >= count;
     }
 
     private static int[] unique(Swarm swarm, int[] units) {
@@ -881,10 +893,14 @@ public final class HangarOps {
     }
 
     /**
-     * Takes an upgrade part for hangar fitting. The stack on the cursor is consumed first so
-     * clicking a hardware bay with a picked-up part does not leave the count and dupe on refund.
+     * Takes exactly {@code count} upgrade parts for hangar fitting.
+     * Cursor stack first (so a picked-up part is consumed once), then inventory / chest / digital.
+     * Never takes from both cursor and bag for the same unit when the cursor already covered {@code count}.
      */
     private static ItemSource.Take takeUpgrade(ServerPlayer player, Item item, int count, boolean allowCraft) {
+        if (item == null || count <= 0) {
+            return new ItemSource.Take(ItemSource.Result.OK, 0, 0);
+        }
         int fromCarried = shrinkCarried(player, item, count);
         int left = count - fromCarried;
         if (left <= 0) {
@@ -893,11 +909,18 @@ public final class HangarOps {
         ItemSource.Take taken = ItemSource.takeDetailed(player, item, left, allowCraft);
         if (taken.result() == ItemSource.Result.OK) {
             noteUse(item, taken.fromDigital(), 0);
-        } else if (taken.result() == ItemSource.Result.CRAFTING) {
+            return taken;
+        }
+        if (taken.result() == ItemSource.Result.CRAFTING) {
             noteUse(item, 0, taken.crafted());
-        } else if (fromCarried > 0) {
-            // Restoring a partial cursor take is awkward; hangar fits always ask for 1.
-            giveStack(player, new ItemStack(item, fromCarried));
+            // Cursor already paid fromCarried — put those back; craft request covers the rest.
+            if (fromCarried > 0) {
+                restoreCarried(player, item, fromCarried);
+            }
+            return taken;
+        }
+        if (fromCarried > 0) {
+            restoreCarried(player, item, fromCarried);
         }
         return taken;
     }
@@ -915,6 +938,24 @@ public final class HangarOps {
         carried.shrink(used);
         player.containerMenu.setCarried(carried);
         return used;
+    }
+
+    /** Puts failed cursor takes back onto the cursor (or inventory if the cursor changed). */
+    private static void restoreCarried(ServerPlayer player, Item item, int count) {
+        if (item == null || count <= 0 || player.containerMenu == null) {
+            return;
+        }
+        ItemStack carried = player.containerMenu.getCarried();
+        if (carried.isEmpty()) {
+            player.containerMenu.setCarried(new ItemStack(item, count));
+            return;
+        }
+        if (carried.is(item)) {
+            carried.grow(count);
+            player.containerMenu.setCarried(carried);
+            return;
+        }
+        giveStack(player, new ItemStack(item, count));
     }
 
     /**

@@ -399,11 +399,8 @@ final class WrightManagePanel {
         if (part.tier() == fitted || !have(screen, part.slot(), part.tier())) {
             return true;
         }
-        int[] targets = markedCount(screen, swarm) > 0 ? marked(screen, swarm) : new int[] { expanded };
-        if (targets.length == 0) {
-            targets = new int[] { expanded };
-        }
-        screen.batch(HangarOps.partFit(part.slot()), part.tier(), targets);
+        // One wright only — marked bulk is the Upgrade marked dialog, not shift-click.
+        screen.batch(HangarOps.partFit(part.slot()), part.tier(), new int[] { expanded });
         return true;
     }
 
@@ -417,13 +414,9 @@ final class WrightManagePanel {
         int fitted = swarm.units().get(expanded).parts().tier(slot);
         ItemStack held = heldPart(screen);
         if (!held.isEmpty() && held.getItem() instanceof WrightPartItem part && part.slot() == slot) {
-            // Cursor / hand already holds the part — server consumes carried first (not only bag stock).
+            // Cursor / hand place: exactly one wright, one part (server eats carried first).
             if (part.tier() != fitted) {
-                int[] targets = markedCount(screen, swarm) > 0 ? marked(screen, swarm) : new int[] { expanded };
-                if (targets.length == 0) {
-                    targets = new int[] { expanded };
-                }
-                screen.batch(HangarOps.partFit(slot), part.tier(), targets);
+                screen.batch(HangarOps.partFit(slot), part.tier(), new int[] { expanded });
             }
             return true;
         }
