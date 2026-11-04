@@ -1301,8 +1301,8 @@ public final class JobManager {
             drone.setWorkStatus(soloShow, ItemStack.EMPTY, DroneEntity.WAIT_NONE);
             if (i == 0) {
                 if (drone.distanceToSqr(Vec3.atCenterOf(pos)) > PLACE_NEAR_SQR) {
-                    break;
-                }
+                break;
+            }
             } else if (!ShapeJobs.inOperationReachFromHover(drone.position(), pos, drone.fabricator())) {
                 break;
             }
@@ -1404,11 +1404,11 @@ public final class JobManager {
             return;
         }
         if (HoverWork.burstRemove(level, player, library, job, null, drone, stand) == HoverWork.Result.CHUNK) {
-            if (job.tickMessage()) {
-                noteChunk(player, library, job);
-            }
-            return;
-        }
+                    if (job.tickMessage()) {
+                        noteChunk(player, library, job);
+                    }
+                    return;
+                }
         if (!job.hungFalls().isEmpty()) {
             CellPlacement.scrubHangRegion(level, job);
         }
@@ -1433,20 +1433,20 @@ public final class JobManager {
         // Same hang rules as paste: no neighbour shape updates, scrub fall ticks around the cell.
         CellPlacement.writeUndo(level, job, pos, putBack);
         if (putBack.isAir()) {
-            FluidState fluid = current.getFluidState();
-            if (!fluid.isEmpty()) {
+        FluidState fluid = current.getFluidState();
+        if (!fluid.isEmpty()) {
                 FluidClearing.clearFluidSpread(level, pos, fluid.getType(), job);
                 // Fluid cleanup can re-schedule falls — scrub hung sand again.
                 CellPlacement.scrubHangAround(level, pos);
-            }
+        }
         }
         // Creative / unpaid placements skip returns; paid Survival placements get items back.
         if (refund.paid()) {
-            Item item = BlockFilters.payment(refund.state());
+        Item item = BlockFilters.payment(refund.state());
             if (item != null) {
                 JobSupply.giveBack(level, player, job, item);
-                job.returnedOne();
-            }
+            job.returnedOne();
+        }
             for (int extraId : refund.extras()) {
                 Item extra = Item.byId(extraId);
                 if (extra != null && extra != Items.AIR) {
@@ -1898,8 +1898,8 @@ public final class JobManager {
                 if (n == 0) {
                     if (drone.distanceToSqr(Vec3.atCenterOf(pos)) > PLACE_NEAR_SQR) {
                         WorkPicker.claimAim(job, hand, at);
-                        break;
-                    }
+                    break;
+                }
                 } else if (!ShapeJobs.inOperationReachFromHover(drone.position(), pos, ShapeJobs.handFabricator(hand))) {
                     WorkPicker.claimAim(job, hand, at);
                     break;
@@ -2033,15 +2033,15 @@ public final class JobManager {
                 continue;
             }
             if (HoverWork.burstRemove(level, player, library, job, hand, drone, stand) == HoverWork.Result.CHUNK) {
-                if (job.tickMessage()) {
-                    noteChunk(player, library, job);
+                        if (job.tickMessage()) {
+                            noteChunk(player, library, job);
+                        }
+                        return;
+                    }
                 }
-                return;
-            }
-        }
         if (!job.hungFalls().isEmpty()) {
             CellPlacement.scrubHangRegion(level, job);
-        }
+            }
         HandSlices.shareUndo(job);
         if (!working) {
             for (BuildJob.Hand hand : job.hands()) {
