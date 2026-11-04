@@ -17,7 +17,7 @@ import com.wrights.WrightsConfig;
 import com.wrights.blueprint.BlueprintTransforms;
 import com.wrights.network.BlueprintPayloads;
 
-public class BlueprintEditScreen extends Screen implements JeiPreview {
+public class BlueprintEditScreen extends WrightsScaledScreen implements JeiPreview {
     private final LayerColumn column = new LayerColumn(LayerColumn.EDIT);
     private int panelX;
     private int panelY;
@@ -216,7 +216,7 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    protected void renderScaled(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(graphics, mouseX, mouseY, partialTick);
         graphics.enableScissor(panelX + 1, bodyTop, panelX + panelW - 1, bodyTop + bodyViewH);
         for (Renderable renderable : this.renderables) {
@@ -269,7 +269,7 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    protected boolean mouseClickedScaled(double mouseX, double mouseY, int button) {
         if (!insideBody(mouseX, mouseY) && mouseY >= bodyTop) {
             return false;
         }
@@ -279,11 +279,11 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
         if (!insideBody(mouseX, mouseY)) {
             return false;
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClickedScaled(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+    protected boolean mouseScrolledScaled(double mouseX, double mouseY, double scrollX, double scrollY) {
         if (insideBody(mouseX, mouseY) && column.mouseScrolled(mouseX, mouseY, scrollY)) {
             return true;
         }
@@ -296,7 +296,7 @@ public class BlueprintEditScreen extends Screen implements JeiPreview {
                 return true;
             }
         }
-        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        return super.mouseScrolledScaled(mouseX, mouseY, scrollX, scrollY);
     }
 
     @Override

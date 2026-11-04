@@ -8,7 +8,7 @@ import net.minecraft.network.chat.Component;
 import com.wrights.WrightsClientConfig;
 
 /** Drag the Ctrl/Shift mode menu, or snap it to a side. */
-public class ModePlaceScreen extends Screen {
+public class ModePlaceScreen extends WrightsScaledScreen {
     private int dragging;
     private int grabX;
     private int grabY;
@@ -57,7 +57,7 @@ public class ModePlaceScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    protected void renderScaled(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(graphics, mouseX, mouseY, partialTick);
         place();
         WrightsHud.drawSampleModeMenu(graphics, this.minecraft, boxX, boxY, boxW, boxH);
@@ -77,8 +77,8 @@ public class ModePlaceScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 0 && super.mouseClicked(mouseX, mouseY, button)) {
+    protected boolean mouseClickedScaled(double mouseX, double mouseY, int button) {
+        if (button == 0 && super.mouseClickedScaled(mouseX, mouseY, button)) {
             return true;
         }
         if (button != 0) {
@@ -95,7 +95,7 @@ public class ModePlaceScreen extends Screen {
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+    protected boolean mouseDraggedScaled(double mouseX, double mouseY, int button, double dragX, double dragY) {
         if (button == 0 && dragging != 0) {
             int left = (int) mouseX - grabX;
             int top = (int) mouseY - grabY;
@@ -104,17 +104,17 @@ public class ModePlaceScreen extends Screen {
                     HudAnchor.fraction(top + boxH / 2, this.height));
             return true;
         }
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+        return super.mouseDraggedScaled(mouseX, mouseY, button, dragX, dragY);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    protected boolean mouseReleasedScaled(double mouseX, double mouseY, int button) {
         if (button == 0 && dragging != 0) {
             dragging = 0;
             WrightsClientConfig.save();
             return true;
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseReleasedScaled(mouseX, mouseY, button);
     }
 
     @Override

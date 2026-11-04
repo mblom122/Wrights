@@ -9,7 +9,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.network.BlueprintPayloads;
 
-public class UndoConfirmScreen extends Screen {
+public class UndoConfirmScreen extends WrightsScaledScreen {
     private final UUID id;
     private final int extra;
     private final int drop;
@@ -55,8 +55,8 @@ public class UndoConfirmScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
+    protected void renderScaled(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        super.renderScaled(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, this.title, panelX + 16, panelY + 10, WrightsUi.COPPER, false);
         String key = drop == BlueprintPayloads.UndoPrompt.AT_CHEST
                 ? "screen.wrights.undo_chest"

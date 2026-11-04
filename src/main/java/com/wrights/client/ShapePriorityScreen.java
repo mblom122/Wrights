@@ -11,7 +11,7 @@ import com.wrights.WrightsClientConfig;
 import com.wrights.blueprint.ShapeSupply;
 
 /** Shared material-source order for Shape, place, and Options. */
-public class ShapePriorityScreen extends Screen {
+public class ShapePriorityScreen extends WrightsScaledScreen {
     private final Screen parent;
     private int panelX;
     private int panelY;
@@ -51,9 +51,9 @@ public class ShapePriorityScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    protected void renderScaled(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         hits.clear();
-        super.render(graphics, mouseX, mouseY, partialTick);
+        super.renderScaled(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, this.title, panelX + 16, panelY + 10, WrightsUi.COPPER, false);
         int y = panelY + 28;
         int inner = panelW - 32;
@@ -101,7 +101,7 @@ public class ShapePriorityScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    protected boolean mouseClickedScaled(double mouseX, double mouseY, int button) {
         if (button == 0) {
             for (Hit hit : hits) {
                 if (mouseX >= hit.x && mouseX < hit.x + hit.w && mouseY >= hit.y && mouseY < hit.y + hit.h) {
@@ -110,7 +110,7 @@ public class ShapePriorityScreen extends Screen {
                 }
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClickedScaled(mouseX, mouseY, button);
     }
 
     private void apply(String id, int value) {

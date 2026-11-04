@@ -23,7 +23,7 @@ import com.wrights.WrightsClientConfig;
  * Edit the shape anchor coordinates and preview the nearby world blocks so the
  * point can be nudged into place without leaving the menu.
  */
-public class ShapeAnchorScreen extends Screen {
+public class ShapeAnchorScreen extends WrightsScaledScreen {
     private static final int RADIUS = 3;
 
     private final Screen parent;
@@ -105,8 +105,8 @@ public class ShapeAnchorScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
+    protected void renderScaled(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        super.renderScaled(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, this.title, panelX + 16, panelY + 10, WrightsUi.COPPER, false);
         for (var line : this.font.split(Component.translatable("screen.wrights.shape_anchor_hint"), panelW - 32)) {
             graphics.drawString(this.font, line, panelX + 16, panelY + 26, WrightsUi.MUTED, false);
@@ -150,33 +150,33 @@ public class ShapeAnchorScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    protected boolean mouseClickedScaled(double mouseX, double mouseY, int button) {
         if (button == 0 && mouseX >= previewLeft && mouseX < previewLeft + previewWidth
                 && mouseY >= previewTop && mouseY < previewTop + previewHeight) {
             dragging = true;
             dragLastX = mouseX;
             return true;
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClickedScaled(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    protected boolean mouseReleasedScaled(double mouseX, double mouseY, int button) {
         if (button == 0 && dragging) {
             dragging = false;
             return true;
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseReleasedScaled(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+    protected boolean mouseDraggedScaled(double mouseX, double mouseY, int button, double dragX, double dragY) {
         if (dragging && button == 0) {
             yaw += (float) (mouseX - dragLastX) * 0.8F;
             dragLastX = mouseX;
             return true;
         }
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+        return super.mouseDraggedScaled(mouseX, mouseY, button, dragX, dragY);
     }
 
     @Override

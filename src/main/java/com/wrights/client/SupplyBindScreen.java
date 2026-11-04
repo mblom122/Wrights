@@ -6,7 +6,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 
 /** Bind-mode menu: teleport (creative), highlight, or clear the bound supply chest. */
-public class SupplyBindScreen extends Screen {
+public class SupplyBindScreen extends WrightsScaledScreen {
     private static final int PAD = 12;
     private static final int ROW = 18;
     private static final int GAP = 4;
@@ -66,8 +66,8 @@ public class SupplyBindScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
+    protected void renderScaled(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        super.renderScaled(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, this.title, panelX + PAD, panelY + PAD, WrightsUi.COPPER, false);
         boolean bound = WrightsClientState.supplyBound && WrightsClientState.supplyPos != null;
         String status;

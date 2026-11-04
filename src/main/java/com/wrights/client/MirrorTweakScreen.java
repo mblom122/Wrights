@@ -12,7 +12,7 @@ import com.wrights.blueprint.Mirror;
  * Compact Shift+right-click tweak for Mirror: Blocks / Blueprints mode, Axis or Anchored face,
  * axes or copy count, and the options you flip most often while building.
  */
-public class MirrorTweakScreen extends Screen {
+public class MirrorTweakScreen extends WrightsScaledScreen {
     private static final int PAD = 8;
     private static final int ROW = 14;
     private static final int GAP = 4;
@@ -156,9 +156,9 @@ public class MirrorTweakScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    protected void renderScaled(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         tip = null;
-        super.render(graphics, mouseX, mouseY, partialTick);
+        super.renderScaled(graphics, mouseX, mouseY, partialTick);
         int titleY = panelY + PAD;
         graphics.drawString(this.font, this.title, panelX + PAD, titleY, WrightsUi.COPPER, false);
         drawHelp(graphics, mouseX, mouseY, panelX + PAD + this.font.width(this.title) + 4, titleY - 2,
@@ -277,9 +277,9 @@ public class MirrorTweakScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    protected boolean mouseClickedScaled(double mouseX, double mouseY, int button) {
         if (button != 0) {
-            return super.mouseClicked(mouseX, mouseY, button);
+            return super.mouseClickedScaled(mouseX, mouseY, button);
         }
         if (modeChoicesY >= 0 && clickPair(mouseX, mouseY, modeChoicesY,
                 () -> {
@@ -348,7 +348,7 @@ public class MirrorTweakScreen extends Screen {
                 WrightsClientConfig::setMirrorMineVoid)) {
             return true;
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClickedScaled(mouseX, mouseY, button);
     }
 
     private boolean clickPair(double mouseX, double mouseY, int y, Runnable left, Runnable right) {

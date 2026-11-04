@@ -14,7 +14,7 @@ import com.wrights.blueprint.BlueprintActions;
 import com.wrights.item.BlueprintSlips;
 import com.wrights.network.BlueprintPayloads;
 
-public class ImportExportScreen extends Screen {
+public class ImportExportScreen extends WrightsScaledScreen {
     private final Screen parent;
     private final UUID selectedId;
     private final boolean selectedFolder;
@@ -264,8 +264,8 @@ public class ImportExportScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
+    protected void renderScaled(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        super.renderScaled(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, this.title, panelX + 14, panelY + 12, WrightsUi.COPPER, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.transfer_sub"), panelX + 14, panelY + 26, WrightsUi.MUTED, false);
         graphics.drawString(this.font, this.font.plainSubstrByWidth(selectionLine.getString(), panelW - 28), panelX + 14, panelY + 40, selectedId == null ? WrightsUi.MUTED : WrightsUi.TEXT, false);

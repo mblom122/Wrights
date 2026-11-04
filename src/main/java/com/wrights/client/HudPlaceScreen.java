@@ -8,7 +8,7 @@ import net.minecraft.network.chat.Component;
 import com.wrights.WrightsClientConfig;
 
 /** Drag the hint and the toast, or snap the selected one to a side. */
-public class HudPlaceScreen extends Screen {
+public class HudPlaceScreen extends WrightsScaledScreen {
     private static final int HINT_H = 36;
 
     private boolean hints = true;
@@ -62,7 +62,7 @@ public class HudPlaceScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    protected void renderScaled(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(graphics, mouseX, mouseY, partialTick);
         place();
         WrightsHud.drawSampleHint(graphics, this.minecraft, hintX, hintY, hintW);
@@ -89,8 +89,8 @@ public class HudPlaceScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 0 && super.mouseClicked(mouseX, mouseY, button)) {
+    protected boolean mouseClickedScaled(double mouseX, double mouseY, int button) {
+        if (button == 0 && super.mouseClickedScaled(mouseX, mouseY, button)) {
             return true;
         }
         if (button != 0) {
@@ -115,7 +115,7 @@ public class HudPlaceScreen extends Screen {
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+    protected boolean mouseDraggedScaled(double mouseX, double mouseY, int button, double dragX, double dragY) {
         if (button == 0 && dragging != 0) {
             boolean hint = dragging == 1;
             int boxW = hint ? hintW : toastW;
@@ -125,17 +125,17 @@ public class HudPlaceScreen extends Screen {
             WrightsClientConfig.setHudCustom(hint, HudAnchor.fraction(left + boxW / 2, this.width), HudAnchor.fraction(top + boxH / 2, this.height));
             return true;
         }
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+        return super.mouseDraggedScaled(mouseX, mouseY, button, dragX, dragY);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    protected boolean mouseReleasedScaled(double mouseX, double mouseY, int button) {
         if (button == 0 && dragging != 0) {
             dragging = 0;
             WrightsClientConfig.save();
             return true;
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseReleasedScaled(mouseX, mouseY, button);
     }
 
     @Override

@@ -12,7 +12,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 import com.wrights.blueprint.LayerAxis;
 
-public class BlueprintMapScreen extends Screen implements JeiPreview {
+public class BlueprintMapScreen extends WrightsScaledScreen implements JeiPreview {
     public interface Pick {
         void selectCell(int x, int y, int z);
     }
@@ -107,8 +107,8 @@ public class BlueprintMapScreen extends Screen implements JeiPreview {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
+    protected void renderScaled(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        super.renderScaled(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, this.title, gridX, 10, WrightsUi.COPPER, false);
         Component layerLine = Component.translatable("screen.wrights.layer", LayerAxis.letter(axis), layer + 1, LayerAxis.of(sizeX, sizeY, sizeZ, axis));
         graphics.drawString(this.font, layerLine, gridX + pixel - this.font.width(layerLine), 10, WrightsUi.MUTED, false);
@@ -117,8 +117,8 @@ public class BlueprintMapScreen extends Screen implements JeiPreview {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (super.mouseClicked(mouseX, mouseY, button)) {
+    protected boolean mouseClickedScaled(double mouseX, double mouseY, int button) {
+        if (super.mouseClickedScaled(mouseX, mouseY, button)) {
             return true;
         }
         if (button != 0) {

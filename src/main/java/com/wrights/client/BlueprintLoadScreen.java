@@ -17,7 +17,7 @@ import com.wrights.item.BlueprintItem;
 import com.wrights.item.BlueprintSlips;
 import com.wrights.network.BlueprintPayloads;
 
-public class BlueprintLoadScreen extends Screen {
+public class BlueprintLoadScreen extends WrightsScaledScreen {
     private static final int ROW = 24;
     private static final int HEADER = 16;
 
@@ -184,7 +184,7 @@ public class BlueprintLoadScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    protected boolean mouseClickedScaled(double mouseX, double mouseY, int button) {
         if (button == 0 && insideList(mouseX, mouseY)) {
             int y = listY - scroll;
             for (View view : views) {
@@ -200,16 +200,16 @@ public class BlueprintLoadScreen extends Screen {
                 y += height;
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClickedScaled(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+    protected boolean mouseScrolledScaled(double mouseX, double mouseY, double scrollX, double scrollY) {
         if (insideList(mouseX, mouseY)) {
             scroll = Mth.clamp(scroll - (int) Math.signum(scrollY) * 16, 0, Math.max(0, contentHeight() - listH));
             return true;
         }
-        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        return super.mouseScrolledScaled(mouseX, mouseY, scrollX, scrollY);
     }
 
     private boolean insideList(double mouseX, double mouseY) {
@@ -225,8 +225,8 @@ public class BlueprintLoadScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
+    protected void renderScaled(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        super.renderScaled(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, this.title, panelX + 14, panelY + 12, WrightsUi.COPPER, false);
         renderList(graphics, mouseX, mouseY);
         renderDetail(graphics);

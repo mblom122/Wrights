@@ -15,7 +15,7 @@ import com.wrights.network.BlueprintPayloads;
  * Info-only History log: completed jobs, returns, stalls, pauses, and similar events.
  * No action buttons — Manage keeps those on live / finished job cards.
  */
-public class JobHistoryScreen extends Screen {
+public class JobHistoryScreen extends WrightsScaledScreen {
     private static final int ROW = 60;
 
     private final Screen parent;
@@ -60,8 +60,8 @@ public class JobHistoryScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
+    protected void renderScaled(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        super.renderScaled(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, this.title, panelX + 16, panelY + 10, WrightsUi.COPPER, false);
         Component summary = rows.isEmpty()
                 ? Component.translatable("screen.wrights.job_history_empty")
@@ -90,7 +90,7 @@ public class JobHistoryScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    protected boolean mouseClickedScaled(double mouseX, double mouseY, int button) {
         if (button == 0 && maxScroll() > 0 && mouseX >= listX + listW - 8 && mouseX < listX + listW && mouseY >= listY && mouseY < listY + listH) {
             int max = maxScroll();
             int thumb = thumbH();
@@ -103,11 +103,11 @@ public class JobHistoryScreen extends Screen {
             }
             return true;
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClickedScaled(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+    protected boolean mouseDraggedScaled(double mouseX, double mouseY, int button, double dragX, double dragY) {
         if (button == 0 && dragGrab >= 0 && maxScroll() > 0) {
             int thumb = thumbH();
             int track = Math.max(1, listH - thumb);
@@ -115,22 +115,22 @@ public class JobHistoryScreen extends Screen {
             scroll = Mth.clamp(next, 0, maxScroll());
             return true;
         }
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+        return super.mouseDraggedScaled(mouseX, mouseY, button, dragX, dragY);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    protected boolean mouseReleasedScaled(double mouseX, double mouseY, int button) {
         dragGrab = -1;
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseReleasedScaled(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+    protected boolean mouseScrolledScaled(double mouseX, double mouseY, double scrollX, double scrollY) {
         if (mouseX >= listX && mouseX < listX + listW && mouseY >= listY && mouseY < listY + listH) {
             scroll = Mth.clamp(scroll - (int) Math.signum(scrollY) * ROW, 0, maxScroll());
             return true;
         }
-        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        return super.mouseScrolledScaled(mouseX, mouseY, scrollX, scrollY);
     }
 
     @Override

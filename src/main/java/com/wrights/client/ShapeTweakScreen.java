@@ -26,7 +26,7 @@ import com.wrights.util.BlockFilters;
  * size, Look vs Anchor, materials / Replace with icons + Change, and Edit point.
  * Same light-veil panel style as {@link ShapeLookSnapScreen}.
  */
-public class ShapeTweakScreen extends Screen {
+public class ShapeTweakScreen extends WrightsScaledScreen {
     private static final int PAD = 8;
     private static final int ROW = 14;
     private static final int GAP = 4;
@@ -189,9 +189,9 @@ public class ShapeTweakScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    protected void renderScaled(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         tip = null;
-        super.render(graphics, mouseX, mouseY, partialTick);
+        super.renderScaled(graphics, mouseX, mouseY, partialTick);
         int titleY = panelY + PAD;
         graphics.drawString(this.font, this.title, panelX + PAD, titleY, WrightsUi.COPPER, false);
         drawHelp(graphics, mouseX, mouseY, panelX + PAD + this.font.width(this.title) + 4, titleY - 2,
@@ -351,11 +351,11 @@ public class ShapeTweakScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    protected boolean mouseClickedScaled(double mouseX, double mouseY, int button) {
         if (button == 0 && handleModeClick(mouseX, mouseY)) {
             return true;
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClickedScaled(mouseX, mouseY, button);
     }
 
     private boolean handleModeClick(double mouseX, double mouseY) {

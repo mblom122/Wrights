@@ -24,7 +24,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import com.wrights.network.BlueprintPayloads;
 import com.wrights.util.BlockFilters;
 
-public class BlockPickerScreen extends Screen implements JeiPreview {
+public class BlockPickerScreen extends WrightsScaledScreen implements JeiPreview {
     private enum Tab {
         RECENT,
         INVENTORY,
@@ -231,9 +231,9 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    protected void renderScaled(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         layoutLists();
-        super.render(graphics, mouseX, mouseY, partialTick);
+        super.renderScaled(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, this.title, panelX + 12, panelY + 10, WrightsUi.COPPER, false);
         rebuild(false);
         int rows = Math.max(1, (listH - 4) / CELL);
@@ -313,7 +313,7 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    protected boolean mouseClickedScaled(double mouseX, double mouseY, int button) {
         if (multi && button == 1) {
             int trayIndex = trayIndexAt(mouseX, mouseY);
             if (trayIndex >= 0 && trayIndex < selected.size()) {
@@ -344,21 +344,21 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
                 }
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClickedScaled(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+    protected boolean mouseDraggedScaled(double mouseX, double mouseY, int button, double dragX, double dragY) {
         if (multi && button == 0 && dragIndex >= 0) {
             int hover = trayIndexAt(mouseX, mouseY);
             dragHover = hover >= 0 ? Math.min(hover, Math.max(0, selected.size() - 1)) : -1;
             return true;
         }
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+        return super.mouseDraggedScaled(mouseX, mouseY, button, dragX, dragY);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    protected boolean mouseReleasedScaled(double mouseX, double mouseY, int button) {
         if (multi && button == 0 && dragIndex >= 0) {
             int from = dragIndex;
             int to = dragHover;
@@ -370,7 +370,7 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
             }
             return true;
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseReleasedScaled(mouseX, mouseY, button);
     }
 
     private int trayIndexAt(double mouseX, double mouseY) {
@@ -385,7 +385,7 @@ public class BlockPickerScreen extends Screen implements JeiPreview {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+    protected boolean mouseScrolledScaled(double mouseX, double mouseY, double scrollX, double scrollY) {
         int rows = Math.max(1, (listH - 4) / CELL);
         int maxScroll = Math.max(0, (shown.size() + COLS - 1) / COLS - rows);
         scroll = Mth.clamp(scroll + (scrollY > 0 ? -1 : 1), 0, maxScroll);

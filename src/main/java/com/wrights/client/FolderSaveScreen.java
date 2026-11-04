@@ -12,7 +12,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.network.BlueprintPayloads;
 
-public class FolderSaveScreen extends Screen {
+public class FolderSaveScreen extends WrightsScaledScreen {
     private static final int ROW = 22;
 
     private final int slot;
@@ -78,7 +78,7 @@ public class FolderSaveScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    protected boolean mouseClickedScaled(double mouseX, double mouseY, int button) {
         if (button == 0 && mouseX >= listX && mouseX < listX + listW && mouseY >= listY && mouseY < listY + listH) {
             List<BlueprintPayloads.FolderLine> found = folders();
             int index = ((int) mouseY - listY + scroll) / ROW;
@@ -88,16 +88,16 @@ public class FolderSaveScreen extends Screen {
                 return true;
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClickedScaled(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+    protected boolean mouseScrolledScaled(double mouseX, double mouseY, double scrollX, double scrollY) {
         if (mouseX >= listX && mouseX < listX + listW && mouseY >= listY && mouseY < listY + listH) {
             scroll = Mth.clamp(scroll - (int) Math.signum(scrollY) * ROW, 0, Math.max(0, folders().size() * ROW - listH));
             return true;
         }
-        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        return super.mouseScrolledScaled(mouseX, mouseY, scrollX, scrollY);
     }
 
     @Override
@@ -113,8 +113,8 @@ public class FolderSaveScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
+    protected void renderScaled(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        super.renderScaled(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, this.title, panelX + 14, panelY + 12, WrightsUi.COPPER, false);
         int hintY = panelY + 26;
         for (var line : this.font.split(Component.translatable("screen.wrights.folder_save_hint"), panelW - 28)) {

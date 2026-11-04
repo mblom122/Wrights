@@ -26,7 +26,7 @@ import com.wrights.drone.WrightportPlaces;
 import com.wrights.item.PersonalWrightportItem;
 import com.wrights.network.BlueprintPayloads;
 
-public class WrightsMenuScreen extends Screen implements JeiPreview {
+public class WrightsMenuScreen extends WrightsScaledScreen implements JeiPreview {
     static final int ROW = 18;
     private static final int PAGE_BUILDING = 0;
     private static final int PAGE_JOBS = 1;
@@ -768,7 +768,7 @@ public class WrightsMenuScreen extends Screen implements JeiPreview {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    protected void renderScaled(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         if (options) {
             optionsPanel.layoutOptions();
         }
@@ -787,7 +787,7 @@ public class WrightsMenuScreen extends Screen implements JeiPreview {
             BlueprintList.Row row = selectedRow();
             syncDetailScrollLayout(true, row != null && !row.folder() && marked.size() <= 1);
         }
-        super.render(graphics, mouseX, mouseY, partialTick);
+        super.renderScaled(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, Component.translatable("menu.wrights.title"), panelX + 16, panelY + 10, WrightsUi.COPPER, false);
         graphics.drawString(this.font, Component.translatable("menu.wrights.subtitle"), panelX + 16, panelY + 22, WrightsUi.MUTED, false);
         clampNavScroll();
@@ -1390,7 +1390,7 @@ public class WrightsMenuScreen extends Screen implements JeiPreview {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    protected boolean mouseClickedScaled(double mouseX, double mouseY, int button) {
         if (button == 0 && buildingPage()) {
             if (hitSub(mouseX, mouseY, taskBlueprintsY())) {
                 return chooseBuildMode(BuildMode.BLUEPRINTS);
@@ -1413,7 +1413,7 @@ public class WrightsMenuScreen extends Screen implements JeiPreview {
         }
         if (helpPage) {
             if (button == 0 && closeButton != null && closeButton.visible && closeButton.isMouseOver(mouseX, mouseY)) {
-                return super.mouseClicked(mouseX, mouseY, button);
+                return super.mouseClickedScaled(mouseX, mouseY, button);
             }
             if (helpPanel.mouseClicked(mouseX, mouseY, button, this.font)) {
                 return true;
@@ -1436,7 +1436,7 @@ public class WrightsMenuScreen extends Screen implements JeiPreview {
             if (manage.isOpen() && manage.mouseClicked(manageHost, mouseX, mouseY, button)) {
                 return true;
             }
-            super.mouseClicked(mouseX, mouseY, button);
+            super.mouseClickedScaled(mouseX, mouseY, button);
             return true;
         }
         if (jobsPage) {
@@ -1445,7 +1445,7 @@ public class WrightsMenuScreen extends Screen implements JeiPreview {
             }
             // Close still works; everything else is consumed so shelf/manage widgets cannot steal hits.
             if (button == 0 && closeButton != null && closeButton.visible && closeButton.isMouseOver(mouseX, mouseY)) {
-                return super.mouseClicked(mouseX, mouseY, button);
+                return super.mouseClickedScaled(mouseX, mouseY, button);
             }
             return true;
         }
@@ -1453,11 +1453,11 @@ public class WrightsMenuScreen extends Screen implements JeiPreview {
             if (optionsPanel.click(mouseX, mouseY)) {
                 return true;
             }
-            return super.mouseClicked(mouseX, mouseY, button);
+            return super.mouseClickedScaled(mouseX, mouseY, button);
         }
         if (mirrorPage && buildingPage()) {
             if (overWidget(mouseX, mouseY)) {
-                return super.mouseClicked(mouseX, mouseY, button);
+                return super.mouseClickedScaled(mouseX, mouseY, button);
             }
             if (button == 0) {
                 mirrorPanel.clickMirror(mouseX, mouseY);
@@ -1466,7 +1466,7 @@ public class WrightsMenuScreen extends Screen implements JeiPreview {
         }
         if ((shapePage || exchangePage || placePage) && buildingPage()) {
             if (overWidget(mouseX, mouseY)) {
-                return super.mouseClicked(mouseX, mouseY, button);
+                return super.mouseClickedScaled(mouseX, mouseY, button);
             }
             if (button == 0 && shapePanel != null && shapePanel.mouseClicked(mouseX, mouseY)) {
                 return true;
@@ -1476,7 +1476,7 @@ public class WrightsMenuScreen extends Screen implements JeiPreview {
         if (shelfPanel.clickShelf(mouseX, mouseY, button)) {
             return true;
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClickedScaled(mouseX, mouseY, button);
     }
 
     private enum BuildMode {
@@ -1593,7 +1593,7 @@ public class WrightsMenuScreen extends Screen implements JeiPreview {
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+    protected boolean mouseDraggedScaled(double mouseX, double mouseY, int button, double dragX, double dragY) {
         if (button == 0 && shelfPress != null) {
             if (!shelfDragging && (Math.abs(mouseX - shelfPressX) > 4 || Math.abs(mouseY - shelfPressY) > 4) && canArrange()) {
                 shelfDragging = true;
@@ -1636,11 +1636,11 @@ public class WrightsMenuScreen extends Screen implements JeiPreview {
             pitch = Mth.clamp(pitch + (float) dragY * 0.45F, -70.0F, 70.0F);
             return true;
         }
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+        return super.mouseDraggedScaled(mouseX, mouseY, button, dragX, dragY);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    protected boolean mouseReleasedScaled(double mouseX, double mouseY, int button) {
         if (helpPage && helpPanel.mouseReleased(button)) {
             return true;
         }
@@ -1685,7 +1685,7 @@ public class WrightsMenuScreen extends Screen implements JeiPreview {
             WrightsClientConfig.save();
             return true;
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseReleasedScaled(mouseX, mouseY, button);
     }
 
     @Override
@@ -1986,7 +1986,7 @@ public class WrightsMenuScreen extends Screen implements JeiPreview {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+    protected boolean mouseScrolledScaled(double mouseX, double mouseY, double scrollX, double scrollY) {
         if (insideNav(mouseX, mouseY) && navContentH() > navViewH()) {
             navScroll = Mth.clamp(navScroll - (int) Math.signum(scrollY) * 22, 0, Math.max(0, navContentH() - navViewH()));
             return true;
@@ -2060,7 +2060,7 @@ public class WrightsMenuScreen extends Screen implements JeiPreview {
             scroll = Mth.clamp(scroll - (int) Math.signum(scrollY), 0, Math.max(0, rows.size() - visibleRows()));
             return true;
         }
-        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        return super.mouseScrolledScaled(mouseX, mouseY, scrollX, scrollY);
     }
 
     @Override

@@ -10,7 +10,7 @@ import net.minecraft.network.chat.Component;
  * Compact editor for the locked look-mode snap cell: nudge axes with modifier
  * step sizes, type coordinates, confirm, cancel, or clear so the preview follows the mouse again.
  */
-public class ShapeLookSnapScreen extends Screen {
+public class ShapeLookSnapScreen extends WrightsScaledScreen {
     private static final int PAD = 8;
     private static final int ROW = 14;
     private static final int GAP = 4;
@@ -110,9 +110,9 @@ public class ShapeLookSnapScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    protected void renderScaled(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         tip = null;
-        super.render(graphics, mouseX, mouseY, partialTick);
+        super.renderScaled(graphics, mouseX, mouseY, partialTick);
         int titleY = panelY + PAD;
         graphics.drawString(this.font, this.title, panelX + PAD, titleY, WrightsUi.COPPER, false);
         int helpX = panelX + PAD + this.font.width(this.title) + 4;

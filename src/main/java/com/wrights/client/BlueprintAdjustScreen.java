@@ -17,7 +17,7 @@ import com.wrights.blueprint.BlueprintTransforms;
 import com.wrights.blueprint.BoxEdits;
 import com.wrights.network.BlueprintPayloads;
 
-public class BlueprintAdjustScreen extends Screen {
+public class BlueprintAdjustScreen extends WrightsScaledScreen {
     private int panelX;
     private int panelY;
     private int panelW;
@@ -213,8 +213,8 @@ public class BlueprintAdjustScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
+    protected void renderScaled(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        super.renderScaled(graphics, mouseX, mouseY, partialTick);
         Component title = Component.translatable(WrightsClientState.editingId == null ? "screen.wrights.adjust" : "screen.wrights.adjust_edit");
         graphics.drawString(this.font, title, panelX + 14, panelY + 8, WrightsUi.COPPER, false);
         graphics.drawString(this.font, Component.translatable("screen.wrights.location"), panelX + 12, locationY, WrightsUi.BLUE, false);
@@ -666,7 +666,7 @@ public class BlueprintAdjustScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    protected boolean mouseClickedScaled(double mouseX, double mouseY, int button) {
         if (button == 0 && (hitHelp(mouseX, mouseY, fluidX, fluidY, "screen.wrights.copy_fluids")
                 || hitHelp(mouseX, mouseY, nbtX, nbtY, "screen.wrights.copy_nbt_blocks")
                 || hitHelp(mouseX, mouseY, settingsX, settingsY, "screen.wrights.copy_nbt_settings")
@@ -713,24 +713,24 @@ public class BlueprintAdjustScreen extends Screen {
             spinning = true;
             return true;
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClickedScaled(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+    protected boolean mouseDraggedScaled(double mouseX, double mouseY, int button, double dragX, double dragY) {
         if (spinning && button == 0) {
             yaw += (float) dragX * 0.75F;
             pitch = Mth.clamp(pitch + (float) dragY * 0.45F, -70.0F, 70.0F);
             return true;
         }
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+        return super.mouseDraggedScaled(mouseX, mouseY, button, dragX, dragY);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    protected boolean mouseReleasedScaled(double mouseX, double mouseY, int button) {
         if (button == 0) {
             spinning = false;
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseReleasedScaled(mouseX, mouseY, button);
     }
 }

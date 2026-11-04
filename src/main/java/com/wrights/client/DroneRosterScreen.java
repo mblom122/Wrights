@@ -16,7 +16,7 @@ import com.wrights.drone.WrightTier;
 import com.wrights.network.BlueprintPayloads;
 
 /** Moves wrights between jobs. The window stays put, and each list scrolls on its own. */
-public class DroneRosterScreen extends Screen {
+public class DroneRosterScreen extends WrightsScaledScreen {
     private static final int PREFERRED_W = 372;
     private static final int ROW = 20;
     private static final int HEADER = 46;
@@ -70,8 +70,8 @@ public class DroneRosterScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
+    protected void renderScaled(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        super.renderScaled(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, this.title, panelX + 16, panelY + 8, WrightsUi.COPPER, false);
         Component summary = Component.translatable("screen.wrights.roster_split", freeCount(), busyCount());
         graphics.drawString(this.font, summary, panelX + 16, panelY + 22, WrightsUi.MUTED, false);
@@ -81,7 +81,7 @@ public class DroneRosterScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    protected boolean mouseClickedScaled(double mouseX, double mouseY, int button) {
         if (button == 0) {
             if (clickList(freeWell(), freeRows, true, mouseX, mouseY)) {
                 return true;
@@ -93,11 +93,11 @@ public class DroneRosterScreen extends Screen {
                 return true;
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClickedScaled(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+    protected boolean mouseDraggedScaled(double mouseX, double mouseY, int button, double dragX, double dragY) {
         if (drag != 0 && button == 0) {
             if (drag == 3) {
                 moveScroll = Mth.clamp((int) (mouseY - dragGrab - moveListY()), 0, moveMax());
@@ -119,19 +119,19 @@ public class DroneRosterScreen extends Screen {
             }
             return true;
         }
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+        return super.mouseDraggedScaled(mouseX, mouseY, button, dragX, dragY);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    protected boolean mouseReleasedScaled(double mouseX, double mouseY, int button) {
         if (button == 0) {
             drag = 0;
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseReleasedScaled(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+    protected boolean mouseScrolledScaled(double mouseX, double mouseY, double scrollX, double scrollY) {
         int delta = (int) Math.signum(scrollY) * ROW;
         if (inside(mouseX, mouseY, freeWell())) {
             freeScroll = Mth.clamp(freeScroll - delta, 0, maxScroll(freeRows, listH(freeWell())));

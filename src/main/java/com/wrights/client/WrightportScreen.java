@@ -327,46 +327,56 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        this.renderBackground(graphics, mouseX, mouseY, partialTick);
-        renderBg(graphics, partialTick, mouseX, mouseY);
-        manage.render(this, graphics, mouseX, mouseY);
-        drawEnergy(graphics);
-        drawPortButtons(graphics, mouseX, mouseY);
-        boolean modal = manage.dialogOpen();
-        this.hoveredSlot = null;
-        if (!modal) {
-            graphics.pose().pushPose();
-            graphics.pose().translate(leftPos, topPos, 0.0F);
-            for (var slot : this.menu.slots) {
-                if (!slot.isActive()) {
-                    continue;
+        if (WrightsGuiScale.active()) {
+            graphics.fill(0, 0, this.width, this.height, 0xC0101010);
+        }
+        int localX = WrightsGuiScale.localX(mouseX, this.width);
+        int localY = WrightsGuiScale.localY(mouseY, this.height);
+        WrightsGuiScale.begin(graphics, this.width, this.height);
+        try {
+            this.renderBackground(graphics, localX, localY, partialTick);
+            renderBg(graphics, partialTick, localX, localY);
+            manage.render(this, graphics, localX, localY);
+            drawEnergy(graphics);
+            drawPortButtons(graphics, localX, localY);
+            boolean modal = manage.dialogOpen();
+            this.hoveredSlot = null;
+            if (!modal) {
+                graphics.pose().pushPose();
+                graphics.pose().translate(leftPos, topPos, 0.0F);
+                for (var slot : this.menu.slots) {
+                    if (!slot.isActive()) {
+                        continue;
+                    }
+                    this.renderSlot(graphics, slot);
+                    if (this.isHovering(slot.x, slot.y, 16, 16, localX, localY)) {
+                        this.hoveredSlot = slot;
+                        AbstractContainerScreen.renderSlotHighlight(graphics, slot.x, slot.y, 0);
+                    }
                 }
-                this.renderSlot(graphics, slot);
-                if (this.isHovering(slot.x, slot.y, 16, 16, mouseX, mouseY)) {
-                    this.hoveredSlot = slot;
-                    AbstractContainerScreen.renderSlotHighlight(graphics, slot.x, slot.y, 0);
-                }
+                graphics.pose().popPose();
             }
-            graphics.pose().popPose();
+            for (Renderable widget : this.renderables) {
+                widget.render(graphics, localX, localY, partialTick);
+            }
+            // Dialog + tip last so hangar/inventory do not show through; tip stays readable.
+            manage.renderOverlay(this, graphics, localX, localY);
+            var carried = this.menu.getCarried();
+            if (!carried.isEmpty()) {
+                graphics.pose().pushPose();
+                graphics.pose().translate(0.0F, 0.0F, 500.0F);
+                graphics.renderItem(carried, localX - 8, localY - 8);
+                graphics.renderItemDecorations(this.font, carried, localX - 8, localY - 8);
+                graphics.pose().popPose();
+            }
+            Component portTip = portButtonTip(localX, localY);
+            if (portTip != null) {
+                graphics.renderTooltip(this.font, portTip, localX, localY);
+            }
+            this.renderTooltip(graphics, localX, localY);
+        } finally {
+            WrightsGuiScale.end(graphics);
         }
-        for (Renderable widget : this.renderables) {
-            widget.render(graphics, mouseX, mouseY, partialTick);
-        }
-        // Dialog + tip last so hangar/inventory do not show through; tip stays readable.
-        manage.renderOverlay(this, graphics, mouseX, mouseY);
-        var carried = this.menu.getCarried();
-        if (!carried.isEmpty()) {
-            graphics.pose().pushPose();
-            graphics.pose().translate(0.0F, 0.0F, 500.0F);
-            graphics.renderItem(carried, mouseX - 8, mouseY - 8);
-            graphics.renderItemDecorations(this.font, carried, mouseX - 8, mouseY - 8);
-            graphics.pose().popPose();
-        }
-        Component portTip = portButtonTip(mouseX, mouseY);
-        if (portTip != null) {
-            graphics.renderTooltip(this.font, portTip, mouseX, mouseY);
-        }
-        this.renderTooltip(graphics, mouseX, mouseY);
     }
 
     @Override
@@ -380,27 +390,49 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 0 && clickPortButton(mouseX, mouseY)) {
+        double localX = WrightsGuiScale.localX(mouseX, this.width);
+        double localY = WrightsGuiScale.localY(mouseY, this.height);
+        if (button == 0 && clickPortButton(localX, localY)) {
             return true;
         }
-        if (manage.mouseClicked(this, mouseX, mouseY, button)) {
+        if (manage.mouseClicked(this, localX, localY, button)) {
             return true;
         }
         for (GuiEventListener child : this.children()) {
-            if (child.mouseClicked(mouseX, mouseY, button)) {
+            if (child.mouseClicked(localX, localY, button)) {
                 setFocused(child);
                 return true;
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(localX, localY, button);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        return super.mouseReleased(
+                WrightsGuiScale.localX(mouseX, this.width),
+                WrightsGuiScale.localY(mouseY, this.height),
+                button);
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        return super.mouseDragged(
+                WrightsGuiScale.localX(mouseX, this.width),
+                WrightsGuiScale.localY(mouseY, this.height),
+                button,
+                WrightsGuiScale.localDelta(dragX),
+                WrightsGuiScale.localDelta(dragY));
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        if (manage.mouseScrolled(this, mouseX, mouseY, scrollY)) {
+        double localX = WrightsGuiScale.localX(mouseX, this.width);
+        double localY = WrightsGuiScale.localY(mouseY, this.height);
+        if (manage.mouseScrolled(this, localX, localY, scrollY)) {
             return true;
         }
-        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        return super.mouseScrolled(localX, localY, scrollX, scrollY);
     }
 
     @Override

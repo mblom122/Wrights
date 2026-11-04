@@ -25,7 +25,7 @@ import com.wrights.entity.DroneEntity;
 import com.wrights.network.BlueprintPayloads;
 
 /** Assigns wrights to one job. The window stays put; each list scrolls on its own. */
-public class JobDroneScreen extends Screen {
+public class JobDroneScreen extends WrightsScaledScreen {
     private static final int PREFERRED_W = 420;
     private static final int ROW = 20;
     private static final int DETAIL_ROW = 44;
@@ -81,8 +81,8 @@ public class JobDroneScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
+    protected void renderScaled(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        super.renderScaled(graphics, mouseX, mouseY, partialTick);
         BlueprintPayloads.JobLine job = live();
         if (job == null) {
             return;
@@ -120,7 +120,7 @@ public class JobDroneScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    protected boolean mouseClickedScaled(double mouseX, double mouseY, int button) {
         if (button == 0) {
             if (clickWell(onJobWell(), assigned, true, mouseX, mouseY)) {
                 return true;
@@ -129,28 +129,28 @@ public class JobDroneScreen extends Screen {
                 return true;
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClickedScaled(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+    protected boolean mouseDraggedScaled(double mouseX, double mouseY, int button, double dragX, double dragY) {
         if (drag != 0 && button == 0) {
             scrollFromThumb(drag == 1, mouseY);
             return true;
         }
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+        return super.mouseDraggedScaled(mouseX, mouseY, button, dragX, dragY);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    protected boolean mouseReleasedScaled(double mouseX, double mouseY, int button) {
         if (button == 0) {
             drag = 0;
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseReleasedScaled(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+    protected boolean mouseScrolledScaled(double mouseX, double mouseY, double scrollX, double scrollY) {
         int delta = (int) Math.signum(scrollY) * ROW;
         Well onJob = onJobWell();
         Well available = availableWell();

@@ -9,7 +9,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.network.BlueprintPayloads;
 
-public class JobActionScreen extends Screen {
+public class JobActionScreen extends WrightsScaledScreen {
     private static final int CREW_STEP = 14;
 
     private final UUID id;
@@ -64,8 +64,8 @@ public class JobActionScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
+    protected void renderScaled(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        super.renderScaled(graphics, mouseX, mouseY, partialTick);
         BlueprintPayloads.JobLine job = live();
         if (job == null) {
             return;
@@ -102,7 +102,7 @@ public class JobActionScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    protected boolean mouseClickedScaled(double mouseX, double mouseY, int button) {
         if (button == 0) {
             BlueprintPayloads.JobLine job = live();
             if (job != null && !job.finished() && !job.saving()) {
@@ -116,7 +116,7 @@ public class JobActionScreen extends Screen {
                 }
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClickedScaled(mouseX, mouseY, button);
     }
 
     private void drawStep(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, String label, boolean enabled) {

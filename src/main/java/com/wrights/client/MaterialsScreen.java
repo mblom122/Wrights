@@ -17,7 +17,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import com.wrights.WrightsClientConfig;
 import com.wrights.network.BlueprintPayloads;
 
-public class MaterialsScreen extends Screen {
+public class MaterialsScreen extends WrightsScaledScreen {
     private static final int ROW = 20;
     private static final int HEADER = 14;
     private static final int COUNT_W = 44;
@@ -170,8 +170,8 @@ public class MaterialsScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
+    protected void renderScaled(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        super.renderScaled(graphics, mouseX, mouseY, partialTick);
         Component title = Component.translatable(shortage ? "menu.wrights.need_title" : "menu.wrights.materials_title");
         graphics.drawString(this.font, title, panelX + 14, panelY + 8, WrightsUi.COPPER, false);
         boolean creative = this.minecraft.player != null && this.minecraft.player.getAbilities().instabuild && !this.minecraft.player.isSpectator();
@@ -287,7 +287,7 @@ public class MaterialsScreen extends Screen {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+    protected boolean mouseScrolledScaled(double mouseX, double mouseY, double scrollX, double scrollY) {
         int rows = Math.max(1, (listH - HEADER) / ROW);
         scroll = Mth.clamp(scroll - (int) Math.signum(scrollY), 0, Math.max(0, lines.size() - rows));
         return true;
