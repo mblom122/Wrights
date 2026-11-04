@@ -417,7 +417,8 @@ final class WrightManagePanel {
         int fitted = swarm.units().get(expanded).parts().tier(slot);
         ItemStack held = heldPart(screen);
         if (!held.isEmpty() && held.getItem() instanceof WrightPartItem part && part.slot() == slot) {
-            if (part.tier() != fitted && have(screen, slot, part.tier())) {
+            // Cursor / hand already holds the part — server consumes carried first (not only bag stock).
+            if (part.tier() != fitted) {
                 int[] targets = markedCount(screen, swarm) > 0 ? marked(screen, swarm) : new int[] { expanded };
                 if (targets.length == 0) {
                     targets = new int[] { expanded };

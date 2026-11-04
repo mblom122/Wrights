@@ -545,12 +545,11 @@ public final class HangarOps {
             return swarm;
         }
         if (need != null) {
-            // Stock only — marked bulk crafts are ordered separately.
-            ItemSource.Take taken = ItemSource.takeDetailed(player, need, 1, false);
+            // Stock only — marked bulk crafts are ordered separately. Prefer the cursor stack.
+            ItemSource.Take taken = takeUpgrade(player, need, 1, false);
             if (taken.result() != ItemSource.Result.OK) {
                 return swarm;
             }
-            noteUse(need, taken.fromDigital(), 0);
         }
         if (!refund(player, slot, tier)) {
             return swarm;
@@ -878,13 +877,44 @@ public final class HangarOps {
     }
 
     private static ItemSource.Take takeUpgrade(ServerPlayer player, Item item, int count) {
-        ItemSource.Take taken = ItemSource.takeDetailed(player, item, count);
+        return takeUpgrade(player, item, count, true);
+    }
+
+    /**
+     * Takes an upgrade part for hangar fitting. The stack on the cursor is consumed first so
+     * clicking a hardware bay with a picked-up part does not leave the count and dupe on refund.
+     */
+    private static ItemSource.Take takeUpgrade(ServerPlayer player, Item item, int count, boolean allowCraft) {
+        int fromCarried = shrinkCarried(player, item, count);
+        int left = count - fromCarried;
+        if (left <= 0) {
+            return new ItemSource.Take(ItemSource.Result.OK, 0, 0);
+        }
+        ItemSource.Take taken = ItemSource.takeDetailed(player, item, left, allowCraft);
         if (taken.result() == ItemSource.Result.OK) {
             noteUse(item, taken.fromDigital(), 0);
         } else if (taken.result() == ItemSource.Result.CRAFTING) {
             noteUse(item, 0, taken.crafted());
+        } else if (fromCarried > 0) {
+            // Restoring a partial cursor take is awkward; hangar fits always ask for 1.
+            giveStack(player, new ItemStack(item, fromCarried));
         }
         return taken;
+    }
+
+    /** Shrinks the menu cursor stack when it matches {@code item}. */
+    private static int shrinkCarried(ServerPlayer player, Item item, int count) {
+        if (item == null || count <= 0 || player.containerMenu == null) {
+            return 0;
+        }
+        ItemStack carried = player.containerMenu.getCarried();
+        if (carried.isEmpty() || !carried.is(item)) {
+            return 0;
+        }
+        int used = Math.min(count, carried.getCount());
+        carried.shrink(used);
+        player.containerMenu.setCarried(carried);
+        return used;
     }
 
     /**
