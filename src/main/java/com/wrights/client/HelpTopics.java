@@ -17,12 +17,17 @@ public final class HelpTopics {
             new Topic("modes", "help.wrights.nav.modes"),
             new Topic("new", "help.wrights.nav.new"),
             new Topic("build", "help.wrights.nav.build"),
-            new Topic("mirror", "help.wrights.nav.mirror"),
             new Topic("place", "help.wrights.nav.place"),
+            new Topic("mirror", "help.wrights.nav.mirror"),
             new Topic("shape", "help.wrights.nav.shape"),
             new Topic("exchange", "help.wrights.nav.exchange"),
             new Topic("bind", "help.wrights.nav.bind"),
             new Topic("jobs", "help.wrights.nav.jobs"),
+            new Topic("work", "help.wrights.nav.work"),
+            new Topic("ports", "help.wrights.nav.ports"),
+            new Topic("hangar", "help.wrights.nav.hangar"),
+            new Topic("parts", "help.wrights.nav.parts"),
+            new Topic("energy", "help.wrights.nav.energy"),
             new Topic("manage", "help.wrights.nav.manage"),
             new Topic("info", "help.wrights.nav.info"),
             new Topic("link", "help.wrights.nav.link"),
@@ -42,6 +47,8 @@ public final class HelpTopics {
                     line("P", "help.wrights.start.p2"),
                     line("H", "help.wrights.start.h2"),
                     line("P", "help.wrights.start.p3"),
+                    line("H", "help.wrights.start.h3"),
+                    line("P", "help.wrights.start.p4"),
                     line("K", "B|Ctrl+Shift+Scroll|Shift+Scroll"),
                     line("T", "help.wrights.start.tip")
             };
@@ -49,12 +56,12 @@ public final class HelpTopics {
                     line("H", "help.wrights.modes.h1"),
                     line("P", "help.wrights.modes.p1"),
                     line("H", "help.wrights.modes.h2"),
-                    line("P", "help.wrights.modes.p_new"),
                     line("P", "help.wrights.modes.p_build"),
                     line("P", "help.wrights.modes.p_jobs"),
-                    line("P", "help.wrights.modes.p_manage"),
                     line("P", "help.wrights.modes.p_info"),
                     line("P", "help.wrights.modes.p_link"),
+                    line("P", "help.wrights.modes.p_manage"),
+                    line("K", "Ctrl+Shift+Scroll|Shift+Scroll|B"),
                     line("T", "help.wrights.modes.tip")
             };
             case "new" -> new Line[] {
@@ -132,15 +139,73 @@ public final class HelpTopics {
                     line("P", "help.wrights.jobs.p1"),
                     line("H", "help.wrights.jobs.h2"),
                     line("P", "help.wrights.jobs.p2"),
+                    line("H", "help.wrights.jobs.h3"),
+                    line("P", "help.wrights.jobs.p_running"),
+                    line("P", "help.wrights.jobs.p_stalled"),
+                    line("P", "help.wrights.jobs.p_toast"),
                     line("T", "help.wrights.jobs.tip")
+            };
+            case "work" -> new Line[] {
+                    line("H", "help.wrights.work.h1"),
+                    line("P", "help.wrights.work.p1"),
+                    line("P", "help.wrights.work.p2"),
+                    line("H", "help.wrights.work.h2"),
+                    line("P", "help.wrights.work.p3"),
+                    line("P", "help.wrights.work.p4"),
+                    line("T", "help.wrights.work.tip")
+            };
+            case "ports" -> new Line[] {
+                    line("H", "help.wrights.ports.h1"),
+                    line("P", "help.wrights.ports.p1"),
+                    line("H", "help.wrights.ports.h2"),
+                    line("P", "help.wrights.ports.p2"),
+                    line("P", "help.wrights.ports.p3"),
+                    line("H", "help.wrights.ports.h3"),
+                    line("P", "help.wrights.ports.p4"),
+                    line("T", "help.wrights.ports.tip")
+            };
+            case "hangar" -> new Line[] {
+                    line("H", "help.wrights.hangar.h1"),
+                    line("P", "help.wrights.hangar.p1"),
+                    line("P", "help.wrights.hangar.p2"),
+                    line("P", "help.wrights.hangar.p3"),
+                    line("K", "Click|Corner click|Right-click|Shift+Click"),
+                    line("H", "help.wrights.hangar.h2"),
+                    line("P", "help.wrights.hangar.p4"),
+                    line("P", "help.wrights.hangar.p5"),
+                    line("H", "help.wrights.hangar.h3"),
+                    line("P", "help.wrights.hangar.p6"),
+                    line("T", "help.wrights.hangar.tip")
+            };
+            case "parts" -> new Line[] {
+                    line("H", "help.wrights.parts.h1"),
+                    line("P", "help.wrights.parts.p_rotor"),
+                    line("P", "help.wrights.parts.p_fab"),
+                    line("P", "help.wrights.parts.p_core"),
+                    line("H", "help.wrights.parts.h2"),
+                    line("P", "help.wrights.parts.p_tiers"),
+                    line("K", "Basic|Scout|Ranger|Vector|Tempest|Apex"),
+                    line("H", "help.wrights.parts.h3"),
+                    line("P", "help.wrights.parts.p_item"),
+                    line("T", "help.wrights.parts.tip")
+            };
+            case "energy" -> new Line[] {
+                    line("H", "help.wrights.energy.h1"),
+                    line("P", "help.wrights.energy.p1"),
+                    line("P", "help.wrights.energy.p2"),
+                    line("H", "help.wrights.energy.h2"),
+                    line("P", "help.wrights.energy.p3"),
+                    line("P", "help.wrights.energy.p4"),
+                    line("H", "help.wrights.energy.h3"),
+                    line("P", "help.wrights.energy.p5"),
+                    line("T", "help.wrights.energy.tip")
             };
             case "manage" -> new Line[] {
                     line("H", "help.wrights.manage.h1"),
                     line("P", "help.wrights.manage.p1"),
                     line("H", "help.wrights.manage.h2"),
-                    line("P", "help.wrights.manage.p_personal"),
-                    line("P", "help.wrights.manage.p_ports"),
-                    line("P", "help.wrights.manage.p_parts"),
+                    line("P", "help.wrights.manage.p2"),
+                    line("P", "help.wrights.manage.p3"),
                     line("T", "help.wrights.manage.tip")
             };
             case "info" -> new Line[] {
@@ -187,6 +252,9 @@ public final class HelpTopics {
                     line("H", "help.wrights.keys.h3"),
                     line("P", "help.wrights.keys.p3"),
                     line("K", "1 · Ctrl 5 · Shift 10 · Alt 50 · Ctrl+Shift 100"),
+                    line("H", "help.wrights.keys.h4"),
+                    line("P", "help.wrights.keys.p4"),
+                    line("K", "Click|Corner click|Right-click|Shift+Click"),
                     line("T", "help.wrights.keys.tip")
             };
             default -> new Line[] {
