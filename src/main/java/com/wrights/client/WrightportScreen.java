@@ -377,6 +377,8 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
         } finally {
             WrightsGuiScale.end(graphics);
         }
+        // Screen coords (not localX/Y): JEI lays out beside the hangar in unscaled GUI space.
+        HangarScreenEvents.postRender(this, graphics, mouseX, mouseY);
     }
 
     @Override

@@ -256,6 +256,8 @@ public class PersonalHangarScreen extends AbstractContainerScreen<PersonalHangar
         } finally {
             WrightsGuiScale.end(graphics);
         }
+        // Screen coords (not localX/Y): JEI lays out beside the hangar in unscaled GUI space.
+        HangarScreenEvents.postRender(this, graphics, mouseX, mouseY);
     }
 
     private void drawBoundaryButton(GuiGraphics graphics, int mouseX, int mouseY) {
