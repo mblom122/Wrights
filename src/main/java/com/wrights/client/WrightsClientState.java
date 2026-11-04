@@ -431,6 +431,29 @@ public final class WrightsClientState {
         return unit == null ? null : wrightSpots.get(unit);
     }
 
+    /**
+     * True when this wright is physically out of its hangar (working or flying home).
+     * Docked crew leftovers on a stalled/queued job are not away.
+     */
+    public static boolean wrightAway(UUID unit) {
+        if (unit == null) {
+            return false;
+        }
+        for (BlueprintPayloads.JobLine job : jobs) {
+            if (job.finished()) {
+                continue;
+            }
+            for (BlueprintPayloads.CrewHand hand : job.crewHands()) {
+                if (unit.equals(hand.unit()) && hand.out()) {
+                    return true;
+                }
+            }
+        }
+        BlueprintPayloads.WrightSpot spot = wrightSpot(unit);
+        // 0 = on site, 1 = flying home. 2 = assigned but docked.
+        return spot != null && (spot.state() == 0 || spot.state() == 1);
+    }
+
     public static boolean wrightMarked(UUID unit) {
         return unit != null && markedWrights.contains(unit);
     }

@@ -466,6 +466,20 @@ public final class CrewRoster {
         return level != null && level.getEntity(entityId) instanceof DroneEntity drone && drone.isAlive();
     }
 
+    /** True when this wright has a live flyer on any unfinished job (on site or heading home). */
+    public static boolean isOutOnJob(ServerPlayer player, UUID unitId) {
+        if (player == null || unitId == null || player.getServer() == null) {
+            return false;
+        }
+        SchematicLibrary library = SchematicLibrary.get(player.getServer());
+        for (BuildJob job : library.jobsFor(player.getUUID())) {
+            if (!job.finished() && unitIsOut(player, job, unitId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** A personal port counts while you are near the build. A block port counts while its area meets the build. */
     static boolean coversJob(ServerPlayer player, BuildJob job, BlockPos home) {
         BlockPos[] box = JobManager.jobBox(job);

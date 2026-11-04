@@ -186,6 +186,11 @@ final class HangarGui {
 
     /** Tip strip under the hangar art (replaces Add / Remove). */
     static void drawTipStrip(GuiGraphics graphics, net.minecraft.client.gui.Font font, int left, int top, net.minecraft.network.chat.Component tip) {
+        drawTipStrip(graphics, font, left, top, tip, WrightsUi.TEXT);
+    }
+
+    static void drawTipStrip(GuiGraphics graphics, net.minecraft.client.gui.Font font, int left, int top,
+            net.minecraft.network.chat.Component tip, int color) {
         int x = left + 8;
         int y = top + HEIGHT + 4;
         int w = WIDTH - 16;
@@ -193,6 +198,6 @@ final class HangarGui {
             return;
         }
         String text = font.plainSubstrByWidth(tip.getString(), Math.max(8, w));
-        graphics.drawString(font, text, x, y, WrightsUi.TEXT, false);
+        graphics.drawString(font, text, x, y, color, false);
     }
 }

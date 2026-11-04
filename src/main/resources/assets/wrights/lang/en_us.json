@@ -1046,7 +1046,7 @@
   "message.wrights.wrights_removed": "Took out %s",
   "message.wrights.no_wrights": "This port has no wrights",
   "message.wrights.manage_missing": "That personal wrightport is gone",
-  "message.wrights.wright_away": "That wright is out",
+  "message.wrights.wright_away": "That wright is out — wait until it docks",
   "message.wrights.wright_locked": "That wright is being managed",
   "message.wrights.drone_full": "This port already holds %s wrights",
   "message.wrights.wright_cap": "The limit is %s wrights in total",

@@ -27,7 +27,7 @@ import com.wrights.network.BlueprintPayloads;
 
 /**
  * Hangar bay for one wrightport: textured 5×2 STORAGE BAY plus three DRONE HARDWARE part slots.
- * Wrights out on a job stay in their slot but are locked until they return.
+ * Wrights physically out of the hangar stay in their slot but are locked until they dock.
  */
 final class WrightManagePanel {
     /** Marked dialog: first part row, and the height of each. */
@@ -261,12 +261,14 @@ final class WrightManagePanel {
             graphics.pose().popPose();
             return;
         }
-        Component tip = tipLine();
+        Component notice = noticeTip();
+        Component tip = !notice.getString().isEmpty() ? notice : tipLine();
         if (tip.getString().isEmpty()) {
             tip = chromeTip();
         }
         if (!tip.getString().isEmpty()) {
-            HangarGui.drawTipStrip(graphics, screen.font(), panelX, panelY, tip);
+            int color = !notice.getString().isEmpty() ? 0xFFFF5555 : WrightsUi.TEXT;
+            HangarGui.drawTipStrip(graphics, screen.font(), panelX, panelY, tip, color);
         }
     }
 
@@ -276,6 +278,11 @@ final class WrightManagePanel {
             return notice;
         }
         return Component.translatable("screen.wrights.hangar_hint");
+    }
+
+    /** Red tip for 1.4s when trying to edit a wright that is not in the hangar. */
+    private void warnAway() {
+        WrightsClientState.showNotice(Component.translatable("message.wrights.wright_away"));
     }
 
     private void drawHardware(GuiGraphics graphics, ManageHost screen, Swarm swarm, int mouseX, int mouseY) {
@@ -379,7 +386,11 @@ final class WrightManagePanel {
     }
 
     private boolean takeWright(ManageHost screen, Swarm swarm, int slot) {
-        if (slot < 0 || slot >= swarm.units().size() || away(screen, swarm, slot) || !screen.requireTool()) {
+        if (slot < 0 || slot >= swarm.units().size() || !screen.requireTool()) {
+            return true;
+        }
+        if (away(screen, swarm, slot)) {
+            warnAway();
             return true;
         }
         UUID id = swarm.units().get(slot).id();
@@ -405,7 +416,11 @@ final class WrightManagePanel {
         if (expanded < 0 || expanded >= swarm.units().size()) {
             return false;
         }
-        if (away(screen, swarm, expanded) || !screen.requireTool()) {
+        if (!screen.requireTool()) {
+            return true;
+        }
+        if (away(screen, swarm, expanded)) {
+            warnAway();
             return true;
         }
         int fitted = swarm.units().get(expanded).parts().tier(part.slot());
@@ -421,7 +436,11 @@ final class WrightManagePanel {
         if (expanded < 0 || expanded >= swarm.units().size()) {
             return true;
         }
-        if (away(screen, swarm, expanded) || !screen.requireTool()) {
+        if (!screen.requireTool()) {
+            return true;
+        }
+        if (away(screen, swarm, expanded)) {
+            warnAway();
             return true;
         }
         int fitted = swarm.units().get(expanded).parts().tier(slot);
@@ -638,7 +657,11 @@ final class WrightManagePanel {
             expanded = 0;
             return;
         }
-        if (expanded < 0 || expanded >= swarm.units().size() || away(screen, swarm, expanded)) {
+        if (expanded < 0 || expanded >= swarm.units().size()) {
+            return;
+        }
+        if (away(screen, swarm, expanded)) {
+            warnAway();
             return;
         }
         screen.edit(HangarOps.TAKE, expanded);

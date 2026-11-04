@@ -218,12 +218,7 @@ public class WrightportScreen extends AbstractContainerScreen<WrightportMenu> im
 
     @Override
     public boolean away(UUID id) {
-        for (BlueprintPayloads.JobLine job : WrightsClientState.jobs) {
-            if (!job.finished() && job.crew().contains(id)) {
-                return true;
-            }
-        }
-        return false;
+        return WrightsClientState.wrightAway(id);
     }
 
     @Override

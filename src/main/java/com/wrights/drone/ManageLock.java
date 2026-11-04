@@ -8,8 +8,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
 import com.wrights.item.PersonalWrightportItem;
-import com.wrights.job.BuildJob;
-import com.wrights.schematic.SchematicLibrary;
 
 /** Wrights held on the Manage screen stay home until the screen lets them go. */
 public final class ManageLock {
@@ -53,15 +51,12 @@ public final class ManageLock {
         return false;
     }
 
-    /** On a job, including flying back, so the wright is not in the port. */
+    /**
+     * Physically out of the hangar (on site or flying home). Assigned-but-docked crew
+     * leftovers after a stall must stay editable.
+     */
     public static boolean away(ServerPlayer player, UUID unitId) {
-        SchematicLibrary library = SchematicLibrary.get(player.server);
-        for (BuildJob job : library.jobsFor(player.getUUID())) {
-            if (!job.finished() && job.crewUnits().contains(unitId)) {
-                return true;
-            }
-        }
-        return false;
+        return com.wrights.job.CrewRoster.isOutOnJob(player, unitId);
     }
 
     private static Hold fresh(ServerPlayer player) {
