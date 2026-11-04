@@ -2,6 +2,7 @@ package com.wrights.client;
 
 import com.wrights.block.WrightportLamp;
 import com.wrights.drone.Swarm;
+import com.wrights.drone.WrightHomes;
 import com.wrights.entity.DroneEntity;
 
 import java.util.HashMap;
@@ -135,9 +136,6 @@ public class PersonalWrightportRenderer implements ICurioRenderer {
     }
 
     private static Vec3 behindClient(LivingEntity entity) {
-        // Same body-yaw back vector as WrightHomes — pack faces the torso, not the head.
-        float yaw = entity.yBodyRot * Mth.DEG_TO_RAD;
-        Vec3 back = new Vec3(Mth.sin(yaw), 0.0D, -Mth.cos(yaw));
-        return entity.position().add(back.scale(0.42D)).add(0.0D, 1.0D, 0.0D);
+        return WrightHomes.WornPack.of(entity).hatch();
     }
 }

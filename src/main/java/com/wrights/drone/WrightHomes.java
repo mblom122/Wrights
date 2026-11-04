@@ -13,7 +13,6 @@ import net.minecraft.core.SectionPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
@@ -38,33 +37,93 @@ public final class WrightHomes {
     }
 
     /**
-     * Horizontal unit vector pointing behind the torso. Uses body yaw (not look angle) so the
-     * dock lines up with the worn pack when the player faces between the cardinals.
+     * Outward normal of the worn pack door — away from the spine, same side as the iris.
+     * Uses the wearer's yaw through {@link Vec3#directionFromRotation} (same basis as
+     * {@link LivingEntity#getLookAngle()}), then flips to the back. Prefer body yaw when it is
+     * close to look yaw so the door tracks the Curios pack; otherwise look yaw so a turned head
+     * does not send returns to the wrong compass side.
      */
-    public static Vec3 playerBack(LivingEntity entity) {
-        float yaw = entity.yBodyRot * Mth.DEG_TO_RAD;
-        return new Vec3(Mth.sin(yaw), 0.0D, -Mth.cos(yaw));
+    public static Vec3 packOutward(LivingEntity entity) {
+        float lookYaw = entity.getYRot();
+        float bodyYaw = entity.yBodyRot;
+        float yaw = lookYaw;
+        float delta = Math.abs(net.minecraft.util.Mth.wrapDegrees(bodyYaw - lookYaw));
+        // Body drives the pack mesh; use it while it still faces roughly where the player looks.
+        if (delta < 35.0F) {
+            yaw = bodyYaw;
+        }
+        Vec3 forward = Vec3.directionFromRotation(0.0F, yaw);
+        double x = forward.x;
+        double z = forward.z;
+        double len = Math.sqrt(x * x + z * z);
+        if (len < 1.0E-6D) {
+            return new Vec3(0.0D, 0.0D, -1.0D);
+        }
+        // Door / iris face opposite forward (the pack backside).
+        return new Vec3(-x / len, 0.0D, -z / len);
     }
 
-    /** Into the worn pack bay — close to the spine, inside the iris. */
+    /**
+     * Live worn-pack dock pose. Recompute whenever the wearer moves or turns — hatch sits inside
+     * the bay, door is the outer iris face, high is above the door for manage-add / far snaps.
+     * Depths are doubles in blocks along {@link #packOutward}.
+     */
+    public record WornPack(Vec3 hatch, Vec3 door, Vec3 high, Vec3 outward, Vec3 right) {
+        /** Horizontal blocks from feet-center along outward to the iris / bay. */
+        public static final double HATCH_DEPTH = 0.38D;
+        public static final double DOOR_DEPTH = 0.72D;
+        /** Eye-ish heights above feet. */
+        public static final double HATCH_Y = 1.00D;
+        public static final double DOOR_Y = 1.35D;
+
+        public static WornPack of(LivingEntity entity, double lift) {
+            Vec3 outward = packOutward(entity);
+            // Right-handed: outward × up = right along the pack face.
+            Vec3 right = new Vec3(-outward.z, 0.0D, outward.x);
+            Vec3 feet = entity.position();
+            Vec3 hatch = feet.add(outward.scale(HATCH_DEPTH)).add(0.0D, HATCH_Y, 0.0D);
+            Vec3 door = feet.add(outward.scale(DOOR_DEPTH)).add(0.0D, DOOR_Y, 0.0D);
+            Vec3 high = new Vec3(door.x, feet.y + lift, door.z);
+            return new WornPack(hatch, door, high, outward, right);
+        }
+
+        public static WornPack of(LivingEntity entity) {
+            return of(entity, DOOR_Y);
+        }
+
+        /** Slot ring in the pack door plane (not world XZ), so diagonals stay on the pack. */
+        public Vec3 highSlot(int slot, int count) {
+            return offset(high, slot, count, 0.45D);
+        }
+
+        public Vec3 doorSlot(int slot, int count) {
+            return offset(door, slot, count, 0.35D);
+        }
+
+        private Vec3 offset(Vec3 center, int slot, int count, double radius) {
+            int n = Math.max(1, count);
+            if (n <= 1 || radius <= 1.0E-6D) {
+                return center;
+            }
+            double angle = (Math.PI * 2.0D * slot) / n;
+            return center.add(right.scale(Math.cos(angle) * radius))
+                    .add(outward.scale(Math.sin(angle) * radius * 0.15D));
+        }
+    }
+
+    /** Into the worn pack bay (inside the iris). */
     public static Vec3 behindPlayer(ServerPlayer player) {
-        return player.position().add(playerBack(player).scale(0.42D)).add(0.0D, 1.0D, 0.0D);
+        return WornPack.of(player).hatch();
     }
 
-    /**
-     * Just outside / above the worn pack door so a return lines up with the iris, then dives in.
-     */
+    /** Just outside / above the worn pack door. */
     public static Vec3 doorApproach(ServerPlayer player) {
-        return player.position().add(playerBack(player).scale(1.25D)).add(0.0D, 1.55D, 0.0D);
+        return WornPack.of(player).door();
     }
 
-    /**
-     * High point on the personal approach line (same XZ as {@link #doorApproach}) for manage-add
-     * and far home snaps, so the dive aims at the door rather than floating above the hatch.
-     */
+    /** High point on the personal door line for manage-add / far home snaps. */
     public static Vec3 highApproach(ServerPlayer player, double lift) {
-        Vec3 door = doorApproach(player);
-        return new Vec3(door.x, player.getY() + lift, door.z);
+        return WornPack.of(player, lift).high();
     }
 
     /** Inside the roof bay of the two-block tower, under the iris, where a returning wright disappears. */

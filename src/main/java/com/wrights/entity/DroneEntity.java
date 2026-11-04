@@ -231,13 +231,16 @@ public class DroneEntity extends Entity {
         this.setJobId(null);
         setWorkStatus(ItemStack.EMPTY, ItemStack.EMPTY, WAIT_HOME);
         setHomePort(port);
-        int n = Math.max(1, count);
-        double angle = (Math.PI * 2.0D * slot) / n;
-        double radius = n <= 1 ? 0.0D : 0.55D;
         double lift = nextDockHeight();
-        Vec3 above = port != null
-                ? WrightHomes.hatch(port).add(Math.cos(angle) * radius, lift, Math.sin(angle) * radius)
-                : WrightHomes.highApproach(player, lift).add(Math.cos(angle) * radius, 0.0D, Math.sin(angle) * radius);
+        Vec3 above;
+        if (port != null) {
+            int n = Math.max(1, count);
+            double angle = (Math.PI * 2.0D * slot) / n;
+            double radius = n <= 1 ? 0.0D : 0.55D;
+            above = WrightHomes.hatch(port).add(Math.cos(angle) * radius, lift, Math.sin(angle) * radius);
+        } else {
+            above = WrightHomes.WornPack.of(player, lift).highSlot(slot, count);
+        }
         this.moveTo(above.x, above.y, above.z, player.getYRot(), 0.0F);
         this.setYRot(player.getYRot());
         Vec3 dock = port != null ? WrightHomes.hatch(port) : WrightHomes.behindPlayer(player);
@@ -295,14 +298,14 @@ public class DroneEntity extends Entity {
      * opposite side of the hatch. Far snaps use Manage-add height; near teleport-mode uses a short drop.
      */
     private Vec3 returnAbove(ServerPlayer player, @Nullable BlockPos port, int slot, int count, boolean far) {
-        int n = Math.max(1, count);
-        double angle = (Math.PI * 2.0D * slot) / n;
-        double radius = n <= 1 ? 0.0D : 0.55D;
         double lift = far ? nextDockHeight() : (port != null ? 5.0D : 4.0D);
         if (port != null) {
+            int n = Math.max(1, count);
+            double angle = (Math.PI * 2.0D * slot) / n;
+            double radius = n <= 1 ? 0.0D : 0.55D;
             return WrightHomes.hatch(port).add(Math.cos(angle) * radius, lift, Math.sin(angle) * radius);
         }
-        return WrightHomes.highApproach(player, lift).add(Math.cos(angle) * radius, 0.0D, Math.sin(angle) * radius);
+        return WrightHomes.WornPack.of(player, lift).highSlot(slot, count);
     }
 
     @Override
@@ -628,8 +631,10 @@ public class DroneEntity extends Entity {
                 hatch = WrightHomes.hatch(homePort);
                 approach = WrightHomes.doorApproach(homePort);
             } else if (player != null && player.level() == this.level()) {
-                hatch = WrightHomes.behindPlayer(player);
-                approach = WrightHomes.doorApproach(player);
+                // Fresh pack pose each tick so turning / walking keeps the door line locked.
+                WrightHomes.WornPack pack = WrightHomes.WornPack.of(player);
+                hatch = pack.hatch();
+                approach = pack.door();
             } else {
                 finishReturn(serverLevel, player, this.blockPosition());
                 return;
