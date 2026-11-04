@@ -745,16 +745,18 @@ public final class ShapeJobs {
                 job.shapeHollow(),
                 job.shapeAxis(),
                 job.shapePivot());
-        // Stalled Shape/Exchange: wait at home until Replace-with / materials are available again.
+        // Stalled Shape/Exchange: stay stalled until someone can actually pay — do not clear
+        // WAIT_ITEMS just because the owed-cell sample missed a crew-share cell.
         if (job.waitKind() == BuildJob.WAIT_ITEMS && !fast) {
-            BlockState owed = shapeOwedState(level, job, usable, fillMode, random, shapeKind, shapePinLocal);
-            if (owed != null && !crewCanPay(player, library, level, job, usable)) {
+            if (!crewCanPay(player, library, level, job, usable)) {
+                BlockState owed = shapeOwedState(level, job, usable, fillMode, random, shapeKind, shapePinLocal);
+                if (owed == null && !usable.isEmpty()) {
+                    owed = usable.get(0).state();
+                }
                 if (job.droneId() != null) {
                     publishShapeDroneStatus(level, job, owed, DroneEntity.WAIT_ITEMS);
                     DroneFleet.parkSolo(level, player, job);
                 }
-                // The crew tick does not run while stalled — any wright still out (mid-approach or
-                // idle when the stock ran out) would hang there in its last state forever.
                 for (BuildJob.Hand hand : job.hands()) {
                     if (hand.entityId != null) {
                         setShapeHandStatus(level, hand, owed, DroneEntity.WAIT_ITEMS);
@@ -762,15 +764,16 @@ public final class ShapeJobs {
                     }
                     hand.idleTicks = 0;
                 }
+                job.setQueued(true);
                 library.setDirty();
                 return;
             }
-            // Stay queued: the top-up picks wrights whose own port can pay, instead of relaunching the old crew.
             job.setWaitKind(BuildJob.WAIT_NONE);
         }
         if (job.waitKind() == BuildJob.WAIT_ENERGY && !fast) {
             int cost = WrightsConfig.energyCost(job, false, CellPlacement.mirrorPlace(job));
             if (!com.wrights.energy.PortEnergy.canFund(level, player, job, cost)) {
+                job.setQueued(true);
                 library.setDirty();
                 return;
             }
@@ -780,6 +783,12 @@ public final class ShapeJobs {
         if (job.queued()) {
             CrewRoster.topUpQueued(player, library, job);
             if (!job.hasCrew() && !JobManager.instant(player) && job.droneId() == null) {
+                // Keep the Jobs card on Stalled · missing items / energy, not Running 0/N.
+                if (job.waitKind() != BuildJob.WAIT_ENERGY
+                        && !crewCanPay(player, library, level, job, usable)) {
+                    job.setWaitKind(BuildJob.WAIT_ITEMS);
+                }
+                library.setDirty();
                 return;
             }
         }
@@ -2654,16 +2663,17 @@ public final class ShapeJobs {
             java.util.Random random,
             com.wrights.blueprint.Shapes.Kind shapeKind,
             BlockPos shapePinLocal) {
-        int width = job.boxSizeX();
-        int height = job.boxSizeY();
         int orderIndex = job.shapeOrderIndex();
-        int scanCap = Math.max(1, WrightsConfig.COPY_POSITIONS_PER_TICK.getAsInt() * 4);
-        for (int i = 0; i < scanCap && job.cursor() + i < job.total(); i++) {
-            int at = job.cursor() + i;
-            int x = job.min().getX() + (at % width);
-            int y = job.min().getY() + ((at / width) % height);
-            int z = job.min().getZ() + (at / (width * height));
-            BlockPos pos = new BlockPos(x, y, z);
+        int total = job.total();
+        int scanCap = Math.max(64, WrightsConfig.COPY_POSITIONS_PER_TICK.getAsInt() * 8);
+        // Crew shapes resolve out of order — walk unresolved AABB indices, not job.cursor() as a scan head.
+        int start = Math.max(0, job.cursor());
+        for (int n = 0; n < scanCap && n < total; n++) {
+            int at = (start + n) % total;
+            if (job.isShapeResolved(at)) {
+                continue;
+            }
+            BlockPos pos = job.scanPosAt(at);
             if (!com.wrights.blueprint.Shapes.containsWorld(
                     shapeKind,
                     pos,

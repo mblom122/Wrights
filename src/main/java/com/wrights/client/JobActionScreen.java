@@ -73,10 +73,8 @@ public class JobActionScreen extends WrightsScaledScreen {
         int inner = panelW - 32;
         String name = this.font.plainSubstrByWidth(job.name(), inner);
         graphics.drawString(this.font, name, panelX + 16, panelY + 10, WrightsUi.COPPER, false);
-        boolean stalled = !job.paused() && job.waitKind() == com.wrights.job.BuildJob.WAIT_ITEMS;
-        String status = job.undoing()
-                ? "menu.wrights.undoing"
-                : job.paused() ? "menu.wrights.paused" : stalled ? "menu.wrights.stalled" : "menu.wrights.running";
+        String status = WrightsClientState.jobStatusKey(job);
+        boolean stalled = status.equals("menu.wrights.stalled") || status.equals("menu.wrights.stalled_energy");
         int statusColor = job.paused() ? WrightsUi.GOLD : stalled ? WrightsUi.TEAL : WrightsUi.COPPER;
         WrightsUi.status(graphics, panelX + 16, panelY + 24, inner, Math.min(48, panelH - 140), statusColor);
         graphics.drawString(this.font, Component.translatable(status), panelX + 26, panelY + 30, statusColor, false);

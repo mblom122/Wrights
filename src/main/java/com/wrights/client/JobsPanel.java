@@ -664,7 +664,8 @@ final class JobsPanel {
         if (job.paused()) {
             return WrightsUi.GOLD;
         }
-        if (job.waitKind() == com.wrights.job.BuildJob.WAIT_ITEMS) {
+        if (job.waitKind() == com.wrights.job.BuildJob.WAIT_ITEMS
+                || job.waitKind() == com.wrights.job.BuildJob.WAIT_ENERGY) {
             return WrightsUi.TEAL;
         }
         if (job.queued()) {

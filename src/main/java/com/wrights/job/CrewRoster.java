@@ -564,6 +564,10 @@ public final class CrewRoster {
                 job.setQueued(true);
                 job.setPaused(false);
                 job.clearHold();
+                // Docked because supply cannot continue — surface Stalled, not Running 0/N.
+                if (job.waitKind() != BuildJob.WAIT_ENERGY && job.waitKind() != BuildJob.WAIT_CHUNK) {
+                    job.setWaitKind(BuildJob.WAIT_ITEMS);
+                }
                 library.setDirty();
             }
             return;
