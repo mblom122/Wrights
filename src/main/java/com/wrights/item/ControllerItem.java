@@ -79,7 +79,6 @@ public class ControllerItem extends Item {
         tooltip.add(Component.translatable("item.wrights.controller.hint.corners").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("item.wrights.controller.hint.copy").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("item.wrights.controller.hint.paste").withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.translatable("item.wrights.controller.hint.stop").withStyle(ChatFormatting.GRAY));
         GlobalPos linked = stack.get(ModDataComponents.AE_LINK.get());
         if (linked != null) {
             tooltip.add(Component.translatable(
