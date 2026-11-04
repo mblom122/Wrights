@@ -18,7 +18,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.SimpleContainer;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -29,6 +28,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 import com.wrights.drone.Swarm;
 import com.wrights.energy.PortEnergy;
@@ -171,18 +171,28 @@ public class WrightportBlockEntity extends BlockEntity implements MenuProvider {
         return items;
     }
 
-    /** Opens while a wright is in the column above the port, then stays open a moment after it leaves. */
+    /**
+     * Opens when a wright is about one second from the roof door — not the whole tall spawn column.
+     * Hold covers the few ticks between scans.
+     */
+    private static final double HATCH_OPEN_RANGE = 10.0D;
+
     public void animateHatch() {
         this.hatchPrev = this.hatch;
         Level level = this.level;
-        // The column scan is the costly part, so look every few ticks. The hold below covers the gap.
+        // The scan is the costly part, so look every few ticks. The hold below covers the gap.
         if (level == null) {
             this.traffic = false;
         } else if (((level.getGameTime() + this.worldPosition.asLong()) & 3L) == 0L) {
             BlockPos pos = this.worldPosition;
-            AABB box = new AABB(pos.getX() - 6.0D, pos.getY() - 0.5D, pos.getZ() - 6.0D,
-                    pos.getX() + 7.0D, pos.getY() + 57.0D, pos.getZ() + 7.0D);
-            this.traffic = !level.getEntitiesOfClass(DroneEntity.class, box, Entity::isAlive).isEmpty();
+            Vec3 door = com.wrights.drone.WrightHomes.doorApproach(pos);
+            double range = HATCH_OPEN_RANGE;
+            double rangeSqr = range * range;
+            AABB box = new AABB(
+                    door.x - range, door.y - range, door.z - range,
+                    door.x + range, door.y + range, door.z + range);
+            this.traffic = !level.getEntitiesOfClass(DroneEntity.class, box,
+                    drone -> drone.isAlive() && drone.position().distanceToSqr(door) <= rangeSqr).isEmpty();
         }
         boolean traffic = this.traffic;
         if (traffic) {

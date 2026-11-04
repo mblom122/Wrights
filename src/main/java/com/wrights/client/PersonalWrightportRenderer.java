@@ -125,17 +125,24 @@ public class PersonalWrightportRenderer implements ICurioRenderer {
         }
     }
 
+    /**
+     * Open only when a wright is about one second from the door — not when it spawns high above.
+     * Near-dock cruise is ~0.42 blocks/tick (~8.4/s); 10 blocks ≈ 1s plus a little for the lid anim.
+     */
+    private static final double DOOR_OPEN_RANGE = 10.0D;
+
     private static boolean trafficOpen(LivingEntity entity) {
         // The hold pulse comes from the local player's own wrights, so it only belongs on their pack.
         if (entity == Minecraft.getInstance().player && PersonalPortFx.doorHold() > 0) {
             return true;
         }
-        Vec3 dock = behindClient(entity);
-        AABB box = new AABB(dock.x - 5.0D, dock.y - 1.5D, dock.z - 5.0D, dock.x + 5.0D, dock.y + 56.0D, dock.z + 5.0D);
-        return !entity.level().getEntitiesOfClass(DroneEntity.class, box, drone -> drone.isAlive()).isEmpty();
-    }
-
-    private static Vec3 behindClient(LivingEntity entity) {
-        return WrightHomes.WornPack.of(entity).hatch();
+        Vec3 door = WrightHomes.WornPack.of(entity).door();
+        double range = DOOR_OPEN_RANGE;
+        double rangeSqr = range * range;
+        AABB box = new AABB(
+                door.x - range, door.y - range, door.z - range,
+                door.x + range, door.y + range, door.z + range);
+        return !entity.level().getEntitiesOfClass(DroneEntity.class, box,
+                drone -> drone.isAlive() && drone.position().distanceToSqr(door) <= rangeSqr).isEmpty();
     }
 }
