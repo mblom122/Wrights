@@ -98,6 +98,7 @@ public final class JobManager {
     public static void tick(MinecraftServer server) {
         DigitalNetworks.tickCrafts(server);
         com.wrights.drone.CraftDeliveries.tick(server);
+        com.wrights.drone.HangarDock.tick(server);
         WrightFlights.sweepReturns();
         SchematicLibrary library = SchematicLibrary.get(server);
         List<BuildJob> jobs = new ArrayList<>(library.jobs());

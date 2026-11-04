@@ -176,7 +176,7 @@ public final class HangarOps {
         String name = WrightItem.nameOf(stack);
         stack.shrink(1);
         Swarm next = swarm.addUnit(parts, name);
-        HangarDock.show(player, java.util.List.of(parts));
+        HangarDock.show(player, CraftDeliveries.Hangar.personal(player.getUUID(), kind, index), java.util.List.of(parts));
         WrightportPlaces.write(player, kind, index, next);
         if (capRoom <= 1) {
             Messages.actionBar(player, "message.wrights.wright_cap_added", 1, WrightsConfig.maxWrightsOwned());

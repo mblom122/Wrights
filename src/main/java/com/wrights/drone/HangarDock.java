@@ -1,6 +1,7 @@
 package com.wrights.drone;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -11,7 +12,6 @@ import javax.annotation.Nullable;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.TickTask;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -24,20 +24,27 @@ import com.wrights.network.BlueprintPayloads;
 
 /**
  * Spawns short-lived fly-in wrights when a hangar adds units to a personal or placed port.
- * Job depart / return flight is unchanged.
+ * After the last one docks, waits one second, then reopens that hangar.
  */
 public final class HangarDock {
+    /** One second after the last fly-in finishes before the hangar UI comes back. */
     private static final int REOPEN_DELAY_TICKS = 20;
     private static final Map<UUID, Set<UUID>> PENDING = new HashMap<>();
     private static final Map<UUID, CraftDeliveries.Hangar> TARGETS = new HashMap<>();
+    /** Player → hangar reopen at server game time. */
+    private static final Map<UUID, Reopen> REOPEN = new HashMap<>();
 
     private HangarDock() {
+    }
+
+    private record Reopen(CraftDeliveries.Hangar hangar, long atGameTime) {
     }
 
     /** Forgets in-flight fly-ins when the server stops. */
     public static void reset() {
         PENDING.clear();
         TARGETS.clear();
+        REOPEN.clear();
     }
 
     /** Uses the hangar currently pushed on {@link CraftDeliveries}. */
@@ -65,6 +72,7 @@ public final class HangarDock {
 
     private static void spawn(ServerPlayer player, ServerLevel level, CraftDeliveries.Hangar hangar,
             @Nullable BlockPos port, List<Loadout> tiers) {
+        REOPEN.remove(player.getUUID());
         TARGETS.put(player.getUUID(), hangar);
         Set<UUID> pending = PENDING.computeIfAbsent(player.getUUID(), id -> new LinkedHashSet<>());
         int count = tiers.size();
@@ -96,45 +104,67 @@ public final class HangarDock {
             sync(player, left);
         } else if (left == 0) {
             TARGETS.remove(owner);
+            REOPEN.remove(owner);
         }
     }
 
     private static void sync(ServerPlayer player, int remaining) {
         CraftDeliveries.Hangar hangar = TARGETS.get(player.getUUID());
         int left = Math.max(0, remaining);
+        PacketDistributor.sendToPlayer(player, encode(left, hangar));
         if (left > 0) {
-            PacketDistributor.sendToPlayer(player, encode(left, hangar));
             return;
         }
+        // Last wright is gone — clear dock-wait on the client now, reopen hangar one second later.
         TARGETS.remove(player.getUUID());
-        CraftDeliveries.Hangar target = hangar;
-        MinecraftServer server = player.getServer();
-        // Extra second after the last physical dock so the lid can settle before the hangar reopens.
-        server.tell(new TickTask(server.getTickCount() + REOPEN_DELAY_TICKS, () -> finishWait(player, target)));
+        if (hangar == null || player.getServer() == null) {
+            REOPEN.remove(player.getUUID());
+            return;
+        }
+        long at = player.level().getGameTime() + REOPEN_DELAY_TICKS;
+        REOPEN.put(player.getUUID(), new Reopen(hangar, at));
     }
 
-    private static void finishWait(ServerPlayer player, @Nullable CraftDeliveries.Hangar hangar) {
-        if (player == null || !player.isAlive()) {
+    /** Called each server tick — opens the hangar one second after the last dock-in. */
+    public static void tick(MinecraftServer server) {
+        if (server == null || REOPEN.isEmpty()) {
             return;
         }
-        PacketDistributor.sendToPlayer(player, encode(0, hangar));
+        long now = server.overworld().getGameTime();
+        Iterator<Map.Entry<UUID, Reopen>> it = REOPEN.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<UUID, Reopen> entry = it.next();
+            if (now < entry.getValue().atGameTime()) {
+                continue;
+            }
+            it.remove();
+            ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
+            if (player == null || !player.isAlive()) {
+                continue;
+            }
+            reopen(player, entry.getValue().hangar());
+        }
+    }
+
+    private static void reopen(ServerPlayer player, @Nullable CraftDeliveries.Hangar hangar) {
         if (hangar == null) {
             return;
         }
         if (hangar.placed()) {
-            // Skip if hangar stayed open (client dockWatch off); reopen only after a closed fly-in.
-            if (!(player.containerMenu instanceof com.wrights.menu.WrightportMenu open)
-                    || hangar.pos() == null
-                    || !open.pos().equals(hangar.pos())) {
-                reopenPlaced(player, hangar);
+            if (player.containerMenu instanceof com.wrights.menu.WrightportMenu open
+                    && hangar.pos() != null
+                    && open.pos().equals(hangar.pos())) {
+                return;
             }
+            reopenPlaced(player, hangar);
             return;
         }
-        if (!(player.containerMenu instanceof com.wrights.menu.PersonalHangarMenu open)
-                || open.kind() != hangar.kind()
-                || open.index() != hangar.index()) {
-            reopenPersonal(player, hangar);
+        if (player.containerMenu instanceof com.wrights.menu.PersonalHangarMenu open
+                && open.kind() == hangar.kind()
+                && open.index() == hangar.index()) {
+            return;
         }
+        reopenPersonal(player, hangar);
     }
 
     private static BlueprintPayloads.DockWait encode(int remaining, @Nullable CraftDeliveries.Hangar hangar) {
