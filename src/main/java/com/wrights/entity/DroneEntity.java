@@ -58,6 +58,18 @@ public class DroneEntity extends Entity {
     private int returnLimit;
     /** Ticks to stay at the hatch after spawn so a launch is visible before the cruise. */
     private int launchTicks;
+    /**
+     * Return dock phases: 0 cruise to just outside the door, 1 slow fly into the hatch,
+     * 2 hold at the hatch so the dock is visible before discard.
+     */
+    private int dockPhase;
+    private int dockSettleTicks;
+    /** Hold at the hatch after the final fly-in so you see them docked. */
+    private static final int DOCK_SETTLE_TICKS = 20;
+    private static final double DOCK_ENTER_STEP = 0.18D;
+    private static final double APPROACH_ARRIVE_SQR = 0.36D;
+    private static final double HATCH_ARRIVE_SQR_BLOCK = 0.04D;
+    private static final double HATCH_ARRIVE_SQR_PERSONAL = 0.25D;
     private UUID ownerId;
     private UUID unitId;
     private String unitName = "";
@@ -206,6 +218,8 @@ public class DroneEntity extends Entity {
         setReturning(true);
         this.manageDock = true;
         this.returnTicks = 0;
+        this.dockPhase = 0;
+        this.dockSettleTicks = 0;
         this.ownerId = player.getUUID();
         this.unitId = null;
         this.setJobId(null);
@@ -245,6 +259,8 @@ public class DroneEntity extends Entity {
     public void flyHome(ServerPlayer player, int slot, int count, @Nullable BlockPos port) {
         setReturning(true);
         this.returnTicks = 0;
+        this.dockPhase = 0;
+        this.dockSettleTicks = 0;
         this.ownerId = player.getUUID();
         this.setJobId(null);
         // Keep carried haul for the flight home; only clear the place/mine preview.
@@ -499,14 +515,17 @@ public class DroneEntity extends Entity {
         return Math.min(ticks, 12000);
     }
 
-    /** Cruise like a working wright, then slow for the last few blocks into the hatch. */
-    private double returnStep(Vec3 dock, boolean blockHome) {
-        double distSqr = this.distanceToSqr(dock);
+    /** Cruise toward the door approach; slower near the dock, then a crawl for the final enter. */
+    private double returnStep(Vec3 target, boolean blockHome) {
+        if (this.dockPhase >= 1) {
+            return DOCK_ENTER_STEP;
+        }
+        double distSqr = this.distanceToSqr(target);
         if (blockHome && distSqr < 49.0D) {
-            return 0.3D;
+            return 0.28D;
         }
         if (!blockHome && distSqr < 25.0D) {
-            return 0.5D;
+            return 0.42D;
         }
         double step = WrightTier.flyClose(this.rotor());
         if (distSqr > 64.0D) {
@@ -556,28 +575,52 @@ public class DroneEntity extends Entity {
                 return;
             }
             boolean blockHome = homePort != null && (this.stranded || loadedHome);
-            Vec3 dock;
+            Vec3 hatch;
+            Vec3 approach;
             if (blockHome) {
-                dock = WrightHomes.hatch(homePort);
+                hatch = WrightHomes.hatch(homePort);
+                approach = WrightHomes.doorApproach(homePort);
             } else if (player != null && player.level() == this.level()) {
-                dock = WrightHomes.behindPlayer(player);
+                hatch = WrightHomes.behindPlayer(player);
+                approach = WrightHomes.doorApproach(player);
             } else {
                 finishReturn(serverLevel, player, this.blockPosition());
                 return;
             }
             if (this.returnLimit <= 0) {
-                this.returnLimit = returnBudget(dock);
+                this.returnLimit = returnBudget(hatch);
             }
             boolean timedOut = ++this.returnTicks > this.returnLimit;
-            boolean arrived = this.distanceToSqr(dock) <= (blockHome ? 0.04D : 1.15D);
-            if (timedOut || arrived) {
-                BlockPos arrivedAt = this.stranded && this.homePort != null
-                        ? this.homePort
-                        : (loadedHome ? homePort : this.blockPosition());
+            BlockPos arrivedAt = this.stranded && this.homePort != null
+                    ? this.homePort
+                    : (loadedHome ? homePort : this.blockPosition());
+            if (timedOut) {
                 finishReturn(serverLevel, player, arrivedAt);
                 return;
             }
-            this.moveToward(dock, returnStep(dock, blockHome));
+            // Hold at the hatch so the dock-in is visible (add, job return, shelter — all paths).
+            if (this.dockPhase >= 2) {
+                this.moveTo(hatch.x, hatch.y, hatch.z, this.getYRot(), 0.0F);
+                if (--this.dockSettleTicks <= 0) {
+                    finishReturn(serverLevel, player, arrivedAt);
+                }
+                return;
+            }
+            Vec3 target = this.dockPhase == 0 ? approach : hatch;
+            double arriveSqr = this.dockPhase == 0
+                    ? APPROACH_ARRIVE_SQR
+                    : (blockHome ? HATCH_ARRIVE_SQR_BLOCK : HATCH_ARRIVE_SQR_PERSONAL);
+            if (this.distanceToSqr(target) <= arriveSqr) {
+                if (this.dockPhase == 0) {
+                    this.dockPhase = 1;
+                } else {
+                    this.dockPhase = 2;
+                    this.dockSettleTicks = DOCK_SETTLE_TICKS;
+                    this.moveTo(hatch.x, hatch.y, hatch.z, this.getYRot(), 0.0F);
+                }
+                return;
+            }
+            this.moveToward(target, returnStep(target, blockHome));
             return;
         }
         Optional<UUID> id = jobId();

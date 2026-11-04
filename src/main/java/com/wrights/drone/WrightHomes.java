@@ -35,16 +35,27 @@ public final class WrightHomes {
         }
     }
 
-    /** Behind the player's shoulders, slightly up. */
-    public static Vec3 behindPlayer(ServerPlayer player) {
+    /** Horizontal unit vector pointing behind the player (away from look). */
+    public static Vec3 playerBack(ServerPlayer player) {
         Vec3 back = player.getLookAngle();
         back = new Vec3(back.x, 0.0D, back.z);
         if (back.lengthSqr() < 1.0E-4D) {
-            back = new Vec3(0.0D, 0.0D, 1.0D);
-        } else {
-            back = back.normalize();
+            return new Vec3(0.0D, 0.0D, 1.0D);
         }
-        return player.position().add(back.scale(-0.85D)).add(0.0D, 0.95D, 0.0D);
+        return back.normalize().scale(-1.0D);
+    }
+
+    /** Into the worn pack hatch (behind the shoulders, slightly up). */
+    public static Vec3 behindPlayer(ServerPlayer player) {
+        return player.position().add(playerBack(player).scale(0.85D)).add(0.0D, 0.95D, 0.0D);
+    }
+
+    /**
+     * Just outside the worn pack door — further behind than {@link #behindPlayer}, so a return
+     * lines up with the iris before flying into the pack.
+     */
+    public static Vec3 doorApproach(ServerPlayer player) {
+        return player.position().add(playerBack(player).scale(1.45D)).add(0.0D, 1.05D, 0.0D);
     }
 
     /** Inside the roof bay of the two-block tower, under the iris, where a returning wright disappears. */
@@ -55,6 +66,14 @@ public final class WrightHomes {
     /** Just above the iris, where a departing wright clears the top. */
     public static Vec3 lip(BlockPos port) {
         return Vec3.atBottomCenterOf(port).add(0.0D, 2.1D, 0.0D);
+    }
+
+    /**
+     * Just outside / above the placed hangar door before dropping into {@link #hatch}.
+     * Slightly above the lip so the approach reads as lining up with the roof iris.
+     */
+    public static Vec3 doorApproach(BlockPos port) {
+        return lip(port).add(0.0D, 0.55D, 0.0D);
     }
 
     /** High ring a returning wright dives into the hatch from. */
