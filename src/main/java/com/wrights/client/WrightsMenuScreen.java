@@ -6,10 +6,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.core.BlockPos;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -21,9 +18,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 import com.wrights.WrightsClientConfig;
 import com.wrights.WrightsConfig;
-import com.wrights.drone.Swarm;
 import com.wrights.drone.WrightportPlaces;
-import com.wrights.item.PersonalWrightportItem;
 import com.wrights.network.BlueprintPayloads;
 
 public class WrightsMenuScreen extends WrightsScaledScreen implements JeiPreview {
@@ -132,8 +127,6 @@ public class WrightsMenuScreen extends WrightsScaledScreen implements JeiPreview
     private static boolean savedPlace;
     Component mirrorTip;
     private ShapeMenuPanel shapePanel;
-    final WrightManagePanel manage = new WrightManagePanel();
-    final ManageHost manageHost = new MenuManageHost();
     int portKind = -1;
     int portIndex = -1;
     boolean portListOpen;
@@ -141,8 +134,6 @@ public class WrightsMenuScreen extends WrightsScaledScreen implements JeiPreview
     int manageTab;
     int placedScroll;
     BlueprintPayloads.PlacedPort placedPick;
-    private boolean holding;
-    private int holdTicker;
     private int portStockTick;
     int jobScroll;
     int historyScroll;
@@ -434,14 +425,10 @@ public class WrightsMenuScreen extends WrightsScaledScreen implements JeiPreview
                 Component.translatable("menu.wrights.info_bind"), button -> startBindInventory()));
         unbindDigital = add(new WrightsButton(panelX + 140, panelY + panelH - 48, 120, 18,
                 Component.translatable("menu.wrights.digital_unbind"), button -> clearDigitalLink()));
-        manage.addWidgets(manageHost);
         lastToolHeld = toolHeld();
         refresh();
         if (infoPage) {
             requestDigitalInfo();
-        }
-        if (managePage) {
-            sendHold(true);
         }
     }
 
@@ -454,7 +441,6 @@ public class WrightsMenuScreen extends WrightsScaledScreen implements JeiPreview
             savedExchange = exchangePage;
             savedPlace = placePage;
         }
-        sendHold(false);
         savedScroll = scroll;
         savedHistoryScroll = historyScroll;
         savedOptionScroll = optionScroll;
@@ -709,11 +695,6 @@ public class WrightsMenuScreen extends WrightsScaledScreen implements JeiPreview
             setFocused(null);
         }
         portManagePanel.reconcilePlaced();
-        boolean showManage = manageOpen();
-        manage.setActive(showManage);
-        if (showManage) {
-            manage.layoutChrome(manageHost);
-        }
     }
 
     public void refreshDigital() {
@@ -774,13 +755,6 @@ public class WrightsMenuScreen extends WrightsScaledScreen implements JeiPreview
         }
         if (managePage) {
             portManagePanel.reconcilePlaced();
-            boolean open = manageOpen();
-            if (manage.isOpen() != open) {
-                manage.setActive(open);
-            }
-            if (open) {
-                manage.layoutChrome(manageHost);
-            }
         }
         boolean blueprints = !options && !jobsPage && !infoPage && !managePage && !helpPage && !mirrorPage && !shapePage && !exchangePage && !placePage;
         if (blueprints) {
@@ -1433,9 +1407,6 @@ public class WrightsMenuScreen extends WrightsScaledScreen implements JeiPreview
             if (button == 0 && manageTab == 1 && portManagePanel.clickPlacedList(mouseX, mouseY)) {
                 return true;
             }
-            if (manage.isOpen() && manage.mouseClicked(manageHost, mouseX, mouseY, button)) {
-                return true;
-            }
             super.mouseClickedScaled(mouseX, mouseY, button);
             return true;
         }
@@ -1552,7 +1523,6 @@ public class WrightsMenuScreen extends WrightsScaledScreen implements JeiPreview
             setFocused(null);
             refresh();
             PacketDistributor.sendToServer(new BlueprintPayloads.PlacedPortsAsk());
-            sendHold(manageTab == 0);
             return true;
         }
         if (button == 0 && hitTask(mouseX, mouseY, taskInfoY())) {
@@ -1701,9 +1671,6 @@ public class WrightsMenuScreen extends WrightsScaledScreen implements JeiPreview
         if ((shapePage || exchangePage || placePage) && shapePanel != null && shapePanel.editingValue() && shapePanel.keyPressed(keyCode)) {
             return true;
         }
-        if (managePage && manage.keyPressed(manageHost, keyCode, scanCode, modifiers)) {
-            return true;
-        }
         if (portRename != null && portRename.isFocused()) {
             if (keyCode == 257 || keyCode == 335) {
                 portManagePanel.finishPortRename(true);
@@ -1719,9 +1686,6 @@ public class WrightsMenuScreen extends WrightsScaledScreen implements JeiPreview
         if (managePage && keyCode == 256) {
             if (portRenamePos != null) {
                 portManagePanel.finishPortRename(false);
-                return true;
-            }
-            if (manage.closeTop()) {
                 return true;
             }
             if (portListOpen) {
@@ -2000,21 +1964,7 @@ public class WrightsMenuScreen extends WrightsScaledScreen implements JeiPreview
             return true;
         }
         if (managePage) {
-            if (manageTab == 1 && mouseY >= placedListTop() && mouseY < placedListTop() + placedShown() * 18) {
-                portManagePanel.finishPortRename(true);
-                int max = Math.max(0, WrightsClientState.placedPorts.size() - placedShown());
-                placedScroll = Mth.clamp(placedScroll - (int) Math.signum(scrollY), 0, max);
-                return true;
-            }
-            if (portListOpen) {
-                List<WrightportPlaces.Spot> spots = ports();
-                int max = Math.max(0, spots.size() - PORT_ROWS);
-                portScroll = Mth.clamp(portScroll - (int) Math.signum(scrollY), 0, max);
-                return true;
-            }
-            if (manage.isOpen()) {
-                manage.mouseScrolled(manageHost, mouseX, mouseY, scrollY);
-            }
+            portManagePanel.mouseScrolled(mouseX, mouseY, scrollY);
             return true;
         }
         if (jobsPage) {
@@ -2074,11 +2024,8 @@ public class WrightsMenuScreen extends WrightsScaledScreen implements JeiPreview
         if (jobsPage && portStockTick++ % 20 == 0) {
             PacketDistributor.sendToServer(new BlueprintPayloads.PlacedPortsAsk());
         }
-        if (!managePage) {
-            return;
-        }
-        if (holdTicker++ % 10 == 0) {
-            sendHold(true);
+        if (managePage && manageTab == 1 && placedPick != null && portStockTick++ % 20 == 0) {
+            PacketDistributor.sendToServer(new BlueprintPayloads.PlacedSwarmAsk(placedPick.dimension(), placedPick.pos()));
         }
     }
 
@@ -2421,20 +2368,18 @@ public class WrightsMenuScreen extends WrightsScaledScreen implements JeiPreview
 
     private void leaveManage() {
         portManagePanel.finishPortRename(true);
-        if (!managePage && !holding) {
+        if (!managePage) {
             return;
         }
         managePage = false;
         portListOpen = false;
-        manage.setActive(false);
-        sendHold(false);
     }
 
     int manageX() {
         return listX - 2;
     }
 
-    private int manageY() {
+    int manageY() {
         return panelY + 34;
     }
 
@@ -2442,7 +2387,7 @@ public class WrightsMenuScreen extends WrightsScaledScreen implements JeiPreview
         return panelX + panelW - 12 - manageX();
     }
 
-    private int manageH() {
+    int manageH() {
         return Math.max(80, wideCardBottom() - 8 - 18 - 8 - manageY());
     }
 
@@ -2468,45 +2413,9 @@ public class WrightsMenuScreen extends WrightsScaledScreen implements JeiPreview
             }
         }
         WrightportPlaces.Spot first = spots.get(0);
-        if (portKind != first.kind() || portIndex != first.index()) {
-            portKind = first.kind();
-            portIndex = first.index();
-            manage.resetView();
-        }
+        portKind = first.kind();
+        portIndex = first.index();
         return first;
-    }
-
-    void sendHold(boolean active) {
-        if (this.minecraft == null || this.minecraft.player == null) {
-            return;
-        }
-        if (!active || !managePage) {
-            if (holding) {
-                holding = false;
-                PacketDistributor.sendToServer(new BlueprintPayloads.PortHold(0, 0, false));
-            }
-            return;
-        }
-        WrightportPlaces.Spot spot = currentSpot();
-        if (spot == null) {
-            if (holding) {
-                holding = false;
-                PacketDistributor.sendToServer(new BlueprintPayloads.PortHold(0, 0, false));
-            }
-            return;
-        }
-        holding = true;
-        PacketDistributor.sendToServer(new BlueprintPayloads.PortHold(spot.kind(), spot.index(), true));
-    }
-
-    private boolean manageOpen() {
-        if (!managePage) {
-            return false;
-        }
-        if (manageTab == 0) {
-            return currentSpot() != null;
-        }
-        return placedReady();
     }
 
     boolean placedReady() {
@@ -2515,10 +2424,6 @@ public class WrightsMenuScreen extends WrightsScaledScreen implements JeiPreview
                 && !WrightsClientState.placedMissing
                 && placedPick.dimension().equals(WrightsClientState.placedDim)
                 && placedPick.pos().equals(WrightsClientState.placedPos);
-    }
-
-    int personalEnergyY() {
-        return ports().size() > 1 ? portBarY() + 38 : portBarY() + 20;
     }
 
     int placedListTop() {
@@ -2552,162 +2457,5 @@ public class WrightsMenuScreen extends WrightsScaledScreen implements JeiPreview
             return name;
         }
         return Component.empty().append(name).append(Component.literal(" — ")).append(WrightportPlaces.where(spot));
-    }
-
-    final class MenuManageHost implements ManageHost {
-        @Override
-        public int screenWidth() {
-            return WrightsMenuScreen.this.width;
-        }
-
-        @Override
-        public int screenHeight() {
-            return WrightsMenuScreen.this.height;
-        }
-
-        @Override
-        public Font font() {
-            return WrightsMenuScreen.this.font;
-        }
-
-        @Override
-        public Minecraft minecraft() {
-            return WrightsMenuScreen.this.minecraft;
-        }
-
-        @Override
-        public Swarm swarm() {
-            if (manageTab == 1) {
-                return placedReady() ? WrightsClientState.placedSwarm : Swarm.EMPTY;
-            }
-            WrightportPlaces.Spot spot = currentSpot();
-            if (spot == null || WrightsMenuScreen.this.minecraft == null || WrightsMenuScreen.this.minecraft.player == null) {
-                return Swarm.from(ItemStack.EMPTY);
-            }
-            ItemStack stack = WrightportPlaces.stack(WrightsMenuScreen.this.minecraft.player, spot.kind(), spot.index());
-            if (!(stack.getItem() instanceof PersonalWrightportItem)) {
-                return Swarm.from(ItemStack.EMPTY);
-            }
-            return Swarm.from(stack);
-        }
-
-        @Override
-        public boolean away(UUID id) {
-            for (BlueprintPayloads.JobLine job : WrightsClientState.jobs) {
-                if (!job.finished() && job.crew().contains(id)) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        @Override
-        public void edit(int action, int index) {
-            if (manageTab == 1) {
-                if (placedPick == null) {
-                    return;
-                }
-                PacketDistributor.sendToServer(new BlueprintPayloads.PlacedEdit(placedPick.dimension(), placedPick.pos(), action, index));
-                return;
-            }
-            WrightportPlaces.Spot spot = currentSpot();
-            if (spot == null) {
-                return;
-            }
-            PacketDistributor.sendToServer(new BlueprintPayloads.PortEdit(spot.kind(), spot.index(), action, index));
-            sendHold(true);
-        }
-
-        @Override
-        public void rename(int unit, String name) {
-            if (manageTab == 1) {
-                if (placedPick == null) {
-                    return;
-                }
-                PacketDistributor.sendToServer(new BlueprintPayloads.RenameWright(2, placedPick.dimension(), placedPick.pos(), 0, 0, unit, name));
-                return;
-            }
-            WrightportPlaces.Spot spot = currentSpot();
-            if (spot == null) {
-                return;
-            }
-            PacketDistributor.sendToServer(new BlueprintPayloads.RenameWright(1, "", BlockPos.ZERO, spot.kind(), spot.index(), unit, name));
-            sendHold(true);
-        }
-
-        @Override
-        public void batch(int action, int value, int[] units) {
-            if (manageTab == 1) {
-                if (placedPick == null) {
-                    return;
-                }
-                PacketDistributor.sendToServer(new BlueprintPayloads.PlacedBatch(placedPick.dimension(), placedPick.pos(), action, value, units));
-                return;
-            }
-            WrightportPlaces.Spot spot = currentSpot();
-            if (spot == null) {
-                return;
-            }
-            PacketDistributor.sendToServer(new BlueprintPayloads.PortBatch(spot.kind(), spot.index(), action, value, units));
-            sendHold(true);
-        }
-
-        @Override
-        public void addButton(WrightsButton button) {
-            addRenderableWidget(button);
-        }
-
-        @Override
-        public void addField(EditBox box) {
-            addRenderableWidget(box);
-        }
-
-        @Override
-        public void focus(GuiEventListener listener) {
-            setFocused(listener);
-        }
-
-        @Override
-        public void relayout() {
-            refresh();
-        }
-
-        @Override
-        public boolean embedded() {
-            return true;
-        }
-
-        @Override
-        public int areaX() {
-            return manageX() + 4;
-        }
-
-        @Override
-        public int areaY() {
-            if (manageTab == 1) {
-                return placedListTop() + placedShown() * 18 + 6;
-            }
-            return personalEnergyY() + 16;
-        }
-
-        @Override
-        public int areaW() {
-            return Math.max(160, manageW() - 8);
-        }
-
-        @Override
-        public int areaH() {
-            return Math.max(120, manageY() + manageH() - areaY() - 4);
-        }
-
-        @Override
-        public boolean toolHeld() {
-            return WrightsMenuScreen.this.toolHeld();
-        }
-
-        @Override
-        public boolean requireTool() {
-            return WrightsMenuScreen.this.requireTool();
-        }
     }
 }
