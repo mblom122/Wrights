@@ -21,6 +21,7 @@ import com.wrights.drone.Loadout;
 import com.wrights.drone.PartSlot;
 import com.wrights.drone.Swarm;
 import com.wrights.drone.WrightTier;
+import com.wrights.energy.PortEnergy;
 
 /**
  * A wright stored as an item. It keeps its fitted parts ({@link Loadout}) and its name, so it comes back out
@@ -144,18 +145,16 @@ public class WrightItem extends Item {
 
     /**
      * Place cost after this wright's rotor/core drain, plus the same cost for a full
-     * actions/tick burst. Green below base, red above.
+     * actions/tick burst. Amount and FE stay white.
      */
     public static Component energyLine(Loadout parts) {
         int base = WrightsConfig.ENERGY.get() ? WrightsConfig.ENERGY_PLACE.get() : 0;
         int perAction = WrightTier.energyCost(base, parts.rotor(), parts.core());
         int fullTick = perAction * WrightTier.actionsPerTick(parts.fabricator());
-        int percent = parts.energyPercent();
-        ChatFormatting color = percent < 100 ? ChatFormatting.GREEN : percent > 100 ? ChatFormatting.RED : ChatFormatting.GRAY;
         return Component.translatable(
                 "item.wrights.wright.energy",
-                Component.literal(Integer.toString(perAction)).withStyle(color),
-                Component.literal(Integer.toString(fullTick)).withStyle(color)).withStyle(ChatFormatting.GRAY);
+                PortEnergy.fe(perAction),
+                PortEnergy.fe(fullTick)).withStyle(ChatFormatting.GRAY);
     }
 
     /** Left-click another wright with the same upgrades onto this stack: merge up to 64, ignoring names. */

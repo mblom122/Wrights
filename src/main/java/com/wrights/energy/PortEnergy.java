@@ -61,7 +61,17 @@ public final class PortEnergy {
         }
         int stored = itemStored(stack);
         int capacity = WrightsConfig.portEnergyCapacity();
-        tooltip.add(Component.translatable("menu.wrights.energy", format(stored), format(capacity)).withStyle(ChatFormatting.GRAY));
+        tooltip.add(fePair(stored, capacity));
+    }
+
+    /** Amount + {@code FE} in white for tooltips. */
+    public static Component fe(int amount) {
+        return Component.literal(format(amount) + " FE").withStyle(ChatFormatting.WHITE);
+    }
+
+    /** {@code stored / capacity FE} in white for tooltips. */
+    public static Component fePair(int stored, int capacity) {
+        return Component.literal(format(stored) + " / " + format(capacity) + " FE").withStyle(ChatFormatting.WHITE);
     }
 
     /** Lit bars on a wrightport item's charge gauge. */

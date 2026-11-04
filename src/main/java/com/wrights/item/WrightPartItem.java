@@ -13,6 +13,7 @@ import net.minecraft.world.item.TooltipFlag;
 import com.wrights.WrightsConfig;
 import com.wrights.drone.PartSlot;
 import com.wrights.drone.WrightTier;
+import com.wrights.energy.PortEnergy;
 
 /** One drone part. Fitted into its {@link PartSlot} on a wright, from Manage or by clicking it onto a wright item. */
 public class WrightPartItem extends Item {
@@ -59,7 +60,7 @@ public class WrightPartItem extends Item {
                 // Energy is paid once per cell action — Apex 19 actions/tick = up to 19 charges that tick.
                 int perAction = WrightsConfig.ENERGY.get() ? WrightsConfig.ENERGY_PLACE.get() : 0;
                 lines.add(Component.translatable("item.wrights.fabricator.actions", WrightTier.actionsPerTick(tier)));
-                lines.add(Component.translatable("item.wrights.fabricator.energy", perAction));
+                lines.add(Component.translatable("item.wrights.fabricator.energy", PortEnergy.fe(perAction)));
                 lines.add(Component.translatable(reachKey(tier)));
             }
             case CORE -> {
