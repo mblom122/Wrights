@@ -45,7 +45,8 @@ final class WrightManagePanel {
 
     private boolean open;
     private int scroll;
-    private int expanded = -1;
+    /** Hangar bay index always selected (0 = slot 1). Never -1 while the panel is open. */
+    private int expanded = 0;
     private int dialog;
     /** When set, BEST_PARTS may order crafts from digital storage. */
     private boolean craftDigital;
@@ -86,7 +87,7 @@ final class WrightManagePanel {
             if (!open) {
                 open = true;
                 scroll = 0;
-                expanded = -1;
+                expanded = 0;
                 dialog = NONE;
                 checked.clear();
             }
@@ -103,12 +104,19 @@ final class WrightManagePanel {
 
     void resetView() {
         scroll = 0;
-        expanded = -1;
+        expanded = 0;
         dialog = NONE;
         checked.clear();
         if (countBox != null) {
             countBox.setVisible(false);
             countBox.setFocused(false);
+        }
+    }
+
+    /** Keep a valid bay slot selected; defaults to slot 1 (index 0). */
+    private void ensureSelected() {
+        if (expanded < 0 || expanded >= HangarBay.SLOTS) {
+            expanded = 0;
         }
     }
 
@@ -120,7 +128,7 @@ final class WrightManagePanel {
     void toggle(ManageHost screen) {
         open = !open;
         scroll = 0;
-        expanded = -1;
+        expanded = 0;
         dialog = NONE;
         checked.clear();
         screen.relayout();
@@ -188,9 +196,7 @@ final class WrightManagePanel {
             graphics.fill(panelX, panelY + HangarGui.HEIGHT, panelX + HangarGui.WIDTH, panelY + HangarGui.PANEL_H, 0xFF0C141C);
         }
         Swarm swarm = screen.swarm();
-        if (expanded >= 0 && (expanded >= swarm.units().size() || away(screen, swarm, expanded))) {
-            expanded = -1;
-        }
+        ensureSelected();
         int away = awayCount(screen, swarm);
         int home = swarm.units().size() - away;
         headExtra = 0;
@@ -225,7 +231,7 @@ final class WrightManagePanel {
                         checked.contains(unit.id()), i == expanded, locked, hovered, false);
             } else {
                 HangarBay.drawSlot(graphics, screen.font(), sx, sy, HangarGui.BAY_SLOT, ItemStack.EMPTY,
-                        false, false, false, hovered, false);
+                        false, i == expanded, false, hovered, false);
             }
         }
 
@@ -373,9 +379,11 @@ final class WrightManagePanel {
         }
         UUID id = swarm.units().get(slot).id();
         screen.edit(HangarOps.TAKE, slot);
-        if (expanded == slot) {
-            expanded = -1;
+        // Units above the removed index shift down; keep the same bay cell when it was selected.
+        if (expanded > slot) {
+            expanded--;
         }
+        ensureSelected();
         checked.remove(id);
         return true;
     }
@@ -462,12 +470,8 @@ final class WrightManagePanel {
             if (Screen.hasShiftDown()) {
                 return takeWright(screen, swarm, slot);
             }
-            if (expanded == slot) {
-                expanded = -1;
-            } else {
-                expanded = slot;
-                scroll = 0;
-            }
+            expanded = slot;
+            scroll = 0;
             return true;
         }
         if (slot >= Swarm.capacity()) {
@@ -539,14 +543,15 @@ final class WrightManagePanel {
         if (units.length > 0) {
             screen.batch(HangarOps.TAKE_MARKED, 0, units);
             checked.clear();
-            expanded = -1;
+            expanded = 0;
             return;
         }
-        if (expanded < 0 || away(screen, swarm, expanded)) {
+        if (expanded < 0 || expanded >= swarm.units().size() || away(screen, swarm, expanded)) {
             return;
         }
         screen.edit(HangarOps.TAKE, expanded);
-        expanded = -1;
+        expanded = Math.max(0, expanded - 1);
+        ensureSelected();
     }
 
     private boolean dialogClick(ManageHost screen, double mouseX, double mouseY) {
