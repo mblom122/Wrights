@@ -2809,7 +2809,7 @@ public final class WrightsClientState {
 
     public static void showNotice(Component text) {
         notice = text == null ? Component.empty() : text;
-        noticeUntil = notice.getString().isEmpty() ? 0L : System.currentTimeMillis() + 6000L;
+        noticeUntil = notice.getString().isEmpty() ? 0L : System.currentTimeMillis() + 1400L;
     }
 
     public static void showCenterTip(Component text) {
