@@ -920,7 +920,8 @@ FLAT_DISPLAY = {
 }
 
 PACK_DISPLAY = {
-    "gui": {"rotation": [20, 160, 0], "translation": [-1.6, -8, 0], "scale": [0.67, 0.67, 0.67]},
+    # Slightly smaller and higher in the GUI slot (energy strip under Manage is separate UI).
+    "gui": {"rotation": [20, 160, 0], "translation": [-1.6, -5.5, 0], "scale": [0.56, 0.56, 0.56]},
     "ground": {"rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [0.3, 0.3, 0.3]},
     "fixed": {"rotation": [0, 180, 0], "translation": [0, -4, 0], "scale": [0.6, 0.6, 0.6]},
     "head": {"rotation": [0, 180, 0], "translation": [0, -2, 0], "scale": [0.6, 0.6, 0.6]},
