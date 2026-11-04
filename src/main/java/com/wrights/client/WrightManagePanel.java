@@ -267,7 +267,10 @@ final class WrightManagePanel {
             tip = chromeTip();
         }
         if (!tip.getString().isEmpty()) {
-            int color = !notice.getString().isEmpty() ? 0xFFFF5555 : WrightsUi.TEXT;
+            // Colored notices set noticeColor (copper success, red warnings); else normal tip text.
+            int color = !notice.getString().isEmpty()
+                    ? (WrightsClientState.noticeColor != 0 ? WrightsClientState.noticeColor : WrightsUi.TEXT)
+                    : WrightsUi.TEXT;
             HangarGui.drawTipStrip(graphics, screen.font(), panelX, panelY, tip, color);
         }
     }
@@ -282,7 +285,7 @@ final class WrightManagePanel {
 
     /** Red tip for 1.4s when trying to edit a wright that is not in the hangar. */
     private void warnAway() {
-        WrightsClientState.showNotice(Component.translatable("message.wrights.wright_away"));
+        WrightsClientState.showNotice(Component.translatable("message.wrights.wright_away"), 0xFFFF5555);
     }
 
     private void drawHardware(GuiGraphics graphics, ManageHost screen, Swarm swarm, int mouseX, int mouseY) {
@@ -543,7 +546,7 @@ final class WrightManagePanel {
         boolean stock = canAddFromStock(screen);
         boolean craft = canCraftLinked(screen);
         if (!stock && !craft && !creative(screen)) {
-            WrightsClientState.notice = Component.translatable("screen.wrights.manage_no_wrights");
+            WrightsClientState.showNotice(Component.translatable("screen.wrights.manage_no_wrights"), 0xFFFF5555);
             WrightsClientState.noticeUntil = System.currentTimeMillis() + 2800L;
             return;
         }

@@ -2115,9 +2115,13 @@ public final class BlueprintPayloads {
      * Client tip. {@code center} draws short white text mid-screen; otherwise it is for Manage
      * (vanilla action bar sits behind that window).
      */
-    public record Notice(Component text, boolean center) implements CustomPacketPayload {
+    public record Notice(Component text, boolean center, int color) implements CustomPacketPayload {
         public Notice(Component text) {
-            this(text, false);
+            this(text, false, 0);
+        }
+
+        public Notice(Component text, boolean center) {
+            this(text, center, 0);
         }
 
         public static final Type<Notice> TYPE = payloadType("notice");
@@ -2125,8 +2129,9 @@ public final class BlueprintPayloads {
                 (buf, value) -> {
                     buf.writeJsonWithCodec(ComponentSerialization.CODEC, value.text == null ? Component.empty() : value.text);
                     buf.writeBoolean(value.center);
+                    buf.writeInt(value.color);
                 },
-                buf -> new Notice(buf.readJsonWithCodec(ComponentSerialization.CODEC), buf.readBoolean()));
+                buf -> new Notice(buf.readJsonWithCodec(ComponentSerialization.CODEC), buf.readBoolean(), buf.readInt()));
 
         @Override
         public Type<? extends CustomPacketPayload> type() {

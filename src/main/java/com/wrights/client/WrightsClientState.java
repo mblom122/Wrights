@@ -161,6 +161,8 @@ public final class WrightsClientState {
     public static long digitalUseUntil;
     public static Component notice = Component.empty();
     public static long noticeUntil;
+    /** Tip-strip color for {@link #notice}; 0 means the hangar default. */
+    public static int noticeColor;
     /** Brief white mid-screen tip (no-op exchange / already done). */
     public static Component centerTip = Component.empty();
     public static long centerTipUntil;
@@ -2881,7 +2883,12 @@ public final class WrightsClientState {
     }
 
     public static void showNotice(Component text) {
+        showNotice(text, 0);
+    }
+
+    public static void showNotice(Component text, int color) {
         notice = text == null ? Component.empty() : text;
+        noticeColor = color;
         noticeUntil = notice.getString().isEmpty() ? 0L : System.currentTimeMillis() + 1400L;
     }
 

@@ -50,6 +50,13 @@ public final class HangarOps {
     /** Batch action: fit the tier in {@code value} to every marked wright. Plus {@link PartSlot#ordinal()}; see {@link #partFit}. */
     private static final int PART_FIT = 40;
 
+    /** Hangar tip strip: fitted / added. */
+    private static final int TIP_ADD = 0xFF6FCF97;
+    /** Hangar tip strip: took out a part or wright. */
+    private static final int TIP_TAKE = 0xFFC47A3A;
+    /** Hangar tip strip: warnings (need part, no space, …). */
+    private static final int TIP_WARN = 0xFFFF5555;
+
     public static final int ONE = 0;
     public static final int SIXTEEN = 1;
     public static final int STACK = 2;
@@ -507,9 +514,9 @@ public final class HangarOps {
         if (blocked && taken == 0) {
             Messages.actionBar(player, "message.wrights.inv_no_space");
         } else if (taken > 0) {
-            Messages.actionBar(player, "message.wrights.wrights_removed", taken);
+            Messages.actionBar(player, TIP_TAKE, "message.wrights.wrights_removed", taken);
             if (blocked) {
-                Messages.actionBar(player, "message.wrights.inv_no_space");
+                Messages.actionBar(player, TIP_WARN, "message.wrights.inv_no_space");
             }
         }
         return next;
@@ -560,9 +567,10 @@ public final class HangarOps {
                 return swarm;
             }
             took = true;
-            Messages.actionBar(player, "message.wrights.part_fitted", Component.translatable(slot.fittedKey(target)));
+            // Green = fitted/added, orange = took out. Red stays for warnings.
+            Messages.actionBar(player, TIP_ADD, "message.wrights.part_fitted", Component.translatable(slot.fittedKey(target)));
         } else {
-            Messages.actionBar(player, "message.wrights.part_removed", Component.translatable(slot.fittedKey(tier)));
+            Messages.actionBar(player, TIP_TAKE, "message.wrights.part_removed", Component.translatable(slot.fittedKey(tier)));
         }
         if (!refund(player, slot, tier)) {
             if (took && need != null) {
@@ -660,7 +668,7 @@ public final class HangarOps {
         } else if (missing > 0 && !crafting) {
             Messages.actionBar(player, "message.wrights.marked_short", moved, missing);
         } else {
-            Messages.actionBar(player, "message.wrights.marked_fitted", moved, label);
+            Messages.actionBar(player, TIP_ADD, "message.wrights.marked_fitted", moved, label);
         }
         return next;
     }
@@ -706,7 +714,7 @@ public final class HangarOps {
             }
         }
         if (raised > 0) {
-            Messages.actionBar(player, "message.wrights.marked_raised", raised);
+            Messages.actionBar(player, TIP_ADD, "message.wrights.marked_raised", raised);
             return next;
         }
         if (noSpace) {
@@ -803,7 +811,7 @@ public final class HangarOps {
             next = next.withParts(index, Loadout.BASIC);
             stripped++;
         }
-        Messages.actionBar(player, "message.wrights.marked_stripped", stripped);
+        Messages.actionBar(player, TIP_TAKE, "message.wrights.marked_stripped", stripped);
         return next;
     }
 
@@ -837,7 +845,7 @@ public final class HangarOps {
             }
             next = next.removeUnit(index);
         }
-        Messages.actionBar(player, "message.wrights.wrights_removed", order.length);
+        Messages.actionBar(player, TIP_TAKE, "message.wrights.wrights_removed", order.length);
         return next;
     }
 

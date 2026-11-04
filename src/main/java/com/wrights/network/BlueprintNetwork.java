@@ -710,7 +710,7 @@ public final class BlueprintNetwork {
             if (payload.center()) {
                 com.wrights.client.WrightsClientState.showCenterTip(payload.text());
             } else {
-                com.wrights.client.WrightsClientState.showNotice(payload.text());
+                com.wrights.client.WrightsClientState.showNotice(payload.text(), payload.color());
             }
         });
     }
