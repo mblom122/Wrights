@@ -459,8 +459,11 @@ final class WrightManagePanel {
             screen.edit(HangarOps.partRemove(slot), expanded);
             return true;
         }
-        if (fitted < WrightTier.APEX && have(screen, slot, fitted + 1)) {
-            screen.edit(HangarOps.partNext(slot), expanded);
+        // Empty slot: fit the best part on hand / in digital (not only Scout). Rotor/Core
+        // looked fine when Scout was stocked; Fabricator failed when only a higher tier was.
+        int best = bestHave(screen, slot, fitted);
+        if (best > fitted) {
+            screen.batch(HangarOps.partFit(slot), best, new int[] { expanded });
         }
         return true;
     }
@@ -1029,6 +1032,16 @@ final class WrightManagePanel {
             return true;
         }
         return count(screen, part) > 0 || digitalStock(part) > 0L || digitalCraftable(part);
+    }
+
+    /** Highest tier above {@code fitted} that {@link #have} can supply, or {@code fitted} when none. */
+    private static int bestHave(ManageHost screen, PartSlot slot, int fitted) {
+        for (int tier = WrightTier.APEX; tier > fitted; tier--) {
+            if (have(screen, slot, tier)) {
+                return tier;
+            }
+        }
+        return fitted;
     }
 
     private static BlueprintPayloads.DigitalInfoLine digitalLine(Item item) {

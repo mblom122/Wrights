@@ -531,7 +531,13 @@ public final class HangarOps {
             Messages.actionBar(player, "message.wrights.part_max", Component.translatable(slot.fittedKey(tier)));
             return swarm;
         }
-        return fitOne(player, swarm, index, slot, tier + 1);
+        int best = bestOnHand(player, slot, tier);
+        if (best <= tier) {
+            Messages.actionBar(player, TIP_WARN, "message.wrights.part_need",
+                    Component.translatable(slot.fittedKey(Math.min(WrightTier.APEX, tier + 1))));
+            return swarm;
+        }
+        return fitOne(player, swarm, index, slot, best);
     }
 
     /** Fits the {@code target} part to one wright, or takes the part out when {@code target} is Basic. */
