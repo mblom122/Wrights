@@ -1001,7 +1001,7 @@
   "screen.wrights.manage_no_wrights": "No wrights available in inventory or the network",
   "screen.wrights.manage_add_count": "Add",
   "screen.wrights.manage_add_all": "All that fit",
-  "screen.wrights.manage_cancel": "Cancel",
+  "screen.wrights.manage_cancel": "Close",
   "screen.wrights.manage_marked_title": "Marked wrights",
   "screen.wrights.manage_marked_count": "%s marked",
   "screen.wrights.manage_marked_hint": "Pick a tier for every marked wright. The part each one had comes back to you.",
