@@ -26,7 +26,7 @@ public final class WrightportOps {
         }
         Swarm swarm = port.swarm();
         if (HangarOps.targetsUnit(action) && HangarOps.awayUnit(player, swarm, index)) {
-            Messages.actionBar(player, "message.wrights.wright_away");
+            Messages.actionBar(player, 0xFFFF5555, "message.wrights.wright_away");
             return;
         }
         if (port.owner() == null) {
@@ -130,7 +130,7 @@ public final class WrightportOps {
         Swarm swarm = port.swarm();
         int[] home = HangarOps.isAdd(action) ? units : HangarOps.homeUnits(player, swarm, units);
         if (!HangarOps.isAdd(action) && units != null && units.length > 0 && home.length == 0) {
-            Messages.actionBar(player, "message.wrights.wright_away");
+            Messages.actionBar(player, 0xFFFF5555, "message.wrights.wright_away");
             return;
         }
         if (port.owner() == null && HangarOps.isAdd(action)) {

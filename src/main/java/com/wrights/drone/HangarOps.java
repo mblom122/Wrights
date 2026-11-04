@@ -96,7 +96,7 @@ public final class HangarOps {
         }
         Swarm swarm = Swarm.from(stack);
         if (targetsUnit(action) && awayUnit(player, swarm, unit)) {
-            Messages.actionBar(player, "message.wrights.wright_away");
+            Messages.actionBar(player, TIP_WARN, "message.wrights.wright_away");
             ManageLock.hold(player, kind, index);
             return;
         }
@@ -117,7 +117,7 @@ public final class HangarOps {
         Swarm swarm = Swarm.from(stack);
         int[] home = isAdd(action) ? units : homeUnits(player, swarm, units);
         if (!isAdd(action) && units != null && units.length > 0 && home.length == 0) {
-            Messages.actionBar(player, "message.wrights.wright_away");
+            Messages.actionBar(player, TIP_WARN, "message.wrights.wright_away");
             ManageLock.hold(player, kind, index);
             return;
         }
@@ -1132,7 +1132,7 @@ public final class HangarOps {
             return swarm;
         }
         if (ManageLock.away(player, swarm.units().get(index).id())) {
-            Messages.actionBar(player, "message.wrights.wright_away");
+            Messages.actionBar(player, TIP_WARN, "message.wrights.wright_away");
             return swarm;
         }
         return swarm.withName(index, name);

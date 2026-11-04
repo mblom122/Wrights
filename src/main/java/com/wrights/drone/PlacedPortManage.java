@@ -81,7 +81,7 @@ public final class PlacedPortManage {
         Swarm swarm = port.swarm();
         int[] home = HangarOps.isAdd(action) ? units : HangarOps.homeUnits(player, swarm, units);
         if (!HangarOps.isAdd(action) && units != null && units.length > 0 && home.length == 0) {
-            Messages.actionBar(player, "message.wrights.wright_away");
+            Messages.actionBar(player, 0xFFFF5555, "message.wrights.wright_away");
             return;
         }
         CraftDeliveries.push(CraftDeliveries.Hangar.placed(port.owner(), port.getLevel().dimension(), pos));
