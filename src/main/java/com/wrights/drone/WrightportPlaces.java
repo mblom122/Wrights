@@ -86,6 +86,19 @@ public final class WrightportPlaces {
         };
     }
 
+    /** Spot that currently holds this exact stack instance, or null. */
+    public static Spot find(Player player, ItemStack stack) {
+        if (player == null || stack == null || stack.isEmpty()) {
+            return null;
+        }
+        for (Spot spot : list(player)) {
+            if (stack(player, spot.kind(), spot.index()) == stack) {
+                return spot;
+            }
+        }
+        return null;
+    }
+
     /** Takes one wright out of every personal port this player is carrying. */
     public static void removeUnit(Player player, UUID id) {
         if (player == null || id == null) {

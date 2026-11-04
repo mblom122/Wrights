@@ -94,6 +94,7 @@ public class WrightsClient {
     @SubscribeEvent
     public static void registerScreens(RegisterMenuScreensEvent event) {
         event.register(ModMenus.WRIGHTPORT.get(), WrightportScreen::new);
+        event.register(ModMenus.PERSONAL_HANGAR.get(), PersonalHangarScreen::new);
     }
 
     @SubscribeEvent

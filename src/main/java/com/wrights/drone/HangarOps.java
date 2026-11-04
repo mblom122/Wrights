@@ -153,6 +153,44 @@ public final class HangarOps {
         ManageLock.hold(player, kind, index);
     }
 
+    /** Shift-click one wright item into a personal wrightport hangar bay. */
+    public static boolean quickDepositPort(ServerPlayer player, int kind, int index, ItemStack stack) {
+        if (!(stack.getItem() instanceof WrightItem) || stack.isEmpty()) {
+            return false;
+        }
+        ItemStack port = WrightportPlaces.stack(player, kind, index);
+        if (!(port.getItem() instanceof PersonalWrightportItem)) {
+            return false;
+        }
+        Swarm swarm = Swarm.from(port);
+        if (swarm.units().size() >= Swarm.capacity()) {
+            Messages.actionBar(player, "message.wrights.drone_full", Swarm.capacity());
+            return false;
+        }
+        int capRoom = WrightLedger.room(player.serverLevel().getServer(), player.getUUID());
+        if (capRoom <= 0) {
+            Messages.actionBar(player, "message.wrights.wright_cap", WrightsConfig.maxWrightsOwned());
+            return false;
+        }
+        Loadout parts = WrightItem.parts(stack);
+        String name = WrightItem.nameOf(stack);
+        stack.shrink(1);
+        Swarm next = swarm.addUnit(parts, name);
+        HangarDock.show(player, java.util.List.of(parts));
+        WrightportPlaces.write(player, kind, index, next);
+        if (capRoom <= 1) {
+            Messages.actionBar(player, "message.wrights.wright_cap_added", 1, WrightsConfig.maxWrightsOwned());
+        } else {
+            Messages.actionBar(player, "message.wrights.wrights_added", 1);
+        }
+        ManageLock.hold(player, kind, index);
+        if (player.containerMenu instanceof com.wrights.menu.PersonalHangarMenu open
+                && open.kind() == kind && open.index() == index) {
+            open.broadcastChanges();
+        }
+        return true;
+    }
+
     static boolean targetsUnit(int action) {
         return action == REMOVE || action == UP || action == DOWN || action == TAKE
                 || slotOf(action, PART_NEXT) != null || slotOf(action, PART_REMOVE) != null;
