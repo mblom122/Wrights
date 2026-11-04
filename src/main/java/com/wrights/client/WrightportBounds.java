@@ -9,22 +9,34 @@ import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 
+import com.wrights.WrightsConfig;
 import com.wrights.drone.WrightHomes;
 
-/** Which placed wrightports are drawing their reach, and the cube that reach makes. */
+/** Which wrightports are drawing their reach, and the boxes that reach makes. */
 public final class WrightportBounds {
     private static final Set<BlockPos> shown = new HashSet<>();
     @Nullable
     private static ResourceKey<Level> dimension;
+    /** Personal / worn port reach around the player (maxRange sphere drawn as a cube). */
+    private static boolean personalShown;
 
     private WrightportBounds() {
     }
 
     public static boolean showing(BlockPos pos) {
         return shown.contains(pos);
+    }
+
+    public static boolean personalShowing() {
+        return personalShown;
+    }
+
+    public static void togglePersonal() {
+        personalShown = !personalShown;
     }
 
     public static void toggle(ResourceKey<Level> level, BlockPos pos) {
@@ -65,5 +77,17 @@ public final class WrightportBounds {
                 SectionPos.sectionToBlockCoord(sectionX + reach + 1),
                 SectionPos.sectionToBlockCoord(sectionY + reach + 1),
                 SectionPos.sectionToBlockCoord(sectionZ + reach + 1));
+    }
+
+    /** Axis-aligned box of {@link WrightsConfig#MAX_RANGE} around the player (personal wright reach). */
+    public static AABB personalCube(Player player) {
+        double r = WrightsConfig.MAX_RANGE.getAsInt();
+        return new AABB(
+                player.getX() - r,
+                player.getY() - r,
+                player.getZ() - r,
+                player.getX() + r,
+                player.getY() + r,
+                player.getZ() + r);
     }
 }

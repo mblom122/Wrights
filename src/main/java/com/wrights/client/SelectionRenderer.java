@@ -92,6 +92,7 @@ public final class SelectionRenderer {
         viewLook = Vec3.directionFromRotation(event.getCamera().getXRot(), event.getCamera().getYRot());
         MultiBufferSource.BufferSource buffers = minecraft.renderBuffers().bufferSource();
         drawPortBounds(pose, buffers, camera, minecraft);
+        drawPersonalBounds(pose, buffers, camera, minecraft);
         drawPortGlow(pose, buffers, camera, minecraft);
         drawMarkedPorts(pose, buffers, camera, minecraft);
         drawMarkedWrights(pose, buffers, camera, minecraft);
@@ -910,6 +911,15 @@ public final class SelectionRenderer {
         if (any) {
             buffers.endBatch(RenderType.lines());
         }
+    }
+
+    private static void drawPersonalBounds(PoseStack pose, MultiBufferSource.BufferSource buffers, Vec3 camera, Minecraft minecraft) {
+        if (!WrightportBounds.personalShowing() || minecraft.player == null) {
+            return;
+        }
+        VertexConsumer lines = buffers.getBuffer(RenderType.lines());
+        drawBox(pose, lines, WrightportBounds.personalCube(minecraft.player), camera, 0.77F, 0.48F, 0.23F, 1.0F);
+        buffers.endBatch(RenderType.lines());
     }
 
     /** 5s pulse from the wrightport Bind Chest → Highlight button (no controller required). */

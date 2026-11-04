@@ -107,12 +107,12 @@ final class PortManagePanel {
             return;
         }
         int detailTop = top + h + 8;
-        drawPersonalEnergy(graphics, detailTop);
+        drawPersonalEnergy(graphics, detailTop, mouseX, mouseY);
         Swarm swarm = personalSwarm(spot);
         drawWrightList(graphics, swarm, detailTop + 14, mouseX, mouseY);
     }
 
-    private void drawPersonalEnergy(GuiGraphics graphics, int y) {
+    private void drawPersonalEnergy(GuiGraphics graphics, int y, int mouseX, int mouseY) {
         if (s.minecraft() == null || s.minecraft().player == null) {
             return;
         }
@@ -123,7 +123,13 @@ final class PortManagePanel {
         ItemStack stack = WrightportPlaces.stack(s.minecraft().player, spot.kind(), spot.index());
         long stored = com.wrights.energy.PortEnergy.itemStored(stack);
         long capacity = com.wrights.WrightsConfig.portEnergyCapacity();
-        WrightsUi.energyBar(graphics, s.font(), portBarX(), y, portBarW(), stored, capacity);
+        int barX = portBarX();
+        int barW = portBarW();
+        boolean on = WrightportBounds.personalShowing();
+        String key = on ? "menu.wrights.boundary_on" : "menu.wrights.boundary";
+        int btnW = s.jobButtonWidth(key);
+        WrightsUi.energyBar(graphics, s.font(), barX, y, Math.max(40, barW - btnW - 6), stored, capacity);
+        s.drawJobButton(graphics, barX + barW, y - 1, key, mouseX, mouseY, btnW, on ? 0xFFF2D48A : 0);
     }
 
     private Swarm personalSwarm(WrightportPlaces.Spot spot) {
@@ -443,7 +449,25 @@ final class PortManagePanel {
             }
             return true;
         }
+        if (clickPersonalBoundary(mouseX, mouseY, top, shown)) {
+            return true;
+        }
         return clickWrightList(mouseX, mouseY);
+    }
+
+    private boolean clickPersonalBoundary(double mouseX, double mouseY, int listTop, int shown) {
+        if (shown <= 0 || s.currentSpot() == null) {
+            return false;
+        }
+        int y = listTop + shown * ROW + 8 - 1;
+        boolean on = WrightportBounds.personalShowing();
+        String key = on ? "menu.wrights.boundary_on" : "menu.wrights.boundary";
+        int btnW = s.jobButtonWidth(key);
+        if (!hitWide(mouseX, mouseY, portBarX() + portBarW(), y, btnW)) {
+            return false;
+        }
+        WrightportBounds.togglePersonal();
+        return true;
     }
 
     private int wrightListTopPersonal() {

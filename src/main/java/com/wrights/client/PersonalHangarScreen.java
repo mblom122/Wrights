@@ -218,6 +218,7 @@ public class PersonalHangarScreen extends AbstractContainerScreen<PersonalHangar
             ItemStack port = menu.getSlot(0).getItem();
             HangarGui.drawEnergyGauge(graphics, leftPos, topPos,
                     PortEnergy.itemStored(port), com.wrights.WrightsConfig.portEnergyCapacity());
+            drawBoundaryButton(graphics, localX, localY);
             boolean modal = manage.dialogOpen();
             this.hoveredSlot = null;
             if (!modal) {
@@ -247,10 +248,41 @@ public class PersonalHangarScreen extends AbstractContainerScreen<PersonalHangar
                 graphics.renderItemDecorations(this.font, carried, localX - 8, localY - 8);
                 graphics.pose().popPose();
             }
+            Component boundaryTip = boundaryTip(localX, localY);
+            if (boundaryTip != null) {
+                graphics.renderTooltip(this.font, boundaryTip, localX, localY);
+            }
             this.renderTooltip(graphics, localX, localY);
         } finally {
             WrightsGuiScale.end(graphics);
         }
+    }
+
+    private void drawBoundaryButton(GuiGraphics graphics, int mouseX, int mouseY) {
+        int size = HangarGui.BTN_SLOT;
+        int x = HangarGui.buttonX(leftPos);
+        int y = HangarGui.buttonY(topPos, HangarGui.BTN_BOUNDARY);
+        boolean hover = mouseX >= x && mouseX < x + size && mouseY >= y && mouseY < y + size;
+        boolean on = WrightportBounds.personalShowing();
+        HangarGui.blitButton(graphics, leftPos, topPos, HangarGui.BTN_BOUNDARY,
+                HangarGui.buttonState(true, on, hover));
+    }
+
+    private boolean clickBoundaryButton(double mouseX, double mouseY) {
+        int hit = HangarGui.buttonHit(leftPos, topPos, mouseX, mouseY);
+        if (hit != HangarGui.BTN_BOUNDARY) {
+            return false;
+        }
+        WrightportBounds.togglePersonal();
+        return true;
+    }
+
+    private Component boundaryTip(int mouseX, int mouseY) {
+        int hit = HangarGui.buttonHit(leftPos, topPos, mouseX, mouseY);
+        if (hit != HangarGui.BTN_BOUNDARY) {
+            return null;
+        }
+        return Component.translatable("screen.wrights.boundary_personal");
     }
 
     @Override
@@ -266,6 +298,9 @@ public class PersonalHangarScreen extends AbstractContainerScreen<PersonalHangar
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         double localX = WrightsGuiScale.localX(mouseX, this.width);
         double localY = WrightsGuiScale.localY(mouseY, this.height);
+        if (button == 0 && clickBoundaryButton(localX, localY)) {
+            return true;
+        }
         if (manage.mouseClicked(this, localX, localY, button)) {
             return true;
         }
