@@ -40,6 +40,8 @@ public class DroneEntity extends Entity {
     private static final EntityDataAccessor<ItemStack> NEXT_BLOCK = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.ITEM_STACK);
     private static final EntityDataAccessor<Integer> WAIT_REASON = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> RETURNING = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.BOOLEAN);
+    /** 0 = full size, 1 = finished dock shrink ({@link #DOCK_SCALE_END}). */
+    private static final EntityDataAccessor<Float> DOCK_SHRINK = SynchedEntityData.defineId(DroneEntity.class, EntityDataSerializers.FLOAT);
 
     /** Not waiting — actively flying to or placing the current block. */
     public static final int WAIT_NONE = 0;
@@ -70,6 +72,8 @@ public class DroneEntity extends Entity {
     private static final double APPROACH_ARRIVE_SQR = 0.36D;
     private static final double HATCH_ARRIVE_SQR_BLOCK = 0.04D;
     private static final double HATCH_ARRIVE_SQR_PERSONAL = 0.25D;
+    /** Render scale when dock shrink is complete (flying into the port). */
+    public static final float DOCK_SCALE_END = 0.4F;
     private UUID ownerId;
     private UUID unitId;
     private String unitName = "";
@@ -220,6 +224,7 @@ public class DroneEntity extends Entity {
         this.returnTicks = 0;
         this.dockPhase = 0;
         this.dockSettleTicks = 0;
+        setDockShrink(0.0F);
         this.ownerId = player.getUUID();
         this.unitId = null;
         this.setJobId(null);
@@ -261,6 +266,7 @@ public class DroneEntity extends Entity {
         this.returnTicks = 0;
         this.dockPhase = 0;
         this.dockSettleTicks = 0;
+        setDockShrink(0.0F);
         this.ownerId = player.getUUID();
         this.setJobId(null);
         // Keep carried haul for the flight home; only clear the place/mine preview.
@@ -321,12 +327,52 @@ public class DroneEntity extends Entity {
         builder.define(NEXT_BLOCK, ItemStack.EMPTY);
         builder.define(WAIT_REASON, WAIT_NONE);
         builder.define(RETURNING, false);
+        builder.define(DOCK_SHRINK, 0.0F);
     }
 
     private void setReturning(boolean value) {
         if (this.entityData.get(RETURNING) != value) {
             this.entityData.set(RETURNING, value);
         }
+        if (!value) {
+            setDockShrink(0.0F);
+        }
+    }
+
+    private void setDockShrink(float value) {
+        float next = Mth.clamp(value, 0.0F, 1.0F);
+        if (Math.abs(this.entityData.get(DOCK_SHRINK) - next) > 0.001F) {
+            this.entityData.set(DOCK_SHRINK, next);
+        }
+    }
+
+    /** 0 at door approach, 1 when finished flying into the hatch (settling / done). */
+    public float dockShrink() {
+        return this.entityData.get(DOCK_SHRINK);
+    }
+
+    /** Model scale while docking: 1 → {@link #DOCK_SCALE_END}. */
+    public float dockRenderScale() {
+        return Mth.lerp(dockShrink(), 1.0F, DOCK_SCALE_END);
+    }
+
+    /** Updates shrink from approach→hatch progress (call while entering). */
+    private void updateDockShrink(Vec3 approach, Vec3 hatch) {
+        if (this.dockPhase <= 0) {
+            setDockShrink(0.0F);
+            return;
+        }
+        if (this.dockPhase >= 2) {
+            setDockShrink(1.0F);
+            return;
+        }
+        double span = approach.distanceTo(hatch);
+        if (span < 1.0E-4D) {
+            setDockShrink(1.0F);
+            return;
+        }
+        double left = this.position().distanceTo(hatch);
+        setDockShrink((float) (1.0D - Mth.clamp(left / span, 0.0D, 1.0D)));
     }
 
     /** The drop this wright is bringing home. Empty while it is still on the way out. */
@@ -600,6 +646,7 @@ public class DroneEntity extends Entity {
             }
             // Hold at the hatch so the dock-in is visible (add, job return, shelter — all paths).
             if (this.dockPhase >= 2) {
+                setDockShrink(1.0F);
                 this.moveTo(hatch.x, hatch.y, hatch.z, this.getYRot(), 0.0F);
                 if (--this.dockSettleTicks <= 0) {
                     finishReturn(serverLevel, player, arrivedAt);
@@ -613,12 +660,19 @@ public class DroneEntity extends Entity {
             if (this.distanceToSqr(target) <= arriveSqr) {
                 if (this.dockPhase == 0) {
                     this.dockPhase = 1;
+                    setDockShrink(0.0F);
                 } else {
                     this.dockPhase = 2;
                     this.dockSettleTicks = DOCK_SETTLE_TICKS;
+                    setDockShrink(1.0F);
                     this.moveTo(hatch.x, hatch.y, hatch.z, this.getYRot(), 0.0F);
                 }
                 return;
+            }
+            if (this.dockPhase >= 1) {
+                updateDockShrink(approach, hatch);
+            } else {
+                setDockShrink(0.0F);
             }
             this.moveToward(target, returnStep(target, blockHome));
             return;

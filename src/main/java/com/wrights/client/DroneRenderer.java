@@ -29,12 +29,14 @@ public class DroneRenderer extends EntityRenderer<DroneEntity> {
 
     @Override
     public void render(DroneEntity entity, float yaw, float partialTick, PoseStack pose, MultiBufferSource buffers, int light) {
+        float dock = entity.dockRenderScale();
         pose.pushPose();
         float age = entity.tickCount + partialTick;
-        float bob = Mth.sin(age * 0.15F) * 0.03F;
-        pose.translate(0.0F, 0.15F + bob, 0.0F);
+        float bob = Mth.sin(age * 0.15F) * 0.03F * dock;
+        pose.translate(0.0F, 0.15F * dock + bob, 0.0F);
         pose.mulPose(Axis.YP.rotationDegrees(180.0F - yaw));
-        pose.scale(SCALE, SCALE, SCALE);
+        float body = SCALE * dock;
+        pose.scale(body, body, body);
         pose.translate(-0.5F, -WrightModel.SKIDS / 16.0F, -0.5F);
         WrightModel.render(pose, buffers, entity.parts(), age * 40.0F, light);
         pose.popPose();
@@ -42,9 +44,10 @@ public class DroneRenderer extends EntityRenderer<DroneEntity> {
         ItemStack cargo = entity.displayCargo();
         if (!cargo.isEmpty()) {
             pose.pushPose();
-            pose.translate(0.0D, -0.35D, 0.0D);
+            pose.translate(0.0D, -0.35D * dock, 0.0D);
             pose.mulPose(Axis.YP.rotationDegrees((entity.tickCount + partialTick) * 3.0F));
-            pose.scale(0.55F, 0.55F, 0.55F);
+            float cargoScale = 0.55F * dock;
+            pose.scale(cargoScale, cargoScale, cargoScale);
             this.items.renderStatic(cargo, ItemDisplayContext.GROUND, light, OverlayTexture.NO_OVERLAY, pose, buffers, entity.level(), entity.getId());
             pose.popPose();
         }
