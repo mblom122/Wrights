@@ -97,6 +97,8 @@ public final class WrightsInput {
             } else if (!wasHeld) {
                 WrightsClientState.tryResume();
             }
+            // Cancel / menu / sync can leave Ready while still holding — always restore.
+            WrightsClientState.ensureMode();
         }
         wasHeld = held;
         if (!held) {

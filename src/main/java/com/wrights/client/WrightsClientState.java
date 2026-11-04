@@ -693,7 +693,7 @@ public final class WrightsClientState {
 
     private static void rememberMode() {
         int modeId = switch (mode) {
-            case CAPTURE -> 1;
+            case CAPTURE, SAVING -> 1;
             case BUILD -> 2;
             case JOBS -> 3;
             case MANAGE -> 4;
@@ -856,25 +856,22 @@ public final class WrightsClientState {
         if (mode != Mode.NONE || resumeSent) {
             return;
         }
+        resumeSent = true;
         int last = com.wrights.WrightsClientConfig.LAST_MODE.get();
         if (last == 3 && WrightsConfig.allowJobs()) {
-            resumeSent = true;
             enterJobs();
             return;
         }
         // 4 was Manage on the controller — that task lives on the B menu now.
         if (last == 5 && WrightsConfig.allowInfo()) {
-            resumeSent = true;
             enterInfo();
             return;
         }
         if (last == 6 && WrightsConfig.allowLink()) {
-            resumeSent = true;
             enterLink();
             return;
         }
         if (last == 2 && WrightsConfig.allowPlace()) {
-            resumeSent = true;
             java.util.UUID id = net.minecraft.Util.NIL_UUID;
             String raw = com.wrights.WrightsClientConfig.LAST_BUILD.get();
             if (raw != null && !raw.isBlank()) {
@@ -892,14 +889,28 @@ public final class WrightsClientState {
             return;
         }
         if (last == 1 && WrightsConfig.allowCapture()) {
-            resumeSent = true;
             net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                     new com.wrights.network.BlueprintPayloads.Resume(1, net.minecraft.Util.NIL_UUID));
             return;
         }
         // New player / no last task / retired Manage: New blueprint (box is the default lastStyle).
-        resumeSent = true;
         enterDefaultNew();
+    }
+
+    /**
+     * Never leave the controller on Ready while it is held — restore the last task, or New box.
+     * Safe to call every tick; no-ops when already on a task or the tool is not equipped.
+     */
+    public static void ensureMode() {
+        if (mode != Mode.NONE) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || !com.wrights.item.ControllerItem.isHeld(minecraft.player)) {
+            return;
+        }
+        resumeSent = false;
+        tryResume();
     }
 
     /** First-hold / empty last-mode: New template with the saved style (defaults to box). */
@@ -947,6 +958,7 @@ public final class WrightsClientState {
         clearPortChestAim();
         styleHudTicks = STYLE_HUD_TICKS;
         updateFlags();
+        rememberMode();
     }
 
     private static List<String> libraryNames() {
@@ -963,6 +975,7 @@ public final class WrightsClientState {
         clearBuildAims();
         clearPortChestAim();
         updateFlags();
+        rememberMode();
     }
 
     public static void enterManage() {
@@ -979,6 +992,7 @@ public final class WrightsClientState {
         clearBuildAims();
         clearPortChestAim();
         updateFlags();
+        rememberMode();
     }
 
     public static void enterInfo() {
@@ -987,6 +1001,7 @@ public final class WrightsClientState {
         clearBuildAims();
         clearPortChestAim();
         updateFlags();
+        rememberMode();
     }
 
     public static void enterLink() {
@@ -995,6 +1010,7 @@ public final class WrightsClientState {
         clearBuildAims();
         clearPortChestAim();
         updateFlags();
+        rememberMode();
     }
 
     /** True once New has been left for Build, so coming back starts a blank capture. */
@@ -1216,6 +1232,7 @@ public final class WrightsClientState {
 
     public static void clearLocal() {
         mode = Mode.NONE;
+        resumeSent = false;
         cornerA = null;
         cornerB = null;
         editingId = null;
@@ -1325,22 +1342,27 @@ public final class WrightsClientState {
                 cornerB = null;
                 boxDragging = false;
             }
-            // Jobs / Manage / Info / Link are client-only. A CaptureCancel NONE sync must not
-            // yank the task strip back to Ready right after leaving New.
-            boolean clientOnly = previous == Mode.JOBS || previous == Mode.MANAGE
-                    || previous == Mode.INFO || previous == Mode.LINK;
-            if (incoming == Mode.NONE && clientOnly) {
+            // Client tasks (and Build) must not be wiped to Ready by a late CaptureCancel NONE sync.
+            boolean keepTask = previous == Mode.JOBS || previous == Mode.MANAGE
+                    || previous == Mode.INFO || previous == Mode.LINK
+                    || previous == Mode.BUILD;
+            if (incoming == Mode.NONE && keepTask) {
                 cornerA = null;
                 cornerB = null;
                 editingId = null;
                 boxDragging = false;
-                buildId = null;
-                ghosts = List.of();
-                concealed = false;
-                follow = false;
+                if (previous != Mode.BUILD) {
+                    buildId = null;
+                    ghosts = List.of();
+                    concealed = false;
+                    follow = false;
+                }
                 clearCapturePreview();
             } else {
                 mode = incoming;
+                if (incoming == Mode.NONE) {
+                    resumeSent = false;
+                }
                 if (incoming != Mode.CAPTURE) {
                     boxDragging = false;
                 } else if (previous != Mode.CAPTURE) {
@@ -1361,9 +1383,15 @@ public final class WrightsClientState {
                 if ((incoming != Mode.CAPTURE && incoming != Mode.SAVING) || cornerA == null || cornerB == null) {
                     clearCapturePreview();
                 }
+                if (mode != Mode.NONE) {
+                    rememberMode();
+                }
             }
         }
         updateFlags();
+        if (mode == Mode.NONE) {
+            ensureMode();
+        }
         Minecraft minecraft = Minecraft.getInstance();
         boolean hasBoth = cornerA != null && cornerB != null;
         if (apply && !boxDragging && mode == Mode.CAPTURE && hasBoth && (!hadBoth || payload.generation() > previousGeneration)) {
@@ -3269,7 +3297,11 @@ public final class WrightsClientState {
             }
             return;
         }
+        if (mode != Mode.NONE) {
+            rememberMode();
+        }
         mode = Mode.NONE;
+        resumeSent = false;
         cornerA = null;
         cornerB = null;
         editingId = null;
@@ -3279,6 +3311,7 @@ public final class WrightsClientState {
         clearCapturePreview();
         updateFlags();
         Minecraft.getInstance().setScreen(new WrightsMenuScreen());
+        ensureMode();
     }
 
     public static void sendUpdate() {
