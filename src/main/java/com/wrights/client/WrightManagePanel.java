@@ -34,6 +34,11 @@ final class WrightManagePanel {
     private static final int MARKED_TOP = 70;
     private static final int MARKED_ROW = 30;
     private static final int MARKED_FOOT = 102;
+    /** Add dialog: 1–10 count grid (5×2). */
+    private static final int ADD_GRID_COLS = 5;
+    private static final int ADD_GRID_ROWS = 2;
+    private static final int ADD_BTN_H = 18;
+    private static final int ADD_BTN_GAP = 4;
     private static final int NONE = 0;
     private static final int ADD = 1;
     private static final int MARKED = 2;
@@ -211,7 +216,7 @@ final class WrightManagePanel {
             backButton.setShown(open && chrome && !screen.embedded());
         }
         if (countBox != null) {
-            countBox.setVisible(open && dialog == ADD);
+            countBox.setVisible(false);
         }
 
         int bayX = bayX();
@@ -515,14 +520,16 @@ final class WrightManagePanel {
         if (!screen.requireTool() || roomLeft(screen.swarm()) <= 0) {
             return;
         }
+        PacketDistributor.sendToServer(new BlueprintPayloads.DigitalInfoRequest());
         boolean stock = canAddFromStock(screen);
-        boolean craft = canCraftWright(screen);
-        if (!stock && !craft) {
+        boolean craft = canCraftLinked(screen);
+        if (!stock && !craft && !creative(screen)) {
             WrightsClientState.notice = Component.translatable("screen.wrights.manage_no_wrights");
             WrightsClientState.noticeUntil = System.currentTimeMillis() + 2800L;
             return;
         }
         dialog = ADD;
+        craftDigital = false;
         if (countBox != null) {
             countBox.setVisible(false);
             countBox.setFocused(false);
@@ -537,8 +544,73 @@ final class WrightManagePanel {
         return creative(screen) || readyWrights(screen) > 0;
     }
 
-    private static boolean canCraftWright(ManageHost screen) {
-        return creative(screen) || digitalCraftable(ModItems.WRIGHT.get());
+    /** Digital is linked and reports the wright recipe as craftable. */
+    private static boolean canCraftLinked(ManageHost screen) {
+        return WrightsClientState.digitalOnline && digitalCraftable(ModItems.WRIGHT.get());
+    }
+
+    private static int inventoryWrights(ManageHost screen) {
+        return held(screen);
+    }
+
+    private static int networkWrights(ManageHost screen) {
+        long stock = digitalStock(ModItems.WRIGHT.get());
+        return stock > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) stock;
+    }
+
+    /** True when count fits hangar room and stock (plus craft when allowed). */
+    private boolean canAddCount(ManageHost screen, int count) {
+        if (count <= 0 || count > roomLeft(screen.swarm()) || !screen.toolHeld()) {
+            return false;
+        }
+        if (creative(screen)) {
+            return true;
+        }
+        if (count <= readyWrights(screen)) {
+            return true;
+        }
+        return craftDigital && canCraftLinked(screen);
+    }
+
+    private static int addDialogH() {
+        // Title + label + 5×2 grid + craft check + close row.
+        return 12 + 12 + 16 + 8 + ADD_GRID_ROWS * ADD_BTN_H + (ADD_GRID_ROWS - 1) * ADD_BTN_GAP + 12 + 14 + 10 + 22;
+    }
+
+    private static int addGridX(int dx) {
+        return dx + 12;
+    }
+
+    private static int addGridY(int dy) {
+        return dy + 12 + 12 + 16 + 8;
+    }
+
+    private static int addBtnW(int dw) {
+        int inner = dw - 24;
+        return Math.max(24, (inner - (ADD_GRID_COLS - 1) * ADD_BTN_GAP) / ADD_GRID_COLS);
+    }
+
+    /** 1–10 under the cursor in the add grid, or 0. */
+    private static int addCountAt(double mouseX, double mouseY, int dx, int dy, int dw) {
+        int gridX = addGridX(dx);
+        int gridY = addGridY(dy);
+        int btnW = addBtnW(dw);
+        int gridW = ADD_GRID_COLS * btnW + (ADD_GRID_COLS - 1) * ADD_BTN_GAP;
+        int gridH = ADD_GRID_ROWS * ADD_BTN_H + (ADD_GRID_ROWS - 1) * ADD_BTN_GAP;
+        if (mouseX < gridX || mouseY < gridY || mouseX >= gridX + gridW || mouseY >= gridY + gridH) {
+            return 0;
+        }
+        int col = (int) (mouseX - gridX) / (btnW + ADD_BTN_GAP);
+        int row = (int) (mouseY - gridY) / (ADD_BTN_H + ADD_BTN_GAP);
+        if (col < 0 || col >= ADD_GRID_COLS || row < 0 || row >= ADD_GRID_ROWS) {
+            return 0;
+        }
+        int cellX = gridX + col * (btnW + ADD_BTN_GAP);
+        int cellY = gridY + row * (ADD_BTN_H + ADD_BTN_GAP);
+        if (mouseX >= cellX + btnW || mouseY >= cellY + ADD_BTN_H) {
+            return 0;
+        }
+        return row * ADD_GRID_COLS + col + 1;
     }
 
     private void openMarked(ManageHost screen) {
@@ -576,7 +648,7 @@ final class WrightManagePanel {
 
     private boolean dialogClick(ManageHost screen, double mouseX, double mouseY) {
         int dw = Math.min(312, Math.max(220, screen.screenWidth() - 24));
-        int dh = dialog == ADD ? 110 : markedDialogH();
+        int dh = dialog == ADD ? addDialogH() : markedDialogH();
         int dx = (screen.screenWidth() - dw) / 2;
         int dy = (screen.screenHeight() - dh) / 2;
         if (mouseX < dx || mouseY < dy || mouseX >= dx + dw || mouseY >= dy + dh) {
@@ -592,21 +664,22 @@ final class WrightManagePanel {
                 closeTop();
                 return true;
             }
-            boolean stock = canAddFromStock(screen);
-            boolean craft = canCraftWright(screen);
-            if (hit(mouseX, mouseY, dx + 12, dy + 36, dw - 24, 16)) {
-                if (stock) {
-                    screen.batch(HangarOps.ADD_STOCK, 1, new int[0]);
-                    closeTop();
-                }
+            if (!canCraftLinked(screen)) {
+                craftDigital = false;
+            }
+            int checkY = addGridY(dy) + ADD_GRID_ROWS * ADD_BTN_H + (ADD_GRID_ROWS - 1) * ADD_BTN_GAP + 12;
+            if (canCraftLinked(screen) && hit(mouseX, mouseY, dx + 12, checkY, dw - 24, 14)) {
+                craftDigital = !craftDigital;
                 return true;
             }
-            if (hit(mouseX, mouseY, dx + 12, dy + 58, dw - 24, 16)) {
-                if (craft) {
-                    screen.batch(HangarOps.ADD_CRAFT, 1, new int[0]);
-                    closeTop();
+            int count = addCountAt(mouseX, mouseY, dx, dy, dw);
+            if (count > 0 && canAddCount(screen, count)) {
+                if (craftDigital) {
+                    screen.batch(HangarOps.ADD_COUNT, count, new int[0]);
+                } else {
+                    screen.batch(HangarOps.ADD_STOCK, count, new int[0]);
                 }
-                return true;
+                closeTop();
             }
             return true;
         }
@@ -650,21 +723,39 @@ final class WrightManagePanel {
 
     private void renderDialog(ManageHost screen, GuiGraphics graphics, Swarm swarm, int mouseX, int mouseY) {
         int dw = Math.min(312, Math.max(220, screen.screenWidth() - 24));
-        int dh = dialog == ADD ? 110 : markedDialogH();
+        int dh = dialog == ADD ? addDialogH() : markedDialogH();
         int dx = (screen.screenWidth() - dw) / 2;
         int dy = (screen.screenHeight() - dh) / 2;
         // Fully cover hangar icons, player inventory, and tip chrome under the modal.
         graphics.fill(0, 0, screen.screenWidth(), screen.screenHeight(), 0xFF060C14);
         WrightsUi.panel(graphics, dx, dy, dw, dh);
         if (dialog == ADD) {
-            graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_add_title"), dx + 12, dy + 12, WrightsUi.COPPER, false);
-            boolean stock = canAddFromStock(screen);
-            boolean craft = canCraftWright(screen);
-            int ready = readyWrights(screen);
-            drawMini(graphics, screen, dx + 12, dy + 36, dw - 24,
-                    Component.translatable("screen.wrights.manage_add_from_stock", ready), stock, false, mouseX, mouseY);
-            drawMini(graphics, screen, dx + 12, dy + 58, dw - 24,
-                    Component.translatable("screen.wrights.manage_add_craft_one"), craft, false, mouseX, mouseY);
+            graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_add_title"),
+                    dx + 12, dy + 12, WrightsUi.COPPER, false);
+            int inv = inventoryWrights(screen);
+            int network = networkWrights(screen);
+            Component label = Component.translatable("screen.wrights.manage_add_sources", inv, network);
+            String clipped = screen.font().plainSubstrByWidth(label.getString(), Math.max(8, dw - 24));
+            graphics.drawString(screen.font(), clipped, dx + 12, dy + 28, WrightsUi.TEXT, false);
+            int gridX = addGridX(dx);
+            int gridY = addGridY(dy);
+            int btnW = addBtnW(dw);
+            for (int n = 1; n <= HangarBay.SLOTS; n++) {
+                int col = (n - 1) % ADD_GRID_COLS;
+                int row = (n - 1) / ADD_GRID_COLS;
+                int bx = gridX + col * (btnW + ADD_BTN_GAP);
+                int by = gridY + row * (ADD_BTN_H + ADD_BTN_GAP);
+                boolean enabled = canAddCount(screen, n);
+                drawAddCount(graphics, screen, bx, by, btnW, n, enabled, mouseX, mouseY);
+            }
+            boolean canCraft = canCraftLinked(screen);
+            if (!canCraft) {
+                craftDigital = false;
+            }
+            int checkY = gridY + ADD_GRID_ROWS * ADD_BTN_H + (ADD_GRID_ROWS - 1) * ADD_BTN_GAP + 12;
+            drawCheck(graphics, dx + 12, checkY + 2, craftDigital, canCraft, mouseX, mouseY);
+            graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_add_allow_craft"),
+                    dx + 26, checkY + 3, canCraft ? WrightsUi.TEXT : 0xFF6E7A86, false);
         } else {
             graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_marked_title"), dx + 12, dy + 12, WrightsUi.COPPER, false);
             graphics.drawString(screen.font(), Component.translatable("screen.wrights.manage_marked_count", markedCount(screen, swarm)), dx + 12, dy + 28, WrightsUi.TEXT, false);
@@ -957,6 +1048,17 @@ final class WrightManagePanel {
         if (checked && enabled) {
             graphics.fill(x + 2, y + 2, x + 8, y + 8, WrightsUi.COPPER);
         }
+    }
+
+    private static void drawAddCount(GuiGraphics graphics, ManageHost screen, int x, int y, int width, int count,
+            boolean enabled, int mouseX, int mouseY) {
+        boolean hover = enabled && mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + ADD_BTN_H;
+        int fill = !enabled ? 0xFF141A22 : (hover ? 0xFF2C3E52 : 0xFF1A2633);
+        graphics.fill(x, y, x + width, y + ADD_BTN_H, fill);
+        WrightsUi.border(graphics, x, y, width, ADD_BTN_H, enabled ? (hover ? WrightsUi.COPPER : 0xFF3D4E5E) : 0xFF2A3440);
+        String text = Integer.toString(count);
+        int color = enabled ? WrightsUi.TEXT : 0xFF6E7A86;
+        graphics.drawString(screen.font(), text, x + (width - screen.font().width(text)) / 2, y + 5, color, false);
     }
 
     private static void drawMini(GuiGraphics graphics, ManageHost screen, int x, int y, int width, Component label, boolean enabled, boolean selected, int mouseX, int mouseY) {
