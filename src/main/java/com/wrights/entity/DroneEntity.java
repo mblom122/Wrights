@@ -243,11 +243,11 @@ public class DroneEntity extends Entity {
         this.returnLimit = returnBudget(dock);
     }
 
-    /** Random 45–55 blocks above the dock; never repeats the previous manage-add pick. */
+    /** Random 30–35 blocks above the dock; never repeats the previous manage-add pick. */
     private int nextDockHeight() {
-        int height = 45 + this.getRandom().nextInt(11);
+        int height = 30 + this.getRandom().nextInt(6);
         if (height == lastDockHeight) {
-            height = 45 + (height - 45 + 1 + this.getRandom().nextInt(10)) % 11;
+            height = 30 + (height - 30 + 1 + this.getRandom().nextInt(5)) % 6;
         }
         lastDockHeight = height;
         return height;
