@@ -9,7 +9,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -402,15 +401,22 @@ public final class DroneFleet {
         job.setWaitKind(BuildJob.WAIT_ENERGY);
         job.setQueued(true);
         job.setCrewQuota(Math.max(1, Math.max(job.crewQuota(), job.hands().size())));
+        int returned = 0;
         for (BuildJob.Hand hand : job.hands()) {
             hand.awaitingItems = false;
             hand.idle = false;
+            if (hand.entityId != null) {
+                returned++;
+            }
             recallHand(level, player, hand);
         }
         if (job.hands().isEmpty()) {
+            if (job.droneId() != null) {
+                returned++;
+            }
             parkSolo(level, player, job);
         }
-        JobAnnouncements.noteHistory(player, library, job, JobEventLog.STALLED_ITEMS, Component.translatable("history.wrights.stalled_energy").getString());
+        JobAnnouncements.stalled(player, library, job, true, returned);
         library.setDirty();
     }
 

@@ -873,7 +873,6 @@ public final class ShapeJobs {
                 statusState = usable.get(0).state();
                 statusWait = DroneEntity.WAIT_ITEMS;
                 job.setWaitKind(BuildJob.WAIT_ITEMS);
-                JobAnnouncements.noteHistory(player, library, job, JobEventLog.STALLED_ITEMS, Component.translatable("history.wrights.stalled_items").getString());
                 break;
             }
             // Exchange already matching — count it without flying out first.
@@ -950,6 +949,7 @@ public final class ShapeJobs {
         }
         if (job.waitKind() != BuildJob.WAIT_ITEMS && job.waitKind() != BuildJob.WAIT_CHUNK) {
             job.setWaitKind(BuildJob.WAIT_NONE);
+            job.setStallNoticed(false);
             statusWait = DroneEntity.WAIT_NONE;
         } else if (job.waitKind() == BuildJob.WAIT_ITEMS) {
             statusWait = DroneEntity.WAIT_ITEMS;
@@ -965,6 +965,7 @@ public final class ShapeJobs {
         }
         // Out of materials: send the wright home with its carry (same as blueprint stall).
         if (job.waitKind() == BuildJob.WAIT_ITEMS && !fast) {
+            JobAnnouncements.stalled(player, library, job, false, job.droneId() != null ? 1 : 0);
             DroneFleet.parkSolo(level, player, job);
             job.setQueued(true);
             job.setCrewQuota(Math.max(1, job.crewQuota()));
@@ -1063,6 +1064,7 @@ public final class ShapeJobs {
             }
             WorkPicker.claimAim(job, hand, at);
             hand.idle = false;
+            hand.awaitingItems = false;
             BlockPos pos = job.scanPosAt(at);
             BlockState state = shapeNextState(job, usable, fillMode, random);
             if (state == null) {
@@ -1203,11 +1205,16 @@ public final class ShapeJobs {
             job.setWaitKind(BuildJob.WAIT_CHUNK);
         } else if (waitingItems) {
             job.setWaitKind(BuildJob.WAIT_ITEMS);
-            JobAnnouncements.noteHistory(player, library, job, JobEventLog.STALLED_ITEMS, Component.translatable("history.wrights.stalled_items").getString());
+            // Nobody can pay: the stall branch recalls the rest next tick, so count the whole crew.
+            int returned = !job.stallNoticed() && !crewCanPay(player, library, level, job, usable)
+                    ? job.hands().size()
+                    : JobManager.awaitingHome(job);
+            JobAnnouncements.stalled(player, library, job, false, returned);
             job.setQueued(true);
             job.setCrewQuota(Math.max(1, job.crewQuota()));
         } else {
             job.setWaitKind(BuildJob.WAIT_NONE);
+            job.setStallNoticed(false);
         }
         if (job.exchangeJob() && job.schematicId() != null && job.total() > 8000
                 && level.getGameTime() % 40L == 0L

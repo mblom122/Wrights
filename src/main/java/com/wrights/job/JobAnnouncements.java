@@ -59,6 +59,31 @@ public final class JobAnnouncements {
         noteHistory(player, library, job, kind, historyDetail);
     }
 
+    /**
+     * Job ran out of items or Forge Energy: toast once per stall (why, and how many wrights flew home)
+     * and write History. A job tick that ends with no wait re-arms the toast for the next stall.
+     */
+    static void stalled(ServerPlayer player, SchematicLibrary library, BuildJob job, boolean energy, int returned) {
+        if (player == null || library == null || job == null) {
+            return;
+        }
+        String reasonKey = energy ? "history.wrights.stalled_energy" : "history.wrights.stalled_items";
+        noteHistory(player, library, job, JobEventLog.STALLED_ITEMS, Component.translatable(reasonKey).getString());
+        if (job.stallNoticed()) {
+            return;
+        }
+        job.setStallNoticed(true);
+        Component header = Component.translatable(energy ? "hud.wrights.job_stalled_energy" : "hud.wrights.job_stalled_items");
+        Component name = Component.literal(JobTitles.jobCardTitle(job, library));
+        String key = energy ? "hud.wrights.stalled_energy_detail" : "hud.wrights.stalled_items_detail";
+        Component detail = returned <= 0
+                ? Component.translatable(key + "_none")
+                : returned == 1
+                        ? Component.translatable(key + "_one")
+                        : Component.translatable(key, returned);
+        BlueprintNetwork.jobDone(player, header, name, detail, -1);
+    }
+
     private static boolean isNoopFinish(Component detail) {
         if (detail == null) {
             return false;

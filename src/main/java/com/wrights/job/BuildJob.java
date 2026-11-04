@@ -251,6 +251,17 @@ public final class BuildJob {
         operations++;
     }
 
+    /** Stall toast already shown for this stall. Cleared when a tick ends with no wait. Not saved. */
+    private boolean stallNoticed;
+
+    public boolean stallNoticed() {
+        return stallNoticed;
+    }
+
+    public void setStallNoticed(boolean stallNoticed) {
+        this.stallNoticed = stallNoticed;
+    }
+
     public int skipped() {
         return skipped;
     }

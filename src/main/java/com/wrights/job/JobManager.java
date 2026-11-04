@@ -1239,7 +1239,7 @@ public final class JobManager {
         }
         if (at == NEED_ITEMS) {
             job.setWaitKind(BuildJob.WAIT_ITEMS);
-            JobAnnouncements.noteHistory(player, library, job, JobEventLog.STALLED_ITEMS, Component.translatable("history.wrights.stalled_items").getString());
+            JobAnnouncements.stalled(player, library, job, false, job.droneId() != null ? 1 : 0);
             DroneFleet.parkSolo(level, player, job);
             DroneFleet.releaseStalledHome(player, library, job);
             library.setDirty();
@@ -1284,6 +1284,7 @@ public final class JobManager {
             if (index == NEED_ITEMS) {
                 job.setWaitKind(BuildJob.WAIT_ITEMS);
                 drone.setWorkStatus(soloShow, ItemStack.EMPTY, DroneEntity.WAIT_ITEMS);
+                JobAnnouncements.stalled(player, library, job, false, 1);
                 DroneFleet.parkSolo(level, player, job);
                 DroneFleet.releaseStalledHome(player, library, job);
                 break;
@@ -1343,6 +1344,7 @@ public final class JobManager {
         }
         if (job.waitKind() != BuildJob.WAIT_ITEMS && job.waitKind() != BuildJob.WAIT_FLOOR) {
             job.setWaitKind(BuildJob.WAIT_NONE);
+            job.setStallNoticed(false);
         }
         library.setDirty();
         if (job.cursor() >= job.total()) {
@@ -1995,8 +1997,11 @@ public final class JobManager {
             reason = BuildJob.WAIT_FLOOR;
         }
         job.setWaitKind(reason);
+        if (reason == BuildJob.WAIT_NONE) {
+            job.setStallNoticed(false);
+        }
         if (reason == BuildJob.WAIT_ITEMS) {
-            JobAnnouncements.noteHistory(player, library, job, JobEventLog.STALLED_ITEMS, Component.translatable("history.wrights.stalled_items").getString());
+            JobAnnouncements.stalled(player, library, job, false, awaitingHome(job));
             DroneFleet.releaseStalledHome(player, library, job);
         }
         if (!working && !scanning && !waiting) {
@@ -2004,6 +2009,17 @@ public final class JobManager {
         } else if (waitingChunk && job.tickMessage()) {
             noteChunk(player, library, job);
         }
+    }
+
+    /** Crew wrights sent home this stall because their supply could not pay. */
+    static int awaitingHome(BuildJob job) {
+        int count = 0;
+        for (BuildJob.Hand hand : job.hands()) {
+            if (hand.awaitingItems && hand.entityId == null) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private static void tickUndoCrew(ServerLevel level, ServerPlayer player, SchematicLibrary library, BuildJob job) {
