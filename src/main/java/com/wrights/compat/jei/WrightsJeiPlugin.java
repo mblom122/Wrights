@@ -7,7 +7,9 @@ import com.wrights.WrightsMod;
 import com.wrights.client.BlockPickerScreen;
 import com.wrights.client.BlueprintEditScreen;
 import com.wrights.client.BlueprintMapScreen;
+import com.wrights.client.PersonalHangarScreen;
 import com.wrights.client.PlacementScreen;
+import com.wrights.client.WrightportScreen;
 import com.wrights.client.WrightsMenuScreen;
 import com.wrights.item.ModItems;
 
@@ -40,10 +42,11 @@ public class WrightsJeiPlugin implements IModPlugin {
         registration.addGuiScreenHandler(PlacementScreen.class, WrightsJeiScreens::area);
         registration.addGuiScreenHandler(BlueprintMapScreen.class, WrightsJeiScreens::area);
         registration.addGuiScreenHandler(BlockPickerScreen.class, WrightsJeiScreens::area);
-        // Controller Manage hangar (plain Screen — JEI needs an explicit handler).
+        // Plain Screen + hangars (custom render / GUI scale) need explicit handlers so JEI
+        // keeps the ingredient list open in the right-hand lane.
         registration.addGuiScreenHandler(WrightsMenuScreen.class, WrightsJeiScreens::area);
-        // WrightportScreen is an AbstractContainerScreen: JEI's default handler keeps the list open;
-        // leftPos is still shifted in-screen via JeiPreview.left.
+        registration.addGuiScreenHandler(WrightportScreen.class, WrightsJeiScreens::area);
+        registration.addGuiScreenHandler(PersonalHangarScreen.class, WrightsJeiScreens::area);
         registration.addGhostIngredientHandler(BlueprintEditScreen.class, new PreviewGhostHandler<>());
         registration.addGhostIngredientHandler(PlacementScreen.class, new PreviewGhostHandler<>());
         registration.addGhostIngredientHandler(BlueprintMapScreen.class, new PreviewGhostHandler<>());

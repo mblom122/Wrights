@@ -37,7 +37,15 @@ public interface JeiPreview {
 
     /** Shift a centered panel left when the right side would otherwise cover JEI. */
     static int left(int screenWidth, int panelWidth) {
-        int natural = Math.max(4, (screenWidth - panelWidth) / 2);
-        return Math.max(4, Math.min(natural, screenWidth - panelWidth - JEI_LANE));
+        float factor = WrightsGuiScale.factor();
+        int visualWidth = factor >= 0.999F ? panelWidth : Math.max(1, Math.round(panelWidth * factor));
+        int naturalVisual = Math.max(4, (screenWidth - visualWidth) / 2);
+        int visualLeft = Math.max(4, Math.min(naturalVisual, screenWidth - visualWidth - JEI_LANE));
+        if (factor >= 0.999F) {
+            return visualLeft;
+        }
+        // Invert the center-scale transform so the drawn panel lands on visualLeft.
+        float mid = screenWidth * 0.5F;
+        return Math.round(mid + (visualLeft - mid) / factor);
     }
 }
