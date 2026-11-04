@@ -71,7 +71,8 @@ public class DroneEntity extends Entity {
     private static final double DOCK_ENTER_STEP = 0.18D;
     private static final double APPROACH_ARRIVE_SQR = 0.36D;
     private static final double HATCH_ARRIVE_SQR_BLOCK = 0.04D;
-    private static final double HATCH_ARRIVE_SQR_PERSONAL = 0.25D;
+    /** Personal hatch is small — finish only when actually inside the bay. */
+    private static final double HATCH_ARRIVE_SQR_PERSONAL = 0.06D;
     /** Render scale when dock shrink is complete (flying into the port). */
     public static final float DOCK_SCALE_END = 0.4F;
     private UUID ownerId;
@@ -236,7 +237,7 @@ public class DroneEntity extends Entity {
         double lift = nextDockHeight();
         Vec3 above = port != null
                 ? WrightHomes.hatch(port).add(Math.cos(angle) * radius, lift, Math.sin(angle) * radius)
-                : WrightHomes.behindPlayer(player).add(Math.cos(angle) * radius, lift, Math.sin(angle) * radius);
+                : WrightHomes.highApproach(player, lift).add(Math.cos(angle) * radius, 0.0D, Math.sin(angle) * radius);
         this.moveTo(above.x, above.y, above.z, player.getYRot(), 0.0F);
         this.setYRot(player.getYRot());
         Vec3 dock = port != null ? WrightHomes.hatch(port) : WrightHomes.behindPlayer(player);
@@ -301,7 +302,7 @@ public class DroneEntity extends Entity {
         if (port != null) {
             return WrightHomes.hatch(port).add(Math.cos(angle) * radius, lift, Math.sin(angle) * radius);
         }
-        return WrightHomes.behindPlayer(player).add(Math.cos(angle) * radius, lift, Math.sin(angle) * radius);
+        return WrightHomes.highApproach(player, lift).add(Math.cos(angle) * radius, 0.0D, Math.sin(angle) * radius);
     }
 
     @Override

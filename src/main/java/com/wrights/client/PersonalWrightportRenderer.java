@@ -135,13 +135,9 @@ public class PersonalWrightportRenderer implements ICurioRenderer {
     }
 
     private static Vec3 behindClient(LivingEntity entity) {
-        Vec3 back = entity.getLookAngle();
-        back = new Vec3(back.x, 0.0D, back.z);
-        if (back.lengthSqr() < 1.0E-4D) {
-            back = new Vec3(0.0D, 0.0D, 1.0D);
-        } else {
-            back = back.normalize();
-        }
-        return entity.position().add(back.scale(-0.85D)).add(0.0D, 0.95D, 0.0D);
+        // Same body-yaw back vector as WrightHomes — pack faces the torso, not the head.
+        float yaw = entity.yBodyRot * Mth.DEG_TO_RAD;
+        Vec3 back = new Vec3(Mth.sin(yaw), 0.0D, -Mth.cos(yaw));
+        return entity.position().add(back.scale(0.42D)).add(0.0D, 1.0D, 0.0D);
     }
 }

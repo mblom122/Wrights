@@ -13,6 +13,8 @@ import net.minecraft.core.SectionPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -35,27 +37,34 @@ public final class WrightHomes {
         }
     }
 
-    /** Horizontal unit vector pointing behind the player (away from look). */
-    public static Vec3 playerBack(ServerPlayer player) {
-        Vec3 back = player.getLookAngle();
-        back = new Vec3(back.x, 0.0D, back.z);
-        if (back.lengthSqr() < 1.0E-4D) {
-            return new Vec3(0.0D, 0.0D, 1.0D);
-        }
-        return back.normalize().scale(-1.0D);
+    /**
+     * Horizontal unit vector pointing behind the torso. Uses body yaw (not look angle) so the
+     * dock lines up with the worn pack when the player faces between the cardinals.
+     */
+    public static Vec3 playerBack(LivingEntity entity) {
+        float yaw = entity.yBodyRot * Mth.DEG_TO_RAD;
+        return new Vec3(Mth.sin(yaw), 0.0D, -Mth.cos(yaw));
     }
 
-    /** Into the worn pack hatch (behind the shoulders, slightly up). */
+    /** Into the worn pack bay — close to the spine, inside the iris. */
     public static Vec3 behindPlayer(ServerPlayer player) {
-        return player.position().add(playerBack(player).scale(0.85D)).add(0.0D, 0.95D, 0.0D);
+        return player.position().add(playerBack(player).scale(0.42D)).add(0.0D, 1.0D, 0.0D);
     }
 
     /**
-     * Just outside the worn pack door — further behind than {@link #behindPlayer}, so a return
-     * lines up with the iris before flying into the pack.
+     * Just outside / above the worn pack door so a return lines up with the iris, then dives in.
      */
     public static Vec3 doorApproach(ServerPlayer player) {
-        return player.position().add(playerBack(player).scale(1.45D)).add(0.0D, 1.05D, 0.0D);
+        return player.position().add(playerBack(player).scale(1.25D)).add(0.0D, 1.55D, 0.0D);
+    }
+
+    /**
+     * High point on the personal approach line (same XZ as {@link #doorApproach}) for manage-add
+     * and far home snaps, so the dive aims at the door rather than floating above the hatch.
+     */
+    public static Vec3 highApproach(ServerPlayer player, double lift) {
+        Vec3 door = doorApproach(player);
+        return new Vec3(door.x, player.getY() + lift, door.z);
     }
 
     /** Inside the roof bay of the two-block tower, under the iris, where a returning wright disappears. */
