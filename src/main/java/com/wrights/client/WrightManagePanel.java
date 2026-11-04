@@ -601,7 +601,6 @@ final class WrightManagePanel {
             int chips = dy + MARKED_TOP + k * MARKED_ROW + 10;
             if (tier >= WrightTier.BASIC && mouseY >= chips && mouseY < chips + 14) {
                 screen.batch(HangarOps.partFit(slots[k]), tier, marked(screen, screen.swarm()));
-                closeTop();
                 return true;
             }
         }
