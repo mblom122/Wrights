@@ -83,8 +83,9 @@ final class HangarGui {
     static void drawInventoryPanel(GuiGraphics graphics, int left, int top) {
         int sx0 = left + invSlotLeft();
         int sy0 = top + invSlotTop();
-        int panelX = sx0 - 8;
-        int panelY = sy0 - 8;
+        // Panel chrome sits a bit left/up of the slot grid so the frame lines up with the wells.
+        int panelX = sx0 - 10;
+        int panelY = sy0 - 10;
         WrightsUi.panel(graphics, panelX, panelY, INV_W, INV_H);
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
