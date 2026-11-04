@@ -389,8 +389,7 @@ public final class WrightsInput {
     }
 
     private static boolean menuMode() {
-        return WrightsClientState.mode == WrightsClientState.Mode.MANAGE
-                || WrightsClientState.mode == WrightsClientState.Mode.INFO
+        return WrightsClientState.mode == WrightsClientState.Mode.INFO
                 || WrightsClientState.mode == WrightsClientState.Mode.LINK;
     }
 

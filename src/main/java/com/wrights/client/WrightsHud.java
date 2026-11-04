@@ -530,7 +530,6 @@ public final class WrightsHud {
         Component how = Component.translatable("hud.wrights.main_how");
         Component build = Component.translatable("hud.wrights.main_build");
         Component jobs = Component.translatable("hud.wrights.main_jobs");
-        Component manage = Component.translatable("hud.wrights.main_manage");
         Component info = Component.translatable("hud.wrights.main_info");
         Component link = Component.translatable("hud.wrights.main_link");
         Component selected = Component.translatable("hud.wrights.mode_selected");
@@ -538,13 +537,12 @@ public final class WrightsHud {
         width = Math.max(width, minecraft.font.width(title) + 28);
         width = Math.max(width, minecraft.font.width(build) + minecraft.font.width(selected) + 36);
         width = Math.max(width, minecraft.font.width(jobs) + minecraft.font.width(selected) + 36);
-        width = Math.max(width, minecraft.font.width(manage) + minecraft.font.width(selected) + 36);
         width = Math.max(width, minecraft.font.width(info) + minecraft.font.width(selected) + 36);
         width = Math.max(width, minecraft.font.width(link) + minecraft.font.width(selected) + 36);
         int row = 18;
         int textWidth = width - 24;
         int footer = footerHeight(minecraft, how, textWidth);
-        int height = 28 + row * 5 + footer;
+        int height = 28 + row * 4 + footer;
         int x = HudAnchor.modeX(graphics.guiWidth(), width);
         int y = HudAnchor.modeY(graphics.guiHeight(), height);
         WrightsUi.panel(graphics, x, y, width, height);
@@ -554,9 +552,8 @@ public final class WrightsHud {
                 || WrightsClientState.mode == WrightsClientState.Mode.SAVING;
         drawMainRow(graphics, minecraft, x, y + 24, width, building, build, selected);
         drawMainRow(graphics, minecraft, x, y + 24 + row, width, WrightsClientState.mode == WrightsClientState.Mode.JOBS, jobs, selected);
-        drawMainRow(graphics, minecraft, x, y + 24 + row * 2, width, WrightsClientState.mode == WrightsClientState.Mode.MANAGE, manage, selected);
-        drawMainRow(graphics, minecraft, x, y + 24 + row * 3, width, WrightsClientState.mode == WrightsClientState.Mode.INFO, info, selected);
-        drawMainRow(graphics, minecraft, x, y + 24 + row * 4, width, WrightsClientState.mode == WrightsClientState.Mode.LINK, link, selected);
+        drawMainRow(graphics, minecraft, x, y + 24 + row * 2, width, WrightsClientState.mode == WrightsClientState.Mode.INFO, info, selected);
+        drawMainRow(graphics, minecraft, x, y + 24 + row * 3, width, WrightsClientState.mode == WrightsClientState.Mode.LINK, link, selected);
         drawFooter(graphics, minecraft, how, x + 12, y + height - footer + 4, textWidth, WrightsUi.MUTED);
     }
 

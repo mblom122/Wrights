@@ -862,11 +862,7 @@ public final class WrightsClientState {
             enterJobs();
             return;
         }
-        if (last == 4 && WrightsConfig.allowManage()) {
-            resumeSent = true;
-            enterManage();
-            return;
-        }
+        // 4 was Manage on the controller — that task lives on the B menu now.
         if (last == 5 && WrightsConfig.allowInfo()) {
             resumeSent = true;
             enterInfo();
@@ -877,28 +873,59 @@ public final class WrightsClientState {
             enterLink();
             return;
         }
-        if ((last == 1 && !WrightsConfig.allowCapture()) || (last == 2 && !WrightsConfig.allowPlace())) {
+        if (last == 2 && WrightsConfig.allowPlace()) {
             resumeSent = true;
-            return;
-        }
-        if (last != 1 && last != 2) {
-            return;
-        }
-        resumeSent = true;
-        java.util.UUID id = net.minecraft.Util.NIL_UUID;
-        String raw = com.wrights.WrightsClientConfig.LAST_BUILD.get();
-        if (raw != null && !raw.isBlank()) {
-            try {
-                id = java.util.UUID.fromString(raw);
-            } catch (IllegalArgumentException ignored) {
+            java.util.UUID id = net.minecraft.Util.NIL_UUID;
+            String raw = com.wrights.WrightsClientConfig.LAST_BUILD.get();
+            if (raw != null && !raw.isBlank()) {
+                try {
+                    id = java.util.UUID.fromString(raw);
+                } catch (IllegalArgumentException ignored) {
+                    id = net.minecraft.Util.NIL_UUID;
+                }
+            }
+            // Drop a missing blueprint id so Build (and Shape/Mirror) still resumes.
+            if (!id.equals(net.minecraft.Util.NIL_UUID) && libraryKnown && summary(id) == null) {
                 id = net.minecraft.Util.NIL_UUID;
             }
+            net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.wrights.network.BlueprintPayloads.Resume(2, id));
+            return;
         }
-        // Drop a missing blueprint id so Build (and Shape/Mirror) still resumes.
-        if (last == 2 && !id.equals(net.minecraft.Util.NIL_UUID) && libraryKnown && summary(id) == null) {
-            id = net.minecraft.Util.NIL_UUID;
+        if (last == 1 && WrightsConfig.allowCapture()) {
+            resumeSent = true;
+            net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                    new com.wrights.network.BlueprintPayloads.Resume(1, net.minecraft.Util.NIL_UUID));
+            return;
         }
-        net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.wrights.network.BlueprintPayloads.Resume(last, id));
+        // New player / no last task / retired Manage: New blueprint (box is the default lastStyle).
+        resumeSent = true;
+        enterDefaultNew();
+    }
+
+    /** First-hold / empty last-mode: New template with the saved style (defaults to box). */
+    private static void enterDefaultNew() {
+        if (!WrightsConfig.allowCapture()) {
+            if (WrightsConfig.allowPlace()) {
+                enterBuildFromLast();
+                applyLastBuildTool();
+            } else if (WrightsConfig.allowJobs()) {
+                enterJobs();
+            } else if (WrightsConfig.allowInfo()) {
+                enterInfo();
+            } else if (WrightsConfig.allowLink()) {
+                enterLink();
+            }
+            return;
+        }
+        int style = com.wrights.WrightsClientConfig.LAST_STYLE.get();
+        CaptureStyle[] styles = CaptureStyle.values();
+        captureStyle = styles[Math.max(0, Math.min(styles.length - 1, style))];
+        // Brand-new config uses box; Move needs an existing box so fall back to box.
+        if (captureStyle == CaptureStyle.MOVE) {
+            captureStyle = CaptureStyle.BOX;
+        }
+        enterNewMode();
+        rememberMode();
     }
 
     public static void beginCaptureLocal() {
@@ -1010,15 +1037,16 @@ public final class WrightsClientState {
         PacketDistributor.sendToServer(new BlueprintPayloads.BeginBuild(send));
     }
 
+    /**
+     * Controller scroll tasks. Manage is only on the B menu now.
+     * Ids: 0 Building, 1 Jobs, 2 Info, 3 Link.
+     */
     private static int[] mainModes() {
         int count = 0;
         if (WrightsConfig.showBuilding()) {
             count++;
         }
         if (WrightsConfig.allowJobs()) {
-            count++;
-        }
-        if (WrightsConfig.allowManage()) {
             count++;
         }
         if (WrightsConfig.allowInfo()) {
@@ -1035,14 +1063,11 @@ public final class WrightsClientState {
         if (WrightsConfig.allowJobs()) {
             modes[n++] = 1;
         }
-        if (WrightsConfig.allowManage()) {
+        if (WrightsConfig.allowInfo()) {
             modes[n++] = 2;
         }
-        if (WrightsConfig.allowInfo()) {
-            modes[n++] = 3;
-        }
         if (WrightsConfig.allowLink()) {
-            modes[n++] = 4;
+            modes[n++] = 3;
         }
         if (n == 0) {
             return new int[0];
@@ -1063,9 +1088,8 @@ public final class WrightsClientState {
         int current = switch (mode) {
             case CAPTURE, SAVING, BUILD -> 0;
             case JOBS -> 1;
-            case MANAGE -> 2;
-            case INFO -> 3;
-            case LINK -> 4;
+            case INFO -> 2;
+            case LINK -> 3;
             default -> -1;
         };
         int at = 0;
@@ -1086,8 +1110,6 @@ public final class WrightsClientState {
         } else if (next == 1) {
             enterJobs();
         } else if (next == 2) {
-            enterManage();
-        } else if (next == 3) {
             enterInfo();
         } else {
             enterLink();
