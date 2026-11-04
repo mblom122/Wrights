@@ -11,6 +11,8 @@ import net.neoforged.fml.config.ModConfig;
 
 import com.wrights.block.ModBlockEntities;
 import com.wrights.block.ModBlocks;
+import com.wrights.block.WrightportBlock;
+import com.wrights.block.WrightportBlockEntity;
 import com.wrights.item.ModCreativeTabs;
 import com.wrights.item.ModDataComponents;
 import com.wrights.item.ModItems;
@@ -49,10 +51,18 @@ public class WrightsMod {
     }
 
     private static void registerCapabilities(RegisterCapabilitiesEvent event) {
-        event.registerBlockEntity(
+        // Block-level so Jade / pipes see energy on the upper half too (BE lives on the lower half only).
+        event.registerBlock(
                 Capabilities.EnergyStorage.BLOCK,
-                ModBlockEntities.WRIGHTPORT.get(),
-                (port, side) -> port.energyStorage());
+                (level, pos, state, be, side) -> {
+                    if (state == null || !(state.getBlock() instanceof WrightportBlock)) {
+                        return null;
+                    }
+                    var base = WrightportBlock.base(state, pos);
+                    var entity = be != null && base.equals(pos) ? be : level.getBlockEntity(base);
+                    return entity instanceof WrightportBlockEntity port ? port.energyStorage() : null;
+                },
+                ModBlocks.WRIGHTPORT.get());
         event.registerItem(
                 Capabilities.EnergyStorage.ITEM,
                 (stack, context) -> com.wrights.energy.PortEnergy.itemStorage(stack),
