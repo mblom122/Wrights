@@ -251,13 +251,61 @@ public class WrightsMenuScreen extends WrightsScaledScreen implements JeiPreview
 
     public WrightsMenuScreen() {
         super(Component.translatable("menu.wrights.title"));
-        if (WrightsClientState.mode == WrightsClientState.Mode.JOBS) {
+        // B / open: land on the page for the held controller mode when it maps
+        // (Shape → Shape, Jobs → Jobs, …); otherwise restore the last browsed page.
+        if (!openForControllerMode()) {
+            openSavedPage();
+        }
+        scroll = savedScroll;
+        jobScroll = 0;
+        historyScroll = savedHistoryScroll;
+        optionScroll = savedOptionScroll;
+        infoScroll = savedInfoScroll;
+        searchText = savedSearch;
+    }
+
+    /**
+     * Prefer the active controller task/tool page. Returns false when there is no
+     * matching menu (Ready / unknown) so the caller can restore {@link #savedPage}.
+     */
+    private boolean openForControllerMode() {
+        WrightsClientState.Mode mode = WrightsClientState.mode;
+        int buildTool = -1;
+        // Resume can leave Ready for a tick while the packet is in flight — use the
+        // remembered task so B still opens Shape / Jobs / etc.
+        if (mode == WrightsClientState.Mode.NONE) {
+            net.minecraft.client.Minecraft minecraft = net.minecraft.client.Minecraft.getInstance();
+            if (minecraft.player == null || !com.wrights.item.ControllerItem.isHeld(minecraft.player)) {
+                return false;
+            }
+            int last = WrightsClientConfig.LAST_MODE.get();
+            if (last == 3 && WrightsConfig.allowJobs()) {
+                mode = WrightsClientState.Mode.JOBS;
+            } else if (last == 5 && WrightsConfig.allowInfo()) {
+                mode = WrightsClientState.Mode.INFO;
+            } else if (last == 6 && WrightsConfig.allowLink()) {
+                mode = WrightsClientState.Mode.LINK;
+            } else if (last == 2 && WrightsConfig.allowPlace()) {
+                mode = WrightsClientState.Mode.BUILD;
+                buildTool = WrightsClientConfig.LAST_BUILD_TOOL.get();
+            } else if (last == 1 && WrightsConfig.allowCapture()) {
+                mode = WrightsClientState.Mode.CAPTURE;
+            } else if (last == 4 && WrightsConfig.allowManage()) {
+                mode = WrightsClientState.Mode.MANAGE;
+            } else {
+                return false;
+            }
+        }
+        if (mode == WrightsClientState.Mode.JOBS) {
             jobsPage = true;
             options = false;
             infoPage = false;
             managePage = false;
             helpPage = false;
-        } else if (WrightsClientState.mode == WrightsClientState.Mode.MANAGE) {
+            clearBuildStrip();
+            return true;
+        }
+        if (mode == WrightsClientState.Mode.MANAGE) {
             if (WrightsClientState.dockWaiting()) {
                 managePage = false;
                 jobsPage = WrightsConfig.allowJobs();
@@ -271,80 +319,94 @@ public class WrightsMenuScreen extends WrightsScaledScreen implements JeiPreview
                 infoPage = false;
                 helpPage = false;
             }
-        } else if (WrightsClientState.mode == WrightsClientState.Mode.INFO
-                || WrightsClientState.mode == WrightsClientState.Mode.LINK) {
+            clearBuildStrip();
+            return true;
+        }
+        if (mode == WrightsClientState.Mode.INFO || mode == WrightsClientState.Mode.LINK) {
             infoPage = true;
             managePage = false;
             jobsPage = false;
             options = false;
             helpPage = false;
-        } else if (WrightsClientState.mode == WrightsClientState.Mode.BUILD
-                || WrightsClientState.mode == WrightsClientState.Mode.CAPTURE
-                || WrightsClientState.mode == WrightsClientState.Mode.SAVING) {
+            clearBuildStrip();
+            return true;
+        }
+        if (mode == WrightsClientState.Mode.BUILD
+                || mode == WrightsClientState.Mode.CAPTURE
+                || mode == WrightsClientState.Mode.SAVING) {
             jobsPage = false;
             options = false;
             infoPage = false;
             managePage = false;
             helpPage = false;
-            if (WrightsClientState.placeAim && WrightsConfig.allowPlaceTool()) {
-                placePage = true;
-                exchangePage = false;
-                shapePage = false;
-                mirrorPage = false;
-            } else if (WrightsClientState.exchangeAim && WrightsConfig.allowExchange()) {
-                exchangePage = true;
-                placePage = false;
-                shapePage = false;
-                mirrorPage = false;
-            } else if (WrightsClientState.shapeAim && WrightsConfig.allowShape()) {
-                shapePage = true;
-                placePage = false;
-                mirrorPage = false;
-                exchangePage = false;
-            } else if (WrightsClientState.mirrorAim && WrightsConfig.allowMirror()) {
-                mirrorPage = true;
-                placePage = false;
-                shapePage = false;
-                exchangePage = false;
-            } else if (savedPlace && WrightsConfig.allowPlaceTool()) {
-                placePage = true;
-                exchangePage = false;
-                shapePage = false;
-                mirrorPage = false;
-            } else if (savedExchange && WrightsConfig.allowExchange()) {
-                exchangePage = true;
-                placePage = false;
-                shapePage = false;
-                mirrorPage = false;
-            } else if (savedShape && WrightsConfig.allowShape()) {
-                shapePage = true;
-                placePage = false;
-                mirrorPage = false;
-                exchangePage = false;
+            if (mode == WrightsClientState.Mode.BUILD) {
+                openBuildToolPage(buildTool);
             } else {
-                mirrorPage = savedMirror && WrightsConfig.allowMirror();
-                placePage = false;
-                shapePage = false;
-                exchangePage = false;
+                // New blueprint / saving → Blueprints list, not a sticky Shape strip.
+                clearBuildStrip();
             }
-        } else {
-            jobsPage = savedPage == PAGE_JOBS;
-            options = savedPage == PAGE_OPTIONS;
-            infoPage = savedPage == PAGE_INFO;
-            managePage = savedPage == PAGE_MANAGE;
-            helpPage = savedPage == PAGE_HELP;
-            boolean building = !jobsPage && !options && !infoPage && !managePage && !helpPage;
-            placePage = building && savedPlace && WrightsConfig.allowPlaceTool();
-            exchangePage = building && !placePage && savedExchange && WrightsConfig.allowExchange();
-            shapePage = building && !placePage && !exchangePage && savedShape && WrightsConfig.allowShape();
-            mirrorPage = building && !placePage && !exchangePage && !shapePage && savedMirror && WrightsConfig.allowMirror();
+            return true;
         }
-        scroll = savedScroll;
-        jobScroll = 0;
-        historyScroll = savedHistoryScroll;
-        optionScroll = savedOptionScroll;
-        infoScroll = savedInfoScroll;
-        searchText = savedSearch;
+        return false;
+    }
+
+    /** Place / Exchange / Shape / Mirror from live aims, or from a remembered tool id. */
+    private void openBuildToolPage(int rememberedTool) {
+        boolean place = WrightsClientState.placeAim;
+        boolean exchange = WrightsClientState.exchangeAim;
+        boolean shape = WrightsClientState.shapeAim;
+        boolean mirror = WrightsClientState.mirrorAim;
+        if (!place && !exchange && !shape && !mirror && rememberedTool >= 0) {
+            place = rememberedTool == 5;
+            exchange = rememberedTool == 4;
+            shape = rememberedTool == 2;
+            mirror = rememberedTool == 1;
+        }
+        if (place && WrightsConfig.allowPlaceTool()) {
+            placePage = true;
+            exchangePage = false;
+            shapePage = false;
+            mirrorPage = false;
+        } else if (exchange && WrightsConfig.allowExchange()) {
+            exchangePage = true;
+            placePage = false;
+            shapePage = false;
+            mirrorPage = false;
+        } else if (shape && WrightsConfig.allowShape()) {
+            shapePage = true;
+            placePage = false;
+            mirrorPage = false;
+            exchangePage = false;
+        } else if (mirror && WrightsConfig.allowMirror()) {
+            mirrorPage = true;
+            placePage = false;
+            shapePage = false;
+            exchangePage = false;
+        } else {
+            // Use template / Bind inventory → Blueprints.
+            clearBuildStrip();
+        }
+    }
+
+    private void clearBuildStrip() {
+        placePage = false;
+        exchangePage = false;
+        shapePage = false;
+        mirrorPage = false;
+    }
+
+    /** Last closed menu page (Building strip, Jobs, Options, …). */
+    private void openSavedPage() {
+        jobsPage = savedPage == PAGE_JOBS;
+        options = savedPage == PAGE_OPTIONS;
+        infoPage = savedPage == PAGE_INFO;
+        managePage = savedPage == PAGE_MANAGE;
+        helpPage = savedPage == PAGE_HELP;
+        boolean building = !jobsPage && !options && !infoPage && !managePage && !helpPage;
+        placePage = building && savedPlace && WrightsConfig.allowPlaceTool();
+        exchangePage = building && !placePage && savedExchange && WrightsConfig.allowExchange();
+        shapePage = building && !placePage && !exchangePage && savedShape && WrightsConfig.allowShape();
+        mirrorPage = building && !placePage && !exchangePage && !shapePage && savedMirror && WrightsConfig.allowMirror();
     }
 
     @Override
@@ -1953,8 +2015,8 @@ public class WrightsMenuScreen extends WrightsScaledScreen implements JeiPreview
     protected boolean mouseScrolledScaled(double mouseX, double mouseY, double scrollX, double scrollY) {
         if (insideNav(mouseX, mouseY) && navContentH() > navViewH()) {
             navScroll = Mth.clamp(navScroll - (int) Math.signum(scrollY) * 22, 0, Math.max(0, navContentH() - navViewH()));
-            return true;
-        }
+                return true;
+            }
         if (helpPage && helpPanel.mouseScrolled(mouseX, mouseY, scrollY)) {
             return true;
         }
@@ -1973,38 +2035,38 @@ public class WrightsMenuScreen extends WrightsScaledScreen implements JeiPreview
             boolean inView = mouseY >= jobsViewTop && mouseY < jobsViewTop + jobsViewH;
             if (inView && mouseY >= workListY && mouseY < workGroupY + workGroupH - 2 && workingJobs.size() > workRows) {
                 jobScroll = Mth.clamp(jobScroll - delta, 0, Math.max(0, workingJobs.size() - workRows));
-                return true;
-            }
+            return true;
+        }
             if (inView && mouseY >= doneListY && mouseY < doneGroupY + doneGroupH - 2 && finishedJobs.size() > doneRows) {
                 historyScroll = Mth.clamp(historyScroll - delta, 0, Math.max(0, finishedJobs.size() - doneRows));
-                return true;
-            }
+                    return true;
+                }
             if (inView && jobsContentH > jobsViewH) {
                 jobsBodyScroll = Mth.clamp(jobsBodyScroll - delta * 24, 0, Math.max(0, jobsContentH - jobsViewH));
                 return true;
             }
-            return true;
-        }
+                    return true;
+                }
         if (options && optionsPanel.insideOptionView(mouseX, mouseY)) {
             int max = Math.max(0, optionContentH - optionViewH);
             optionScroll = Mth.clamp(optionScroll - (int) Math.signum(scrollY) * 16, 0, max);
-            return true;
-        }
+                return true;
+            }
         if (mirrorPanel.insideMirrorView(mouseX, mouseY)) {
             int max = Math.max(0, mirrorContentH - mirrorViewH);
             mirrorScroll = Mth.clamp(mirrorScroll - (int) Math.signum(scrollY) * 16, 0, max);
             return true;
         }
         if ((shapePage || exchangePage || placePage) && shapePanel != null && shapePanel.mouseScrolled(mouseX, mouseY, scrollY)) {
-            return true;
-        }
+                return true;
+            }
         if (!options && !jobsPage && !infoPage && !managePage && !helpPage && !mirrorPage && !shapePage && !exchangePage && !placePage && insideDetailBody(mouseX, mouseY)) {
             int max = Math.max(0, detailContentH - detailBodyH);
             int next = Mth.clamp(detailScroll - (int) Math.signum(scrollY) * 16, 0, max);
             if (next != detailScroll) {
                 detailScroll = next;
-                return true;
-            }
+            return true;
+        }
         }
         if (insideList(mouseX, mouseY)) {
             scroll = Mth.clamp(scroll - (int) Math.signum(scrollY), 0, Math.max(0, rows.size() - visibleRows()));
@@ -2413,8 +2475,8 @@ public class WrightsMenuScreen extends WrightsScaledScreen implements JeiPreview
             }
         }
         WrightportPlaces.Spot first = spots.get(0);
-        portKind = first.kind();
-        portIndex = first.index();
+            portKind = first.kind();
+            portIndex = first.index();
         return first;
     }
 
