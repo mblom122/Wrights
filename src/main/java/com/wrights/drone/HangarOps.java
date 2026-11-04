@@ -396,6 +396,17 @@ public final class HangarOps {
         if (count <= 0) {
             return new Pull(tiers, 0);
         }
+        // Cursor first so clicking a bay with a picked-up wright deposits that stack.
+        if (player.containerMenu != null) {
+            ItemStack carried = player.containerMenu.getCarried();
+            while (tiers.size() < count && carried.getItem() instanceof WrightItem && !carried.isEmpty()) {
+                Loadout parts = WrightItem.parts(carried);
+                String name = WrightItem.nameOf(carried);
+                carried.shrink(1);
+                tiers.add(new Taken(parts, name));
+            }
+            player.containerMenu.setCarried(carried);
+        }
         Inventory inventory = player.getInventory();
         for (int slot = 0; slot < inventory.getContainerSize() && tiers.size() < count; slot++) {
             ItemStack stack = inventory.getItem(slot);

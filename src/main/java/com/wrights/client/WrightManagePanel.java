@@ -477,7 +477,27 @@ final class WrightManagePanel {
         if (slot >= Swarm.capacity()) {
             return true;
         }
+        // Drop a wright from the cursor into an empty bay (same as shift-click from the bag).
+        if (depositCarriedWright(screen, swarm)) {
+            return true;
+        }
         tryOpenAdd(screen);
+        return true;
+    }
+
+    /** Places one wright from the menu cursor into the hangar when there is room. */
+    private boolean depositCarriedWright(ManageHost screen, Swarm swarm) {
+        ItemStack carried = carriedStack(screen);
+        if (!(carried.getItem() instanceof WrightItem) || carried.isEmpty()) {
+            return false;
+        }
+        if (!screen.requireTool() || roomLeft(swarm) <= 0) {
+            return true;
+        }
+        int next = swarm.units().size();
+        screen.batch(HangarOps.ADD_STOCK, 1, new int[0]);
+        expanded = Math.min(next, HangarBay.SLOTS - 1);
+        scroll = 0;
         return true;
     }
 
@@ -861,6 +881,10 @@ final class WrightManagePanel {
             return 0;
         }
         int count = 0;
+        ItemStack carried = carriedStack(screen);
+        if (carried.getItem() instanceof WrightItem) {
+            count += carried.getCount();
+        }
         Inventory inventory = screen.minecraft().player.getInventory();
         for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
             ItemStack stack = inventory.getItem(slot);
