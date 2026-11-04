@@ -1536,12 +1536,9 @@ public final class WrightsClientState {
         dockNotice = new DockNotice(toast);
     }
 
-    /** Manage-add fly-ins still in the air. Manage stays closed until this hits zero. */
+    /** Hangar-add fly-ins still in the air. Hangar stays closed until this hits zero. */
     public static int dockWaitRemaining;
-    private static int dockReopenHome;
-    private static int dockReopenKind;
-    private static int dockReopenIndex;
-    /** Camera type before a manage-add dock fly-in forced third-person back. */
+    /** Camera type before a hangar-add dock fly-in forced third-person back. */
     private static CameraType dockSavedCamera;
     private static boolean dockCameraActive;
 
@@ -1554,17 +1551,12 @@ public final class WrightsClientState {
             return;
         }
         int next = Math.max(0, payload.remaining());
-        if (next > 0) {
-            dockReopenHome = payload.home();
-            dockReopenKind = payload.kind();
-            dockReopenIndex = payload.index();
-        }
         dockWaitRemaining = next;
         Minecraft minecraft = Minecraft.getInstance();
         boolean watch = WrightsClientConfig.DOCK_WATCH.get();
         if (next > 0) {
             if (watch) {
-                if (minecraft.screen instanceof WrightsMenuScreen || minecraft.screen instanceof WrightportScreen) {
+                if (minecraft.screen instanceof PersonalHangarScreen || minecraft.screen instanceof WrightportScreen) {
                     minecraft.setScreen(null);
                 }
                 beginDockCamera(minecraft);
@@ -1572,11 +1564,7 @@ public final class WrightsClientState {
             return;
         }
         endDockCamera(minecraft);
-        if (watch) {
-            reopenManageAfterDock(minecraft);
-        } else {
-            dockReopenHome = 0;
-        }
+        // Server reopens the personal/placed hangar after the fly-in.
     }
 
     private static void beginDockCamera(Minecraft minecraft) {
@@ -1600,30 +1588,6 @@ public final class WrightsClientState {
         if (minecraft != null && minecraft.options != null && restore != null) {
             minecraft.options.setCameraType(restore);
         }
-    }
-
-    private static void reopenManageAfterDock(Minecraft minecraft) {
-        if (minecraft == null || minecraft.player == null) {
-            dockReopenHome = 0;
-            return;
-        }
-        int home = dockReopenHome;
-        dockReopenHome = 0;
-        if (home == 2) {
-            // Server opens the placed wrightport menu with DockWait(0).
-            return;
-        }
-        if (home != 1) {
-            return;
-        }
-        leaveCapture();
-        mode = Mode.MANAGE;
-        clearBuildAims();
-        updateFlags();
-        minecraft.setScreen(new WrightsMenuScreen());
-        PacketDistributor.sendToServer(new BlueprintPayloads.LibraryRequest(libraryGlobal));
-        PacketDistributor.sendToServer(new BlueprintPayloads.PlacedPortsAsk());
-        PacketDistributor.sendToServer(new BlueprintPayloads.PortHold(dockReopenKind, dockReopenIndex, true));
     }
 
     public static void applyDeploy() {

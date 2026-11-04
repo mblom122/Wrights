@@ -23,7 +23,7 @@ import com.wrights.entity.ModEntities;
 import com.wrights.network.BlueprintPayloads;
 
 /**
- * Spawns short-lived fly-in wrights when Manage adds units to a personal or placed port.
+ * Spawns short-lived fly-in wrights when a hangar adds units to a personal or placed port.
  * Job depart / return flight is unchanged.
  */
 public final class HangarDock {
@@ -78,7 +78,7 @@ public final class HangarDock {
         sync(player, pending.size());
     }
 
-    /** A manage-add fly-in finished (or was cancelled). Reopens Manage when none remain. */
+    /** A hangar-add fly-in finished (or was cancelled). Reopens the hangar when none remain. */
     public static void arrived(ServerLevel level, UUID owner, UUID drone) {
         if (level == null || owner == null || drone == null) {
             return;
@@ -109,7 +109,7 @@ public final class HangarDock {
         TARGETS.remove(player.getUUID());
         CraftDeliveries.Hangar target = hangar;
         MinecraftServer server = player.getServer();
-        // Extra second after the last physical dock so the lid can settle before Manage reopens.
+        // Extra second after the last physical dock so the lid can settle before the hangar reopens.
         server.tell(new TickTask(server.getTickCount() + REOPEN_DELAY_TICKS, () -> finishWait(player, target)));
     }
 
@@ -118,13 +118,22 @@ public final class HangarDock {
             return;
         }
         PacketDistributor.sendToPlayer(player, encode(0, hangar));
-        if (hangar != null && hangar.placed()) {
-            // Skip if Manage stayed open (client dockWatch off); reopen only after a closed fly-in.
+        if (hangar == null) {
+            return;
+        }
+        if (hangar.placed()) {
+            // Skip if hangar stayed open (client dockWatch off); reopen only after a closed fly-in.
             if (!(player.containerMenu instanceof com.wrights.menu.WrightportMenu open)
                     || hangar.pos() == null
                     || !open.pos().equals(hangar.pos())) {
                 reopenPlaced(player, hangar);
             }
+            return;
+        }
+        if (!(player.containerMenu instanceof com.wrights.menu.PersonalHangarMenu open)
+                || open.kind() != hangar.kind()
+                || open.index() != hangar.index()) {
+            reopenPersonal(player, hangar);
         }
     }
 
@@ -148,5 +157,12 @@ public final class HangarDock {
             return;
         }
         player.openMenu(port, buffer -> buffer.writeBlockPos(hangar.pos()));
+    }
+
+    private static void reopenPersonal(ServerPlayer player, CraftDeliveries.Hangar hangar) {
+        if (player == null || hangar == null || hangar.placed() || !player.isAlive()) {
+            return;
+        }
+        PersonalHangars.open(player, new WrightportPlaces.Spot(hangar.kind(), hangar.index()));
     }
 }

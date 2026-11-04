@@ -38,6 +38,13 @@ public class PersonalHangarScreen extends AbstractContainerScreen<PersonalHangar
         super.init();
         this.leftPos = JeiPreview.left(this.width, this.imageWidth);
         this.topPos = Math.max(4, (this.height - this.imageHeight) / 3);
+        if (WrightsClientState.dockWaiting()) {
+            if (getMinecraft().player != null) {
+                getMinecraft().player.displayClientMessage(Component.translatable("message.wrights.dock_wait_busy"), true);
+            }
+            onClose();
+            return;
+        }
         manage.setActive(true);
         clearWidgets();
         manage.addWidgets(this);
