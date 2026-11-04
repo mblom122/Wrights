@@ -6,15 +6,19 @@ Curios is required. The personal wrightport uses that slot.
 
 ## Playing
 
-Hold the **Wright Controller**. **Ctrl + Shift + scroll** changes mode: Build, Jobs, Manage, Info, and Link. Inside Build, **Shift + scroll** picks the tool. Press **B** to open blueprints, jobs, and wrights.
+Hold the **Wright Controller**. **Ctrl + Shift + scroll** changes mode: Build, Jobs, Info, and Link. Inside Build, **Shift + scroll** picks the tool: New template, Use template, Place, Mirror, Shape, Exchange, or Bind inventory. Press **B** to open the menu on the page for your current mode. The in-game Help page under Options covers every tool.
 
 **New** marks a blueprint. Two corners, a dragged box, or a box you slide into place. Chests and machines can be saved empty, with their settings, or, in Creative, as an exact copy.
 
 **Build** places a blueprint. A hologram follows where you look. The list shows every block and where it will come from. Survival spends those items. Creative builds for free. A job waits in the queue when no wright is free.
 
-**Mirror** uses an anchor. Shift-right-click a block to set it, and shift-right-click air to clear it. Blocks mode places the block in your other hand. Blueprints mode builds mirrored copies of the blueprint you are placing. A slider makes 1 to 32 copies around the anchored face, or the copy can mirror through the middle of the anchor on X, Y, and Z. Breaking a block can send wrights to mine the copies as one job.
+**Mirror** uses an anchor. Ctrl-right-click a block face to set it, and Ctrl-right-click air to clear it. Blocks mode places the block in your other hand. Blueprints mode builds mirrored copies of the blueprint you are placing. A slider makes 1 to 32 copies around the anchored face, or the copy can mirror through the middle of the anchor on X, Y, and Z. Breaking a block can send wrights to mine the copies as one job.
 
-The bulb on the personal wrightport, and the lamps on a placed wrightport, use the same colors. Red means no wrights are stored. Yellow means every stored wright is out on a job. Green means at least one is free.
+**Shape**, **Exchange**, and **Place** build spheres, rings, floors, walls, beams, stairs, and more from a material palette, or swap the blocks inside a volume.
+
+Wrights live in a **wrightport**: a personal one worn in the Curios slot, or a two-block tower placed in the world. Right-click either to open its hangar, where you add wrights and fit parts. Each wright has a Rotor Assembly (flight speed), a Fabricator Head (actions per tick and reach), and a Power Core (energy efficiency), in tiers from Scout to Apex.
+
+Wrightports spend Forge Energy for every block. A placed wrightport takes FE from cables. A personal one draws from the batteries you carry. When a job runs out of blocks or energy, it stalls, the crew flies home, and the job resumes on its own once supply returns.
 
 ## Requirements
 

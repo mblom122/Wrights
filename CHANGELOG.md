@@ -1,5 +1,68 @@
 # Changelog
 
+## 0.2.0
+
+### Upgrading from 0.1.8
+- The old Speed and Operations upgrades are replaced by wright parts. Existing upgrade items turn into the matching Rotor Assembly or Fabricator Head.
+- Wrightports now run on Forge Energy. A newly placed wrightport starts empty, so charge it before its first job. Server owners can turn energy off in `wrights-server.toml`.
+- Manage left the controller's mode scroll. Press B to open it from the menu.
+
+### Features
+- **Wright parts.** Every wright has three slots: Rotor Assembly (flight speed), Fabricator Head (actions per tick and reach), and Power Core (energy efficiency). Each comes in five tiers: Scout, Ranger, Vector, Tempest, and Apex. Fitted parts show on the flying wright and its item icon.
+- Wright items keep their parts. Right-click a part onto a wright item to fit it, and hover a wright to see its flight speed, actions, and energy per action.
+- **Forge Energy.** Every block a wright places, mines, swaps, or voids costs FE from the wrightport that launched it. A placed wrightport holds 1,000,000 FE and takes power from cables on either half. A personal wrightport draws from the batteries you carry, and fills from a wireless charger such as Mekanism’s chargepad.
+- Six charge bars on both wrightports and on their items fill and turn red, yellow, then green. Jade shows the stored energy.
+- **Hangar.** Right-click a personal wrightport (from your hand, inventory, or Curios) or a placed wrightport to open a textured hangar with ten bays, the three part slots, and your inventory below.
+  - Click an empty bay to add 1–10 wrights, or All that fit, from your inventory or a linked network, with an option to craft them.
+  - Shift-click or drag wrights and parts in from your inventory. Right-click or Shift-click a wright to take it out.
+  - Click an empty part slot to fit the best tier you have. Click a fitted slot to take the part out.
+  - Mark several wrights and use Upgrade marked to set a tier per slot, upgrade everything to the best parts on hand (optionally crafting from digital storage), or strip all parts.
+  - A tip strip confirms every change: green when a part goes in, orange when one comes out, red for warnings.
+  - JEI sits beside the hangar.
+- New wrights fly in from the sky and dock through the wrightport’s spiral iris hatch. Watch docking (Options) switches to third-person while they land, then reopens the hangar.
+- Placed wrightports get Boundary and Bind Chest buttons: bind a supply chest inside the boundary, with a five-second chest highlight. Personal wrightports get a Boundary toggle that shows how far your wrights reach around you.
+- **Stall notices.** When a job runs out of items or energy, a toast says why and how many wrights flew home. The job shows Stalled · missing items or Stalled · no energy until supply returns, then resumes on its own.
+- **Jobs History** window: a scrollable event log with size, blocks, duration, anchor, and start and queue details.
+- − and + on job cards change how many wrights a job may use.
+- Personal crews dock home when you fly out of range, with a toast, and rejoin the job when you come back.
+- Manage lists each wrightport’s wrights with their parts and status (Home, In flight, On a job) and has Send home.
+- Shape Square and Box get Equal sides. Exchange Circle gets a Floor / Wall mount.
+- Options: minimum Job done toast length, and Watch docking.
+- Help rewritten for 0.2.0, with new Wrights at work, Wrightports, Hangar, Parts & tiers, and Energy pages.
+
+### Changes
+- Every model is rebuilt in a 3D drone-part style. The placed wrightport is now a two-block tower. In-world wrights are a little smaller.
+- B opens the menu on the page for your current controller mode, and otherwise on the last page you used.
+- The controller remembers its last mode and tool across restarts and hotbar swaps. A new controller starts on New template with Box.
+- Round shapes are sized by Diameter instead of radius.
+- Place, Mirror, Shape, and Exchange only arm from Build, so browsing their pages no longer changes the controller mode.
+- A centered Need setup banner shows when a mode is missing a vital option.
+- Wrights from a placed wrightport take blocks from that wrightport’s chest and network instead of your inventory. Shape jobs respect Queue builds and wait for materials.
+- Jobs that only “finish” with nothing to change show a short mid-screen tip instead of a toast.
+- Wrights GUIs shrink at GUI scale 4 and up. Long item tooltips wrap. FE amounts show in white.
+
+### Optimizations
+- Wrights work from a hover point and handle a whole burst of nearby blocks at once, instead of flying to every block. Paste, mine, undo, Shape, Exchange, and Place all use it.
+- Small shapes use predefined 3×3×3 stands: a sphere is one hover, a 6×6 floor is four.
+- Big jobs split into shares. A wright that finishes moves over to help the busiest share, so crews finish together instead of standing by or building one-block lines.
+- Large Shape crews split into strips so wrights stop piling onto one cell.
+- Exchange skips launching when every cell already matches.
+- Server caches clear between worlds, and wrightport traffic scans are throttled.
+
+### Fixes
+- The shared blueprint library is written atomically with a backup, and no longer overwrites blueprints saved by another Minecraft instance.
+- Pasted blueprints have a cap on how far they may decompress.
+- AE2 / RS craft state resets between worlds.
+- A job that runs out of items no longer keeps showing Running with 0 wrights. Every wright is recalled and none freeze mid-build.
+- Idle wrights with nothing left to do fly home instead of searching forever.
+- Leftover shape cells finish instead of leaving the crew one block short, or stuck trading shares at the end.
+- Exchange Wall wire boxes stand upright again. Wall circles no longer start empty jobs, and short beams no longer crawl at the end.
+- Hanging sand stays put during blueprint undo, the same as during paste.
+- Highlighting a huge job no longer washes out the view, and the guide line shows for five seconds.
+- Adding wrights from Manage no longer pulls wrights off running Shape jobs.
+- The B menu stays open when Resume re-arms the last build.
+- The wrightport is pickaxe-mineable and drops correctly with its wrights, name, and energy.
+
 ## 0.1.8
 
 ### Features
